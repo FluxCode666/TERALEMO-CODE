@@ -12,9 +12,10 @@
       </template>
       <template #table>
         <DataTable :columns="columns" :data="items" :loading="busy">
-          <template #cell-name="{ row }"><RouterLink :to="`/admin/enterprises/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400">{{ row.name }}</RouterLink><p class="text-xs text-gray-500">#{{ row.id }}</p></template>
+          <template #cell-name="{ row }"><RouterLink :to="`/admin/enterprises/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400">{{ row.name }}</RouterLink><p class="text-xs text-gray-500">#{{ row.id }}</p><EnterpriseOwnerWarning class="mt-2" :active-owner-count="row.active_owner_count" /></template>
           <template #cell-status="{ value }"><span :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
           <template #cell-balance="{ value }">${{ value.toFixed(4) }}</template>
+          <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
           <template #cell-actions="{ row }"><div class="flex flex-wrap gap-3"><RouterLink :to="`/admin/enterprises/${row.id}`" class="text-primary-600 dark:text-primary-400">{{ t('admin.enterprises.open') }}</RouterLink><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-edit-${row.id}`" @click="editing = row">{{ t('enterprise.edit') }}</button><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-balance-${row.id}`" @click="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</button><button class="text-amber-700 dark:text-amber-400" :data-test="`enterprise-status-${row.id}`" @click="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</button><button class="text-red-600 dark:text-red-400" :data-test="`enterprise-delete-${row.id}`" @click="deleting = row">{{ t('admin.enterprises.delete') }}</button></div></template>
         </DataTable>
       </template>
@@ -68,6 +69,8 @@ import { useEnterpriseAction } from '@/features/enterprise/useEnterpriseAction'
 import EnterpriseBasicsForm from '@/features/enterprise/components/EnterpriseBasicsForm.vue'
 import EnterpriseBalanceForm from '@/features/enterprise/components/EnterpriseBalanceForm.vue'
 import EnterpriseDeleteDialog from '@/features/enterprise/components/EnterpriseDeleteDialog.vue'
+import EnterpriseOwnerWarning from '@/features/enterprise/components/EnterpriseOwnerWarning.vue'
+import { formatDateTime } from '@/utils/format'
 const { t } = useI18n()
 const { busy, error, run, read } = useEnterpriseAction()
 const items = ref<Enterprise[]>([]), deleting = ref<Enterprise | null>(null)

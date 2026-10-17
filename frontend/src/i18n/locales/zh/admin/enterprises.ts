@@ -6,6 +6,8 @@ export default {
     "createTitle": "创建企业",
     "initialOwner": "初始企业负责人",
     "noOwner": "暂不设置负责人",
+    "noActiveOwner": "无可用负责人",
+    "noActiveOwnerHint": "需在成员中指定一位启用的负责人",
     "open": "查看详情",
     "delete": "删除企业",
     "confirmDelete": "确定删除此企业？",

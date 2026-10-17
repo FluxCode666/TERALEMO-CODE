@@ -6,6 +6,8 @@ export default {
     "createTitle": "Create enterprise",
     "initialOwner": "Initial enterprise owner",
     "noOwner": "No initial owner",
+    "noActiveOwner": "No active owner",
+    "noActiveOwnerHint": "Assign an enabled owner in the member list.",
     "open": "View details",
     "delete": "Delete enterprise",
     "confirmDelete": "Delete this enterprise?",

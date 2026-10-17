@@ -3,6 +3,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t(kind === 'audit' ? 'enterprise.audit' : 'enterprise.balanceLogs') }}</h2><form v-if="kind === 'audit'" class="flex gap-2" @submit.prevent="searchLogs"><input v-model.trim="action" class="input" :aria-label="t('enterprise.action')" :placeholder="t('enterprise.action')" /><button class="btn btn-secondary" :disabled="busy">{{ t('enterprise.search') }}</button></form></div>
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <button class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
     <DataTable :columns="columns" :data="rows" :loading="busy">
+      <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
       <template #cell-type="{ value }">{{ t(value === 'add' ? 'enterprise.addBalance' : 'enterprise.subtractBalance') }}</template>
       <template #cell-amount="{ value }">${{ value.toFixed(4) }}</template>
       <template #cell-balance_before="{ value }">${{ value.toFixed(4) }}</template>
@@ -18,6 +19,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseAuditLog, EnterpriseBalanceLog, EnterprisePage } from '@/types/enterprise'
+import { formatDateTime } from '@/utils/format'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'

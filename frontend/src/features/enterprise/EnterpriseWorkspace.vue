@@ -2,8 +2,12 @@
   <div class="min-w-0 space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0 flex-1"><h1 class="max-w-full break-words text-2xl font-bold text-gray-900 dark:text-white">{{ enterprise?.name || t('enterprise.title') }}</h1><p v-if="overview" class="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">{{ t(`enterprise.roles.${overview.me.role}`) }} · {{ overview.me.department_name || t('enterprise.noDepartment') }}</p></div>
-      <button class="btn btn-secondary" :disabled="busy" @click="refresh">{{ t('enterprise.refresh') }}</button>
+      <div class="flex flex-wrap items-center gap-3" data-test="enterprise-header-actions">
+        <slot name="header-actions" />
+        <button class="btn btn-secondary" :disabled="busy" @click="refresh">{{ t('enterprise.refresh') }}</button>
+      </div>
     </div>
+    <EnterpriseOwnerWarning v-if="adminEnterprise" :active-owner-count="adminEnterprise.active_owner_count" />
     <p v-if="readonly" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300" data-test="enterprise-readonly">{{ t('enterprise.readonly') }}</p>
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <button class="underline" @click="refresh">{{ t('enterprise.retry') }}</button></p>
     <div v-if="busy && !enterprise" class="h-40 animate-pulse rounded-xl bg-gray-100 dark:bg-dark-800"></div>
@@ -13,9 +17,16 @@
       </nav>
       <section v-if="activeTab === 'overview'" class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="money(balance)" />
-          <template v-if="adminEnterprise"><StatCard :title="t('enterprise.totalRecharged')" :value="money(adminEnterprise.total_recharged)" /><StatCard :title="t('enterprise.memberCount')" :value="adminEnterprise.member_count" /><StatCard :title="t('enterprise.departmentCount')" :value="adminEnterprise.department_count" /></template>
-          <template v-if="overview"><StatCard :title="t('enterprise.todayCost')" :value="money(overview.stats.today_cost)" /><StatCard :title="t('enterprise.monthCost')" :value="money(overview.stats.month_cost)" /></template>
+          <StatCard v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="money(balance)" :icon="BalanceIcon" icon-variant="success" />
+          <template v-if="adminEnterprise">
+            <StatCard :title="t('enterprise.totalRecharged')" :value="money(adminEnterprise.total_recharged)" :icon="RechargeIcon" icon-variant="success" />
+            <StatCard :title="t('enterprise.memberCount')" :value="adminEnterprise.member_count" :icon="MembersIcon" />
+            <StatCard :title="t('enterprise.departmentCount')" :value="adminEnterprise.department_count" :icon="DepartmentsIcon" icon-variant="warning" />
+          </template>
+          <template v-if="overview">
+            <StatCard :title="t('enterprise.todayCost')" :value="money(overview.stats.today_cost)" :icon="TodayCostIcon" icon-variant="warning" />
+            <StatCard :title="t('enterprise.monthCost')" :value="money(overview.stats.month_cost)" :icon="MonthCostIcon" />
+          </template>
         </div>
         <div class="card flex flex-wrap items-center justify-between gap-4 p-5"><div><span class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.status') }}</span><p class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ t(enterprise.status === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</p></div><button v-if="admin" class="btn btn-primary" @click="balanceOpen = true">{{ t('enterprise.adjustBalance') }}</button></div>
         <EnterpriseQuotaDisplay v-if="enterpriseQuota" data-test="enterprise-quota" :quota="enterpriseQuota" :title="t('enterprise.enterpriseScope')" />
@@ -37,13 +48,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { enterpriseAPI } from '@/api/enterprise'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import type { Enterprise, EnterpriseOverview } from '@/types/enterprise'
 import StatCard from '@/components/common/StatCard.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import Icon from '@/components/icons/Icon.vue'
 import EnterpriseOrganizationPanel from './components/EnterpriseOrganizationPanel.vue'
 import EnterpriseQuotaDisplay from './components/EnterpriseQuotaDisplay.vue'
 import EnterpriseQuotaPanel from './components/EnterpriseQuotaPanel.vue'
@@ -53,10 +65,17 @@ import EnterpriseLogsPanel from './components/EnterpriseLogsPanel.vue'
 import EnterpriseSettingsPanel from './components/EnterpriseSettingsPanel.vue'
 import EnterpriseBasicsForm from './components/EnterpriseBasicsForm.vue'
 import EnterpriseBalanceForm from './components/EnterpriseBalanceForm.vue'
+import EnterpriseOwnerWarning from './components/EnterpriseOwnerWarning.vue'
 import { useEnterpriseAction } from './useEnterpriseAction'
 const props = defineProps<{ admin?: boolean; enterpriseId?: number; overview?: EnterpriseOverview }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
+const BalanceIcon = () => h(Icon, { name: 'dollar', size: 'lg' })
+const RechargeIcon = () => h(Icon, { name: 'creditCard', size: 'lg' })
+const MembersIcon = () => h(Icon, { name: 'users', size: 'lg' })
+const DepartmentsIcon = () => h(Icon, { name: 'grid', size: 'lg' })
+const TodayCostIcon = () => h(Icon, { name: 'clock', size: 'lg' })
+const MonthCostIcon = () => h(Icon, { name: 'calendar', size: 'lg' })
 const { busy, error, read } = useEnterpriseAction()
 const adminEnterprise = ref<Enterprise | null>(null)
 const enterprise = computed(() => props.admin ? adminEnterprise.value : props.overview?.enterprise)

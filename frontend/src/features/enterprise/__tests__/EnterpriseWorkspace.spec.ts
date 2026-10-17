@@ -4,6 +4,7 @@ import type { Enterprise, EnterpriseOverview, EnterprisePermissions, EnterpriseQ
 import { defaultEnterpriseSettings } from '@/types/enterprise'
 import EnterpriseWorkspace from '../EnterpriseWorkspace.vue'
 import EnterpriseQuotaDisplay from '../components/EnterpriseQuotaDisplay.vue'
+import EnterpriseDetailView from '@/views/admin/EnterpriseDetailView.vue'
 
 const { api, getEnterprise, showError } = vi.hoisted(() => ({
   api: {
@@ -34,6 +35,7 @@ vi.mock('@/api/admin', () => ({
 }))
 
 vi.mock('@/api/client', () => ({ apiClient: {} }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }), useRouter: () => ({ push: vi.fn() }) }))
 
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({ showSuccess: vi.fn(), showError })
@@ -236,6 +238,59 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     reject(new Error('late detail failure'))
     await flushPromises()
     expect(showError).not.toHaveBeenCalled()
+  })
+
+  it.each([0, 1, undefined])('shows the administrator owner warning only for an explicit zero count (%s)', async activeOwnerCount => {
+    const enterprise: Enterprise = {
+      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '',
+      settings: { ...defaultEnterpriseSettings }, member_count: 2, department_count: 1,
+      active_owner_count: activeOwnerCount, created_at: '', updated_at: ''
+    }
+    getEnterprise.mockResolvedValue(enterprise)
+    const wrapper = mount(EnterpriseDetailView, {
+      global: { stubs: { AppLayout: { template: '<main><slot /></main>' } } }
+    })
+    wrappers.push(wrapper)
+    await flushPromises()
+
+    const warning = wrapper.find('[data-test="enterprise-owner-warning"]')
+    expect(warning.exists()).toBe(activeOwnerCount === 0)
+    if (activeOwnerCount === 0) {
+      expect(warning.text()).toContain('admin.enterprises.noActiveOwner')
+      expect(warning.text()).toContain('admin.enterprises.noActiveOwnerHint')
+      await wrapper.get('[data-test="tab-members"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-test="enterprise-owner-warning"]').exists()).toBe(true)
+      getEnterprise.mockResolvedValue({ ...enterprise, active_owner_count: 1 })
+      wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).vm.$emit('updated')
+      await flushPromises()
+      expect(wrapper.find('[data-test="enterprise-owner-warning"]').exists()).toBe(false)
+    }
+  })
+
+  it('places detail deletion beside refresh and opens the existing confirmation dialog', async () => {
+    getEnterprise.mockResolvedValue({
+      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      member_count: 2, department_count: 1
+    })
+    const wrapper = mount(EnterpriseDetailView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<main><slot /></main>' },
+          EnterpriseDeleteDialog: { name: 'EnterpriseDeleteDialog', props: ['enterpriseId'], template: '<div />' }
+        }
+      }
+    })
+    wrappers.push(wrapper)
+    await flushPromises()
+
+    const actions = wrapper.get('[data-test="enterprise-header-actions"]')
+    expect(actions.get('button.btn-secondary').text()).toBe('enterprise.refresh')
+    const deleteButton = actions.get('[data-test="enterprise-delete-detail"]')
+    expect(deleteButton.classes()).toContain('btn-danger')
+    await deleteButton.trigger('click')
+    expect(wrapper.findComponent({ name: 'EnterpriseDeleteDialog' }).props('enterpriseId')).toBe(1)
   })
 
   it('does not request members, settings, audit, or department rankings for an ordinary member', async () => {

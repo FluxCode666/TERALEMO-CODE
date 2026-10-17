@@ -64,6 +64,7 @@ export interface Enterprise {
   settings: EnterpriseSettings
   member_count: number
   department_count: number
+  active_owner_count?: number
   quota?: EnterpriseQuota | null
   created_at: string
   updated_at: string

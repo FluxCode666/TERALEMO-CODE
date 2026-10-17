@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { Enterprise, EnterprisePage } from '@/types/enterprise'
 import { defaultEnterpriseSettings } from '@/types/enterprise'
 import EnterprisesView from '../EnterprisesView.vue'
+import { formatDateTime } from '@/utils/format'
 
 const { listEnterprises, removeEnterprise, showError, showSuccess } = vi.hoisted(() => ({
   listEnterprises: vi.fn(), removeEnterprise: vi.fn(), showError: vi.fn(), showSuccess: vi.fn()
@@ -208,5 +209,39 @@ describe('administrator enterprise latest reads', () => {
     expectPage(wrapper, 1, 8, 20)
     expect(wrapper.find('[data-test="delete-confirm"]').exists()).toBe(false)
     expect(showSuccess).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('administrator enterprise display', () => {
+  it('only warns on rows whose active owner count is explicitly zero', async () => {
+    listEnterprises.mockResolvedValue({
+      items: [
+        { ...enterprise(1), active_owner_count: 0 },
+        { ...enterprise(2), active_owner_count: 1 },
+        enterprise(3)
+      ], total: 3, page: 1, page_size: 20, pages: 1
+    })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    wrappers.push(wrapper)
+    await flushPromises()
+
+    const warnings = wrapper.findAll('[data-test="enterprise-owner-warning"]')
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].text()).toContain('admin.enterprises.noActiveOwner')
+    expect(warnings[0].text()).toContain('admin.enterprises.noActiveOwnerHint')
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].text()).toContain('admin.enterprises.noActiveOwner')
+    for (const row of rows.slice(1)) expect(row.find('[data-test="enterprise-owner-warning"]').exists()).toBe(false)
+  })
+
+  it('formats enterprise creation timestamps with the shared date formatter', async () => {
+    const timestamp = '2026-10-18T00:15:27.98669+08:00'
+    listEnterprises.mockResolvedValue({ ...page(1), items: [{ ...enterprise(1), created_at: timestamp }] })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    wrappers.push(wrapper)
+    await flushPromises()
+
+    expect(wrapper.get('tbody').text()).toContain(formatDateTime(timestamp))
+    expect(wrapper.get('tbody').text()).not.toContain(timestamp)
   })
 })

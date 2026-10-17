@@ -12,10 +12,10 @@
       <button type="button" class="btn btn-secondary" :disabled="busy" @click="resetFilters">{{ t('enterprise.reset') }}</button>
     </form>
     <p v-if="validation || error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation || error }} <button v-if="error" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
-    <div v-if="stats" class="grid gap-4 sm:grid-cols-3"><StatCard :title="t('enterprise.requests')" :value="stats.total_requests" /><StatCard :title="t('enterprise.tokens')" :value="stats.total_tokens" /><StatCard :title="t('enterprise.cost')" :value="money(stats.total_actual_cost)" /></div>
+    <div v-if="stats" class="grid gap-4 sm:grid-cols-3"><StatCard :title="t('enterprise.requests')" :value="stats.total_requests" :icon="RequestsIcon" /><StatCard :title="t('enterprise.tokens')" :value="stats.total_tokens" :icon="TokensIcon" icon-variant="warning" /><StatCard :title="t('enterprise.cost')" :value="money(stats.total_actual_cost)" :icon="CostIcon" icon-variant="success" /></div>
     <div class="card p-4 sm:p-5">
       <h3 class="mb-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.trend') }}</h3>
-      <div v-if="trend.length" class="h-64"><Line :data="chartData" :options="chartOptions" :aria-label="t('enterprise.trend')" role="img" /></div>
+      <div v-if="trend.length" class="relative h-64 w-full min-w-0"><Line :data="chartData" :options="chartOptions" :height="256" :aria-label="t('enterprise.trend')" role="img" /></div>
       <p v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.empty') }}</p>
       <details v-if="trend.length" class="mt-4 text-sm"><summary class="cursor-pointer text-gray-600 dark:text-gray-300">{{ t('enterprise.detail') }}</summary><DataTable :columns="trendColumns" :data="trend"><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></details>
     </div>
@@ -23,6 +23,7 @@
     <div v-if="canFilterMembers" class="card overflow-hidden"><h3 class="p-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.memberRanking') }}</h3><DataTable :columns="memberColumns" :data="memberRanking" :loading="busy"><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></div>
     <div v-if="canFilterDepartments" class="card overflow-hidden"><h3 class="p-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.departmentRanking') }}</h3><DataTable :columns="departmentColumns" :data="departmentRanking" :loading="busy"><template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></div>
     <DataTable :columns="columns" :data="rows" :loading="busy">
+      <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
       <template #cell-user="{ row }"><span>{{ row.user?.username || row.user?.email }}</span><p class="text-xs text-gray-500">{{ row.user?.email }}</p></template>
       <template #cell-api_key="{ row }">{{ row.api_key?.name || '—' }}</template>
       <template #cell-department_id="{ value }">{{ departments.find(item => item.id === value)?.name || (value ? `#${value}` : t('enterprise.noDepartment')) }}</template>
@@ -34,20 +35,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseUsageLog, EnterpriseUsageStats, EnterpriseUsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage, EnterpriseQuery } from '@/types/enterprise'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import StatCard from '@/components/common/StatCard.vue'
+import Icon from '@/components/icons/Icon.vue'
+import { formatDateTime } from '@/utils/format'
 import { loadMemberOptions } from '../memberOptions'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const { t } = useI18n()
+const RequestsIcon = () => h(Icon, { name: 'chart', size: 'lg' })
+const TokensIcon = () => h(Icon, { name: 'bolt', size: 'lg' })
+const CostIcon = () => h(Icon, { name: 'dollar', size: 'lg' })
 const rowAction = useEnterpriseAction()
 const summaryAction = useEnterpriseAction()
 const optionAction = useEnterpriseAction()
@@ -73,17 +80,46 @@ const darkMode = ref(document.documentElement.classList.contains('dark'))
 const themeObserver = new MutationObserver(() => { darkMode.value = document.documentElement.classList.contains('dark') })
 onMounted(() => themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }))
 onUnmounted(() => themeObserver.disconnect())
-const chartData = computed(() => ({ labels: trend.value.map(item => item.date), datasets: [{ label: t('enterprise.cost'), data: trend.value.map(item => item.actual_cost), borderColor: '#14b8a6', backgroundColor: '#14b8a6', tension: 0.25 }] }))
-const chartOptions = computed(() => {
+const chartData = computed<ChartData<'line'>>(() => ({
+  labels: trend.value.map(item => item.date),
+  datasets: [{
+    label: t('enterprise.cost'),
+    data: trend.value.map(item => item.actual_cost),
+    borderColor: '#14b8a6',
+    backgroundColor: '#14b8a6',
+    borderWidth: 2,
+    // A single bucket has no line segment: keep its point visible inside the plot.
+    pointRadius: trend.value.length === 1 ? 5 : 3,
+    pointHoverRadius: 7,
+    pointHitRadius: 12,
+    tension: 0.25
+  }]
+}))
+const chartOptions = computed<ChartOptions<'line'>>(() => {
   const textColor = darkMode.value ? '#cbd5e1' : '#475569'
   const gridColor = darkMode.value ? 'rgba(148, 163, 184, 0.15)' : '#e5e7eb'
   return {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: true, labels: { color: textColor } } },
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+      legend: { display: true, labels: { color: textColor, usePointStyle: true } },
+      tooltip: {
+        callbacks: {
+          label: context => `${context.dataset.label}: ${money(context.parsed.y ?? 0)}`,
+          afterBody: items => {
+            const point = trend.value[items[0]?.dataIndex ?? -1]
+            return point ? [
+              `${t('enterprise.requests')}: ${point.requests.toLocaleString()}`,
+              `${t('enterprise.tokens')}: ${point.total_tokens.toLocaleString()}`
+            ] : []
+          }
+        }
+      }
+    },
     scales: {
-      x: { ticks: { color: textColor }, grid: { color: gridColor } },
-      y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } }
+      x: { offset: true, ticks: { color: textColor }, grid: { color: gridColor } },
+      y: { beginAtZero: true, grace: '10%', ticks: { color: textColor }, grid: { color: gridColor } }
     }
   }
 })

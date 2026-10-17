@@ -17,6 +17,7 @@
       <template #cell-role="{ value }">{{ t(`enterprise.roles.${value}`) }}</template>
       <template #cell-status="{ value }"><span :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
       <template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template>
+      <template #cell-joined_at="{ value }">{{ formatDateTime(value) }}</template>
       <template #cell-actions="{ row }"><div v-if="canManage && (mode === 'departments' || canManageMember(row))" class="flex gap-3"><button class="text-primary-600 dark:text-primary-400" @click="openForm(row)">{{ t('enterprise.edit') }}</button><button class="text-red-600 dark:text-red-400" @click="deleting = row">{{ t('enterprise.remove') }}</button></div></template>
     </DataTable>
     <Pagination v-if="mode === 'members'" :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" />
@@ -37,6 +38,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseRole, EnterpriseQuery, CreateEnterpriseAccountMemberRequest, CreateEnterpriseMemberRequest, UpdateEnterpriseMemberRequest } from '@/types/enterprise'
+import { formatDateTime } from '@/utils/format'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import DataTable from '@/components/common/DataTable.vue'

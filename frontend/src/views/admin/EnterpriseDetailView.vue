@@ -1,7 +1,8 @@
 <template>
   <AppLayout>
-    <div class="mb-4 flex justify-end"><button class="btn btn-danger" data-test="enterprise-delete-detail" @click="deleting = true">{{ t('admin.enterprises.delete') }}</button></div>
-    <EnterpriseWorkspace :key="enterpriseId" admin :enterprise-id="enterpriseId" />
+    <EnterpriseWorkspace :key="enterpriseId" admin :enterprise-id="enterpriseId">
+      <template #header-actions><button class="btn btn-danger" data-test="enterprise-delete-detail" @click="deleting = true">{{ t('admin.enterprises.delete') }}</button></template>
+    </EnterpriseWorkspace>
     <EnterpriseDeleteDialog v-if="deleting" :key="enterpriseId" :enterprise-id="enterpriseId" @cancel="deleting = false" @deleted="removed" />
   </AppLayout>
 </template>

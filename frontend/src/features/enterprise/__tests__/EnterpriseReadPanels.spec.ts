@@ -12,7 +12,7 @@ const { showError } = vi.hoisted(() => ({ showError: vi.fn() }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError, showSuccess: vi.fn() }) }))
 vi.mock('@/api/admin', () => ({ adminAPI: { users: { list: vi.fn() }, groups: { getAll: vi.fn().mockResolvedValue([]) } } }))
 vi.mock('@/api/client', () => ({ apiClient: {} }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('vue-chartjs', () => ({ Line: { template: '<div />' } }))
 
 const stubs = {

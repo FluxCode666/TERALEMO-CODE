@@ -18,7 +18,7 @@ const stubs = {
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
   DataTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></div></div>' },
   ConfirmDialog: { props: ['show', 'message'], emits: ['confirm', 'cancel'], template: '<div v-if="show" data-test="delete-confirm"><p>{{ message }}</p><slot /><button data-test="confirm-delete" @click="$emit(\'confirm\')">Confirm</button><button data-test="cancel-delete" @click="$emit(\'cancel\')">Cancel</button></div>' },
-  EnterpriseWorkspace: true, Pagination: true, BaseDialog: true, RouterLink: true
+  EnterpriseWorkspace: { template: '<div><slot name="header-actions" /></div>' }, Pagination: true, BaseDialog: true, RouterLink: true
 }
 
 describe('Enterprise deletion confirmation', () => {
