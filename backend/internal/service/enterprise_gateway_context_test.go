@@ -65,6 +65,7 @@ func TestEnterpriseGatewayContextClearsRemovedMembership(t *testing.T) {
 
 func TestEnterpriseSessionEligibilityRechecksWithoutCountingRPM(t *testing.T) {
 	user, quotas := enterpriseEligibilityFixture()
+	user.Status = StatusActive
 	user.RPMLimit = 100
 	group := &Group{ID: 42, RPMLimit: 100}
 	cache := &enterpriseRuntimeCacheStub{balance: 50, quotas: quotas}
@@ -90,8 +91,17 @@ func TestEnterpriseSessionEligibilityRechecksWithoutCountingRPM(t *testing.T) {
 
 func TestEnterpriseSessionEligibilityRequiresGroupAndDoesNotTouchPersonal(t *testing.T) {
 	var absent *BillingCacheService
-	require.NoError(t, absent.CheckEnterpriseSessionEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, ""))
+	require.NoError(t, absent.CheckEnterpriseSessionEligibility(context.Background(), &User{ID: 1, Status: StatusActive}, nil, nil, nil, ""))
 	user, _ := enterpriseEligibilityFixture()
+	user.Status = StatusActive
 	require.ErrorIs(t, absent.CheckEnterpriseSessionEligibility(context.Background(), user, nil, &Group{ID: 42}, nil, ""), ErrBillingServiceUnavailable)
 	require.ErrorIs(t, (&BillingCacheService{}).CheckEnterpriseSessionEligibility(context.Background(), user, nil, nil, nil, ""), ErrEnterpriseGatewayGroupNotAllowed)
+}
+
+func TestEnterpriseSessionEligibilityRejectsInactiveUserBeforePersonalOrEnterpriseChecks(t *testing.T) {
+	for _, member := range []*EnterpriseMemberContext{nil, {EnterpriseID: 1}} {
+		var unavailable *BillingCacheService
+		user := &User{ID: 42, Status: StatusDisabled, Enterprise: member}
+		require.ErrorIs(t, unavailable.CheckEnterpriseSessionEligibility(context.Background(), user, nil, nil, nil, ""), ErrGatewayUserInactive)
+	}
 }

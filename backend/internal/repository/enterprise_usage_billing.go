@@ -28,12 +28,15 @@ func deductUsageBillingEnterpriseBalance(ctx context.Context, tx *sql.Tx, enterp
 // order before UPDATE can execute. Never depend on an UPDATE plan's row order.
 // Frozen scopes include soft-deleted archive rows. A missing row is an integrity
 // incident, but must not undo payment for usage already consumed upstream.
-func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) error {
+func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) (*service.EnterpriseBillingWindowStarts, error) {
 	expected := 2
 	if cmd.EnterpriseDepartmentID != 0 {
 		expected++
 	}
 	now := timezone.Now()
+	windows := &service.EnterpriseBillingWindowStarts{
+		Daily: timezone.StartOfDay(now), Weekly: timezone.StartOfWeek(now), Monthly: timezone.StartOfMonth(now),
+	}
 	var updated int
 	err := tx.QueryRowContext(ctx, `
 		WITH locked AS MATERIALIZED (
@@ -59,9 +62,9 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 		)
 		SELECT COUNT(*) FROM updated
 	`, cmd.EnterpriseBalanceCost, cmd.EnterpriseID, cmd.EnterpriseDepartmentID, cmd.EnterpriseMemberID,
-		timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now)).Scan(&updated)
+		windows.Daily, windows.Weekly, windows.Monthly).Scan(&updated)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if updated != expected {
 		slog.ErrorContext(ctx, "enterprise billing quota row count mismatch; enterprise payment retained",
@@ -69,5 +72,5 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 			"enterprise_id", cmd.EnterpriseID, "department_id", cmd.EnterpriseDepartmentID, "member_id", cmd.EnterpriseMemberID,
 			"cost", cmd.EnterpriseBalanceCost, "updated_rows", updated, "expected_rows", expected)
 	}
-	return nil
+	return windows, nil
 }

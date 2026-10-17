@@ -193,9 +193,11 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		}
 		result.NewEnterpriseBalance = &newBalance
 		result.BalanceOverdrafted = newBalance < 0
-		if err := incrementUsageBillingEnterpriseQuotas(ctx, tx, cmd); err != nil {
+		windows, err := incrementUsageBillingEnterpriseQuotas(ctx, tx, cmd)
+		if err != nil {
 			return err
 		}
+		result.EnterpriseQuotaWindows = windows
 	}
 
 	if cmd.BalanceCost > 0 {
@@ -225,7 +227,12 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	if cmd.AccountQuotaCost > 0 && (strings.EqualFold(cmd.AccountType, service.AccountTypeAPIKey) || strings.EqualFold(cmd.AccountType, service.AccountTypeBedrock)) {
 		quotaState, err := incrementUsageBillingAccountQuota(ctx, tx, cmd.AccountID, cmd.AccountQuotaCost)
 		if err != nil {
-			return err
+			if !errors.Is(err, service.ErrAccountNotFound) {
+				return err
+			}
+			// Upstream consumption already happened. A removed account must not
+			// undo the payer's charge, usage counters or idempotency claim.
+			logger.LegacyPrintf("repository.usage_billing", "[UsageBilling] account missing; payer settlement retained: account=%d request=%s api_key=%d", cmd.AccountID, cmd.RequestID, cmd.APIKeyID)
 		}
 		result.QuotaState = quotaState
 	}
@@ -521,7 +528,7 @@ func incrementUsageBillingAccountQuota(ctx context.Context, tx *sql.Tx, accountI
 				   ELSE '{}'::jsonb END
 			ELSE '{}'::jsonb END
 		), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
+		WHERE id = $2
 		RETURNING
 			COALESCE((extra->>'quota_used')::numeric, 0),
 			COALESCE((extra->>'quota_limit')::numeric, 0),

@@ -26,6 +26,22 @@ type EnterpriseBillingRuntimeCache interface {
 	IncrementEnterpriseQuotaUsage(context.Context, string, int64, float64, time.Time) error
 }
 
+// EnterpriseBillingGenerationCache fences database loads against management
+// invalidation and committed usage increments. Generations must not expire:
+// forgetting one would let an older, still-running loader pass its CAS again.
+type EnterpriseBillingGenerationCache interface {
+	GetEnterpriseBalanceGeneration(context.Context, int64) (int64, error)
+	SetEnterpriseBalanceIfGeneration(context.Context, int64, float64, int64) (bool, error)
+	GetEnterpriseQuotaGeneration(context.Context, string, int64) (int64, error)
+	SetEnterpriseQuotaIfGeneration(context.Context, *EnterpriseQuota, int64) (bool, error)
+}
+
+// EnterpriseQuotaWindowCache synchronizes only the exact windows committed by
+// Apply. A different cache window must be invalidated instead of rolled forward.
+type EnterpriseQuotaWindowCache interface {
+	IncrementEnterpriseQuotaUsageForWindows(context.Context, string, int64, float64, EnterpriseBillingWindowStarts) error
+}
+
 type EnterpriseBalanceReader interface {
 	GetBalance(context.Context, int64) (float64, error)
 }
@@ -56,19 +72,41 @@ func (s *BillingCacheService) GetEnterpriseBalance(ctx context.Context, enterpri
 	result := s.balanceLoadSF.DoChan("enterprise:"+strconv.FormatInt(enterpriseID, 10), func() (any, error) {
 		loadCtx, cancel := context.WithTimeout(context.Background(), balanceLoadTimeout)
 		defer cancel()
-		balance, err := s.enterpriseBalanceRepo.GetBalance(loadCtx, enterpriseID)
-		if err != nil {
-			return nil, err
-		}
-		if math.IsNaN(balance) || math.IsInf(balance, 0) {
-			return nil, fmt.Errorf("invalid enterprise balance")
-		}
-		if s.enterpriseCache != nil {
-			if err := s.enterpriseCache.SetEnterpriseBalance(loadCtx, enterpriseID, balance); err != nil {
-				logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise balance %d: %v", enterpriseID, err)
+		for attempt := 0; attempt < 3; attempt++ {
+			generationCache, guarded := s.enterpriseCache.(EnterpriseBillingGenerationCache)
+			var generation int64
+			if guarded {
+				var err error
+				generation, err = generationCache.GetEnterpriseBalanceGeneration(loadCtx, enterpriseID)
+				if err != nil {
+					guarded = false
+				}
 			}
+			balance, err := s.enterpriseBalanceRepo.GetBalance(loadCtx, enterpriseID)
+			if err != nil {
+				return nil, err
+			}
+			if math.IsNaN(balance) || math.IsInf(balance, 0) {
+				return nil, fmt.Errorf("invalid enterprise balance")
+			}
+			if s.enterpriseCache != nil {
+				if guarded {
+					stored, err := generationCache.SetEnterpriseBalanceIfGeneration(loadCtx, enterpriseID, balance, generation)
+					if err == nil && !stored {
+						continue
+					}
+					if err != nil {
+						logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise balance %d: %v", enterpriseID, err)
+					}
+				} else if _, versioned := s.enterpriseCache.(EnterpriseBillingGenerationCache); !versioned {
+					if err := s.enterpriseCache.SetEnterpriseBalance(loadCtx, enterpriseID, balance); err != nil {
+						logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise balance %d: %v", enterpriseID, err)
+					}
+				}
+			}
+			return balance, nil
 		}
-		return balance, nil
+		return nil, fmt.Errorf("enterprise balance changed during reload")
 	})
 	select {
 	case <-ctx.Done():
@@ -140,23 +178,53 @@ func (s *BillingCacheService) getEnterpriseBillingQuotas(ctx context.Context, me
 	result := s.quotaLoadSF.DoChan(key.String(), func() (any, error) {
 		loadCtx, cancel := context.WithTimeout(context.Background(), balanceLoadTimeout)
 		defer cancel()
-		// A partial cache miss reloads the complete scope set in one database query.
-		quotas, err := s.enterpriseQuotaRepo.GetByScopes(loadCtx, member.EnterpriseID, scopes)
-		if err != nil {
-			return nil, err
-		}
-		validated, err := validateEnterpriseBillingQuotas(member.EnterpriseID, scopes, quotas)
-		if err != nil {
-			return nil, err
-		}
-		if s.enterpriseCache != nil {
-			for i := range quotas {
-				if err := s.enterpriseCache.SetEnterpriseQuota(loadCtx, &quotas[i]); err != nil {
-					logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise quota %s/%d: %v", quotas[i].ScopeType, quotas[i].ScopeID, err)
+		for attempt := 0; attempt < 3; attempt++ {
+			generationCache, guarded := s.enterpriseCache.(EnterpriseBillingGenerationCache)
+			generations := make(map[EnterpriseQuotaScope]int64, len(scopes))
+			if guarded {
+				for _, scope := range scopes {
+					generation, err := generationCache.GetEnterpriseQuotaGeneration(loadCtx, scope.ScopeType, scope.ScopeID)
+					if err != nil {
+						guarded = false
+						break
+					}
+					generations[scope] = generation
 				}
 			}
+			// A partial cache miss reloads the complete scope set in one database query.
+			quotas, err := s.enterpriseQuotaRepo.GetByScopes(loadCtx, member.EnterpriseID, scopes)
+			if err != nil {
+				return nil, err
+			}
+			validated, err := validateEnterpriseBillingQuotas(member.EnterpriseID, scopes, quotas)
+			if err != nil {
+				return nil, err
+			}
+			if s.enterpriseCache != nil {
+				retry := false
+				for i := range quotas {
+					if guarded {
+						q := &quotas[i]
+						stored, err := generationCache.SetEnterpriseQuotaIfGeneration(loadCtx, q, generations[EnterpriseQuotaScope{ScopeType: q.ScopeType, ScopeID: q.ScopeID}])
+						if err == nil && !stored {
+							retry = true
+						}
+						if err != nil {
+							logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise quota %s/%d: %v", q.ScopeType, q.ScopeID, err)
+						}
+					} else if _, versioned := s.enterpriseCache.(EnterpriseBillingGenerationCache); !versioned {
+						if err := s.enterpriseCache.SetEnterpriseQuota(loadCtx, &quotas[i]); err != nil {
+							logger.LegacyPrintf("service.billing_cache", "Warning: cache enterprise quota %s/%d: %v", quotas[i].ScopeType, quotas[i].ScopeID, err)
+						}
+					}
+				}
+				if retry {
+					continue
+				}
+			}
+			return validated, nil
 		}
-		return validated, nil
+		return nil, fmt.Errorf("enterprise quota changed during reload")
 	})
 	select {
 	case <-ctx.Done():
@@ -245,7 +313,7 @@ func checkEnterpriseQuota(q *EnterpriseQuota, now time.Time, pending float64) er
 
 // SyncEnterpriseUsage runs only after a successful, non-replayed transaction.
 // Lua updates existing entries only; on failure invalidate rather than risk a stale allowance.
-func (s *BillingCacheService) SyncEnterpriseUsage(ctx context.Context, member *EnterpriseMemberContext, cost float64) {
+func (s *BillingCacheService) SyncEnterpriseUsage(ctx context.Context, member *EnterpriseMemberContext, cost float64, committed ...*EnterpriseBillingWindowStarts) {
 	if s == nil || s.enterpriseCache == nil || member == nil || cost <= 0 {
 		return
 	}
@@ -255,9 +323,13 @@ func (s *BillingCacheService) SyncEnterpriseUsage(ctx context.Context, member *E
 		_ = s.enterpriseCache.InvalidateEnterpriseBalance(syncCtx, member.EnterpriseID)
 		logger.LegacyPrintf("service.billing_cache", "Warning: sync enterprise balance %d: %v", member.EnterpriseID, err)
 	}
-	now := timezone.Now()
 	for _, scope := range enterpriseBillingScopes(member) {
-		if err := s.enterpriseCache.IncrementEnterpriseQuotaUsage(syncCtx, scope.ScopeType, scope.ScopeID, cost, now); err != nil {
+		windowCache, ok := s.enterpriseCache.(EnterpriseQuotaWindowCache)
+		if !ok || len(committed) == 0 || committed[0] == nil {
+			_ = s.enterpriseCache.InvalidateEnterpriseQuota(syncCtx, scope.ScopeType, scope.ScopeID)
+			continue
+		}
+		if err := windowCache.IncrementEnterpriseQuotaUsageForWindows(syncCtx, scope.ScopeType, scope.ScopeID, cost, *committed[0]); err != nil {
 			_ = s.enterpriseCache.InvalidateEnterpriseQuota(syncCtx, scope.ScopeType, scope.ScopeID)
 			logger.LegacyPrintf("service.billing_cache", "Warning: sync enterprise quota %s/%d: %v", scope.ScopeType, scope.ScopeID, err)
 		}
@@ -268,6 +340,13 @@ func (s *BillingCacheService) SyncEnterpriseUsage(ctx context.Context, member *E
 // Redis implements it so enterprise reservations survive long streaming requests.
 type InflightScopeReservationRenewer interface {
 	RenewInflightScope(context.Context, string, string, time.Duration) (bool, error)
+}
+
+// EnterpriseInflightReservationCache reads the current cached balance and
+// registers a covered reservation in one Redis operation. A cache miss writes
+// nothing and asks the caller to reload before retrying.
+type EnterpriseInflightReservationCache interface {
+	ReserveEnterpriseInflight(context.Context, int64, string, float64, time.Duration) (cacheHit, allowed bool, err error)
 }
 
 type enterpriseInflightRenewer struct {
@@ -284,9 +363,9 @@ func (s *BillingCacheService) reserveEnterpriseInflight(ctx context.Context, use
 	if !ok || cache == nil {
 		return nil, nil
 	}
-	balance, err := s.GetEnterpriseBalance(ctx, user.Enterprise.EnterpriseID)
-	if err != nil {
-		return nil, ErrBillingServiceUnavailable.WithCause(err)
+	atomicCache, ok := s.cache.(EnterpriseInflightReservationCache)
+	if !ok {
+		return nil, nil
 	}
 	cfg, _ := s.inflightReservationConfig()
 	ttl := defaultInflightReservationTTL
@@ -296,17 +375,31 @@ func (s *BillingCacheService) reserveEnterpriseInflight(ctx context.Context, use
 	scope := "ent:" + strconv.FormatInt(user.Enterprise.EnterpriseID, 10)
 	res := &InflightReservation{userID: user.ID, requestID: uuid.NewString(), amount: amount, ttl: ttl, scopeCache: cache, scopes: []string{scope}}
 	res.refs.Store(1)
-	reserveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), inflightReservationReserveTimeout)
-	pending, err := cache.ReserveInflightScope(reserveCtx, scope, res.requestID, amount, ttl)
-	cancel()
-	if err != nil {
-		res.Release()
-		logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation failed for %s (fail-open): %v", scope, err)
-		return nil, nil
-	}
-	if balance-pending < amount {
-		res.Release()
-		return nil, ErrEnterpriseBillingBalanceInsufficient
+	for attempt := 0; ; attempt++ {
+		reserveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), inflightReservationReserveTimeout)
+		hit, allowed, err := atomicCache.ReserveEnterpriseInflight(reserveCtx, user.Enterprise.EnterpriseID, res.requestID, amount, ttl)
+		cancel()
+		if err != nil {
+			res.Release()
+			logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation failed for %s (fail-open): %v", scope, err)
+			return nil, nil
+		}
+		if !hit {
+			if _, err := s.GetEnterpriseBalance(ctx, user.Enterprise.EnterpriseID); err != nil {
+				return nil, ErrBillingServiceUnavailable.WithCause(err)
+			}
+			// A healthy DB with an unavailable cache keeps the agreed fail-open
+			// reservation behavior. Never fall back to checking a stale balance.
+			if attempt >= 2 {
+				return nil, nil
+			}
+			continue
+		}
+		if !allowed {
+			res.Release()
+			return nil, ErrEnterpriseBillingBalanceInsufficient
+		}
+		break
 	}
 	if r, ok := s.cache.(InflightScopeReservationRenewer); renew && ok {
 		res.startRenewal(enterpriseInflightRenewer{cache: r, scope: scope})

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -172,13 +173,23 @@ type AccountQuotaState struct {
 	WeeklyLimit float64
 }
 
+// EnterpriseBillingWindowStarts is the exact set of natural window starts used
+// by the committed enterprise quota SQL. Cache updates must use these starts,
+// rather than recomputing them after a transaction crosses a window boundary.
+type EnterpriseBillingWindowStarts struct {
+	Daily   time.Time
+	Weekly  time.Time
+	Monthly time.Time
+}
+
 type UsageBillingApplyResult struct {
-	Applied              bool
-	APIKeyQuotaExhausted bool
-	NewEnterpriseBalance *float64           // post-deduction enterprise balance (nil = no enterprise deduction)
-	NewBalance           *float64           // post-deduction balance (nil = no balance deduction)
-	BalanceOverdrafted   bool               // true when the sufficient-balance guard missed and debt was still recorded
-	QuotaState           *AccountQuotaState // post-increment quota state (nil = no quota increment)
+	Applied                bool
+	APIKeyQuotaExhausted   bool
+	NewEnterpriseBalance   *float64                       // post-deduction enterprise balance (nil = no enterprise deduction)
+	EnterpriseQuotaWindows *EnterpriseBillingWindowStarts // nil when no enterprise quota SQL was applied
+	NewBalance             *float64                       // post-deduction balance (nil = no balance deduction)
+	BalanceOverdrafted     bool                           // true when the sufficient-balance guard missed and debt was still recorded
+	QuotaState             *AccountQuotaState             // post-increment quota state (nil = no quota increment)
 }
 
 // BatchImageBalanceHoldCommand describes an idempotent balance hold operation.

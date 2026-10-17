@@ -3,13 +3,20 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	coderws "github.com/coder/websocket"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func wsEnterpriseMember(departmentID int64) *service.EnterpriseMemberContext {
@@ -18,7 +25,7 @@ func wsEnterpriseMember(departmentID int64) *service.EnterpriseMemberContext {
 
 func wsEnterpriseConnection() *service.APIKey {
 	groupID := int64(77)
-	return &service.APIKey{ID: 5, Key: "sk-enterprise-ws", GroupID: &groupID, User: &service.User{ID: 9, Balance: 7, Enterprise: wsEnterpriseMember(20)}, Group: &service.Group{ID: groupID, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeStandard, RateMultiplier: 3}}
+	return &service.APIKey{ID: 5, Key: "sk-enterprise-ws", GroupID: &groupID, User: &service.User{ID: 9, Status: service.StatusActive, Balance: 7, Enterprise: wsEnterpriseMember(20)}, Group: &service.Group{ID: groupID, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeStandard, RateMultiplier: 3}}
 }
 
 func wsEnterpriseLatest(conn *service.APIKey) *service.APIKey {
@@ -129,10 +136,9 @@ func TestOpenAIWSTurnEnterpriseBeginWithoutLookupFailsClosed(t *testing.T) {
 	_, err := keys.begin(context.Background(), nil, 2, conn)
 	require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
 	conn.User.Enterprise = nil
-	ctx, err := keys.begin(context.Background(), nil, 2, conn)
-	require.NoError(t, err)
-	require.NotNil(t, ctx)
-	require.Same(t, conn, keys.forTurn(2, conn))
+	_, err = keys.begin(context.Background(), nil, 2, conn)
+	require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
+	require.NotContains(t, keys.keys, 2)
 }
 
 func TestOpenAIWSTurnEnterpriseBeginDetectsUngroupedJoin(t *testing.T) {
@@ -147,17 +153,22 @@ func TestOpenAIWSTurnEnterpriseBeginDetectsUngroupedJoin(t *testing.T) {
 	require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
 }
 
-func TestOpenAIWSTurnUngroupedPersonalKeepsSnapshotAndLookupFailureBehavior(t *testing.T) {
+func TestOpenAIWSTurnUngroupedPersonalKeepsSnapshotAndLookupFailureCloses(t *testing.T) {
 	for _, lookupErr := range []error{nil, errors.New("auth unavailable")} {
 		conn := wsEnterpriseConnection()
 		conn.User.Enterprise = nil
 		conn.Group = nil
 		latest := *conn
-		latest.User = &service.User{ID: conn.User.ID, Balance: 100}
+		latest.User = &service.User{ID: conn.User.ID, Status: service.StatusActive, Balance: 100}
 		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, lookupErr }), conn)
-		require.NoError(t, err)
-		require.Same(t, conn, got)
-		require.Equal(t, 7.0, got.User.Balance)
+		if lookupErr != nil {
+			require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
+			require.Nil(t, got)
+		} else {
+			require.NoError(t, err)
+			require.Same(t, conn, got)
+			require.Equal(t, 7.0, got.User.Balance)
+		}
 	}
 }
 
@@ -265,5 +276,170 @@ func TestOpenAIResponsesWebSocket_EnterpriseMembershipRefreshClosesBeforeNextTur
 				return repo.adminUpdate(apiKeyService, func(_ *service.APIKey, _ *service.Group) { tc.mutate(repo) })
 			}, secondTurnCloseExpected: true, closeStatus: coderws.StatusPolicyViolation, closeReason: tc.reason})
 		})
+	}
+}
+
+func TestOpenAIResponsesWebSocket_UserDisabledAfterFirstTurn(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		for _, enterprise := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/enterprise=%t", mode, enterprise), func(t *testing.T) {
+				repo := newWSGroupPricingAPIKeyRepoStub(3)
+				if enterprise {
+					repo.apiKey.User.Enterprise = wsEnterpriseMember(20)
+				}
+				apiKeys := newWSGroupPricingAPIKeyService(repo)
+				got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+					firstPayload: wsGroupPricingFirst, secondPayload: wsGroupPricingSecond, ingressMode: mode,
+					apiKeyService: apiKeys, apiKeyCredential: wsGroupPricingKey,
+					afterFirstUpstreamRequest: func(*service.ChannelService) error {
+						return repo.adminUpdate(apiKeys, func(key *service.APIKey, _ *service.Group) { key.User.Status = service.StatusDisabled })
+					},
+					secondTurnCloseExpected: true, closeStatus: coderws.StatusPolicyViolation, closeReason: "user account is not active",
+				})
+				require.Len(t, got.logs, 1, "disabled user's second turn must neither reach upstream nor settle")
+				require.Len(t, got.clientEvents, 2)
+				require.Equal(t, "USER_INACTIVE", gjson.GetBytes(got.clientEvents[1], "error.code").String())
+			})
+		}
+	}
+}
+
+func TestOpenAIWSTurnPersonalStatusRefreshIgnoresGroupCompatibility(t *testing.T) {
+	for _, noGroup := range []bool{false, true} {
+		conn := wsEnterpriseConnection()
+		conn.User.Enterprise = nil
+		latest := *conn
+		latest.User = &service.User{ID: conn.User.ID, Status: service.StatusDisabled}
+		latest.GroupID = new(int64(999))
+		if noGroup {
+			conn.Group = nil
+		}
+		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, nil }), conn)
+		require.NoError(t, err)
+		require.Equal(t, service.StatusDisabled, got.User.Status)
+		require.Equal(t, service.StatusActive, conn.User.Status, "admitted first turn retains its active snapshot")
+		require.ErrorIs(t, (&OpenAIGatewayHandler{}).checkOpenAIWSTurnEnterpriseBilling(context.Background(), got, nil), service.ErrGatewayUserInactive)
+	}
+}
+
+func TestOpenAIResponsesWebSocket_QuotaErrorBeforeUpgradePreservesHTTPDetails(t *testing.T) {
+	for _, scope := range []string{service.EnterpriseScopeEnterprise, service.EnterpriseScopeDepartment, service.EnterpriseScopeMember} {
+		t.Run(scope, func(t *testing.T) {
+			key := wsEnterpriseConnection()
+			quotas := wsEnterpriseQuotas()
+			for i := range quotas {
+				if quotas[i].ScopeType == scope {
+					quotas[i].MonthlyLimitUSD = new(float64(0))
+				}
+			}
+			cfg := &config.Config{}
+			billing := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+			t.Cleanup(billing.Stop)
+			billing.ConfigureEnterpriseBilling(&wsEnterpriseRuntimeCache{balance: 50, quotas: quotas}, nil, nil)
+			h := &OpenAIGatewayHandler{gatewayService: &service.OpenAIGatewayService{}, billingCacheService: billing, apiKeyService: &service.APIKeyService{}, concurrencyHelper: NewConcurrencyHelper(service.NewConcurrencyService(&concurrencyCacheMock{}), SSEPingFormatNone, time.Second)}
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, "/openai/v1/responses", nil)
+			c.Request.Header.Set("Upgrade", "websocket")
+			c.Request.Header.Set("Connection", "Upgrade")
+			c.Set(string(middleware.ContextKeyAPIKey), key)
+			c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: key.User.ID})
+			h.ResponsesWebSocket(c)
+			require.Equal(t, http.StatusTooManyRequests, w.Code)
+			require.NotEmpty(t, w.Header().Get("Retry-After"))
+			require.Equal(t, wsEnterpriseQuotaErrorCode(scope), gjson.GetBytes(w.Body.Bytes(), "error.code").String())
+			require.Equal(t, scope, gjson.GetBytes(w.Body.Bytes(), "error.metadata.scope").String())
+			require.Equal(t, "monthly", gjson.GetBytes(w.Body.Bytes(), "error.metadata.window").String())
+			require.NotEmpty(t, gjson.GetBytes(w.Body.Bytes(), "error.metadata.window_resets_at").String())
+		})
+	}
+}
+
+func TestOpenAIResponsesWebSocket_QuotaErrorAfterFirstTurnPreservesEventDetails(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		for _, scope := range []string{service.EnterpriseScopeEnterprise, service.EnterpriseScopeDepartment, service.EnterpriseScopeMember} {
+			t.Run(mode+"/"+scope, func(t *testing.T) {
+				repo := newWSGroupPricingAPIKeyRepoStub(3)
+				repo.apiKey.User.Enterprise = wsEnterpriseMember(20)
+				apiKeys := newWSGroupPricingAPIKeyService(repo)
+				cache := &wsEnterpriseRuntimeCache{balance: 50, quotas: wsEnterpriseQuotas()}
+				got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+					firstPayload: wsGroupPricingFirst, secondPayload: wsGroupPricingSecond, ingressMode: mode,
+					apiKeyService: apiKeys, apiKeyCredential: wsGroupPricingKey,
+					configureBilling: func(cfg *config.Config, billing *service.BillingCacheService) {
+						cfg.RunMode = config.RunModeStandard
+						billing.ConfigureEnterpriseBilling(cache, nil, nil)
+					},
+					afterFirstUpstreamRequest: func(*service.ChannelService) error {
+						for i := range cache.quotas {
+							if cache.quotas[i].ScopeType == scope {
+								cache.quotas[i].MonthlyLimitUSD = new(float64(0))
+							}
+						}
+						return nil
+					},
+					secondTurnCloseExpected: true, closeStatus: coderws.StatusPolicyViolation, closeReason: "enterprise billing check failed",
+				})
+				require.Len(t, got.logs, 1)
+				require.Len(t, got.clientEvents, 2, "structured billing error must precede the close frame")
+				errEvent := got.clientEvents[1]
+				require.Equal(t, "error", gjson.GetBytes(errEvent, "type").String())
+				require.Equal(t, wsEnterpriseQuotaErrorCode(scope), gjson.GetBytes(errEvent, "error.code").String())
+				require.Equal(t, scope, gjson.GetBytes(errEvent, "error.metadata.scope").String())
+				require.Equal(t, "monthly", gjson.GetBytes(errEvent, "error.metadata.window").String())
+				require.NotEmpty(t, gjson.GetBytes(errEvent, "error.metadata.window_resets_at").String())
+				require.Positive(t, gjson.GetBytes(errEvent, "error.retry_after").Int())
+			})
+		}
+	}
+}
+
+func wsEnterpriseQuotas() []service.EnterpriseQuota {
+	return []service.EnterpriseQuota{{ID: 1, EnterpriseID: 10, ScopeType: service.EnterpriseScopeMember, ScopeID: 30}, {ID: 2, EnterpriseID: 10, ScopeType: service.EnterpriseScopeDepartment, ScopeID: 20}, {ID: 3, EnterpriseID: 10, ScopeType: service.EnterpriseScopeEnterprise, ScopeID: 10}}
+}
+
+func wsEnterpriseQuotaErrorCode(scope string) string {
+	switch scope {
+	case service.EnterpriseScopeMember:
+		return "MEMBER_QUOTA_EXCEEDED"
+	case service.EnterpriseScopeDepartment:
+		return "DEPARTMENT_QUOTA_EXCEEDED"
+	default:
+		return "ENTERPRISE_QUOTA_EXCEEDED"
+	}
+}
+
+func TestOpenAIResponsesWebSocket_PersonalUserStatusLookupFailureClosesBeforeSecondTurn(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		t.Run(mode, func(t *testing.T) {
+			repo := newWSGroupPricingAPIKeyRepoStub(3)
+			apiKeys := newWSGroupPricingAPIKeyService(repo)
+			got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+				firstPayload: wsGroupPricingFirst, secondPayload: wsGroupPricingSecond, ingressMode: mode,
+				apiKeyService: apiKeys, apiKeyCredential: wsGroupPricingKey,
+				afterFirstUpstreamRequest: func(*service.ChannelService) error {
+					return repo.adminUpdate(apiKeys, func(_ *service.APIKey, _ *service.Group) { repo.err = errors.New("cannot confirm user state") })
+				},
+				secondTurnCloseExpected: true, closeStatus: coderws.StatusPolicyViolation, closeReason: "please reconnect",
+			})
+			require.Len(t, got.logs, 1)
+			require.Len(t, got.clientEvents, 2)
+			require.Equal(t, "billing_session_reconnect_required", gjson.GetBytes(got.clientEvents[1], "error.code").String())
+		})
+	}
+}
+
+func TestOpenAIWSTurnPersonalMissingCurrentUserCloses(t *testing.T) {
+	for _, ungrouped := range []bool{false, true} {
+		conn := wsEnterpriseConnection()
+		conn.User.Enterprise = nil
+		if ungrouped {
+			conn.Group = nil
+		}
+		latest := *conn
+		latest.User = nil
+		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, nil }), conn)
+		require.Nil(t, got)
+		require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
 	}
 }

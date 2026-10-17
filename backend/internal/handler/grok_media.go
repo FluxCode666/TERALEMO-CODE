@@ -165,9 +165,6 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	}
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if historicalPersonalVideo {
-		subscription = nil
-	}
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 
 	userReleaseFunc, acquired := h.acquireResponsesUserSlot(c, subject.UserID, subject.Concurrency, false, &streamStarted, reqLog)
@@ -511,6 +508,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				VideoResolution:      result.VideoResolution,
 				VideoDurationSeconds: result.VideoDurationSeconds,
 				OriginalModel:        clientRequestedModel(c, requestModel),
+				BillingIdentity:      newGrokVideoBillingIdentity(apiKey, subscription),
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
@@ -684,6 +682,7 @@ func prepareGrokVideoCompletionBilling(
 	// Re-merge with pending: resolution is request-only; model/duration fill gaps.
 	merged := *statusResult
 	if pending != nil {
+		merged.AsyncVideoBillingIdentity = pending.BillingIdentity
 		if strings.TrimSpace(merged.Model) == "" {
 			merged.Model = firstNonEmptyString(pending.BillingModel, pending.Model, pending.OriginalModel)
 		}
@@ -754,6 +753,17 @@ func recordGrokMediaUsage(
 	body []byte,
 	requestID string,
 ) {
+	if result != nil && result.AsyncVideoBillingIdentity != nil {
+		var err error
+		apiKey, subscription, err = restoreGrokVideoBillingIdentity(apiKey, result.AsyncVideoBillingIdentity)
+		if err != nil {
+			reqLog.Error("grok_media.video_billing_identity_invalid", zap.String("request_id", requestID), zap.Error(err))
+			if releaseErr := h.gatewayService.ReleaseGrokVideoBilling(c.Request.Context(), requestID, subject.UserID, apiKey.ID); releaseErr != nil {
+				reqLog.Warn("grok_media.video_billing_claim_release_failed", zap.Error(releaseErr))
+			}
+			return
+		}
+	}
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := ip.GetClientIP(c)
 	sessionID := service.ExtractClientSessionID(c)
@@ -819,4 +829,42 @@ func recordGrokMediaUsage(
 			reqLog.Debug("grok_media.record_usage_failed", zap.Error(err))
 		}
 	})
+}
+
+func newGrokVideoBillingIdentity(key *service.APIKey, subscription *service.UserSubscription) *service.GrokVideoBillingIdentity {
+	if key == nil || key.User == nil || key.Group == nil {
+		return nil
+	}
+	identity := &service.GrokVideoBillingIdentity{UserID: key.User.ID, GroupID: key.Group.ID, BillingType: service.BillingTypeBalance}
+	if subscription != nil && key.Group.IsSubscriptionType() {
+		identity.BillingType = service.BillingTypeSubscription
+		identity.SubscriptionID = subscription.ID
+		identity.SubscriptionUserID = subscription.UserID
+		identity.SubscriptionGroupID = subscription.GroupID
+	}
+	return identity
+}
+
+func restoreGrokVideoBillingIdentity(key *service.APIKey, identity *service.GrokVideoBillingIdentity) (*service.APIKey, *service.UserSubscription, error) {
+	if key == nil || key.User == nil || key.Group == nil || identity == nil || identity.UserID <= 0 || identity.UserID != key.User.ID || identity.UserID != key.UserID || identity.GroupID <= 0 {
+		return key, nil, errors.New("async video billing identity does not match task owner")
+	}
+	copy := *personalAsyncVideoBillingKey(key)
+	group := *key.Group
+	group.ID = identity.GroupID
+	copy.Group = &group
+	copy.GroupID = &group.ID
+	switch identity.BillingType {
+	case service.BillingTypeSubscription:
+		if identity.SubscriptionID <= 0 || identity.SubscriptionUserID != identity.UserID || identity.SubscriptionGroupID != identity.GroupID {
+			return key, nil, errors.New("async video subscription identity does not match task owner and group")
+		}
+		group.SubscriptionType = service.SubscriptionTypeSubscription
+		return &copy, &service.UserSubscription{ID: identity.SubscriptionID, UserID: identity.UserID, GroupID: identity.GroupID}, nil
+	case service.BillingTypeBalance:
+		group.SubscriptionType = ""
+		return &copy, nil, nil
+	default:
+		return key, nil, errors.New("async video billing mode is invalid")
+	}
 }

@@ -42,9 +42,9 @@ func TestEnterpriseBillingCacheQuotaWindowsAndMissing(t *testing.T) {
 	mr, cache := newEnterpriseCacheTest(t)
 	ctx := context.Background()
 	now := time.Date(2026, time.March, 31, 13, 0, 0, 0, timezone.Location())
-	old := time.Date(2026, time.February, 28, 13, 0, 0, 0, timezone.Location())
+	daily, weekly, monthly := timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now)
 	limit := 5.0
-	q := &service.EnterpriseQuota{ID: 1, EnterpriseID: 10, ScopeType: service.EnterpriseScopeMember, ScopeID: 30, DailyLimitUSD: &limit, TotalLimitUSD: &limit, DailyUsageUSD: 4, WeeklyUsageUSD: 4, MonthlyUsageUSD: 4, TotalUsageUSD: 4, DailyWindowStart: &old, WeeklyWindowStart: &old, MonthlyWindowStart: &old}
+	q := &service.EnterpriseQuota{ID: 1, EnterpriseID: 10, ScopeType: service.EnterpriseScopeMember, ScopeID: 30, DailyLimitUSD: &limit, TotalLimitUSD: &limit, DailyUsageUSD: 4, WeeklyUsageUSD: 4, MonthlyUsageUSD: 4, TotalUsageUSD: 4, DailyWindowStart: &daily, WeeklyWindowStart: &weekly, MonthlyWindowStart: &monthly}
 	require.NoError(t, cache.IncrementEnterpriseQuotaUsage(ctx, q.ScopeType, q.ScopeID, 1, now))
 	require.False(t, mr.Exists(enterpriseBillingQuotaKey(q.ScopeType, q.ScopeID)))
 	require.NoError(t, cache.SetEnterpriseQuota(ctx, q))
@@ -56,15 +56,15 @@ func TestEnterpriseBillingCacheQuotaWindowsAndMissing(t *testing.T) {
 	got := quotas[0]
 	require.Equal(t, q.DailyLimitUSD, got.DailyLimitUSD)
 	require.Nil(t, got.MonthlyLimitUSD)
-	require.Equal(t, 1.0, got.DailyUsageUSD)
-	require.Equal(t, 1.0, got.WeeklyUsageUSD)
-	require.Equal(t, 1.0, got.MonthlyUsageUSD)
+	require.Equal(t, 5.0, got.DailyUsageUSD)
+	require.Equal(t, 5.0, got.WeeklyUsageUSD)
+	require.Equal(t, 5.0, got.MonthlyUsageUSD)
 	require.Equal(t, 5.0, got.TotalUsageUSD)
 	require.True(t, timezone.StartOfMonth(now).Equal(*got.MonthlyWindowStart))
 	require.NoError(t, cache.IncrementEnterpriseQuotaUsage(ctx, q.ScopeType, q.ScopeID, 2, now))
 	quotas, err = cache.GetEnterpriseQuotas(ctx, 10, scopes)
 	require.NoError(t, err)
-	require.Equal(t, 3.0, quotas[0].MonthlyUsageUSD)
+	require.Equal(t, 7.0, quotas[0].MonthlyUsageUSD)
 	require.Equal(t, 7.0, quotas[0].TotalUsageUSD)
 	require.NoError(t, cache.InvalidateEnterpriseQuota(ctx, q.ScopeType, q.ScopeID))
 	quotas, err = cache.GetEnterpriseQuotas(ctx, 10, scopes)
@@ -214,12 +214,13 @@ func TestEnterpriseSyncUsageOnlyExistingEntries(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, cache.SetEnterpriseBalance(ctx, 10, 5))
 	now := timezone.Now()
-	q := &service.EnterpriseQuota{ID: 1, EnterpriseID: 10, ScopeType: "enterprise", ScopeID: 10, DailyWindowStart: &now, WeeklyWindowStart: &now, MonthlyWindowStart: &now}
+	daily, weekly, monthly := timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now)
+	q := &service.EnterpriseQuota{ID: 1, EnterpriseID: 10, ScopeType: "enterprise", ScopeID: 10, DailyWindowStart: &daily, WeeklyWindowStart: &weekly, MonthlyWindowStart: &monthly}
 	require.NoError(t, cache.SetEnterpriseQuota(ctx, q))
 	svc := &service.BillingCacheService{}
 	svc.ConfigureEnterpriseBilling(cache, nil, nil)
 	user, _ := enterpriseInflightUsers()
-	svc.SyncEnterpriseUsage(ctx, user.Enterprise, 0.25)
+	svc.SyncEnterpriseUsage(ctx, user.Enterprise, 0.25, &service.EnterpriseBillingWindowStarts{Daily: daily, Weekly: weekly, Monthly: monthly})
 	balance, err := cache.GetEnterpriseBalance(ctx, 10)
 	require.NoError(t, err)
 	require.Equal(t, 4.75, balance)

@@ -1417,7 +1417,7 @@ func TestOpenAIResponsesWebSocket_ContentModerationBlocksFirstFrame(t *testing.T
 	repo.resetLogs()
 	h := &OpenAIGatewayHandler{
 		gatewayService:           &service.OpenAIGatewayService{},
-		billingCacheService:      &service.BillingCacheService{},
+		billingCacheService:      newOpenAIWSHandlerTestBillingService(t),
 		apiKeyService:            &service.APIKeyService{},
 		contentModerationService: moderationSvc,
 		concurrencyHelper:        NewConcurrencyHelper(service.NewConcurrencyService(&concurrencyCacheMock{}), SSEPingFormatNone, time.Second),
@@ -1892,6 +1892,14 @@ func TestOpenAIHandler_InstructionsInjection(t *testing.T) {
 	require.True(t, gjson.ValidBytes(result))
 }
 
+func newOpenAIWSHandlerTestBillingService(t *testing.T) *service.BillingCacheService {
+	t.Helper()
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	billing := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billing.Stop)
+	return billing
+}
+
 func newOpenAIHandlerForPreviousResponseIDValidation(t *testing.T, cache *concurrencyCacheMock) *OpenAIGatewayHandler {
 	t.Helper()
 	if cache == nil {
@@ -1906,7 +1914,7 @@ func newOpenAIHandlerForPreviousResponseIDValidation(t *testing.T, cache *concur
 	}
 	return &OpenAIGatewayHandler{
 		gatewayService:      &service.OpenAIGatewayService{},
-		billingCacheService: &service.BillingCacheService{},
+		billingCacheService: newOpenAIWSHandlerTestBillingService(t),
 		apiKeyService:       &service.APIKeyService{},
 		concurrencyHelper:   NewConcurrencyHelper(service.NewConcurrencyService(cache), SSEPingFormatNone, time.Second),
 	}
@@ -1917,9 +1925,16 @@ func newOpenAIWSHandlerTestServer(t *testing.T, h *OpenAIGatewayHandler, subject
 	groupID := int64(2)
 	apiKey := &service.APIKey{
 		ID:      101,
+		Key:     "sk-ws-handler-validation",
 		GroupID: &groupID,
-		User:    &service.User{ID: subject.UserID},
+		User:    &service.User{ID: subject.UserID, Status: service.StatusActive},
 	}
+	// Production authentication supplies an active user and a refreshable key.
+	// Keep those prerequisites in frame-validation and ingress-capacity fixtures.
+	authRepo := newWSGroupPricingAPIKeyRepoStub(1)
+	authRepo.apiKey = *apiKey
+	authRepo.group.ID = groupID
+	h.apiKeyService = newWSGroupPricingAPIKeyService(authRepo)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set(string(middleware.ContextKeyAPIKey), apiKey)
@@ -1932,6 +1947,7 @@ func newOpenAIWSHandlerTestServer(t *testing.T, h *OpenAIGatewayHandler, subject
 
 type openAIResponsesWSUsageLogCase struct {
 	simpleModeRejectAtRead int64
+	configureBilling       func(*config.Config, *service.BillingCacheService)
 	compositeResolver      *service.CompositeRouteResolver
 	accountPlatform        string
 	closeReason            string
@@ -3011,6 +3027,9 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 	}
 	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, keyRepo, nil, nil, cfg, nil)
 	t.Cleanup(billingCacheSvc.Stop)
+	if tc.configureBilling != nil {
+		tc.configureBilling(cfg, billingCacheSvc)
+	}
 	gatewaySvc := service.NewOpenAIGatewayService(
 		accountRepo,
 		usageRepo,
@@ -3057,6 +3076,13 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		ID:      1801,
 		GroupID: &groupID,
 		User:    &service.User{ID: 1701, Status: service.StatusActive},
+	}
+	if tc.apiKeyService == nil {
+		// Real authenticated connections always have a credential and a lookup
+		// capable of confirming the current user status for subsequent turns.
+		apiKey.Key = wsGroupPricingKey
+		repo := newWSGroupPricingAPIKeyRepoStub(1)
+		h.apiKeyService = newWSGroupPricingAPIKeyService(repo)
 	}
 	if tc.apiKeyService != nil {
 		h.apiKeyService = tc.apiKeyService
@@ -3110,10 +3136,21 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 	if tc.closeStatus == 0 {
 		tc.closeStatus = coderws.StatusPolicyViolation
 	}
-	if tc.firstFrameCloseExpected {
+	clientEvents := make([][]byte, 0, turnCount)
+	readClientClose := func() error {
 		readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
-		_, _, readErr := clientConn.Read(readCtx)
-		cancelRead()
+		defer cancelRead()
+		for {
+			_, event, readErr := clientConn.Read(readCtx)
+			if readErr != nil {
+				return readErr
+			}
+			require.Equal(t, "error", gjson.GetBytes(event, "type").String())
+			clientEvents = append(clientEvents, append([]byte(nil), event...))
+		}
+	}
+	if tc.firstFrameCloseExpected {
+		readErr := readClientClose()
 		require.Error(t, readErr, "first frame should have been rejected with a close")
 		var closeErr coderws.CloseError
 		require.ErrorAs(t, readErr, &closeErr)
@@ -3129,10 +3166,8 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		require.Contains(t, closeErr.Reason, reason)
 		require.Empty(t, upstreamPayloadCh, "rejected first frame must not reach upstream")
 		_ = clientConn.CloseNow()
-		return openAIResponsesWSUsageLogResult{}
+		return openAIResponsesWSUsageLogResult{clientEvents: clientEvents}
 	}
-
-	clientEvents := make([][]byte, 0, turnCount)
 	readCompleted := func() {
 		readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
 		_, event, readErr := clientConn.Read(readCtx)
@@ -3155,9 +3190,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		cancelWrite()
 		require.NoError(t, err)
 		if tc.secondTurnCloseExpected {
-			readCtx, cancelRead := context.WithTimeout(context.Background(), 3*time.Second)
-			_, _, readErr := clientConn.Read(readCtx)
-			cancelRead()
+			readErr := readClientClose()
 			require.Error(t, readErr, "second turn should have been rejected with a close")
 			var closeErr coderws.CloseError
 			require.ErrorAs(t, readErr, &closeErr)
