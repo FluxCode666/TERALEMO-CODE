@@ -204,6 +204,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/enterprise',
+    name: 'Enterprise',
+    component: () => import('@/views/user/EnterpriseView.vue'),
+    meta: { requiresAuth: true, requiresEnterprise: true, titleKey: 'enterprise.title', descriptionKey: 'enterprise.description' }
+  },
+  {
     path: '/keys',
     name: 'Keys',
     component: () => import('@/views/user/KeysView.vue'),
@@ -221,6 +227,7 @@ const routes: RouteRecordRaw[] = [
     alias: '/docs/batch-image',
     component: () => import('@/views/user/BatchImageGuideView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Batch Image Guide',
@@ -245,6 +252,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Redeem Code',
@@ -306,6 +314,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PurchaseSubscription',
     component: () => import('@/views/user/PaymentView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Purchase Subscription',
@@ -319,6 +328,7 @@ const routes: RouteRecordRaw[] = [
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'My Orders',
@@ -331,6 +341,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PaymentQRCode',
     component: () => import('@/views/user/PaymentQRCodeView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Payment',
@@ -343,6 +354,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PaymentResult',
     component: () => import('@/views/user/PaymentResultView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Payment Result',
@@ -355,6 +367,7 @@ const routes: RouteRecordRaw[] = [
     name: 'StripePayment',
     component: () => import('@/views/user/StripePaymentView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Stripe Payment',
@@ -367,6 +380,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AirwallexPayment',
     component: () => import('@/views/user/AirwallexPaymentView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Airwallex Payment',
@@ -379,6 +393,7 @@ const routes: RouteRecordRaw[] = [
     name: 'StripePopup',
     component: () => import('@/views/user/StripePopupView.vue'),
     meta: {
+      requiresPersonalWallet: true,
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Payment',
@@ -437,6 +452,18 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'admin.audit.title',
       descriptionKey: 'admin.audit.description'
     }
+  },
+  {
+    path: '/admin/enterprises',
+    name: 'AdminEnterprises',
+    component: () => import('@/views/admin/EnterprisesView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.enterprises.title', descriptionKey: 'admin.enterprises.description' }
+  },
+  {
+    path: '/admin/enterprises/:id',
+    name: 'AdminEnterpriseDetail',
+    component: () => import('@/views/admin/EnterpriseDetailView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.enterprises.detail', descriptionKey: 'admin.enterprises.description' }
   },
   {
     path: '/admin/users',
@@ -816,6 +843,12 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
+  // This check also covers public payment callbacks that can open a payment form.
+  if (authStore.isAuthenticated && authStore.user?.enterprise && to.meta.requiresPersonalWallet) {
+    next('/enterprise')
+    return
+  }
+
   // If route doesn't require auth, allow access
   if (!requiresAuth) {
     // If already authenticated and trying to access login/register, redirect to appropriate dashboard
@@ -880,6 +913,11 @@ router.beforeEach(async (to, _from, next) => {
       path: '/login',
       query: { redirect: to.fullPath } // Save intended destination
     })
+    return
+  }
+
+  if (to.meta.requiresEnterprise && !authStore.user?.enterprise) {
+    next('/dashboard')
     return
   }
 

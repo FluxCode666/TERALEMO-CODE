@@ -13,6 +13,12 @@ declare module 'vue-router' {
      */
     requiresAuth?: boolean
 
+    /** Requires membership in an enterprise. */
+    requiresEnterprise?: boolean
+
+    /** Personal payments, balance redemption and unsupported wallet flows. */
+    requiresPersonalWallet?: boolean
+
     /**
      * Whether this route requires admin role
      * @default false

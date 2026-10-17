@@ -8,10 +8,12 @@ type NavigationGuard = (
 
 const routerHarness = vi.hoisted(() => ({
   guard: null as NavigationGuard | null,
+  routes: [] as Array<{ name?: string; path: string; meta?: Record<string, unknown> }>,
 }))
 
 const authStore = vi.hoisted(() => ({
   checkAuth: vi.fn(),
+  user: null as null | { enterprise?: { id: number } | null },
   isAuthenticated: true,
   isAdmin: false,
   isSimpleMode: false,
@@ -33,13 +35,15 @@ const appStore = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
-  createRouter: vi.fn(() => ({
+  createRouter: vi.fn((config) => {
+    routerHarness.routes = config.routes
+    return ({
     beforeEach: vi.fn((guard: NavigationGuard) => {
       routerHarness.guard = guard
     }),
     afterEach: vi.fn(),
     onError: vi.fn(),
-  })),
+  }) }),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -112,6 +116,7 @@ describe('feature route guard', () => {
   })
 
   beforeEach(() => {
+    authStore.user = null
     authStore.isAuthenticated = true
     authStore.isAdmin = false
     authStore.isSimpleMode = false
@@ -208,5 +213,60 @@ describe('subscription route guard (opt-out flag)', () => {
     await navigation
 
     expect(next).toHaveBeenCalledWith('/admin/dashboard')
+  })
+})
+
+
+describe('enterprise route access', () => {
+  beforeEach(() => {
+    authStore.isAuthenticated = true
+    authStore.isAdmin = false
+    authStore.isSimpleMode = false
+    authStore.user = { enterprise: { id: 1 } }
+    appStore.publicSettingsLoaded = true
+    appStore.cachedPublicSettings = { payment_enabled: true }
+    appStore.fetchPublicSettings.mockReset()
+  })
+
+  it.each([
+    'Redeem', 'PurchaseSubscription', 'OrderList', 'PaymentQRCode', 'PaymentResult',
+    'StripePayment', 'AirwallexPayment', 'StripePopup', 'BatchImageGuide',
+  ])('blocks enterprise direct navigation to actual route %s', async (name) => {
+    const route = routerHarness.routes.find(item => item.name === name)!
+    expect(route).toBeDefined()
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith('/enterprise')
+  })
+
+  it('redirects non-members from the enterprise route', async () => {
+    authStore.user = { enterprise: null }
+    const route = routerHarness.routes.find(item => item.name === 'Enterprise')!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('keeps ordinary users able to purchase', async () => {
+    authStore.user = { enterprise: null }
+    const route = routerHarness.routes.find(item => item.name === 'PurchaseSubscription')!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it.each(['AdminEnterprises', 'AdminEnterpriseDetail'])('protects actual admin route %s', async name => {
+    const route = routerHarness.routes.find(item => item.name === name)!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('keeps existing subscriptions accessible to enterprise members', async () => {
+    const route = routerHarness.routes.find(item => item.name === 'Subscriptions')!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledWith()
   })
 })

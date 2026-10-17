@@ -163,6 +163,8 @@ export default {
 
   // Navigation
   nav: {
+    enterprise: 'My enterprise',
+    enterprises: 'Enterprises',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',

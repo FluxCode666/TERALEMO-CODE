@@ -1,12 +1,12 @@
 ## W1 后端数据层（主工作区）
 
-- [ ] 1.1 `internal/domain/enterprise.go`：角色、状态、scope_type、审计 action 常量；`EnterpriseSettings` 及默认值与容错反序列化；错误码常量（D7）
-- [ ] 1.2 ent schema：`enterprise.go`、`enterprise_department.go`、`enterprise_member.go`、`enterprise_quota.go`、`enterprise_balance_log.go`、`enterprise_audit_log.go`、`enterprise_allowed_group.go`、`enterprise_group_whitelist.go`；`usage_log.go` 增加 `enterprise_id`、`enterprise_department_id`；`go generate ./ent`
-- [ ] 1.3 迁移 `246_add_enterprises.sql`（全部新表、部分唯一索引、外键、COMMENT）、`247_usage_logs_enterprise_columns.sql`（ADD COLUMN IF NOT EXISTS）、`248_usage_logs_enterprise_indexes_notx.sql`（参照已有 usage_logs 索引迁移处理分区表）；迁移内容测试
-- [ ] 1.4 service 包：模型（`Enterprise`、`EnterpriseDepartment`、`EnterpriseMember`、`EnterpriseQuota`、`EnterpriseBalanceLog`、`EnterpriseAuditLog`、`EnterpriseGroupWhitelist`）、`EnterpriseMemberContext`（`Active`、`AllowsGroup`）、仓储窄接口、`EnterpriseBillingCache` 接口与 no-op 实现
-- [ ] 1.5 repository 实现：企业 CRUD 与列表（成员数、部门数）、部门 CRUD（人数）、成员 CRUD / 列表过滤 / 按 user_id 唯一性、限额读写 / 重置 / 按 scope 批量读取、余额原子调整 + 流水（同事务）、审计写入与分页、分组池与白名单读写、`GetMemberContextByUserID` 与批量版本、按 enterprise 列出全部成员 user_id（供缓存失效）
-- [ ] 1.6 repository 集成测试（testcontainers）：唯一约束（一人一企业、部门重名）、软删除后可重新加入、余额调整不为负且流水正确、成员上下文组装（池 / 白名单交集、无部门、停用状态）
-- [ ] 1.7 wire 注册（repository、no-op cache），`go generate ./cmd/server`，`go build ./...` 与 `go test -tags=unit ./...` 通过
+- [x] 1.1 `internal/domain/enterprise.go`：角色、状态、scope_type、审计 action 常量；`EnterpriseSettings` 及默认值与容错反序列化；错误码常量（D7）
+- [x] 1.2 ent schema：`enterprise.go`、`enterprise_department.go`、`enterprise_member.go`、`enterprise_quota.go`、`enterprise_balance_log.go`、`enterprise_audit_log.go`、`enterprise_allowed_group.go`、`enterprise_group_whitelist.go`；`usage_log.go` 增加 `enterprise_id`、`enterprise_department_id`；`go generate ./ent`
+- [x] 1.3 迁移 `246_add_enterprises.sql`（全部新表、部分唯一索引、外键、COMMENT）、`247_usage_logs_enterprise_columns.sql`（ADD COLUMN IF NOT EXISTS）、`248_usage_logs_enterprise_indexes_notx.sql`（参照已有 usage_logs 索引迁移处理分区表）；迁移内容测试
+- [x] 1.4 service 包：模型（`Enterprise`、`EnterpriseDepartment`、`EnterpriseMember`、`EnterpriseQuota`、`EnterpriseBalanceLog`、`EnterpriseAuditLog`、`EnterpriseGroupWhitelist`）、`EnterpriseMemberContext`（`Active`、`AllowsGroup`）、仓储窄接口、`EnterpriseBillingCache` 接口与 no-op 实现
+- [x] 1.5 repository 实现：企业 CRUD 与列表（成员数、部门数）、部门 CRUD（人数）、成员 CRUD / 列表过滤 / 按 user_id 唯一性、限额读写 / 重置 / 按 scope 批量读取、余额原子调整 + 流水（同事务）、审计写入与分页、分组池与白名单读写、`GetMemberContextByUserID` 与批量版本、按 enterprise 列出全部成员 user_id（供缓存失效）
+- [x] 1.6 repository 集成测试（testcontainers）：唯一约束（一人一企业、部门重名）、软删除后可重新加入、余额调整不为负且流水正确、成员上下文组装（池 / 白名单交集、无部门、停用状态）
+- [x] 1.7 wire 注册（repository、no-op cache），`go generate ./cmd/server`，`go build ./...` 与 `go test -tags=unit ./...` 通过
 
 ## W2 后端管理接口（主工作区，W1 之后）
 
@@ -36,13 +36,13 @@
 
 ## W4 前端（主工作区，只改 frontend/）
 
-- [ ] 4.1 类型 `src/types/enterprise.ts`；`User.enterprise`；API `src/api/admin/enterprises.ts`（注册 `adminAPI`）、`src/api/enterprise.ts`；API 单测
-- [ ] 4.2 管理端：企业列表页（创建 / 编辑 / 停用 / 删除 / 余额调整）与详情页（概览、部门、成员、限额、分组池与白名单、使用记录、余额流水、审计、设置）
-- [ ] 4.3 用户侧 `/enterprise` 页面：按 `overview.permissions` 显示 Tab；成员新建 / 编辑 / 移出；限额查看与编辑；白名单编辑；使用记录（范围内过滤、成员 / 部门排行、趋势）；设置；审计
-- [ ] 4.4 企业成员钱包适配：顶栏 / 仪表盘余额改为企业余额（按可见性）、隐藏充值 / 购买 / 余额兑换入口、路由守卫
-- [ ] 4.5 路由、侧边栏菜单（管理端「企业管理」、用户侧「我的企业」）
-- [ ] 4.6 i18n（zh/en 完全对齐，加入防冲突测试）
-- [ ] 4.7 组件 / 页面测试（权限 Tab 显隐、可见性 null 处理、表单校验），`pnpm typecheck`、`pnpm lint:check`、`pnpm test:run`、`pnpm check:i18n` 通过
+- [x] 4.1 类型 `src/types/enterprise.ts`；`User.enterprise`；API `src/api/admin/enterprises.ts`（注册 `adminAPI`）、`src/api/enterprise.ts`；API 单测
+- [x] 4.2 管理端：企业列表页（创建 / 编辑 / 停用 / 删除 / 余额调整）与详情页（概览、部门、成员、限额、分组池与白名单、使用记录、余额流水、审计、设置）
+- [x] 4.3 用户侧 `/enterprise` 页面：按 `overview.permissions` 显示 Tab；成员新建 / 编辑 / 移出；限额查看与编辑；白名单编辑；使用记录（范围内过滤、成员 / 部门排行、趋势）；设置；审计
+- [x] 4.4 企业成员钱包适配：顶栏 / 仪表盘余额改为企业余额（按可见性）、隐藏充值 / 购买 / 余额兑换入口、路由守卫
+- [x] 4.5 路由、侧边栏菜单（管理端「企业管理」、用户侧「我的企业」）
+- [x] 4.6 i18n（zh/en 完全对齐，加入防冲突测试）
+- [x] 4.7 组件 / 页面测试（权限 Tab 显隐、可见性 null 处理、表单校验），`pnpm typecheck`、`pnpm lint:check`、`pnpm test:run`、`pnpm check:i18n` 通过
 
 ## 5. 集成与验证
 

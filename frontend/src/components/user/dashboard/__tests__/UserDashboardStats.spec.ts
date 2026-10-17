@@ -82,6 +82,25 @@ function cardPlatforms(w: VueWrapper): string[] {
 }
 
 describe('UserDashboardStats 按平台拆分', () => {
+  it('企业余额不可见时隐藏整个余额卡片，不显示为 0', () => {
+    const w = mount(UserDashboardStats, {
+      props: { stats: makeStats(), balance: null, enterpriseBalance: true, isSimple: false },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.find('[data-testid="dashboard-balance"]').exists()).toBe(false)
+  })
+
+  it('可见的企业零余额仍显示企业余额标签', () => {
+    const w = mount(UserDashboardStats, {
+      props: { stats: makeStats(), balance: 0, enterpriseBalance: true, isSimple: false },
+      global: { stubs: { Icon: true } },
+    })
+    const card = w.get('[data-testid="dashboard-balance"]')
+    expect(card.text()).toContain('enterprise.balance')
+    expect(card.text()).toContain('$0.00')
+    expect(card.text()).not.toContain('dashboard.balance')
+  })
+
   it('只有用量的平台才产生卡片；三档全空的限额记录不产生卡片', () => {
     const w = mountStats(
       makeStats({ total_actual_cost: 0.03, today_actual_cost: 0.03, by_platform: [usage('grok', 0.03)] }),

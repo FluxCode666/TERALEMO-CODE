@@ -1,0 +1,15 @@
+import { apiClient } from '../client'
+import { createEnterpriseAPI } from '../enterprise'
+import type { Enterprise, EnterpriseQuery, EnterprisePage, CreateEnterpriseRequest, UpdateEnterpriseRequest } from '@/types/enterprise'
+
+const base = '/admin/enterprises'
+export const enterprisesAPI = {
+  list: async (params?: EnterpriseQuery): Promise<EnterprisePage<Enterprise>> => (await apiClient.get<EnterprisePage<Enterprise>>(base, { params })).data,
+  create: async (body: CreateEnterpriseRequest): Promise<Enterprise> => (await apiClient.post<Enterprise>(base, body)).data,
+  get: async (id: number): Promise<Enterprise> => (await apiClient.get<Enterprise>(`${base}/${id}`)).data,
+  update: async (id: number, body: UpdateEnterpriseRequest): Promise<Enterprise> => (await apiClient.put<Enterprise>(`${base}/${id}`, body)).data,
+  remove: async (id: number): Promise<void> => { await apiClient.delete(`${base}/${id}`) },
+  adjustBalance: async (id: number, body: { operation: 'add' | 'subtract'; amount: number; notes?: string }): Promise<Enterprise> => (await apiClient.post<Enterprise>(`${base}/${id}/balance`, body)).data,
+  forEnterprise: (id: number) => createEnterpriseAPI(`${base}/${id}`)
+}
+export default enterprisesAPI

@@ -58,7 +58,9 @@
 
         <!-- Balance Display -->
         <div
-          v-if="user"
+          v-if="user && balanceVisible"
+          data-testid="header-balance"
+          :aria-label="balanceLabel"
           class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
         >
           <svg
@@ -75,15 +77,16 @@
             />
           </svg>
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-            {{ formatHeaderMoney(availableBalance) }}
+            <span v-if="enterprise" class="mr-1 font-normal">{{ t('enterprise.balance') }}</span>{{ formatHeaderMoney(availableBalance) }}
           </span>
           <span
-            v-if="frozenBalance > 0"
+            v-if="!enterprise && frozenBalance > 0"
             class="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
           >
             {{ balanceFrozenLabel }}
           </span>
           <div
+            v-if="!enterprise"
             class="pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block dark:border-dark-700 dark:bg-dark-800"
           >
             <div class="flex items-center justify-between">
@@ -142,14 +145,14 @@
               </div>
 
               <!-- Balance (mobile only) -->
-              <div class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
+              <div v-if="balanceVisible" data-testid="header-mobile-balance" class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
                 <div class="text-xs text-gray-500 dark:text-dark-400">
-                  {{ t('common.balance') }}
+                  {{ balanceLabel }}
                 </div>
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
                   {{ formatHeaderMoney(availableBalance) }}
                 </div>
-                <div v-if="frozenBalance > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                <div v-if="!enterprise && frozenBalance > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
                   {{ balanceFrozenText }} {{ formatHeaderMoney(frozenBalance) }}
                 </div>
               </div>
@@ -281,7 +284,10 @@ const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
-const availableBalance = computed(() => Number(user.value?.balance || 0))
+const enterprise = computed(() => user.value?.enterprise)
+const balanceVisible = computed(() => !enterprise.value || (enterprise.value.balance_visible && enterprise.value.balance != null))
+const balanceLabel = computed(() => enterprise.value ? t('enterprise.balance') : t('common.balance'))
+const availableBalance = computed(() => Number(enterprise.value ? enterprise.value.balance ?? 0 : user.value?.balance || 0))
 const frozenBalance = computed(() => Number(user.value?.frozen_balance || 0))
 const totalBalance = computed(() => availableBalance.value + frozenBalance.value)
 const balanceAvailableText = computed(() => t('common.availableBalance') === 'common.availableBalance' ? '可用余额' : t('common.availableBalance'))

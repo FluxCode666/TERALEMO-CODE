@@ -163,6 +163,8 @@ export default {
 
   // Navigation
   nav: {
+    enterprise: '我的企业',
+    enterprises: '企业管理',
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',

@@ -83,7 +83,7 @@
           </div>
         </div>
 
-        <div class="card p-6">
+        <div v-if="!authStore.user?.enterprise" class="card p-6" data-testid="affiliate-transfer-balance">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('affiliate.transfer.title') }}</h3>
@@ -205,7 +205,7 @@ async function copyInviteLink(): Promise<void> {
 }
 
 async function transferQuota(): Promise<void> {
-  if (!detail.value || detail.value.aff_quota <= 0 || transferring.value) return
+  if (authStore.user?.enterprise || !detail.value || detail.value.aff_quota <= 0 || transferring.value) return
   transferring.value = true
   try {
     const resp = await userAPI.transferAffiliateQuota()

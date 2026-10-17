@@ -1,3 +1,7 @@
+import enEnterprise from '../locales/en/enterprise'
+import enAdminEnterprises from '../locales/en/admin/enterprises'
+import zhEnterprise from '../locales/zh/enterprise'
+import zhAdminEnterprises from '../locales/zh/admin/enterprises'
 import { describe, expect, it } from 'vitest'
 
 import enAdminAccounts from '../locales/en/admin/accounts'
@@ -42,12 +46,13 @@ function collisions(modules: Modules): string[] {
 }
 
 const roots: Record<string, Modules> = {
-  zh: { landing: zhLanding, common: zhCommon, dashboard: zhDashboard, misc: zhMisc },
-  en: { landing: enLanding, common: enCommon, dashboard: enDashboard, misc: enMisc }
+  zh: { enterprise: zhEnterprise, landing: zhLanding, common: zhCommon, dashboard: zhDashboard, misc: zhMisc },
+  en: { enterprise: enEnterprise, landing: enLanding, common: enCommon, dashboard: enDashboard, misc: enMisc }
 }
 
 const admins: Record<string, Modules> = {
   zh: {
+    enterprises: zhAdminEnterprises,
     overview: zhAdminOverview,
     channels: zhAdminChannels,
     accounts: zhAdminAccounts,
@@ -56,6 +61,7 @@ const admins: Record<string, Modules> = {
     settings: zhAdminSettings
   },
   en: {
+    enterprises: enAdminEnterprises,
     overview: enAdminOverview,
     channels: enAdminChannels,
     accounts: enAdminAccounts,

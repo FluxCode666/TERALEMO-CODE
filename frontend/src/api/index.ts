@@ -9,6 +9,8 @@ export { apiClient } from './client'
 // Auth API
 export { authAPI, isTotp2FARequired, type LoginResponse } from './auth'
 
+export { enterpriseAPI } from './enterprise'
+
 // User APIs
 export { keysAPI } from './keys'
 export { usageAPI } from './usage'
