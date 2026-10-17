@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,15 @@ type enterpriseScopeReviewCache struct {
 	reservations     map[string]string
 	releases, renews int
 	lastScope        string
+	balanceMiss      bool
+}
+
+func (c *enterpriseScopeReviewCache) ReserveEnterpriseInflight(ctx context.Context, enterpriseID int64, id string, amount float64, ttl time.Duration) (bool, bool, error) {
+	if c.balanceMiss {
+		return false, false, nil
+	}
+	pending, err := c.ReserveInflightScope(ctx, fmt.Sprintf("ent:%d", enterpriseID), id, amount, ttl)
+	return true, 50-pending >= amount, err
 }
 
 func (c *enterpriseScopeReviewCache) ReserveInflightScope(_ context.Context, scope, id string, _ float64, _ time.Duration) (float64, error) {
@@ -103,7 +113,7 @@ func TestEnterpriseInflightReservationRedisFailureReleasesAndFailsOpen(t *testin
 }
 
 func TestEnterpriseInflightReservationBalanceReadStillFailsClosed(t *testing.T) {
-	cache := &enterpriseScopeReviewCache{}
+	cache := &enterpriseScopeReviewCache{balanceMiss: true}
 	svc := newEnterpriseInflightReviewService(t, cache, &enterpriseRuntimeCacheStub{balanceErr: errors.New("redis down")}, true)
 	user, _ := enterpriseEligibilityFixture()
 	res, err := svc.ReserveInflight(context.Background(), user, &Group{ID: 5}, nil, 1)

@@ -89,6 +89,7 @@ func TestUsageBillingEnterpriseAtomicDedupWindowsAndOverdraft(t *testing.T) {
 	first, err := repo.Apply(ctx, cmd)
 	require.NoError(t, err)
 	require.True(t, first.Applied)
+	require.NotNil(t, first.EnterpriseQuotaWindows)
 	require.Nil(t, first.NewBalance)
 	require.Equal(t, 8.75, *first.NewEnterpriseBalance)
 	require.False(t, first.BalanceOverdrafted)
@@ -109,6 +110,9 @@ func TestUsageBillingEnterpriseAtomicDedupWindowsAndOverdraft(t *testing.T) {
 		require.True(t, day.Equal(timezone.StartOfDay(now)))
 		require.True(t, week.Equal(timezone.StartOfWeek(now)))
 		require.True(t, month.Equal(timezone.StartOfMonth(now)))
+		require.True(t, day.Equal(first.EnterpriseQuotaWindows.Daily), "Apply returns the daily window actually written by SQL")
+		require.True(t, week.Equal(first.EnterpriseQuotaWindows.Weekly), "Apply returns the weekly window actually written by SQL")
+		require.True(t, month.Equal(first.EnterpriseQuotaWindows.Monthly), "Apply returns the monthly window actually written by SQL")
 		count++
 	}
 	require.NoError(t, rows.Err())

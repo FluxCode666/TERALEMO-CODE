@@ -431,7 +431,11 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
 		if p.User.Enterprise != nil {
 			if deps.billingCacheService != nil {
-				deps.billingCacheService.SyncEnterpriseUsage(ctx, p.User.Enterprise, QuantizeUsageBillingAmount(p.Cost.ActualCost))
+				var windows *EnterpriseBillingWindowStarts
+				if result != nil {
+					windows = result.EnterpriseQuotaWindows
+				}
+				deps.billingCacheService.SyncEnterpriseUsage(ctx, p.User.Enterprise, QuantizeUsageBillingAmount(p.Cost.ActualCost), windows)
 			}
 		} else {
 			syncBalanceCacheAfterDeduction(ctx, p, deps, result)

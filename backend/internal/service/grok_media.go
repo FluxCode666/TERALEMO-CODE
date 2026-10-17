@@ -381,11 +381,25 @@ type GrokVideoPendingBilling struct {
 	VideoResolution      string `json:"video_resolution,omitempty"`
 	VideoDurationSeconds int    `json:"video_duration_seconds,omitempty"`
 	OriginalModel        string `json:"original_model,omitempty"`
+	// BillingIdentity freezes the accepted task's billing mode and subscription.
+	// Nil identifies legacy pending entries created before identity snapshots.
+	BillingIdentity *GrokVideoBillingIdentity `json:"billing_identity,omitempty"`
 	// CreatedAt is when the gateway accepted the async create (RFC3339Nano UTC).
 	// duration_ms for deferred billing is measured from this instant until the
 	// first official done+video.url observation (status poll or content download),
 	// not the latency of that single discovery request alone.
 	CreatedAt string `json:"created_at,omitempty"`
+}
+
+// GrokVideoBillingIdentity contains only the payer fields needed at completion.
+// Enterprise video creation is disabled, so balance tasks retain a personal payer.
+type GrokVideoBillingIdentity struct {
+	BillingType         int8  `json:"billing_type"`
+	UserID              int64 `json:"user_id"`
+	GroupID             int64 `json:"group_id"`
+	SubscriptionID      int64 `json:"subscription_id,omitempty"`
+	SubscriptionUserID  int64 `json:"subscription_user_id,omitempty"`
+	SubscriptionGroupID int64 `json:"subscription_group_id,omitempty"`
 }
 
 // GrokVideoPendingCreatedAtNow formats a create-accept timestamp for pending billing.

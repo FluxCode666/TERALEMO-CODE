@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 // EnterpriseAllowsGroupForUser applies the same enterprise access predicate at
@@ -18,10 +19,15 @@ func EnterpriseAllowsGroupForUser(user *User, group *Group) bool {
 	return group.IsSubscriptionType() || user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
+var ErrGatewayUserInactive = infraerrors.Unauthorized("USER_INACTIVE", "User account is not active")
+
 // CheckEnterpriseSessionEligibility rechecks a frozen turn without incrementing
 // request RPM. Monetary windows and payer eligibility still apply to each turn.
 func (s *BillingCacheService) CheckEnterpriseSessionEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
-	if user == nil || user.Enterprise == nil {
+	if user == nil || !user.IsActive() {
+		return ErrGatewayUserInactive
+	}
+	if user.Enterprise == nil {
 		return nil
 	}
 	if s == nil {
@@ -103,4 +109,19 @@ func (s *GatewayService) checkEnterpriseResolvedGroup(ctx context.Context, group
 		}
 	}
 	return nil
+}
+
+// CheckResolvedSessionPlatformQuota checks a target that only becomes known
+// after a WebSocket's first frame, without counting its request RPM again.
+func (s *BillingCacheService) CheckResolvedSessionPlatformQuota(ctx context.Context, user *User, group *Group, subscription *UserSubscription, platform string) error {
+	if s == nil {
+		return ErrBillingServiceUnavailable
+	}
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		return nil
+	}
+	if group != nil && group.IsSubscriptionType() && subscription != nil {
+		return nil
+	}
+	return s.checkUserPlatformQuotaEligibility(ctx, user.ID, platform)
 }

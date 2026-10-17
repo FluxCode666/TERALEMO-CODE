@@ -1,10 +1,16 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	pkgerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 )
 
@@ -59,4 +65,43 @@ func (h *GatewayHandler) handleEnterpriseSelectionError(c *gin.Context, err erro
 	}
 	h.handleStreamingAwareError(c, status, code, message, streamStarted)
 	return true
+}
+
+// writeOpenAIBillingWSError preserves the same billing details as HTTP before
+// closing an upgraded Responses connection. Write at the rejection point: the
+// proxy may cancel its context while unwinding its read/write goroutines.
+func writeOpenAIBillingWSError(ctx context.Context, conn *coderws.Conn, err error) {
+	if conn == nil || err == nil {
+		return
+	}
+	status, code, message, retry := billingErrorDetails(err)
+	if errors.Is(err, errOpenAIWSEnterpriseBillingReconnect) {
+		status, code, message = http.StatusForbidden, "billing_session_reconnect_required", errOpenAIWSEnterpriseBillingReconnect.Error()
+	}
+	errType := "permission_error"
+	switch status {
+	case http.StatusUnauthorized:
+		errType = "authentication_error"
+	case http.StatusTooManyRequests:
+		errType = "rate_limit_error"
+	case http.StatusServiceUnavailable:
+		errType = "api_error"
+	}
+	body := gin.H{"type": errType, "code": code, "message": message, "status": status}
+	if appErr := pkgerrors.FromError(err); appErr != nil && len(appErr.Metadata) > 0 {
+		body["metadata"] = appErr.Metadata
+	}
+	if retry > 0 {
+		body["retry_after"] = retry
+	}
+	payload, marshalErr := json.Marshal(gin.H{"event_id": "evt_billing_rejected", "type": "error", "error": body})
+	if marshalErr != nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	_ = conn.Write(writeCtx, coderws.MessageText, payload)
 }

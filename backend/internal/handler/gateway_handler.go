@@ -1627,10 +1627,10 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 	dailyUsage := h.buildAPIKeyDailyUsage(c, subject.UserID, apiKey.ID, days)
 
 	// Best-effort: 获取模型统计
-	var modelStats any
+	var modelStats []gatewayUsageModelStat
 	if h.usageService != nil {
 		if stats, err := h.usageService.GetAPIKeyModelStats(ctx, apiKey.ID, startTime, endTime); err == nil && len(stats) > 0 {
-			modelStats = stats
+			modelStats = publicGatewayUsageModelStats(stats)
 		}
 	}
 
@@ -1713,7 +1713,7 @@ func (h *GatewayHandler) buildAPIKeyDailyUsage(c *gin.Context, userID, apiKeyID 
 }
 
 // usageQuotaLimited 处理 quota_limited 模式的响应
-func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, apiKey *service.APIKey, usageData gin.H, dailyUsage any, modelStats any) {
+func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, apiKey *service.APIKey, usageData gin.H, dailyUsage any, modelStats []gatewayUsageModelStat) {
 	identity, ok := h.enterpriseUsageIdentity(c, ctx, apiKey, apiKey.UserID)
 	if !ok {
 		return
@@ -1811,7 +1811,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 }
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
-func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
+func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats []gatewayUsageModelStat) {
 	identity, ok := h.enterpriseUsageIdentity(c, ctx, apiKey, subject.UserID)
 	if !ok {
 		return
@@ -2540,6 +2540,9 @@ func extractQuotaResetSeconds(err error) int {
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
+	if errors.Is(err, service.ErrGatewayUserInactive) {
+		return http.StatusUnauthorized, "USER_INACTIVE", service.ErrGatewayUserInactive.Message, 0
+	}
 	if appErr := pkgerrors.FromError(err); appErr != nil && isEnterpriseBillingErrorReason(appErr.Reason) {
 		if appErr.Code == http.StatusTooManyRequests {
 			return http.StatusTooManyRequests, appErr.Reason, appErr.Message, extractQuotaResetSeconds(err)
