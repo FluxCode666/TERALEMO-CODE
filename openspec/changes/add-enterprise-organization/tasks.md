@@ -22,17 +22,17 @@
 
 ## W3 后端计费运行时（独立 worktree，W1 之后）
 
-- [ ] 3.1 `service.User.Enterprise`；`CanBindGroup` 企业逻辑；`APIKeyService` 绑定与 `GetAvailableGroups` 过滤（订阅分组也要过 `AllowsGroup`）；面板侧加载用户时附带成员上下文
-- [ ] 3.2 认证快照加入企业上下文并提升 Version；`api_key_repo` 加载
-- [ ] 3.3 中间件：企业 / 成员停用、`ENTERPRISE_GROUP_NOT_ALLOWED`（先于订阅提前放行）、企业成员跳过个人余额阈值
-- [ ] 3.4 `EnterpriseBillingCache` Redis 实现：企业余额缓存（读、存在才扣减、失效）、三级限额 hash（读、存在才累加、失效）
-- [ ] 3.5 `CheckBillingEligibility` 企业分支（D3 前置检查，fail-closed）；`reserveInflight` 与 `ReserveFixedCharge` 企业 scope
-- [ ] 3.6 结算：`UsageBillingCommand` 企业字段与指纹兼容；`buildUsageBillingCommand`；`Apply` 事务内扣企业余额 + 三级用量累加（SQL 窗口归零，固定加锁顺序）；`UsageBillingApplyResult.NewEnterpriseBalance`；legacy 路径
-- [ ] 3.7 事务后：企业余额缓存同步、限额缓存同步、企业余额下穿阈值邮件通知 owner
-- [ ] 3.8 `usage_logs` 写入 `enterprise_id`、`enterprise_department_id`（insert SQL 列清单、`buildRecordUsageLog`、OpenAI 侧）
-- [ ] 3.9 批量图片对企业成员返回 `ENTERPRISE_FEATURE_UNSUPPORTED`
-- [ ] 3.10 `billingErrorDetails` 新错误映射（429 + Retry-After + metadata；403）
-- [ ] 3.11 测试：`CanBindGroup` 表驱动；中间件；前置检查各分支（余额、三级限额、窗口过期归零、缓存失败兜底、非成员零变化）；`Apply` 集成测试（扣企业余额不动个人余额、三级累加、幂等重放、窗口归零、透支标记）；指纹对非企业请求不变
+- [x] 3.1 `service.User.Enterprise`；`CanBindGroup` 企业逻辑；`APIKeyService` 绑定与 `GetAvailableGroups` 过滤（订阅分组也要过 `AllowsGroup`）；面板侧加载用户时附带成员上下文
+- [x] 3.2 认证快照加入企业上下文并提升 Version；`api_key_repo` 加载
+- [x] 3.3 中间件：企业 / 成员停用、`ENTERPRISE_GROUP_NOT_ALLOWED`（先于订阅提前放行）、企业成员跳过个人余额阈值
+- [x] 3.4 `EnterpriseBillingCache` Redis 实现：企业余额缓存（读、存在才扣减、失效）、三级限额 hash（读、存在才累加、失效）
+- [x] 3.5 `CheckBillingEligibility` 企业分支（D3 前置检查，fail-closed）；`reserveInflight` 与 `ReserveFixedCharge` 企业 scope
+- [x] 3.6 结算：`UsageBillingCommand` 企业字段与指纹兼容；`buildUsageBillingCommand`；`Apply` 事务内扣企业余额 + 三级用量累加（SQL 窗口归零，固定加锁顺序）；`UsageBillingApplyResult.NewEnterpriseBalance`；legacy 路径
+- [x] 3.7 事务后：企业余额缓存同步、限额缓存同步、企业余额下穿阈值邮件通知 owner
+- [x] 3.8 `usage_logs` 写入 `enterprise_id`、`enterprise_department_id`（insert SQL 列清单、`buildRecordUsageLog`、OpenAI 侧）
+- [x] 3.9 批量图片对企业成员返回 `ENTERPRISE_FEATURE_UNSUPPORTED`
+- [x] 3.10 `billingErrorDetails` 新错误映射（429 + Retry-After + metadata；403）
+- [x] 3.11 测试：`CanBindGroup` 表驱动；中间件；前置检查各分支（余额、三级限额、窗口过期归零、缓存失败兜底、非成员零变化）；`Apply` 集成测试（扣企业余额不动个人余额、三级累加、幂等重放、窗口归零、透支标记）；指纹对非企业请求不变
 
 ## W4 前端（主工作区，只改 frontend/）
 

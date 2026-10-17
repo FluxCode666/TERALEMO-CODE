@@ -43,6 +43,9 @@ type BalanceNotifyService struct {
 	settingRepo              SettingRepository
 	accountRepo              AccountQuotaReader
 	notificationEmailService *NotificationEmailService
+	enterpriseRepo           enterpriseBalanceNotifyReader
+	enterpriseMemberRepo     enterpriseOwnerNotifyReader
+	enterpriseEmailSender    enterpriseBalanceEmailSender
 }
 
 // NewBalanceNotifyService creates a new BalanceNotifyService.

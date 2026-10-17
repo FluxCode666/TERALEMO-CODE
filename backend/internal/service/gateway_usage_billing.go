@@ -143,7 +143,10 @@ func (p *postUsageBillingParams) shouldUpdateAccountQuota() bool {
 // postUsageBilling is the legacy fallback billing path used when the unified
 // billing repo is unavailable (nil). Production uses applyUsageBilling → repo.Apply
 // for atomic billing. This path only runs in tests or degraded mode.
-func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *billingDeps) {
+func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *billingDeps) error {
+	if p != nil && p.User != nil && p.User.Enterprise != nil && !p.IsSubscriptionBill {
+		return ErrEnterpriseBillingLegacyUnsupported
+	}
 	billingCtx, cancel := detachedBillingContext(ctx)
 	defer cancel()
 
@@ -212,6 +215,7 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 	// cache updates. The legacy path does DB writes directly; the finalize path
 	// does cache queue + notifications. Notifications are dispatched separately
 	// by the caller after recording the usage log.
+	return nil
 }
 
 func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string) string {
@@ -299,6 +303,11 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		AccountType:        p.Account.Type,
 		RequestPayloadHash: strings.TrimSpace(p.RequestPayloadHash),
 	}
+	if enterprise := p.User.Enterprise; enterprise != nil {
+		cmd.EnterpriseID = enterprise.EnterpriseID
+		cmd.EnterpriseDepartmentID = valueOrZero(enterprise.DepartmentID)
+		cmd.EnterpriseMemberID = enterprise.MemberID
+	}
 	if usageLog != nil {
 		cmd.Model = usageLog.Model
 		cmd.BillingType = usageLog.BillingType
@@ -334,7 +343,11 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.ActualCost
 	} else if p.Cost.ActualCost > 0 {
-		cmd.BalanceCost = p.Cost.ActualCost
+		if p.User.Enterprise != nil {
+			cmd.EnterpriseBalanceCost = p.Cost.ActualCost
+		} else {
+			cmd.BalanceCost = p.Cost.ActualCost
+		}
 	}
 
 	if p.shouldDeductAPIKeyQuota() {
@@ -363,7 +376,9 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 		}
 		// The legacy path is only a fallback for standard billing. Simple mode
 		// must retain request-id deduplication and never bill other balances.
-		postUsageBilling(ctx, p, deps)
+		if err := postUsageBilling(ctx, p, deps); err != nil {
+			return false, err
+		}
 		return true, nil
 	}
 
@@ -414,7 +429,13 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
-		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
+		if p.User.Enterprise != nil {
+			if deps.billingCacheService != nil {
+				deps.billingCacheService.SyncEnterpriseUsage(ctx, p.User.Enterprise, QuantizeUsageBillingAmount(p.Cost.ActualCost))
+			}
+		} else {
+			syncBalanceCacheAfterDeduction(ctx, p, deps, result)
+		}
 	}
 
 	if p.Cost.ActualCost > 0 && p.APIKey != nil && p.APIKey.HasRateLimits() && deps.billingCacheService != nil {
@@ -510,6 +531,12 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 		return
 	}
 
+	if p.User.Enterprise != nil {
+		if result != nil && result.NewEnterpriseBalance != nil {
+			deps.balanceNotifyService.CheckEnterpriseBalanceAfterDeduction(context.Background(), p.User.Enterprise.EnterpriseID, *result.NewEnterpriseBalance, QuantizeUsageBillingAmount(p.Cost.ActualCost))
+		}
+		return
+	}
 	oldBalance := resolveOldBalance(p, result)
 	slog.Debug("notifyBalanceLow: calling CheckBalanceAfterDeduction",
 		"user_id", p.User.ID,
@@ -1328,6 +1355,7 @@ func (s *GatewayService) buildRecordUsageLog(
 		SubscriptionID:           optionalSubscriptionID(subscription),
 		CreatedAt:                time.Now(),
 	}
+	applyEnterpriseUsageSnapshot(usageLog, user)
 	if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
 	}
@@ -1364,4 +1392,17 @@ func optionalSubscriptionID(subscription *UserSubscription) *int64 {
 		return &subscription.ID
 	}
 	return nil
+}
+
+// applyEnterpriseUsageSnapshot captures the request membership, including subscription usage.
+func applyEnterpriseUsageSnapshot(log *UsageLog, user *User) {
+	if log == nil || user == nil || user.Enterprise == nil {
+		return
+	}
+	enterpriseID := user.Enterprise.EnterpriseID
+	log.EnterpriseID = &enterpriseID
+	if user.Enterprise.DepartmentID != nil {
+		departmentID := *user.Enterprise.DepartmentID
+		log.EnterpriseDepartmentID = &departmentID
+	}
 }

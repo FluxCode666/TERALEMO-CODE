@@ -23,6 +23,8 @@ type User struct {
 	Concurrency    int
 	Status         string
 	AllowedGroups  []int64
+	// Enterprise is the current membership snapshot; nil keeps personal billing and access rules.
+	Enterprise *EnterpriseMemberContext
 	// RestrictPublicGroups narrows the public groups this user may bind to the
 	// ones listed in AllowedGroups. False keeps the default, where every public
 	// group is bindable.
@@ -82,6 +84,15 @@ func (u *User) IsActive() bool {
 //     RestrictPublicGroups set, in which case the group must be in AllowedGroups
 //   - Exclusive groups: only users with the group in AllowedGroups can bind
 func (u *User) CanBindGroup(groupID int64, isExclusive bool) bool {
+	if u.Enterprise != nil {
+		if !u.Enterprise.AllowsGroup(groupID) {
+			return false
+		}
+		// A configured enterprise pool grants exclusive groups and replaces personal grants.
+		if u.Enterprise.GroupPoolConfigured {
+			return true
+		}
+	}
 	// 公开分组（非专属）：默认所有用户都可以绑定；仅当该用户开启了公开分组
 	// 限制时，才需要落在 AllowedGroups 中。
 	if !isExclusive && !u.RestrictPublicGroups {

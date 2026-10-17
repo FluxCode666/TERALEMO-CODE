@@ -267,18 +267,20 @@ func TestRunLiveControllerClosesExpiredSession(t *testing.T) {
 
 func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 	record := &LiveCallRecord{
-		CallID:          "call_secret",
-		CallHash:        hashLiveCallID("call_secret"),
-		AccountID:       11,
-		APIKeyID:        22,
-		UserID:          33,
-		GroupID:         44,
-		LeaseID:         "lease-1",
-		Model:           "gpt-live-test",
-		CreatedAt:       time.Now().Add(-time.Second),
-		ExpiresAt:       time.Now().Add(time.Hour),
-		Controller:      LiveControllerPending,
-		InboundEndpoint: "/v1/live",
+		EnterpriseID:           55,
+		EnterpriseDepartmentID: 66,
+		CallID:                 "call_secret",
+		CallHash:               hashLiveCallID("call_secret"),
+		AccountID:              11,
+		APIKeyID:               22,
+		UserID:                 33,
+		GroupID:                44,
+		LeaseID:                "lease-1",
+		Model:                  "gpt-live-test",
+		CreatedAt:              time.Now().Add(-time.Second),
+		ExpiresAt:              time.Now().Add(time.Hour),
+		Controller:             LiveControllerPending,
+		InboundEndpoint:        "/v1/live",
 	}
 	store := &liveTestStore{}
 	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
@@ -300,6 +302,8 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 	require.Len(t, usageRepo.logs, 1)
 	log := usageRepo.logs[0]
 	usageRepo.mu.Unlock()
+	require.Equal(t, int64(55), *log.EnterpriseID)
+	require.Equal(t, int64(66), *log.EnterpriseDepartmentID)
 	require.Equal(t, RequestTypeLive, log.RequestType)
 	require.Equal(t, record.CallHash, log.RequestID)
 	require.NotEqual(t, record.CallID, log.RequestID)

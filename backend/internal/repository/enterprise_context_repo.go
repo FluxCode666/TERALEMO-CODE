@@ -2,10 +2,11 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 )
 
 func (r *enterpriseRepository) GetMemberContextByUserID(ctx context.Context, userID int64) (*service.EnterpriseMemberContext, error) {
@@ -25,9 +26,11 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 		return out, nil
 	}
 	client := clientFromContext(ctx, r.client)
+	args := make([]any, 0, len(userIDs))
+	userPlaceholders := enterpriseContextPlaceholders(userIDs, &args)
 	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id
  FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
- WHERE m.user_id = ANY($1::bigint[]) AND m.deleted_at IS NULL ORDER BY m.user_id`, pq.Array(userIDs))
+ WHERE m.user_id IN (`+userPlaceholders+`) AND m.deleted_at IS NULL ORDER BY m.user_id`, args...)
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
@@ -58,8 +61,10 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	if len(out) == 0 {
 		return out, nil
 	}
+	args = make([]any, 0, len(enterpriseIDs))
+	enterprisePlaceholders := enterpriseContextPlaceholders(enterpriseIDs, &args)
 	rows, err = client.QueryContext(ctx, `SELECT a.enterprise_id, a.group_id FROM enterprise_allowed_groups a
- JOIN groups g ON g.id = a.group_id AND g.deleted_at IS NULL WHERE a.enterprise_id = ANY($1::bigint[]) ORDER BY a.enterprise_id, a.group_id`, pq.Array(enterpriseIDs))
+ JOIN groups g ON g.id = a.group_id AND g.deleted_at IS NULL WHERE a.enterprise_id IN (`+enterprisePlaceholders+`) ORDER BY a.enterprise_id, a.group_id`, args...)
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
@@ -77,11 +82,13 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
+	departmentPlaceholders := enterpriseContextPlaceholders(departmentIDs, &args)
+	memberPlaceholders := enterpriseContextPlaceholders(memberIDs, &args)
 	rows, err = client.QueryContext(ctx, `SELECT w.enterprise_id, w.scope_type, w.scope_id, w.group_id FROM enterprise_group_whitelists w
  JOIN groups g ON g.id = w.group_id AND g.deleted_at IS NULL
- WHERE w.enterprise_id = ANY($1::bigint[]) AND ((w.scope_type = 'enterprise' AND w.scope_id = ANY($1::bigint[]))
- OR (w.scope_type = 'department' AND w.scope_id = ANY($2::bigint[])) OR (w.scope_type = 'member' AND w.scope_id = ANY($3::bigint[])))
- ORDER BY w.enterprise_id, w.scope_type, w.scope_id, w.group_id`, pq.Array(enterpriseIDs), pq.Array(departmentIDs), pq.Array(memberIDs))
+ WHERE w.enterprise_id IN (`+enterprisePlaceholders+`) AND ((w.scope_type = 'enterprise' AND w.scope_id IN (`+enterprisePlaceholders+`))
+ OR (w.scope_type = 'department' AND w.scope_id IN (`+departmentPlaceholders+`)) OR (w.scope_type = 'member' AND w.scope_id IN (`+memberPlaceholders+`)))
+ ORDER BY w.enterprise_id, w.scope_type, w.scope_id, w.group_id`, args...)
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
@@ -128,6 +135,20 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 		}
 	}
 	return out, nil
+}
+
+// Parameterized IN keeps the same bounded query count and also works with the
+// SQLite repository harness used for authentication projection tests.
+func enterpriseContextPlaceholders(ids []int64, args *[]any) string {
+	if len(ids) == 0 {
+		return "NULL"
+	}
+	placeholders := make([]string, len(ids))
+	for i, id := range ids {
+		*args = append(*args, id)
+		placeholders[i] = fmt.Sprintf("$%d", len(*args))
+	}
+	return strings.Join(placeholders, ",")
 }
 
 func enterpriseIntersectSortedGroupIDs(left, right []int64) []int64 {

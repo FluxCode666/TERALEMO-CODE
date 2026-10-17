@@ -311,6 +311,9 @@ func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, g
 	if estimate <= 0 || math.IsNaN(estimate) || math.IsInf(estimate, 0) {
 		return nil, nil
 	}
+	if user.Enterprise != nil {
+		return s.reserveEnterpriseInflight(ctx, user, estimate, renew)
+	}
 	rc, ok := s.cache.(InflightBalanceReservationCache)
 	if !ok || rc == nil {
 		return nil, nil

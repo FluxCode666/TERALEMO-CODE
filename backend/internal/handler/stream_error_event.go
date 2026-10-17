@@ -14,8 +14,9 @@ import (
 
 // responsesFailedError 对齐 OpenAI Responses 协议 error 子对象。
 type responsesFailedError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code     string            `json:"code"`
+	Message  string            `json:"message"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // responsesFailedBody 对齐 apicompat.makeResponsesCompletedEvent 输出的 response 子对象字段集。
@@ -64,6 +65,10 @@ func writeResponsesFailedSSE(c *gin.Context, errType, code, message string) bool
 		return false
 	}
 
+	var metadata map[string]string
+	if appErr := enterpriseBillingError(c); appErr != nil {
+		code, metadata = appErr.Reason, appErr.Metadata
+	}
 	payload, err := json.Marshal(responsesFailedEvent{
 		Type: "response.failed",
 		Response: responsesFailedBody{
@@ -74,8 +79,9 @@ func writeResponsesFailedSSE(c *gin.Context, errType, code, message string) bool
 			Status:    "failed",
 			Output:    []any{},
 			Error: responsesFailedError{
-				Code:    mapResponsesErrorCode(errType, code),
-				Message: message,
+				Code:     mapResponsesErrorCode(errType, code),
+				Message:  message,
+				Metadata: metadata,
 			},
 		},
 	})

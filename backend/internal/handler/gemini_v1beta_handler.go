@@ -402,7 +402,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	// 2) billing eligibility check (after wait)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -414,7 +414,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(modelName, body))
 	if err != nil {
 		reqLog.Info("gemini.inflight_reservation_rejected", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -931,11 +931,11 @@ func googlePlatformError(c *gin.Context, status int, message string) {
 func googleErrorWithType(c *gin.Context, status int, errType, code, message string) {
 	service.SetOpsLocalErrorType(c, errType, code)
 	c.JSON(status, gin.H{
-		"error": gin.H{
+		"error": withEnterpriseBillingMetadata(c, gin.H{
 			"code":    status,
 			"message": message,
 			"status":  googleapi.HTTPStatusToGoogleStatus(status),
-		},
+		}),
 	})
 }
 
