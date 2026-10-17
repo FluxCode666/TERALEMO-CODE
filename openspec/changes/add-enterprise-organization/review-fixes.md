@@ -33,8 +33,8 @@
 ### R7 成员移出 / 部门删除后在途请求结算缺少限额行［FA 运行时 + FB 仓储］
 决议：结算使用请求时冻结的身份（enterprise_id、department_id、member_id）。`Apply` 内按 scope 更新限额行时**不过滤 deleted_at**（软删除的归档行照常累加）；企业行同样按 id 扣减不看 deleted_at。若仍出现限额行完全缺失：照常扣企业余额并写日志、累加能找到的行，`slog.Error` 记录缺失，**禁止因此漏扣企业余额**。前置检查（新请求准入）仍对缺行 fail-closed。FB 确保软删除不物理删除限额行。
 
-### R8 认证缓存失效与并发回填竞态［FA］
-决议：不新建代际基础设施。企业成员关系相关的失效统一走一个 helper：立即失效一次，并在约 2 秒后（可配置常量）再失效一次（延迟双删），覆盖「读旧 → 提交 → 失效 → 旧值回填」窗口。FB 的所有调用点改用这个 helper（FA 提供，FB 调用；若 FA 尚未提供，FB 先在 service 包实现 `InvalidateEnterpriseMembersAuthCache(ctx, userIDs)` 并由 FA 复用，二者只保留一个实现）。在 design.md 风险一节记录。
+### R8 认证缓存失效与并发回填竞态［FB］
+决议：不新建代际基础设施。在 service 包实现 `invalidateEnterpriseMembersAuthCache(ctx, userIDs)`：立即调用现有 `InvalidateAuthCacheByUserID`，并在约 2 秒后（常量）再失效一次（延迟双删，后台 goroutine 使用独立 context，带超时），覆盖「读旧 → 提交 → 失效 → 旧值回填」窗口。企业管理侧所有成员关系 / 授权变化的失效调用统一改用它。在 design.md「Risks」记录此方案与残余窗口。
 
 ### R9 删除最后一个允许分组使「受限」变「不限」［FB］
 决议：持久区分「未配置」与「已配置（可能为空 = 全部拒绝）」。新增迁移 249：`enterprises.group_pool_configured BOOLEAN NOT NULL DEFAULT FALSE`；新表 `enterprise_group_whitelist_scopes(enterprise_id, scope_type, scope_id, created_at, PRIMARY KEY(scope_type, scope_id))`，存在即表示该层已配置。语义：
