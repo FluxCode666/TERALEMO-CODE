@@ -32,7 +32,9 @@ func newEnterpriseBillingFixture(t *testing.T) enterpriseBillingFixture {
 	m := enterpriseMemberFixture(t, ctx, e.ID, &d.ID)
 	key := mustCreateApiKey(t, client, &service.APIKey{UserID: m.UserID, Name: "enterprise-billing", Key: "sk-ent-" + uuid.NewString()})
 	// 已提交的当日 usage_logs 会污染全站仪表盘统计类套件（如 UsageLogRepoSuite）。
-	t.Cleanup(func() { _, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM usage_logs WHERE api_key_id=$1", key.ID) })
+	t.Cleanup(func() {
+		_, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM usage_logs WHERE api_key_id=$1", key.ID)
+	})
 	_, err := integrationDB.ExecContext(ctx, `UPDATE enterprises SET balance = 10 WHERE id = $1`, e.ID)
 	require.NoError(t, err)
 	_, err = integrationDB.ExecContext(ctx, `UPDATE users SET balance = 100 WHERE id = $1`, m.UserID)
