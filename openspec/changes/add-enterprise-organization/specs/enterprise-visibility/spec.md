@@ -59,8 +59,14 @@
 - **WHEN** `manager_can_edit_member_quota=false` 时部门负责人修改员工限额
 - **THEN** 系统 MUST 返回 403，错误码 `ENTERPRISE_PERMISSION_DENIED`
 
+#### Scenario: 有编辑权限但无用量查看权限
+- **WHEN** 部门负责人拥有 `manager_can_edit_member_quota=true`，但 `member_quota_visible_to_manager=false`
+- **THEN** `GET /enterprise/quotas` MUST 包含本部门普通成员的限额值以供编辑，MUST NOT 包含他部门或更高角色的额外限额行
+- **AND** 列表、限额更新及重置响应 MUST 返回 `usage_visible:false`，四档 `*_usage_usd` 与各 `*_resets_at` MUST 为 `null`
+- **AND** 有用量查看权限及管理端的限额响应 MUST 返回 `usage_visible:true`
+
 ### Requirement: 当前用户接口暴露企业身份
-当前用户接口（`GET /api/v1/auth/me` 及登录响应中的用户对象）SHALL 为企业成员附加 `enterprise` 对象：`id`、`name`、`role`、`department_id`、`department_name`、`member_status`、`enterprise_status`、`balance_visible`，以及在可见时附加的 `balance`。非企业成员该字段 MUST 为 `null`。企业成员的个人 `balance` 字段 MUST 照常返回但前端 MUST 不展示个人余额与个人充值入口。
+当前用户接口（`GET /api/v1/auth/me`、`GET /api/v1/user/profile`）及所有返回用户对象的认证成功响应 SHALL 为企业成员附加相同的 `enterprise` 对象：`id`、`name`、`role`、`department_id`、`department_name`、`member_status`、`enterprise_status`、`balance_visible`、`balance`。不可见余额 MUST 为 `null`；非企业成员该对象 MUST 为 `null`。企业成员的个人 `balance` 字段 MUST 照常返回但前端 MUST 不展示个人余额与个人充值入口。
 
 #### Scenario: 企业成员登录
 - **WHEN** 企业员工获取当前用户信息

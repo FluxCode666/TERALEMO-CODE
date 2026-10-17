@@ -438,7 +438,9 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	}
 
 	// 检查兑换码状态和码本身的过期时间
-	if redeemCode.Type == RedeemTypeBalance {
+	// Only user-initiated redemption is a new personal-wallet operation. Trusted
+	// fulfillment must still settle orders created before enterprise membership.
+	if rateLimitPolicy == enforceRedeemRateLimit && redeemCode.Type == RedeemTypeBalance {
 		if err := checkEnterprisePersonalWallet(ctx, s.enterpriseMemberships, userID); err != nil {
 			return nil, err
 		}

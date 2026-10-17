@@ -33,6 +33,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
@@ -140,6 +141,7 @@ func checkColumn(t, c string) error {
 			enterprisebalancelog.Table:          enterprisebalancelog.ValidColumn,
 			enterprisedepartment.Table:          enterprisedepartment.ValidColumn,
 			enterprisegroupwhitelist.Table:      enterprisegroupwhitelist.ValidColumn,
+			enterprisegroupwhitelistscope.Table: enterprisegroupwhitelistscope.ValidColumn,
 			enterprisemember.Table:              enterprisemember.ValidColumn,
 			enterprisequota.Table:               enterprisequota.ValidColumn,
 			errorpassthroughrule.Table:          errorpassthroughrule.ValidColumn,

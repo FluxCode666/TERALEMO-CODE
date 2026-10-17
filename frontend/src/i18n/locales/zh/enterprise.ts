@@ -154,10 +154,13 @@ export default {
       "ENTERPRISE_GROUP_NOT_ALLOWED": "企业当前未授权使用此分组，请联系负责人。",
       "ENTERPRISE_MEMBER_WALLET_DISABLED": "企业成员由企业统一付费，暂不可使用个人充值、购买或余额兑换。",
       "ENTERPRISE_FEATURE_UNSUPPORTED": "企业成员暂不支持使用此功能。",
-      "ENTERPRISE_INVALID_SCOPE": "所选范围无效或不属于当前企业，请刷新后重试。"
+      "ENTERPRISE_INVALID_SCOPE": "所选范围无效或不属于当前企业，请刷新后重试。",
+      "INVALID_DATE_RANGE": "日期范围无效，请按时间顺序选择日期，含首尾最多 366 天。"
     },
     "description": "查看企业组织、限额与消费记录",
     "inactiveWhitelistGroups": "以下分组已不在上级允许范围，保存时会移除：{groups}",
-    "validationDateRange": "日期范围必须按时间顺序，且不超过 366 天。"
+    "validationDateRange": "日期范围必须按时间顺序，含首尾最多 366 天。",
+    "hidden": "隐藏",
+    "settingsRefreshedWithEdits": "设置已刷新，已保留你的未保存修改，其他设置已同步。请确认后保存。"
   }
 }

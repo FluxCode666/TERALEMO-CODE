@@ -24,10 +24,12 @@ export const defaultEnterpriseSettings: EnterpriseSettings = {
   manager_can_edit_member_quota: false,
   manager_can_edit_member_groups: false
 }
-export interface EnterpriseIdentity {
+export interface EnterpriseSummary {
   id: number
   name: string
   role: EnterpriseRole
+}
+export interface EnterpriseIdentity extends EnterpriseSummary {
   department_id: number | null
   department_name: string | null
   member_status: EnterpriseStatus
@@ -39,10 +41,11 @@ export type QuotaLimits = Record<`${QuotaWindow}_limit_usd`, number | null>
 export interface EnterpriseQuota extends QuotaLimits {
   scope_type: EnterpriseScope
   scope_id: number
-  daily_usage_usd: number
-  weekly_usage_usd: number
-  monthly_usage_usd: number
-  total_usage_usd: number
+  usage_visible?: boolean
+  daily_usage_usd: number | null
+  weekly_usage_usd: number | null
+  monthly_usage_usd: number | null
+  total_usage_usd: number | null
   daily_resets_at?: string | null
   weekly_resets_at?: string | null
   monthly_resets_at?: string | null
@@ -151,5 +154,6 @@ export type EnterpriseOwnerInput = { user_id: number; email?: never; password?: 
 export type CreateEnterpriseRequest = Pick<Enterprise, 'name'> & Partial<Pick<Enterprise, 'status' | 'notes' | 'contact_name' | 'contact_email' | 'contact_phone' | 'low_balance_threshold' | 'settings'>> & { owner?: EnterpriseOwnerInput }
 export type UpdateEnterpriseRequest = Omit<Partial<CreateEnterpriseRequest>, 'owner'>
 export type CreateEnterpriseMemberRequest = EnterpriseOwnerInput & { department_id?: number | null; role: EnterpriseRole; title?: string }
+export type CreateEnterpriseAccountMemberRequest = { user_id?: never; email: string; password: string; username?: string; department_id?: number | null; role: EnterpriseRole; title?: string }
 export interface UpdateEnterpriseMemberRequest { department_id?: number; role?: EnterpriseRole; status?: EnterpriseStatus; title?: string }
 export type EnterprisePage<T> = BasePaginationResponse<T>

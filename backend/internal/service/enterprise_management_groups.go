@@ -7,7 +7,7 @@ import (
 )
 
 func (s *EnterpriseService) GetAllowedGroups(ctx context.Context, a EnterpriseActor, id int64) ([]Group, error) {
-	_, c, err := s.EnterpriseAuthorize(ctx, a, id, false)
+	e, c, err := s.EnterpriseAuthorize(ctx, a, id, false)
 	if err != nil {
 		return nil, err
 	}
@@ -18,6 +18,9 @@ func (s *EnterpriseService) GetAllowedGroups(ctx context.Context, a EnterpriseAc
 	if a.IsAdmin && len(pool) == 0 {
 		return []Group{}, nil
 	}
+	if e.GroupPoolConfigured && len(pool) == 0 {
+		return []Group{}, nil
+	}
 	active, err := s.groups.ListActive(ctx)
 	if err != nil {
 		return nil, err
@@ -25,7 +28,7 @@ func (s *EnterpriseService) GetAllowedGroups(ctx context.Context, a EnterpriseAc
 	out := make([]Group, 0)
 	var user *User
 	member := !a.IsAdmin && c.Role == EnterpriseRoleMember
-	if member && len(pool) == 0 {
+	if member && !e.GroupPoolConfigured {
 		user, err = s.users.GetByID(ctx, a.UserID)
 		if err != nil {
 			return nil, err
@@ -35,7 +38,7 @@ func (s *EnterpriseService) GetAllowedGroups(ctx context.Context, a EnterpriseAc
 		if !g.IsActive() {
 			continue
 		}
-		if len(pool) > 0 {
+		if e.GroupPoolConfigured {
 			if !slices.Contains(pool, g.ID) {
 				continue
 			}
@@ -137,17 +140,18 @@ func enterpriseGroupsSubset(ids, allowed []int64) bool {
 	}
 	return true
 }
-func (s *EnterpriseService) validateWhitelistParents(ctx context.Context, id int64, target EnterprisePermissionTarget, ids []int64) error {
+func (s *EnterpriseService) validateWhitelistParents(ctx context.Context, e *Enterprise, target EnterprisePermissionTarget, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
+	id := e.ID
 	pool, err := s.enterpriseGroups.GetAllowedGroupIDs(ctx, id)
 	if err != nil {
 		return err
 	}
 	// An unconfigured pool imposes no enterprise restriction; personal public /
 	// exclusive rules remain enforced when members resolve their effective groups.
-	if len(pool) > 0 && !enterpriseGroupsSubset(ids, pool) {
+	if e.GroupPoolConfigured && !enterpriseGroupsSubset(ids, pool) {
 		return ErrEnterpriseGroupOutOfScope
 	}
 	parents := []EnterpriseQuotaScope{}
@@ -162,7 +166,7 @@ func (s *EnterpriseService) validateWhitelistParents(ctx context.Context, id int
 		if err != nil {
 			return err
 		}
-		if w != nil && len(w.GroupIDs) > 0 && !enterpriseGroupsSubset(ids, w.GroupIDs) {
+		if w != nil && !enterpriseGroupsSubset(ids, w.GroupIDs) {
 			return ErrEnterpriseGroupOutOfScope
 		}
 	}
@@ -182,7 +186,7 @@ func (s *EnterpriseService) SetGroupWhitelist(ctx context.Context, a EnterpriseA
 		if err = s.validateGroupsActive(ctx, ids); err != nil {
 			return err
 		}
-		if err = s.validateWhitelistParents(ctx, id, target, ids); err != nil {
+		if err = s.validateWhitelistParents(ctx, e, target, ids); err != nil {
 			return err
 		}
 		before, err := s.enterpriseGroups.GetWhitelist(ctx, id, scope, scopeID)

@@ -30,6 +30,7 @@ vi.mock('@/features/enterprise/EnterpriseWorkspace.vue', () => ({
     name: 'EnterpriseWorkspace',
     props: ['overview'],
     emits: ['updated'],
+    data: () => ({ activeTab: 'overview' }),
     template: '<div data-test="workspace"><span>{{ overview.enterprise.name }}</span><button @click="$emit(\'updated\')">updated</button></div>'
   }
 }))
@@ -63,6 +64,17 @@ function mountView() {
       }
     }
   })
+}
+
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
 }
 
 describe('EnterpriseView overview lifecycle', () => {
@@ -117,4 +129,91 @@ describe('EnterpriseView overview lifecycle', () => {
     expect(wrapper.text()).toContain('Updated enterprise')
     wrapper.unmount()
   })
+
+  it('silently refreshes after saving and preserves the workspace instance and active tab', async () => {
+    const pending = deferred<EnterpriseOverview>()
+    overview.mockResolvedValueOnce(memberOverview).mockReturnValueOnce(pending.promise)
+    const wrapper = mountView()
+    await flushPromises()
+    const workspace = wrapper.findComponent({ name: 'EnterpriseWorkspace' })
+    workspace.vm.$data.activeTab = 'members'
+
+    await wrapper.find('[data-test="workspace"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[aria-busy="true"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm).toBe(workspace.vm)
+
+    pending.resolve({ ...memberOverview, enterprise: { ...memberOverview.enterprise, name: 'Refreshed' } })
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm).toBe(workspace.vm)
+    expect(workspace.vm.$data.activeTab).toBe('members')
+    expect(wrapper.text()).toContain('Refreshed')
+    wrapper.unmount()
+  })
+
+  it('preserves the workspace when a silent refresh fails and lets the user retry', async () => {
+    overview.mockResolvedValueOnce(memberOverview).mockRejectedValueOnce({ code: 'ENTERPRISE_DISABLED' })
+    const wrapper = mountView()
+    await flushPromises()
+    const workspace = wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm
+    await wrapper.find('[data-test="workspace"] button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('enterprise.errors.ENTERPRISE_DISABLED')
+    expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm).toBe(workspace)
+    await wrapper.find('[role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm).toBe(workspace)
+    wrapper.unmount()
+  })
+
+  it('aborts the pending overview request when unmounted', async () => {
+    const pending = deferred<EnterpriseOverview>()
+    overview.mockReturnValueOnce(pending.promise)
+    const wrapper = mountView()
+    const signal = overview.mock.calls[0]?.[0]?.signal as AbortSignal
+    expect(signal.aborted).toBe(false)
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    pending.reject(new Error('request canceled'))
+    await flushPromises()
+    expect(overview).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start a follow-up overview request after unmounting during identity refresh', async () => {
+    const pending = deferred<void>()
+    refreshUser.mockReturnValueOnce(pending.promise)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.find('[data-test="workspace"] button').trigger('click')
+    expect(refreshUser).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+    pending.resolve(undefined)
+    await flushPromises()
+    expect(overview).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores an older refresh response even when the transport ignores cancellation', async () => {
+    const older = deferred<EnterpriseOverview>()
+    const latest = deferred<EnterpriseOverview>()
+    overview.mockResolvedValueOnce(memberOverview).mockReturnValueOnce(older.promise).mockReturnValueOnce(latest.promise)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.find('[data-test="workspace"] button').trigger('click')
+    await flushPromises()
+    const olderSignal = overview.mock.calls[1]?.[0]?.signal as AbortSignal
+    await wrapper.find('[data-test="workspace"] button').trigger('click')
+    await flushPromises()
+    expect(olderSignal.aborted).toBe(true)
+
+    latest.resolve({ ...memberOverview, enterprise: { ...memberOverview.enterprise, name: 'Latest result' } })
+    await flushPromises()
+    older.resolve({ ...memberOverview, enterprise: { ...memberOverview.enterprise, name: 'Older result' } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Latest result')
+    expect(wrapper.text()).not.toContain('Older result')
+    wrapper.unmount()
+  })
+
 })

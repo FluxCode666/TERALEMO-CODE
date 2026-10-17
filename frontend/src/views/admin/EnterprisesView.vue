@@ -15,7 +15,7 @@
           <template #cell-name="{ row }"><RouterLink :to="`/admin/enterprises/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400">{{ row.name }}</RouterLink><p class="text-xs text-gray-500">#{{ row.id }}</p></template>
           <template #cell-status="{ value }"><span :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
           <template #cell-balance="{ value }">${{ value.toFixed(4) }}</template>
-          <template #cell-actions="{ row }"><div class="flex flex-wrap gap-3"><RouterLink :to="`/admin/enterprises/${row.id}`" class="text-primary-600 dark:text-primary-400">{{ t('admin.enterprises.open') }}</RouterLink><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-edit-${row.id}`" @click="editing = row">{{ t('enterprise.edit') }}</button><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-balance-${row.id}`" @click="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</button><button class="text-amber-700 dark:text-amber-400" :data-test="`enterprise-status-${row.id}`" @click="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</button><button class="text-red-600 dark:text-red-400" @click="deleting = row">{{ t('admin.enterprises.delete') }}</button></div></template>
+          <template #cell-actions="{ row }"><div class="flex flex-wrap gap-3"><RouterLink :to="`/admin/enterprises/${row.id}`" class="text-primary-600 dark:text-primary-400">{{ t('admin.enterprises.open') }}</RouterLink><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-edit-${row.id}`" @click="editing = row">{{ t('enterprise.edit') }}</button><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-balance-${row.id}`" @click="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</button><button class="text-amber-700 dark:text-amber-400" :data-test="`enterprise-status-${row.id}`" @click="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</button><button class="text-red-600 dark:text-red-400" :data-test="`enterprise-delete-${row.id}`" @click="deleting = row">{{ t('admin.enterprises.delete') }}</button></div></template>
         </DataTable>
       </template>
       <template #pagination><Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" /></template>
@@ -44,7 +44,7 @@
         <div class="flex justify-end gap-3"><button type="button" class="btn btn-secondary" @click="createOpen = false">{{ t('enterprise.cancel') }}</button><button class="btn btn-primary" :disabled="busy" data-test="enterprise-create">{{ t('admin.enterprises.create') }}</button></div>
       </form>
     </BaseDialog>
-    <ConfirmDialog :show="!!deleting" :title="t('admin.enterprises.delete')" :message="t('admin.enterprises.confirmDelete')" danger @cancel="deleting = null" @confirm="remove" />
+    <EnterpriseDeleteDialog v-if="deleting" :key="deleting.id" :enterprise-id="deleting.id" @cancel="deleting = null" @deleted="removed" />
     <BaseDialog :show="!!editing" :title="t('enterprise.edit')" width="wide" @close="editing = null"><EnterpriseBasicsForm v-if="editing" :key="editing.id" :enterprise="editing" @updated="editing = null; load()" /></BaseDialog>
     <BaseDialog :show="!!balanceTarget" :title="t('enterprise.adjustBalance')" @close="balanceTarget = null"><EnterpriseBalanceForm v-if="balanceTarget" :key="balanceTarget.id" :enterprise-id="balanceTarget.id" @updated="balanceTarget = null; load()" /></BaseDialog>
     <ConfirmDialog :show="!!statusTarget" :title="t(statusTarget?.status === 'active' ? 'enterprise.disabled' : 'enterprise.active')" :message="t('enterprise.confirmStatusChange')" :danger="statusTarget?.status === 'active'" @cancel="statusTarget = null" @confirm="changeStatus" />
@@ -67,6 +67,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import { useEnterpriseAction } from '@/features/enterprise/useEnterpriseAction'
 import EnterpriseBasicsForm from '@/features/enterprise/components/EnterpriseBasicsForm.vue'
 import EnterpriseBalanceForm from '@/features/enterprise/components/EnterpriseBalanceForm.vue'
+import EnterpriseDeleteDialog from '@/features/enterprise/components/EnterpriseDeleteDialog.vue'
 const { t } = useI18n()
 const { busy, error, run } = useEnterpriseAction()
 const items = ref<Enterprise[]>([]), deleting = ref<Enterprise | null>(null)
@@ -103,7 +104,11 @@ async function create() {
   }
   if (await run(() => enterprisesAPI.create(payload), t('enterprise.saved'))) { createOpen.value = false; page.value = 1; await load() }
 }
-async function remove() { if (!deleting.value || busy.value) return; const id = deleting.value.id; if (await run(() => enterprisesAPI.remove(id), t('enterprise.deleted'))) { deleting.value = null; if (items.value.length === 1 && page.value > 1) page.value--; await load() } }
+async function removed() {
+  deleting.value = null
+  if (items.value.length === 1 && page.value > 1) page.value--
+  await load()
+}
 async function changeStatus() {
   if (!statusTarget.value || busy.value) return
   const target = statusTarget.value

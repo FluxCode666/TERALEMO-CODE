@@ -228,6 +228,10 @@ func (r *enterpriseManagementTestEnterpriseGroups) GetWhitelist(_ context.Contex
 }
 func (r *enterpriseManagementTestEnterpriseGroups) SetWhitelist(_ context.Context, eid int64, scope string, id int64, ids []int64) error {
 	r.writes++
+	if len(ids) == 0 {
+		delete(r.whitelists, EnterpriseQuotaScope{scope, id})
+		return nil
+	}
 	r.whitelists[EnterpriseQuotaScope{scope, id}] = EnterpriseGroupWhitelist{EnterpriseID: eid, ScopeType: scope, ScopeID: id, GroupIDs: ids}
 	return nil
 }
@@ -419,6 +423,7 @@ func TestEnterpriseServiceWhitelistIntersectsAllConfiguredParents(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			f := newEnterpriseManagementTestFixture(t)
 			f.g.pool = []int64{1, 2, 3}
+			f.e.e.GroupPoolConfigured = true
 			f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeEnterprise, 1}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1, 2}}
 			f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeDepartment, 3}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1}}
 			err := f.s.SetGroupWhitelist(context.Background(), EnterpriseActor{IsAdmin: true}, 1, EnterpriseScopeMember, 20, tc.ids)
@@ -453,6 +458,7 @@ func TestEnterpriseServiceGroupsApplyPoolOrPersonalRules(t *testing.T) {
 		t.Fatalf("personal fallback groups=%v err=%v", groups, err)
 	}
 	f.g.pool = []int64{2}
+	f.e.e.GroupPoolConfigured = true
 	f.e.caller.GroupPoolConfigured = true
 	f.e.caller.GroupPoolIDs = []int64{2}
 	groups, err = f.s.GetAllowedGroups(context.Background(), EnterpriseActor{UserID: 20}, 1)

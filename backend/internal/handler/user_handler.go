@@ -538,11 +538,9 @@ func (h *UserHandler) buildUserProfileResponse(ctx context.Context, userID int64
 		return userProfileResponse{}, err
 	}
 	profile := userProfileResponseFromService(user, identities)
-	if h.enterpriseIdentity != nil {
-		profile.Enterprise, err = h.enterpriseIdentity.Identity(ctx, userID)
-		if err != nil {
-			return userProfileResponse{}, err
-		}
+	profile.Enterprise, err = readAuthEnterpriseIdentity(ctx, h.enterpriseIdentity, userID)
+	if err != nil {
+		return userProfileResponse{}, err
 	}
 	return profile, nil
 }

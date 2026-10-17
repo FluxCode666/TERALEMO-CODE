@@ -86,6 +86,20 @@ func (_c *EnterpriseCreate) SetNillableStatus(v *string) *EnterpriseCreate {
 	return _c
 }
 
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (_c *EnterpriseCreate) SetGroupPoolConfigured(v bool) *EnterpriseCreate {
+	_c.mutation.SetGroupPoolConfigured(v)
+	return _c
+}
+
+// SetNillableGroupPoolConfigured sets the "group_pool_configured" field if the given value is not nil.
+func (_c *EnterpriseCreate) SetNillableGroupPoolConfigured(v *bool) *EnterpriseCreate {
+	if v != nil {
+		_c.SetGroupPoolConfigured(*v)
+	}
+	return _c
+}
+
 // SetBalance sets the "balance" field.
 func (_c *EnterpriseCreate) SetBalance(v float64) *EnterpriseCreate {
 	_c.mutation.SetBalance(v)
@@ -268,6 +282,10 @@ func (_c *EnterpriseCreate) defaults() error {
 		v := enterprise.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.GroupPoolConfigured(); !ok {
+		v := enterprise.DefaultGroupPoolConfigured
+		_c.mutation.SetGroupPoolConfigured(v)
+	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		v := enterprise.DefaultBalance
 		_c.mutation.SetBalance(v)
@@ -325,6 +343,9 @@ func (_c *EnterpriseCreate) check() error {
 		if err := enterprise.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Enterprise.status": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.GroupPoolConfigured(); !ok {
+		return &ValidationError{Name: "group_pool_configured", err: errors.New(`ent: missing required field "Enterprise.group_pool_configured"`)}
 	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "Enterprise.balance"`)}
@@ -408,6 +429,10 @@ func (_c *EnterpriseCreate) createSpec() (*Enterprise, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(enterprise.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.GroupPoolConfigured(); ok {
+		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
+		_node.GroupPoolConfigured = value
 	}
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)
@@ -564,6 +589,18 @@ func (u *EnterpriseUpsert) SetStatus(v string) *EnterpriseUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *EnterpriseUpsert) UpdateStatus() *EnterpriseUpsert {
 	u.SetExcluded(enterprise.FieldStatus)
+	return u
+}
+
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (u *EnterpriseUpsert) SetGroupPoolConfigured(v bool) *EnterpriseUpsert {
+	u.Set(enterprise.FieldGroupPoolConfigured, v)
+	return u
+}
+
+// UpdateGroupPoolConfigured sets the "group_pool_configured" field to the value that was provided on create.
+func (u *EnterpriseUpsert) UpdateGroupPoolConfigured() *EnterpriseUpsert {
+	u.SetExcluded(enterprise.FieldGroupPoolConfigured)
 	return u
 }
 
@@ -792,6 +829,20 @@ func (u *EnterpriseUpsertOne) SetStatus(v string) *EnterpriseUpsertOne {
 func (u *EnterpriseUpsertOne) UpdateStatus() *EnterpriseUpsertOne {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (u *EnterpriseUpsertOne) SetGroupPoolConfigured(v bool) *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetGroupPoolConfigured(v)
+	})
+}
+
+// UpdateGroupPoolConfigured sets the "group_pool_configured" field to the value that was provided on create.
+func (u *EnterpriseUpsertOne) UpdateGroupPoolConfigured() *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateGroupPoolConfigured()
 	})
 }
 
@@ -1206,6 +1257,20 @@ func (u *EnterpriseUpsertBulk) SetStatus(v string) *EnterpriseUpsertBulk {
 func (u *EnterpriseUpsertBulk) UpdateStatus() *EnterpriseUpsertBulk {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (u *EnterpriseUpsertBulk) SetGroupPoolConfigured(v bool) *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetGroupPoolConfigured(v)
+	})
+}
+
+// UpdateGroupPoolConfigured sets the "group_pool_configured" field to the value that was provided on create.
+func (u *EnterpriseUpsertBulk) UpdateGroupPoolConfigured() *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateGroupPoolConfigured()
 	})
 }
 

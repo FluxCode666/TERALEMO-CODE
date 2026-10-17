@@ -76,4 +76,30 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ status: 'active', title: 'Engineer' })
     wrapper.unmount()
   })
+
+  it('preserves an existing member without a department when the operator has a department', async () => {
+    const member = { id: 7, enterprise_id: 1, user_id: 42, email: 'alice@example.com', username: 'Alice', department_id: null, department_name: null, role: 'member' as const, status: 'active' as const, title: 'Engineer', joined_at: '', user_status: 'active' as const }
+    const wrapper = mount(EnterpriseMemberForm, { props: { member, departments, departmentId: 3 } })
+    expect((wrapper.get('[data-test="member-department"]').element as HTMLSelectElement).value).toBe('0')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ department_id: 0, role: 'member', status: 'active', title: 'Engineer' })
+    wrapper.unmount()
+  })
+
+  it('uses the member department rather than the operator department while editing', async () => {
+    const member = { id: 7, enterprise_id: 1, user_id: 42, email: 'alice@example.com', username: 'Alice', department_id: 3, department_name: '研发部', role: 'member' as const, status: 'active' as const, title: '', joined_at: '', user_status: 'active' as const }
+    const wrapper = mount(EnterpriseMemberForm, { props: { member, departments, departmentId: 8 } })
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ department_id: 3 })
+    wrapper.unmount()
+  })
+
+  it('does not default a new owner-managed member to the operator department', async () => {
+    const wrapper = mount(EnterpriseMemberForm, { props: { departments, departmentId: 3 } })
+    await wrapper.get('[data-test="member-email"]').setValue('employee@example.com')
+    await wrapper.get('[data-test="member-password"]').setValue('password123')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ department_id: undefined })
+    wrapper.unmount()
+  })
 })

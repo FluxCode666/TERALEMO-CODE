@@ -29,6 +29,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
@@ -679,6 +680,33 @@ func (f TraverseEnterpriseGroupWhitelist) Traverse(ctx context.Context, q ent.Qu
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.EnterpriseGroupWhitelistQuery", q)
+}
+
+// The EnterpriseGroupWhitelistScopeFunc type is an adapter to allow the use of ordinary function as a Querier.
+type EnterpriseGroupWhitelistScopeFunc func(context.Context, *ent.EnterpriseGroupWhitelistScopeQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f EnterpriseGroupWhitelistScopeFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.EnterpriseGroupWhitelistScopeQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.EnterpriseGroupWhitelistScopeQuery", q)
+}
+
+// The TraverseEnterpriseGroupWhitelistScope type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseEnterpriseGroupWhitelistScope func(context.Context, *ent.EnterpriseGroupWhitelistScopeQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseEnterpriseGroupWhitelistScope) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseEnterpriseGroupWhitelistScope) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.EnterpriseGroupWhitelistScopeQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.EnterpriseGroupWhitelistScopeQuery", q)
 }
 
 // The EnterpriseMemberFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1428,6 +1456,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.EnterpriseDepartmentQuery, predicate.EnterpriseDepartment, enterprisedepartment.OrderOption]{typ: ent.TypeEnterpriseDepartment, tq: q}, nil
 	case *ent.EnterpriseGroupWhitelistQuery:
 		return &query[*ent.EnterpriseGroupWhitelistQuery, predicate.EnterpriseGroupWhitelist, enterprisegroupwhitelist.OrderOption]{typ: ent.TypeEnterpriseGroupWhitelist, tq: q}, nil
+	case *ent.EnterpriseGroupWhitelistScopeQuery:
+		return &query[*ent.EnterpriseGroupWhitelistScopeQuery, predicate.EnterpriseGroupWhitelistScope, enterprisegroupwhitelistscope.OrderOption]{typ: ent.TypeEnterpriseGroupWhitelistScope, tq: q}, nil
 	case *ent.EnterpriseMemberQuery:
 		return &query[*ent.EnterpriseMemberQuery, predicate.EnterpriseMember, enterprisemember.OrderOption]{typ: ent.TypeEnterpriseMember, tq: q}, nil
 	case *ent.EnterpriseQuotaQuery:

@@ -23,12 +23,12 @@
         <EnterpriseQuotaDisplay v-if="overview?.member_quota_visible && overview.member_quota" data-test="member-quota" :quota="overview.member_quota" :title="t('enterprise.memberScope')" />
         <p v-if="enterpriseQuota || overview?.member_quota || overview?.department_quota" class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.quotaHint') }}</p>
       </section>
-      <EnterpriseOrganizationPanel v-else-if="activeTab === 'departments' || activeTab === 'members'" :key="activeTab" :mode="activeTab" :api="api" :admin="admin" :readonly="readonly" :overview="overview" @updated="updated" />
-      <EnterpriseQuotaPanel v-else-if="activeTab === 'quotas'" :api="api" :admin="admin" :readonly="readonly" :overview="overview" @updated="updated" />
-      <EnterpriseGroupsPanel v-else-if="activeTab === 'groups'" :api="api" :enterprise-id="enterprise.id" :admin="admin" :readonly="readonly" :overview="overview" @updated="updated" />
-      <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" />
-      <EnterpriseLogsPanel v-else-if="activeTab === 'audit' || activeTab === 'balanceLogs'" :key="activeTab" :api="api" :kind="activeTab" />
-      <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" @updated="updated" /></div>
+      <EnterpriseOrganizationPanel v-else-if="activeTab === 'departments' || activeTab === 'members'" :key="activeTab" :mode="activeTab" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
+      <EnterpriseQuotaPanel v-else-if="activeTab === 'quotas'" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
+      <EnterpriseGroupsPanel v-else-if="activeTab === 'groups'" :api="api" :enterprise-id="enterprise.id" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
+      <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
+      <EnterpriseLogsPanel v-else-if="activeTab === 'audit' || activeTab === 'balanceLogs'" :key="activeTab" :api="api" :kind="activeTab" :refresh-key="refreshKey" />
+      <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" :refresh-key="refreshKey" @updated="updated" /></div>
     </template>
     <BaseDialog :show="balanceOpen" :title="t('enterprise.adjustBalance')" @close="balanceOpen = false">
       <EnterpriseBalanceForm v-if="balanceOpen && enterpriseId" :enterprise-id="enterpriseId" @updated="balanceOpen = false; updated()" />
@@ -57,7 +57,7 @@ import { useEnterpriseAction } from './useEnterpriseAction'
 const props = defineProps<{ admin?: boolean; enterpriseId?: number; overview?: EnterpriseOverview }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
-const { busy, error, run } = useEnterpriseAction()
+const { busy, error, read } = useEnterpriseAction()
 const adminEnterprise = ref<Enterprise | null>(null)
 const enterprise = computed(() => props.admin ? adminEnterprise.value : props.overview?.enterprise)
 const api = computed(() => props.admin ? enterprisesAPI.forEnterprise(props.enterpriseId!) : enterpriseAPI)
@@ -77,9 +77,18 @@ const tabs = computed(() => {
   return result
 })
 const activeTab = ref('overview')
+const refreshKey = ref(0)
 const money = (value: number) => `$${value.toFixed(4)}`
 watch(tabs, value => { if (!value.includes(activeTab.value)) activeTab.value = 'overview' })
-async function refresh() { if (props.admin && props.enterpriseId) await run(async () => { adminEnterprise.value = await enterprisesAPI.get(props.enterpriseId!) }); else emit('updated') }
+watch(() => props.overview, () => { if (!props.admin) refreshKey.value++ })
+async function refresh() {
+  if (props.admin && props.enterpriseId) {
+    await read(() => enterprisesAPI.get(props.enterpriseId!), value => {
+      adminEnterprise.value = value
+      refreshKey.value++
+    })
+  } else emit('updated')
+}
 async function updated() { emit('updated'); if (props.admin) await refresh() }
 const balanceOpen = ref(false)
 onMounted(() => { if (props.admin) void refresh() })

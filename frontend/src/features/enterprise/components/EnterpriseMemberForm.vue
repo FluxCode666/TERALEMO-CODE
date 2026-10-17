@@ -50,7 +50,10 @@ const searching = ref(false)
 const users = ref<{ id: number; username: string; email: string }[]>([])
 const userId = ref(0)
 const validation = ref('')
-const form = reactive({ email: '', username: '', password: '', department_id: props.member?.department_id ?? props.departmentId ?? 0, role: props.member?.role ?? 'member', title: props.member?.title ?? '', status: props.member?.status ?? 'active' })
+const initialDepartment = props.member
+  ? props.member.department_id ?? 0
+  : props.limitedManager ? props.departmentId ?? 0 : 0
+const form = reactive({ email: '', username: '', password: '', department_id: initialDepartment, role: props.member?.role ?? 'member', title: props.member?.title ?? '', status: props.member?.status ?? 'active' })
 
 async function searchUsers() {
   searching.value = true
@@ -64,7 +67,7 @@ async function searchUsers() {
 
 function submit() {
   validation.value = ''
-  if (props.limitedManager) {
+  if (props.limitedManager && !props.member) {
     form.role = 'member'
     form.department_id = props.departmentId ?? 0
   }

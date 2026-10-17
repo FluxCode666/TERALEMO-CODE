@@ -33,3 +33,7 @@ func (s *RedeemService) SetEnterpriseMembershipReader(reader EnterpriseMembershi
 func (s *PromoService) SetEnterpriseMembershipReader(reader EnterpriseMembershipReader) {
 	s.enterpriseMemberships = reader
 }
+
+func (s *AffiliateService) SetEnterpriseMembershipReader(reader EnterpriseMembershipReader) {
+	s.enterpriseMemberships = reader
+}

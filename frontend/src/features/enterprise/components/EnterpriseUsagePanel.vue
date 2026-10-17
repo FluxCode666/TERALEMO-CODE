@@ -1,7 +1,7 @@
 <template>
   <section class="space-y-5">
     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('enterprise.usage') }}</h2>
-    <form class="card flex flex-wrap items-end gap-3 p-4" @submit.prevent="page = 1; load()">
+    <form class="card flex flex-wrap items-end gap-3 p-4" @submit.prevent="searchUsage">
       <label><span class="input-label">{{ t('enterprise.startDate') }}</span><input v-model="filters.start_date" class="input" type="date" /></label>
       <label><span class="input-label">{{ t('enterprise.endDate') }}</span><input v-model="filters.end_date" class="input" type="date" /></label>
       <label v-if="canFilterMembers"><span class="input-label">{{ t('enterprise.members') }}</span><select v-model="filters.user_id" class="input"><option value="">{{ t('enterprise.all') }}</option><option v-for="member in members" :key="member.id" :value="member.user_id">{{ member.username || member.email }}</option></select></label>
@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 import { Line } from 'vue-chartjs'
@@ -46,14 +46,19 @@ import StatCard from '@/components/common/StatCard.vue'
 import { loadMemberOptions } from '../memberOptions'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
-const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview }>()
+const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const { t } = useI18n()
-const { busy, error, run } = useEnterpriseAction()
+const rowAction = useEnterpriseAction()
+const summaryAction = useEnterpriseAction()
+const optionAction = useEnterpriseAction()
+const busy = computed(() => rowAction.busy.value || summaryAction.busy.value || optionAction.busy.value)
+const error = computed(() => rowAction.error.value || summaryAction.error.value || optionAction.error.value)
 const page = ref(1), pageSize = ref(20), total = ref(0)
 const rows = ref<EnterpriseUsageLog[]>([]), stats = ref<EnterpriseUsageStats | null>(null), trend = ref<EnterpriseUsageTrend[]>([]), models = ref<EnterpriseUsageModel[]>([])
 const memberRanking = ref<EnterpriseMemberUsage[]>([]), departmentRanking = ref<EnterpriseDepartmentUsage[]>([])
 const departments = ref<EnterpriseDepartment[]>([]), members = ref<EnterpriseMember[]>([])
 const filters = reactive({ start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' })
+let appliedQuery: EnterpriseQuery = {}
 const validation = ref('')
 const canFilterMembers = computed(() => props.admin || !!props.overview?.permissions.view_members)
 const canFilterDepartments = computed(() => props.admin || !!props.overview?.permissions.view_department_usage)
@@ -86,29 +91,40 @@ function query(): EnterpriseQuery { return { start_date: filters.start_date || u
 function validate() {
   validation.value = ''
   if (filters.start_date && filters.end_date) {
-    const days = (new Date(filters.end_date).getTime() - new Date(filters.start_date).getTime()) / 86400000
-    if (days < 0 || days > 366) validation.value = t('enterprise.validationDateRange')
+    const days = (Date.parse(filters.end_date) - Date.parse(filters.start_date)) / 86400000 + 1
+    if (!Number.isFinite(days) || days < 1 || days > 366) validation.value = t('enterprise.validationDateRange')
   }
   return !validation.value
 }
 async function loadRows() {
-  if (!validate()) return
-  await run(async () => { const result = await props.api.usage({ ...query(), page: page.value, page_size: pageSize.value }); rows.value = result.items; total.value = result.total })
+  const params = { ...appliedQuery, page: page.value, page_size: pageSize.value }
+  await rowAction.read(signal => props.api.usage(params, { signal }), result => { rows.value = result.items; total.value = result.total })
 }
 async function load() {
-  if (!validate()) return
-  await run(async () => {
-    const params = query()
-    const [list, summary, trendRows, modelRows, memberRows, departmentRows] = await Promise.all([
-      props.api.usage({ ...params, page: page.value, page_size: pageSize.value }), props.api.usageStats(params), props.api.usageTrend({ ...params, granularity: 'day' }), props.api.usageModels(params),
-      canFilterMembers.value ? props.api.usageMembers(params) : Promise.resolve([]), canFilterDepartments.value ? props.api.usageDepartments(params) : Promise.resolve([])
-    ])
-    rows.value = list.items; total.value = list.total; stats.value = summary; trend.value = trendRows; models.value = modelRows; memberRanking.value = memberRows; departmentRanking.value = departmentRows
-  })
+  const params = { ...appliedQuery }
+  await Promise.all([
+    loadRows(),
+    summaryAction.read(signal => Promise.all([
+      props.api.usageStats(params, { signal }), props.api.usageTrend({ ...params, granularity: 'day' }, { signal }), props.api.usageModels(params, { signal }),
+      canFilterMembers.value ? props.api.usageMembers(params, { signal }) : Promise.resolve([]), canFilterDepartments.value ? props.api.usageDepartments(params, { signal }) : Promise.resolve([])
+    ]), ([summary, trendRows, modelRows, memberRows, departmentRows]) => {
+      stats.value = summary; trend.value = trendRows; models.value = modelRows; memberRanking.value = memberRows; departmentRanking.value = departmentRows
+    })
+  ])
 }
-function resetFilters() { Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); page.value = 1; void load() }
-onMounted(async () => {
-  await run(async () => { const [departmentRows, memberRows] = await Promise.all([props.api.departments(), canFilterMembers.value ? loadMemberOptions(props.api) : Promise.resolve([])]); departments.value = departmentRows; members.value = memberRows })
-  await load()
-})
+function searchUsage() {
+  if (!validate()) return
+  appliedQuery = query()
+  page.value = 1
+  void load()
+}
+function resetFilters() { Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); searchUsage() }
+async function reload() {
+  await Promise.all([
+    optionAction.read(signal => Promise.all([props.api.departments({ signal }), canFilterMembers.value ? loadMemberOptions(props.api, signal) : Promise.resolve([])]), ([departmentRows, memberRows]) => { departments.value = departmentRows; members.value = memberRows }),
+    load()
+  ])
+}
+onMounted(reload)
+watch(() => props.refreshKey, reload)
 </script>

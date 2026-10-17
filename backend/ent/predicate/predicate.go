@@ -69,6 +69,9 @@ type EnterpriseDepartment func(*sql.Selector)
 // EnterpriseGroupWhitelist is the predicate function for enterprisegroupwhitelist builders.
 type EnterpriseGroupWhitelist func(*sql.Selector)
 
+// EnterpriseGroupWhitelistScope is the predicate function for enterprisegroupwhitelistscope builders.
+type EnterpriseGroupWhitelistScope func(*sql.Selector)
+
 // EnterpriseMember is the predicate function for enterprisemember builders.
 type EnterpriseMember func(*sql.Selector)
 

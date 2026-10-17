@@ -80,3 +80,24 @@ func TestUsageLogsEnterpriseIndexesMigration(t *testing.T) {
 		}
 	}
 }
+
+func TestEnterpriseGroupConfigurationMigration(t *testing.T) {
+	content, err := FS.ReadFile("249_enterprise_group_configuration.sql")
+	require.NoError(t, err)
+	sql := strings.Join(strings.Fields(string(content)), " ")
+	for _, definition := range []string{
+		"ALTER TABLE enterprises ADD COLUMN IF NOT EXISTS group_pool_configured BOOLEAN NOT NULL DEFAULT FALSE",
+		"CREATE TABLE IF NOT EXISTS enterprise_group_whitelist_scopes (",
+		"id BIGSERIAL PRIMARY KEY",
+		"CONSTRAINT uq_enterprise_group_whitelist_scopes_scope UNIQUE (scope_type, scope_id)",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"ON enterprise_group_whitelist_scopes (enterprise_id)",
+		"UPDATE enterprises e SET group_pool_configured = TRUE WHERE EXISTS (SELECT 1 FROM enterprise_allowed_groups a WHERE a.enterprise_id = e.id)",
+		"INSERT INTO enterprise_group_whitelist_scopes (enterprise_id, scope_type, scope_id) SELECT DISTINCT enterprise_id, scope_type, scope_id FROM enterprise_group_whitelists ON CONFLICT (scope_type, scope_id) DO NOTHING",
+	} {
+		require.Contains(t, sql, definition)
+	}
+	require.NotContains(t, strings.ToUpper(sql), "DROP TABLE")
+	require.NotContains(t, strings.ToUpper(sql), "DELETE FROM")
+	require.NotContains(t, sql, "PRIMARY KEY (scope_type, scope_id)")
+}

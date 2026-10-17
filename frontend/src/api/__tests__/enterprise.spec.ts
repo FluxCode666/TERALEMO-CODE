@@ -166,6 +166,15 @@ describe('admin enterprises API contract', () => {
     expect(post).toHaveBeenCalledWith('/admin/enterprises', payload)
   })
 
+  it('requires an explicit dissolution flag to send the dissolve query', async () => {
+    await enterprises.remove(12)
+    expect(remove).toHaveBeenLastCalledWith('/admin/enterprises/12')
+    await enterprises.remove(12, true)
+    expect(remove).toHaveBeenLastCalledWith('/admin/enterprises/12', { params: { dissolve: true } })
+    await enterprises.remove(12, false)
+    expect(remove).toHaveBeenLastCalledWith('/admin/enterprises/12')
+  })
+
   it('keeps balance adjustment operation and positive amount in the documented payload', async () => {
     const payload = { operation: 'subtract' as const, amount: 1.25, notes: 'Correction' }
     expect(await enterprises.adjustBalance(12, payload)).toEqual({ id: 12 })

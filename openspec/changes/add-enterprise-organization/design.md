@@ -111,6 +111,7 @@ enterprise_allowed_groups                         -- 管理员配置的可用分
   group_id BIGINT NOT NULL REFERENCES groups(id) ON DELETE CASCADE
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   PK (enterprise_id, group_id)
+  -- enterprises.group_pool_configured BOOLEAN NOT NULL DEFAULT FALSE 标记池是否配置
 
 enterprise_group_whitelists                       -- 三级白名单
   id BIGSERIAL PK, enterprise_id BIGINT NOT NULL
@@ -119,13 +120,21 @@ enterprise_group_whitelists                       -- 三级白名单
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   UNIQUE (scope_type, scope_id, group_id)；索引 (enterprise_id)
 
+enterprise_group_whitelist_scopes                  -- 249：持久化已配置层级，关联分组可为空
+  id BIGSERIAL PK
+  enterprise_id BIGINT NOT NULL
+  scope_type VARCHAR(20) NOT NULL, scope_id BIGINT NOT NULL
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  UNIQUE (scope_type, scope_id)；索引 (enterprise_id)
+
 usage_logs 新增列
   enterprise_id BIGINT NULL, enterprise_department_id BIGINT NULL
   部分索引 (enterprise_id, created_at) WHERE enterprise_id IS NOT NULL
          (enterprise_department_id, created_at) WHERE enterprise_department_id IS NOT NULL
 ```
 
-- 软删除（groups 删除）若不是物理删除，`ON DELETE CASCADE` 不会触发，因此 `group_repo.go:950` 的分组删除清理 MUST 同时删除两张分组表中的该分组。
+- 软删除（groups 删除）若不是物理删除，`ON DELETE CASCADE` 不会触发，因此分组删除清理 MUST 同时删除两张分组表中的该分组，但保留 group_pool_configured 与白名单 scope 标记。已配置但因分组删除而变空的层级 MUST 拒绝全部分组，不能变成不限。PUT 空 group_ids 明确取消该层配置；249 回填既有非空配置。
+- 池 / 白名单重写在删除关联行前，先对旧、新分组并集按 id 升序 FOR KEY SHARE；删除分组先锁 groups。清理关联的路径统一先池、后白名单，避免反向锁环。
 - ent schema 与 SQL 同步；`usage_logs` 的新列也要加进 `ent/schema/usage_log.go`。
 - 领域常量放 `internal/domain/enterprise.go`：角色、状态、scope_type、审计 action、错误码。
 
@@ -142,9 +151,9 @@ type EnterpriseMemberContext struct {
     Role             string   // owner | manager | member
     DepartmentID     *int64
     // 分组访问
-    GroupPoolConfigured      bool
+    GroupPoolConfigured      bool // 来源：enterprises.group_pool_configured
     GroupPoolIDs             []int64
-    GroupWhitelistConfigured bool
+    GroupWhitelistConfigured bool // 来源：相关层级 scope 标记，不按关联组数量推断
     GroupWhitelistIDs        []int64 // 已配置层级（企业/部门/成员）白名单的交集
 }
 
@@ -155,7 +164,7 @@ func (c *EnterpriseMemberContext) AllowsGroup(id int64) bool // (pool 未配置 
 - `service.User` 新增字段 `Enterprise *EnterpriseMemberContext`（`nil` = 非企业成员）。`User.CanBindGroup` 改为：`Enterprise != nil` 时，若 `GroupPoolConfigured` 则 `base = 在 pool 中`，否则 `base = 原个人规则`；结果为 `base && AllowsGroup`。非成员逻辑不变。
 - 数据层提供 `EnterpriseRepository.GetMemberContextByUserID(ctx, userID) (*EnterpriseMemberContext, error)`（未加入企业返回 `nil, nil`）与批量版本，一次查询（或固定少量查询）组装完整上下文。
 - 认证快照 `APIKeyAuthUserSnapshot` 增加企业上下文字段并提升 `Version`；`api_key_repo.go` 加载用户时附带企业上下文；面板请求（API Key 创建、可选分组）通过 `userService`/`EnterpriseRepository` 加载同一上下文。
-- 失效：成员加入 / 移出 / 角色、部门、状态变更、企业状态变更、分组池或任意白名单变更后，MUST 调用现有 `InvalidateAuthCacheByUserID` 失效受影响成员（企业级变更 = 全体成员）。
+- 失效：成员加入 / 移出 / 角色、部门、状态变更、企业状态变更、分组池或任意白名单变更后，MUST 通过 invalidateEnterpriseMembersAuthCache 调用现有 `InvalidateAuthCacheByUserID`：立即失效受影响成员（企业级变更 = 全体成员），约 2 秒后以独立、有超时的 context 再失效一次。
 
 ### D3：企业余额与限额运行时
 
@@ -246,6 +255,7 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 // Quota（scope_type: enterprise|department|member；scope_id 对应 enterprise.id / department.id / member.id）
 { "scope_type":"member", "scope_id":7,
   "daily_limit_usd":10, "weekly_limit_usd":null, "monthly_limit_usd":200, "total_limit_usd":null,
+  "usage_visible":true,
   "daily_usage_usd":1.2, "weekly_usage_usd":3.4, "monthly_usage_usd":20.1, "total_usage_usd":88.0,
   "daily_resets_at":"...", "weekly_resets_at":"...", "monthly_resets_at":"..." }
 // BalanceLog
@@ -273,7 +283,7 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 | `POST /` | 创建：`{name,status?,notes?,contact_*?,low_balance_threshold?,settings?,owner?}`，`owner` 为 `{user_id}` 或 `{email,password,username?}`，可选 |
 | `GET /:id` | 详情（含 settings 与企业级 quota） |
 | `PUT /:id` | 更新基础信息 / 状态 / settings / low_balance_threshold（指针语义，未传不改） |
-| `DELETE /:id` | 软删除，仅无成员时允许 |
+| `DELETE /:id` | 默认仅无成员时软删除；管理员可带 `?dissolve=true` 在同事务解散成员、部门、限额与配置并归档企业 |
 | `POST /:id/balance` | `{operation:"add"|"subtract", amount, notes?}` → 返回企业 |
 | `GET /:id/balance-logs` | 分页 |
 | `GET/POST /:id/departments`，`PUT/DELETE /:id/departments/:departmentId` | 部门 |
@@ -306,9 +316,9 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 | `GET /members` | owner 全部 / manager 本部门；过滤 `search,department_id,role,status`，分页 |
 | `POST /members` | 新建员工 `{email,password,username?,department_id?,role,title?}` |
 | `PUT /members/:memberId`，`DELETE /members/:memberId` | 按 D5 |
-| `GET /quotas` | 返回调用者可见的限额（按 D5 过滤） |
+| `GET /quotas` | 返回调用者可见或有权编辑的限额；manager 有 edit_member_quota 时包含本部门普通成员行，用量不可见时按下文裁剪 |
 | `PUT /quotas/:scopeType/:scopeId`，`POST /quotas/:scopeType/:scopeId/reset` | 按 D5 |
-| `GET /groups` | 可选分组：owner/manager 返回分组池（池为空时返回全部 active 公开分组）；member 返回本人有效可用分组 |
+| `GET /groups` | 可选分组：owner/manager 返回分组池（池未配置时返回全部 active 公开分组；已配置空池返回空数组）；member 返回本人有效可用分组 |
 | `GET /group-whitelists`，`PUT /group-whitelists/:scopeType/:scopeId` | 按 D5（manager 只能读写本部门成员级） |
 | `GET/PUT /settings` | owner；GET 对 manager/member 返回 403 |
 | `GET /usage`，`/usage/stats`，`/usage/trend`，`/usage/models`，`/usage/members`，`/usage/departments` | 同管理端，范围按角色收敛；`/usage/departments` 仅 owner |
@@ -335,7 +345,9 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 }
 ```
 
-**当前用户**：`GET /api/v1/auth/me` 与 `GET /api/v1/user/profile` 的用户对象新增
+Quota 列表与 PUT / reset 响应统一返回 `usage_visible`；无用量查看权限时四档 `*_usage_usd` 及现有 `*_resets_at` 全部为 `null`，限额值保留用于编辑。管理端始终 `usage_visible:true`。Overview 不可见的整行 quota 继续返回 `null`。
+
+**当前用户**：`GET /api/v1/auth/me`、`GET /api/v1/user/profile` 及认证成功响应中返回的用户对象统一包含
 ```jsonc
 "enterprise": { "id":1, "name":"Acme", "role":"member", "department_id":3, "department_name":"研发部",
                 "member_status":"active", "enterprise_status":"active",
@@ -351,6 +363,7 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 | `ENTERPRISE_NAME_EXISTS` / `ENTERPRISE_DEPARTMENT_NAME_EXISTS` | 409 | |
 | `ENTERPRISE_MEMBER_EXISTS` | 409 | 用户已属于某企业 |
 | `ENTERPRISE_MEMBER_ADMIN_FORBIDDEN` | 400 | 加入系统管理员 |
+| `ENTERPRISE_MEMBER_DELETE_FORBIDDEN` | 409 | 仍是企业成员时删除用户账号；必须先移出企业 |
 | `ENTERPRISE_MANAGER_REQUIRES_DEPARTMENT` | 400 | |
 | `ENTERPRISE_LAST_OWNER` | 409 | |
 | `ENTERPRISE_DEPARTMENT_NOT_EMPTY` / `ENTERPRISE_NOT_EMPTY` | 409 | |
@@ -406,6 +419,7 @@ type EnterpriseBillingCache interface {
 
 - **企业行热点**：同一企业所有成员的结算都要更新 `enterprises` 行与企业级限额行，高并发大企业可能出现行锁竞争。结算在 worker 池异步执行、事务很短，第一版可接受；后续可改为 Redis 累计 + 批量落库。
 - **限额超支**：前置检查按 `usage >= limit` 判断，不计本次预估，超支幅度取决于并发在途请求数，与现有平台配额一致。
-- **快照延迟**：认证快照 L1 15s / L2 300s；变更时主动失效，失效失败时最长 5 分钟内生效。
+- **认证回填竞态（R8）**：认证快照 L1 15s / L2 300s。管理变更提交后立即失效，并在约 2 秒后通过独立、5 秒超时的后台 context 再删一次，覆盖“读旧 → 提交 → 删除 → 旧值回填”的常见窗口；不引入代际设施。慢于双删窗口的旧读取、进程重启或缓存失效失败仍可能留下旧快照，最长受现有 5 分钟缓存 TTL 约束；此方案不承诺即时、线性的权限撤销。
+- **在途预留故障语义（R17）**：企业与个人一致，预留关闭或 Redis 故障时预留放行；余额与三级限额前置读取失败仍 fail-closed。未成功建立预留时，透支幅度取决于同时在途请求数量及单请求消费，不能由预留配置推导固定上界。
 - **历史数据**：上线前的 `usage_logs` 没有企业字段，企业视图看不到加入企业前或上线前的记录（预期行为）。
 - **自然月与 30 天滚动不一致**：企业月度限额按自然月，与个人平台配额不同，需要在 UI 文案中注明。

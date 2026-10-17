@@ -36,6 +36,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
@@ -113,6 +114,8 @@ type Client struct {
 	EnterpriseDepartment *EnterpriseDepartmentClient
 	// EnterpriseGroupWhitelist is the client for interacting with the EnterpriseGroupWhitelist builders.
 	EnterpriseGroupWhitelist *EnterpriseGroupWhitelistClient
+	// EnterpriseGroupWhitelistScope is the client for interacting with the EnterpriseGroupWhitelistScope builders.
+	EnterpriseGroupWhitelistScope *EnterpriseGroupWhitelistScopeClient
 	// EnterpriseMember is the client for interacting with the EnterpriseMember builders.
 	EnterpriseMember *EnterpriseMemberClient
 	// EnterpriseQuota is the client for interacting with the EnterpriseQuota builders.
@@ -197,6 +200,7 @@ func (c *Client) init() {
 	c.EnterpriseBalanceLog = NewEnterpriseBalanceLogClient(c.config)
 	c.EnterpriseDepartment = NewEnterpriseDepartmentClient(c.config)
 	c.EnterpriseGroupWhitelist = NewEnterpriseGroupWhitelistClient(c.config)
+	c.EnterpriseGroupWhitelistScope = NewEnterpriseGroupWhitelistScopeClient(c.config)
 	c.EnterpriseMember = NewEnterpriseMemberClient(c.config)
 	c.EnterpriseQuota = NewEnterpriseQuotaClient(c.config)
 	c.ErrorPassthroughRule = NewErrorPassthroughRuleClient(c.config)
@@ -336,6 +340,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		EnterpriseBalanceLog:          NewEnterpriseBalanceLogClient(cfg),
 		EnterpriseDepartment:          NewEnterpriseDepartmentClient(cfg),
 		EnterpriseGroupWhitelist:      NewEnterpriseGroupWhitelistClient(cfg),
+		EnterpriseGroupWhitelistScope: NewEnterpriseGroupWhitelistScopeClient(cfg),
 		EnterpriseMember:              NewEnterpriseMemberClient(cfg),
 		EnterpriseQuota:               NewEnterpriseQuotaClient(cfg),
 		ErrorPassthroughRule:          NewErrorPassthroughRuleClient(cfg),
@@ -402,6 +407,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		EnterpriseBalanceLog:          NewEnterpriseBalanceLogClient(cfg),
 		EnterpriseDepartment:          NewEnterpriseDepartmentClient(cfg),
 		EnterpriseGroupWhitelist:      NewEnterpriseGroupWhitelistClient(cfg),
+		EnterpriseGroupWhitelistScope: NewEnterpriseGroupWhitelistScopeClient(cfg),
 		EnterpriseMember:              NewEnterpriseMemberClient(cfg),
 		EnterpriseQuota:               NewEnterpriseQuotaClient(cfg),
 		ErrorPassthroughRule:          NewErrorPassthroughRuleClient(cfg),
@@ -463,13 +469,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
 		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
-		c.EnterpriseGroupWhitelist, c.EnterpriseMember, c.EnterpriseQuota,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
+		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -486,13 +492,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
 		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
-		c.EnterpriseGroupWhitelist, c.EnterpriseMember, c.EnterpriseQuota,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
+		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -544,6 +550,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.EnterpriseDepartment.mutate(ctx, m)
 	case *EnterpriseGroupWhitelistMutation:
 		return c.EnterpriseGroupWhitelist.mutate(ctx, m)
+	case *EnterpriseGroupWhitelistScopeMutation:
+		return c.EnterpriseGroupWhitelistScope.mutate(ctx, m)
 	case *EnterpriseMemberMutation:
 		return c.EnterpriseMember.mutate(ctx, m)
 	case *EnterpriseQuotaMutation:
@@ -3799,6 +3807,139 @@ func (c *EnterpriseGroupWhitelistClient) mutate(ctx context.Context, m *Enterpri
 		return (&EnterpriseGroupWhitelistDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown EnterpriseGroupWhitelist mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseGroupWhitelistScopeClient is a client for the EnterpriseGroupWhitelistScope schema.
+type EnterpriseGroupWhitelistScopeClient struct {
+	config
+}
+
+// NewEnterpriseGroupWhitelistScopeClient returns a client for the EnterpriseGroupWhitelistScope from the given config.
+func NewEnterpriseGroupWhitelistScopeClient(c config) *EnterpriseGroupWhitelistScopeClient {
+	return &EnterpriseGroupWhitelistScopeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisegroupwhitelistscope.Hooks(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistScopeClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseGroupWhitelistScope = append(c.hooks.EnterpriseGroupWhitelistScope, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisegroupwhitelistscope.Intercept(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistScopeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseGroupWhitelistScope = append(c.inters.EnterpriseGroupWhitelistScope, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseGroupWhitelistScope entity.
+func (c *EnterpriseGroupWhitelistScopeClient) Create() *EnterpriseGroupWhitelistScopeCreate {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpCreate)
+	return &EnterpriseGroupWhitelistScopeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseGroupWhitelistScope entities.
+func (c *EnterpriseGroupWhitelistScopeClient) CreateBulk(builders ...*EnterpriseGroupWhitelistScopeCreate) *EnterpriseGroupWhitelistScopeCreateBulk {
+	return &EnterpriseGroupWhitelistScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseGroupWhitelistScopeClient) MapCreateBulk(slice any, setFunc func(*EnterpriseGroupWhitelistScopeCreate, int)) *EnterpriseGroupWhitelistScopeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseGroupWhitelistScopeCreateBulk{err: fmt.Errorf("calling to EnterpriseGroupWhitelistScopeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseGroupWhitelistScopeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseGroupWhitelistScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Update() *EnterpriseGroupWhitelistScopeUpdate {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdate)
+	return &EnterpriseGroupWhitelistScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseGroupWhitelistScopeClient) UpdateOne(_m *EnterpriseGroupWhitelistScope) *EnterpriseGroupWhitelistScopeUpdateOne {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelistScope(_m))
+	return &EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseGroupWhitelistScopeClient) UpdateOneID(id int64) *EnterpriseGroupWhitelistScopeUpdateOne {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelistScopeID(id))
+	return &EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Delete() *EnterpriseGroupWhitelistScopeDelete {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpDelete)
+	return &EnterpriseGroupWhitelistScopeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseGroupWhitelistScopeClient) DeleteOne(_m *EnterpriseGroupWhitelistScope) *EnterpriseGroupWhitelistScopeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseGroupWhitelistScopeClient) DeleteOneID(id int64) *EnterpriseGroupWhitelistScopeDeleteOne {
+	builder := c.Delete().Where(enterprisegroupwhitelistscope.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseGroupWhitelistScopeDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Query() *EnterpriseGroupWhitelistScopeQuery {
+	return &EnterpriseGroupWhitelistScopeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseGroupWhitelistScope},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseGroupWhitelistScope entity by its id.
+func (c *EnterpriseGroupWhitelistScopeClient) Get(ctx context.Context, id int64) (*EnterpriseGroupWhitelistScope, error) {
+	return c.Query().Where(enterprisegroupwhitelistscope.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseGroupWhitelistScopeClient) GetX(ctx context.Context, id int64) *EnterpriseGroupWhitelistScope {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseGroupWhitelistScopeClient) Hooks() []Hook {
+	return c.hooks.EnterpriseGroupWhitelistScope
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseGroupWhitelistScopeClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseGroupWhitelistScope
+}
+
+func (c *EnterpriseGroupWhitelistScopeClient) mutate(ctx context.Context, m *EnterpriseGroupWhitelistScopeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseGroupWhitelistScopeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseGroupWhitelistScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseGroupWhitelistScopeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseGroupWhitelistScope mutation op: %q", m.Op())
 	}
 }
 
@@ -8115,9 +8256,9 @@ type (
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
 		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
-		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseMember,
-		EnterpriseQuota, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
+		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
+		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
+		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
 		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
@@ -8129,9 +8270,9 @@ type (
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
 		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
-		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseMember,
-		EnterpriseQuota, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
+		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
+		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
+		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
 		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,

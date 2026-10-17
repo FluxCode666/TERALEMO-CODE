@@ -15,20 +15,11 @@ import (
 	"testing"
 )
 
-type identityReaderStub struct {
-	identity *service.EnterpriseIdentity
-	err      error
-}
-
-func (s identityReaderStub) Identity(context.Context, int64) (*service.EnterpriseIdentity, error) {
-	return s.identity, s.err
-}
-
 func TestEnterpriseIdentityOnCurrentUserAndProfile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visibleBalance := 19.5
 	for _, identity := range []*service.EnterpriseIdentity{nil,
-		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active"},
+		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active", Balance: &visibleBalance},
 		{ID: 2, Name: "Acme", Role: "owner", BalanceVisible: true, Balance: &visibleBalance, MemberStatus: "disabled", EnterpriseStatus: "disabled"},
 	} {
 		for _, currentUser := range []bool{true, false} {
@@ -52,7 +43,15 @@ func TestEnterpriseIdentityOnCurrentUserAndProfile(t *testing.T) {
 				Data map[string]json.RawMessage `json:"data"`
 			}
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
-			want, err := json.Marshal(identity)
+			var expected *service.EnterpriseIdentity
+			if identity != nil {
+				copy := *identity
+				if !copy.BalanceVisible {
+					copy.Balance = nil
+				}
+				expected = &copy
+			}
+			want, err := json.Marshal(expected)
 			require.NoError(t, err)
 			require.JSONEq(t, string(want), string(result.Data["enterprise"]))
 		}

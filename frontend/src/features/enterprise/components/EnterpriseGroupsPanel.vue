@@ -26,17 +26,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseDepartment, EnterpriseMember, EnterpriseScope, EnterpriseOverview } from '@/types/enterprise'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 import { loadMemberOptions } from '../memberOptions'
-const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseId: number; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview }>()
+const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseId: number; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
-const { busy, error, run } = useEnterpriseAction()
+const { busy, error, run, read } = useEnterpriseAction()
 const pool = ref<EnterpriseGroup[]>([]), allGroups = ref<EnterpriseGroup[]>([]), whitelists = ref<EnterpriseGroupWhitelist[]>([])
 const departments = ref<EnterpriseDepartment[]>([]), members = ref<EnterpriseMember[]>([])
 const poolSelection = ref<number[]>([]), selection = ref<number[]>([]), selectedScope = ref('')
@@ -71,14 +71,13 @@ const candidates = computed(() => {
 const outOfScopeNames = computed(() => selection.value.filter(id => !candidates.value.some(group => group.id === id)).map(id => allGroups.value.find(group => group.id === id)?.name || `#${id}`))
 function selectScope() { selection.value = [...(whitelists.value.find(item => item.scope_type === scope.value?.type && item.scope_id === scope.value?.id)?.group_ids ?? [])] }
 async function load() {
-  await run(async () => {
-    const [groups, lists, departmentRows, memberRows, catalog] = await Promise.all([
-      props.admin ? props.api.allowedGroups() : props.api.groups(),
-      showWhitelists.value ? props.api.groupWhitelists() : Promise.resolve([]),
-      showWhitelists.value ? props.api.departments() : Promise.resolve([]),
-      showWhitelists.value && (props.admin || props.overview?.permissions.view_members) ? loadMemberOptions(props.api) : Promise.resolve([]),
+  await read(signal => Promise.all([
+      props.admin && 'allowedGroups' in props.api ? props.api.allowedGroups({ signal }) : props.api.groups({ signal }),
+      showWhitelists.value ? props.api.groupWhitelists({ signal }) : Promise.resolve([]),
+      showWhitelists.value ? props.api.departments({ signal }) : Promise.resolve([]),
+      showWhitelists.value && (props.admin || props.overview?.permissions.view_members) ? loadMemberOptions(props.api, signal) : Promise.resolve([]),
       props.admin ? adminAPI.groups.getAll() : Promise.resolve([])
-    ])
+    ]), ([groups, lists, departmentRows, memberRows, catalog]) => {
     pool.value = groups; poolSelection.value = groups.map(item => item.id); whitelists.value = lists; departments.value = departmentRows; members.value = memberRows
     allGroups.value = props.admin ? catalog : groups
     if (!scopes.value.some(item => item.key === selectedScope.value)) selectedScope.value = scopes.value[0]?.key ?? ''
@@ -86,7 +85,9 @@ async function load() {
   })
 }
 async function savePool() {
-  if (await run(() => props.api.updateAllowedGroups(poolSelection.value), t('enterprise.saved'))) { emit('updated'); await load() }
+  const api = props.api
+  if (!props.admin || !('updateAllowedGroups' in api)) return
+  if (await run(() => api.updateAllowedGroups(poolSelection.value), t('enterprise.saved'))) { emit('updated'); await load() }
 }
 async function saveWhitelist() {
   const target = scope.value
@@ -95,4 +96,5 @@ async function saveWhitelist() {
   if (await run(() => props.api.updateGroupWhitelist(target.type, target.id, ids), t('enterprise.saved'))) { emit('updated'); await load() }
 }
 onMounted(load)
+watch(() => props.refreshKey, load)
 </script>

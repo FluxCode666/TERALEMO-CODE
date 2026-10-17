@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -93,11 +92,11 @@ func captchaProof(turnstileToken, tencentTicket, tencentRandstr string) service.
 
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
-	TokenType    string    `json:"token_type"`
-	User         *dto.User `json:"user"`
+	AccessToken  string            `json:"access_token"`
+	RefreshToken string            `json:"refresh_token,omitempty"` // 新增：Refresh Token
+	ExpiresIn    int               `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
+	TokenType    string            `json:"token_type"`
+	User         *authUserResponse `json:"user"`
 }
 
 func ensureLoginUserActive(user *service.User) error {
@@ -113,11 +112,12 @@ func ensureLoginUserActive(user *service.User) error {
 // respondWithTokenPair 生成 Token 对并返回认证响应
 // 如果 Token 对生成失败，回退到只返回 Access Token（向后兼容）
 func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
-	respondWithTokenPair(c, h.authService, user)
+	respondWithTokenPair(c, h.authService, user, h.enterpriseIdentity)
 }
 
-func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user *service.User) {
-	if err := ensureLoginUserActive(user); err != nil {
+func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user *service.User, identityReader enterpriseIdentityReader) {
+	userResponse, err := buildAuthUserResponse(c.Request.Context(), user, identityReader)
+	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -134,7 +134,7 @@ func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user
 		response.Success(c, AuthResponse{
 			AccessToken: token,
 			TokenType:   "Bearer",
-			User:        dto.UserFromService(user),
+			User:        userResponse,
 		})
 		return
 	}
@@ -143,7 +143,7 @@ func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user
 		RefreshToken: tokenPair.RefreshToken,
 		ExpiresIn:    tokenPair.ExpiresIn,
 		TokenType:    "Bearer",
-		User:         dto.UserFromService(user),
+		User:         userResponse,
 	})
 }
 
@@ -452,12 +452,10 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	profile := userProfileResponseFromService(user, identities)
-	if h.enterpriseIdentity != nil {
-		profile.Enterprise, err = h.enterpriseIdentity.Identity(c.Request.Context(), subject.UserID)
-		if err != nil {
-			response.ErrorFrom(c, err)
-			return
-		}
+	profile.Enterprise, err = readAuthEnterpriseIdentity(c.Request.Context(), h.enterpriseIdentity, subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
 	}
 	response.Success(c, UserResponse{
 		userProfileResponse: profile,

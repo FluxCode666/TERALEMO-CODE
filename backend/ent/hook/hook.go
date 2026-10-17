@@ -261,6 +261,18 @@ func (f EnterpriseGroupWhitelistFunc) Mutate(ctx context.Context, m ent.Mutation
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseGroupWhitelistMutation", m)
 }
 
+// The EnterpriseGroupWhitelistScopeFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseGroupWhitelistScope mutator.
+type EnterpriseGroupWhitelistScopeFunc func(context.Context, *ent.EnterpriseGroupWhitelistScopeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseGroupWhitelistScopeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseGroupWhitelistScopeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseGroupWhitelistScopeMutation", m)
+}
+
 // The EnterpriseMemberFunc type is an adapter to allow the use of ordinary
 // function as EnterpriseMember mutator.
 type EnterpriseMemberFunc func(context.Context, *ent.EnterpriseMemberMutation) (ent.Value, error)

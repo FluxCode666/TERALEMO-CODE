@@ -98,13 +98,7 @@ func (s *EnterpriseService) invalidate(ctx context.Context, id int64, userIDs ..
 			return
 		}
 	}
-	seen := map[int64]bool{}
-	for _, uid := range userIDs {
-		if uid > 0 && !seen[uid] {
-			s.authCache.InvalidateAuthCacheByUserID(ctx, uid)
-			seen[uid] = true
-		}
-	}
+	invalidateEnterpriseMembersAuthCache(ctx, userIDs, s.authCache)
 }
 func (s *EnterpriseService) invalidateQuota(ctx context.Context, scope string, id int64) {
 	if s.billingCache != nil {
@@ -238,28 +232,6 @@ func (s *EnterpriseService) UpdateEnterprise(ctx context.Context, a EnterpriseAc
 	s.invalidate(ctx, id)
 	return s.enterprises.GetByID(ctx, id)
 }
-func (s *EnterpriseService) DeleteEnterprise(ctx context.Context, a EnterpriseActor, id int64) error {
-	if !a.IsAdmin {
-		return ErrEnterprisePermissionDenied
-	}
-	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {
-		ids, err := s.enterprises.ListMemberUserIDs(ctx, id)
-		if err != nil {
-			return err
-		}
-		if len(ids) > 0 {
-			return ErrEnterpriseNotEmpty
-		}
-		if err := s.audit(ctx, a, c, id, EnterpriseAuditActionEnterpriseDelete, EnterpriseScopeEnterprise, id, e, nil); err != nil {
-			return err
-		}
-		return s.enterprises.Delete(ctx, id)
-	})
-	if err == nil {
-		s.invalidateQuota(ctx, EnterpriseScopeEnterprise, id)
-	}
-	return err
-}
 func (s *EnterpriseService) AdjustBalance(ctx context.Context, a EnterpriseActor, id int64, in EnterpriseBalanceAdjustment) (*Enterprise, error) {
 	if !a.IsAdmin {
 		return nil, ErrEnterprisePermissionDenied
@@ -368,9 +340,11 @@ func (s *EnterpriseService) createUser(ctx context.Context, a EnterpriseActor, i
 		clone.defaultSubAssigner = nil
 		creator = &clone
 	}
-	// Reuse the administrator's account creation core, including password hashing
-	// and default balance. Subscription side effects run only after commit.
-	return creator.CreateUser(ctx, &CreateUserInput{Email: strings.TrimSpace(in.Email), Password: in.Password, Username: in.Username, Role: RoleUser, Concurrency: 1, ActorAdminID: a.UserID})
+	// Reuse the administrator's account creation core, including password hashing.
+	// Enterprise-created accounts start with a frozen personal wallet at zero;
+	// the global signup gift must not be issued. Subscription side effects run only after commit.
+	zeroBalance := 0.0
+	return creator.CreateUser(ctx, &CreateUserInput{Balance: &zeroBalance, Email: strings.TrimSpace(in.Email), Password: in.Password, Username: in.Username, Role: RoleUser, Concurrency: 1, ActorAdminID: a.UserID})
 }
 func (s *EnterpriseService) afterUserCreated(ctx context.Context, userID int64) {
 	if userID > 0 {

@@ -79,6 +79,7 @@ var (
 type Enterprise struct {
 	ID                                             int64
 	Name, Status                                   string
+	GroupPoolConfigured                            bool
 	Balance, TotalRecharged                        float64
 	LowBalanceThreshold                            *float64
 	ContactName, ContactEmail, ContactPhone, Notes string
@@ -104,6 +105,8 @@ type EnterpriseMember struct {
 	DeletedAt                                   *time.Time
 }
 type EnterpriseQuota struct {
+	// UsageVisible is response-only metadata; nil preserves full visibility for internal callers.
+	UsageVisible                                                  *bool `json:"-"`
 	ID, EnterpriseID                                              int64
 	ScopeType                                                     string
 	ScopeID                                                       int64

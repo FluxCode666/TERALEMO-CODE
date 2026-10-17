@@ -49,7 +49,7 @@
 - **THEN** 系统 MUST 创建用户并加入企业，审计日志 MUST 记录 `member.create`
 
 ### Requirement: 移出与停用成员
-企业负责人和系统管理员 SHALL 能把成员移出企业或在企业内停用成员。部门负责人仅当 `manager_can_manage_members=true` 时可移出 / 停用本部门的 `member`。移出后该用户 MUST 恢复为普通用户，个人余额 MUST 恢复可用；历史使用记录 MUST 仍归属原企业。企业 MUST 至少保留一个启用状态的 `owner`。
+企业负责人和系统管理员 SHALL 能把成员移出企业或在企业内停用成员。部门负责人仅当 `manager_can_manage_members=true` 时可移出 / 停用本部门的 `member`。移出后该用户 MUST 恢复为普通用户，个人余额 MUST 恢复可用；历史使用记录 MUST 仍归属原企业。成员操作 MUST NOT 移出、停用或降级最后一个可用 `owner`；可用同时要求成员启用、用户账号 active 且未删除。此保护不阻止下文的管理员显式解散。
 
 #### Scenario: 移出最后一个负责人
 - **WHEN** 移出、停用或降级企业唯一启用的 `owner`
@@ -60,10 +60,10 @@
 - **THEN** 该成员仍可登录面板，但其网关请求 MUST 被拒绝，错误码 `ENTERPRISE_MEMBER_DISABLED`
 
 ### Requirement: 企业状态
-企业 SHALL 有 `active`/`disabled` 两种状态。企业被停用时，全体成员的网关请求 MUST 被拒绝（错误码 `ENTERPRISE_DISABLED`），企业侧管理接口对非系统管理员 MUST 只读。删除企业 MUST 是软删除，且仅当企业没有成员时允许。
+企业 SHALL 有 `active`/`disabled` 两种状态。企业被停用时，全体成员的网关请求 MUST 被拒绝（错误码 `ENTERPRISE_DISABLED`），企业侧管理接口对非系统管理员 MUST 只读。删除企业 MUST 是软删除；默认仅当企业没有成员时允许。系统管理员 MAY 显式指定 dissolve=true 解散仍有成员的企业。解散 MUST 在一个事务内软删除全部成员、限额与部门，清理白名单和分组池配置，再软删除企业；限额归档行 MUST 保留用于在途请求按冻结身份结算。成员操作的最后 active owner 保护不阻止管理员显式解散。
 
 #### Scenario: 删除仍有成员的企业
-- **WHEN** 管理员删除仍有成员的企业
+- **WHEN** 管理员删除仍有成员的企业且未指定 dissolve=true
 - **THEN** 系统 MUST 返回 409，错误码 `ENTERPRISE_NOT_EMPTY`
 
 ### Requirement: 审计日志
@@ -72,3 +72,12 @@
 #### Scenario: 调整成员限额
 - **WHEN** 企业负责人修改某员工的月度限额
 - **THEN** 审计日志 MUST 记录 `quota.update`，详情包含修改前后的值
+
+#### Scenario: 管理员显式解散企业
+- **WHEN** 管理员调用 DELETE /api/v1/admin/enterprises/:id?dissolve=true
+- **THEN** 企业及全部成员、部门、限额 MUST 同事务归档，成员恢复个人身份与钱包；企业余额随企业归档且 MUST NOT 转入成员个人余额
+- **AND** 系统 MUST 失效解散前全体成员的认证缓存，并写 enterprise.delete 审计，detail 含成员数与剩余余额
+
+#### Scenario: 二次确认解散
+- **WHEN** 管理员在列表或详情删除企业，后端返回 ENTERPRISE_NOT_EMPTY
+- **THEN** 前端 MUST 提示成员将恢复为个人用户、企业余额随企业归档，并仅在第二次确认后带 dissolve=true 重试；取消确认 MUST 不解散

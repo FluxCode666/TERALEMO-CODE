@@ -52,6 +52,8 @@ func (s *EnterpriseService) ListQuotas(ctx context.Context, a EnterpriseActor, i
 	out := make([]EnterpriseQuota, 0, len(items))
 	for _, q := range items {
 		if a.IsAdmin || c.Role == EnterpriseRoleOwner {
+			visible := true
+			q.UsageVisible = &visible
 			out = append(out, q)
 			continue
 		}
@@ -64,7 +66,13 @@ func (s *EnterpriseService) ListQuotas(ctx context.Context, a EnterpriseActor, i
 			}
 			target.Member = m
 		}
-		if CheckEnterprisePermission(c, e.Settings, EnterprisePermissionViewQuota, target) == nil {
+		visible := CheckEnterprisePermission(c, e.Settings, EnterprisePermissionViewQuota, target) == nil
+		// Editors need the limit values even when usage visibility is disabled.
+		// Keep the existing ownership/role rules: a manager cannot gain access to
+		// another department or to an owner's/manager's limits through this path.
+		editable := CheckEnterprisePermission(c, e.Settings, EnterprisePermissionEditQuota, target) == nil
+		if visible || editable {
+			q.UsageVisible = &visible
 			out = append(out, q)
 		}
 	}
@@ -114,6 +122,7 @@ func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, 
 		}
 	}
 	var affectedUID int64
+	var usageVisible bool
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {
 		target, err := s.scopeTarget(ctx, id, scope, scopeID)
 		if err != nil {
@@ -122,6 +131,7 @@ func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, 
 		if err = enterpriseCheck(a, c, e, EnterprisePermissionEditQuota, target); err != nil {
 			return err
 		}
+		usageVisible = enterpriseCheck(a, c, e, EnterprisePermissionViewQuota, target) == nil
 		q, err := s.quotas.GetByScope(ctx, id, scope, scopeID)
 		if err != nil {
 			return err
@@ -154,7 +164,15 @@ func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, 
 		s.invalidate(ctx, id)
 	}
 	s.invalidateQuota(ctx, scope, scopeID)
-	return s.quotas.GetByScope(ctx, id, scope, scopeID)
+	q, err := s.quotas.GetByScope(ctx, id, scope, scopeID)
+	if err != nil || q == nil {
+		return q, err
+	}
+	// Never persist redacted counters: visibility applies only to the returned
+	// response and leaves the repository's accounting values untouched.
+	response := *q
+	response.UsageVisible = &usageVisible
+	return &response, nil
 }
 func (s *EnterpriseService) ResetQuota(ctx context.Context, a EnterpriseActor, id int64, scope string, scopeID int64, windows []string) error {
 	if len(windows) == 0 {

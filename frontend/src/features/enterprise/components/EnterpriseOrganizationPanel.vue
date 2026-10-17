@@ -4,7 +4,7 @@
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t(`enterprise.${mode}`) }}</h2>
       <button v-if="canCreate" class="btn btn-primary" data-test="organization-create" @click="openForm()">{{ t(mode === 'members' ? 'enterprise.addMember' : 'enterprise.addDepartment') }}</button>
     </div>
-    <form v-if="mode === 'members'" class="flex flex-wrap gap-3" @submit.prevent="page = 1; load()">
+    <form v-if="mode === 'members'" class="flex flex-wrap gap-3" @submit.prevent="searchMembers">
       <input v-model.trim="search" class="input w-full sm:w-64" :aria-label="t('enterprise.search')" :placeholder="t('enterprise.search')" />
       <select v-if="!limitedManager" v-model="departmentFilter" class="input w-full sm:w-48" :aria-label="t('enterprise.department')"><option value="">{{ t('enterprise.all') }}</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select>
       <select v-model="roleFilter" class="input w-full sm:w-40" :aria-label="t('enterprise.role')"><option value="">{{ t('enterprise.all') }}</option><option v-for="role in roles" :key="role" :value="role">{{ t(`enterprise.roles.${role}`) }}</option></select>
@@ -33,10 +33,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
-import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseRole, CreateEnterpriseMemberRequest, UpdateEnterpriseMemberRequest } from '@/types/enterprise'
+import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseRole, EnterpriseQuery, CreateEnterpriseAccountMemberRequest, CreateEnterpriseMemberRequest, UpdateEnterpriseMemberRequest } from '@/types/enterprise'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -44,14 +44,15 @@ import Pagination from '@/components/common/Pagination.vue'
 import EnterpriseMemberForm from './EnterpriseMemberForm.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 
-const props = defineProps<{ api: EnterpriseResourceAPI; mode: 'members' | 'departments'; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview }>()
+const props = defineProps<{ api: EnterpriseResourceAPI; mode: 'members' | 'departments'; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
-const { busy, error, run } = useEnterpriseAction()
+const { busy, error, run, read } = useEnterpriseAction()
 const departments = ref<EnterpriseDepartment[]>([])
 const members = ref<EnterpriseMember[]>([])
 const page = ref(1), pageSize = ref(20), total = ref(0)
 const search = ref(''), departmentFilter = ref(''), roleFilter = ref<EnterpriseRole | ''>(''), statusFilter = ref('')
+let appliedQuery: EnterpriseQuery = {}
 const roles = ['owner', 'manager', 'member'] as const
 const formOpen = ref(false)
 const editingMember = ref<EnterpriseMember>()
@@ -67,11 +68,16 @@ const columns = computed(() => props.mode === 'members' ? [
 
 function canManageMember(member: EnterpriseMember) { return !limitedManager.value || (member.role === 'member' && member.department_id === props.overview?.me.department_id) }
 async function load() {
-  await run(async () => {
-    const [departmentRows, memberPage] = await Promise.all([props.api.departments(), props.mode === 'members' ? props.api.members({ page: page.value, page_size: pageSize.value, search: search.value || undefined, department_id: departmentFilter.value ? Number(departmentFilter.value) : undefined, role: roleFilter.value || undefined, status: statusFilter.value || undefined }) : Promise.resolve(null)])
+  const params = { ...appliedQuery, page: page.value, page_size: pageSize.value }
+  await read(signal => Promise.all([props.api.departments({ signal }), props.mode === 'members' ? props.api.members(params, { signal }) : Promise.resolve(null)]), ([departmentRows, memberPage]) => {
     departments.value = departmentRows
     if (memberPage) { members.value = memberPage.items; total.value = memberPage.total }
   })
+}
+function searchMembers() {
+  appliedQuery = { search: search.value || undefined, department_id: departmentFilter.value ? Number(departmentFilter.value) : undefined, role: roleFilter.value || undefined, status: statusFilter.value || undefined }
+  page.value = 1
+  void load()
 }
 function openForm(row?: EnterpriseMember | EnterpriseDepartment) {
   editingMember.value = props.mode === 'members' ? row as EnterpriseMember | undefined : undefined
@@ -83,7 +89,8 @@ function openForm(row?: EnterpriseMember | EnterpriseDepartment) {
 async function saveMember(payload: Record<string, unknown>) {
   const success = await run(async () => {
     if (editingMember.value) await props.api.updateMember(editingMember.value.id, payload as UpdateEnterpriseMemberRequest)
-    else await props.api.createMember(payload as CreateEnterpriseMemberRequest)
+    else if (props.admin && 'allowedGroups' in props.api) await props.api.createMember(payload as CreateEnterpriseMemberRequest)
+    else await props.api.createMember(payload as CreateEnterpriseAccountMemberRequest)
   }, t('enterprise.saved'))
   if (success) { formOpen.value = false; emit('updated'); await load() }
 }
@@ -102,4 +109,5 @@ async function remove() {
   if (success) { deleting.value = null; emit('updated'); await load() }
 }
 onMounted(load)
+watch(() => props.refreshKey, load)
 </script>

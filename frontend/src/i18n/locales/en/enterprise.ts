@@ -154,10 +154,13 @@ export default {
       "ENTERPRISE_GROUP_NOT_ALLOWED": "Your enterprise does not allow this group. Contact your enterprise owner.",
       "ENTERPRISE_MEMBER_WALLET_DISABLED": "Your enterprise pays for usage. Personal top-ups, purchases, and balance redemption are unavailable during membership.",
       "ENTERPRISE_FEATURE_UNSUPPORTED": "This feature is currently unavailable to enterprise members.",
-      "ENTERPRISE_INVALID_SCOPE": "The selected scope is invalid or belongs to another enterprise. Refresh and try again."
+      "ENTERPRISE_INVALID_SCOPE": "The selected scope is invalid or belongs to another enterprise. Refresh and try again.",
+      "INVALID_DATE_RANGE": "Invalid date range. Select dates in chronological order, with at most 366 days including both dates."
     },
     "description": "View your enterprise organization, quotas, and usage",
     "inactiveWhitelistGroups": "These groups are no longer allowed by the parent scope and will be removed when saving: {groups}",
-    "validationDateRange": "The date range must be in chronological order and no longer than 366 days."
+    "validationDateRange": "Select dates in chronological order, with at most 366 days including both dates.",
+    "hidden": "Hidden",
+    "settingsRefreshedWithEdits": "Settings refreshed. Your unsaved edits were kept and other settings were updated. Review before saving."
   }
 }

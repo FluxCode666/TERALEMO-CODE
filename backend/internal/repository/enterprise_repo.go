@@ -18,14 +18,14 @@ func NewEnterpriseRepository(client *dbent.Client) service.EnterpriseRepository 
 }
 
 const enterpriseSelectColumns = `e.id, e.name, e.status, e.balance, e.total_recharged, e.low_balance_threshold,
- e.contact_name, e.contact_email, e.contact_phone, e.notes, e.settings, e.created_at, e.updated_at, e.deleted_at,
+ e.contact_name, e.contact_email, e.contact_phone, e.notes, e.settings, e.group_pool_configured, e.created_at, e.updated_at, e.deleted_at,
  (SELECT COUNT(*) FROM enterprise_members m WHERE m.enterprise_id = e.id AND m.deleted_at IS NULL),
  (SELECT COUNT(*) FROM enterprise_departments d WHERE d.enterprise_id = e.id AND d.deleted_at IS NULL)`
 
 func enterpriseScan(s enterpriseScanner, e *service.Enterprise) error {
 	var settings []byte
 	if err := s.Scan(&e.ID, &e.Name, &e.Status, &e.Balance, &e.TotalRecharged, &e.LowBalanceThreshold,
-		&e.ContactName, &e.ContactEmail, &e.ContactPhone, &e.Notes, &settings, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+		&e.ContactName, &e.ContactEmail, &e.ContactPhone, &e.Notes, &settings, &e.GroupPoolConfigured, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
 		&e.MemberCount, &e.DepartmentCount); err != nil {
 		return err
 	}
@@ -89,8 +89,9 @@ func (r *enterpriseRepository) Delete(ctx context.Context, id int64) error {
 		queries := []string{
 			`UPDATE enterprise_departments SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND deleted_at IS NULL`,
 			`UPDATE enterprise_quotas SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND deleted_at IS NULL`,
-			`DELETE FROM enterprise_group_whitelists WHERE enterprise_id = $1`,
 			`DELETE FROM enterprise_allowed_groups WHERE enterprise_id = $1`,
+			`DELETE FROM enterprise_group_whitelists WHERE enterprise_id = $1`,
+			`DELETE FROM enterprise_group_whitelist_scopes WHERE enterprise_id = $1`,
 			`UPDATE enterprises SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
 		}
 		for _, query := range queries {

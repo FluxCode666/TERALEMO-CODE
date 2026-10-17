@@ -1247,9 +1247,7 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 		for _, key := range groupKeys {
 			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
 		}
-		for _, userID := range enterpriseUserIDs {
-			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
-		}
+		invalidateEnterpriseMembersAuthCache(ctx, enterpriseUserIDs, s.authCacheInvalidator)
 	}
 
 	return nil

@@ -29,6 +29,8 @@ type Enterprise struct {
 	Name string `json:"name,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// GroupPoolConfigured holds the value of the "group_pool_configured" field.
+	GroupPoolConfigured bool `json:"group_pool_configured,omitempty"`
 	// Balance holds the value of the "balance" field.
 	Balance float64 `json:"balance,omitempty"`
 	// TotalRecharged holds the value of the "total_recharged" field.
@@ -87,6 +89,8 @@ func (*Enterprise) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case enterprise.FieldSettings:
 			values[i] = new([]byte)
+		case enterprise.FieldGroupPoolConfigured:
+			values[i] = new(sql.NullBool)
 		case enterprise.FieldBalance, enterprise.FieldTotalRecharged, enterprise.FieldLowBalanceThreshold:
 			values[i] = new(sql.NullFloat64)
 		case enterprise.FieldID:
@@ -146,6 +150,12 @@ func (_m *Enterprise) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case enterprise.FieldGroupPoolConfigured:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field group_pool_configured", values[i])
+			} else if value.Valid {
+				_m.GroupPoolConfigured = value.Bool
 			}
 		case enterprise.FieldBalance:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -260,6 +270,9 @@ func (_m *Enterprise) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("group_pool_configured=")
+	builder.WriteString(fmt.Sprintf("%v", _m.GroupPoolConfigured))
 	builder.WriteString(", ")
 	builder.WriteString("balance=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Balance))

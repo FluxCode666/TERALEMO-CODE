@@ -56,6 +56,8 @@ type Tx struct {
 	EnterpriseDepartment *EnterpriseDepartmentClient
 	// EnterpriseGroupWhitelist is the client for interacting with the EnterpriseGroupWhitelist builders.
 	EnterpriseGroupWhitelist *EnterpriseGroupWhitelistClient
+	// EnterpriseGroupWhitelistScope is the client for interacting with the EnterpriseGroupWhitelistScope builders.
+	EnterpriseGroupWhitelistScope *EnterpriseGroupWhitelistScopeClient
 	// EnterpriseMember is the client for interacting with the EnterpriseMember builders.
 	EnterpriseMember *EnterpriseMemberClient
 	// EnterpriseQuota is the client for interacting with the EnterpriseQuota builders.
@@ -260,6 +262,7 @@ func (tx *Tx) init() {
 	tx.EnterpriseBalanceLog = NewEnterpriseBalanceLogClient(tx.config)
 	tx.EnterpriseDepartment = NewEnterpriseDepartmentClient(tx.config)
 	tx.EnterpriseGroupWhitelist = NewEnterpriseGroupWhitelistClient(tx.config)
+	tx.EnterpriseGroupWhitelistScope = NewEnterpriseGroupWhitelistScopeClient(tx.config)
 	tx.EnterpriseMember = NewEnterpriseMemberClient(tx.config)
 	tx.EnterpriseQuota = NewEnterpriseQuotaClient(tx.config)
 	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)

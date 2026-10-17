@@ -37,7 +37,7 @@
 决议：不新建代际基础设施。在 service 包实现 `invalidateEnterpriseMembersAuthCache(ctx, userIDs)`：立即调用现有 `InvalidateAuthCacheByUserID`，并在约 2 秒后（常量）再失效一次（延迟双删，后台 goroutine 使用独立 context，带超时），覆盖「读旧 → 提交 → 失效 → 旧值回填」窗口。企业管理侧所有成员关系 / 授权变化的失效调用统一改用它。在 design.md「Risks」记录此方案与残余窗口。
 
 ### R9 删除最后一个允许分组使「受限」变「不限」［FB］
-决议：持久区分「未配置」与「已配置（可能为空 = 全部拒绝）」。新增迁移 249：`enterprises.group_pool_configured BOOLEAN NOT NULL DEFAULT FALSE`；新表 `enterprise_group_whitelist_scopes(enterprise_id, scope_type, scope_id, created_at, PRIMARY KEY(scope_type, scope_id))`，存在即表示该层已配置。语义：
+决议（按协调者后续调整）：持久区分「未配置」与「已配置（可能为空 = 全部拒绝）」。新增迁移 249：`enterprises.group_pool_configured BOOLEAN NOT NULL DEFAULT FALSE`；新表 `enterprise_group_whitelist_scopes(id BIGSERIAL PRIMARY KEY, enterprise_id, scope_type, scope_id, created_at, UNIQUE(scope_type, scope_id))`，存在即表示该层已配置。采用普通 Ent 实体与标准生成命令，不自定义生成器钩子或迁移元数据模板。语义：
 - 管理端 / 企业侧 PUT `{group_ids:[...]}` 非空 → 配置；**空数组 → 显式取消该层配置**（API 不变，前端不用改）。
 - 删除分组只删关联行，不动配置标志 → 若因此变空，该层仍为「已配置」，拒绝全部。
 - `GetMemberContext*` 的 `GroupPoolConfigured` / `GroupWhitelistConfigured` 改为读标志，不再由行数推断。
@@ -97,3 +97,15 @@
 
 ### X1 企业删除（W2 偏差）［FB，含前端微调］
 「最后 owner 保护」只约束企业侧和管理员的成员操作；管理员删除企业时提供**解散**：`DELETE /api/v1/admin/enterprises/:id?dissolve=true`，在一个事务内软删除全部成员、限额行、白名单与分组池配置、部门，再软删除企业，失效全体成员认证缓存，审计 `enterprise.delete`（detail 含成员数与剩余余额）。不带 `dissolve` 且仍有成员 → 409 `ENTERPRISE_NOT_EMPTY`。前端：删除确认时若后端返回 `ENTERPRISE_NOT_EMPTY`，弹出二次确认（说明会把全部成员恢复为个人用户、企业余额随企业归档），确认后带 `dissolve=true` 重试。在途请求按 R7 冻结身份结算。
+
+## 契约审查追加（基准 e57526fab）
+
+### C1 登录响应缺少 `user.enterprise`［FB］
+`handler/auth_handler.go` 约 146 返回 `dto.UserFromService`，不含企业字段；只有 `/auth/me`、`/user/profile` 有。决议：所有返回用户对象的认证成功响应（邮箱登录、注册、2FA 完成、OAuth 回调 / pending 流程、刷新 token 若返回用户）统一附带与 `/auth/me` 相同的 `enterprise` 对象（非成员 `null`，不可见余额 `balance:null`）。抽一个共享函数，避免各入口各写一遍。
+
+### F2 / F3 限额写响应泄露隐藏用量；有编辑权无查看权时无法编辑［FB 后端；前端由 W4 处理］
+决议：
+- 部门负责人拥有 `edit_member_quota` 时，`GET /enterprise/quotas` 返回本部门成员的限额行（编辑需要看到限额）。
+- 调用者无用量查看权限时（manager 且 `member_quota_visible_to_manager=false`，或对应部门 / 本人开关关闭），Quota 对象的四档 `*_usage_usd` 与 `*_resets_at` 置 `null`，并返回 `usage_visible:false`；可见时 `usage_visible:true`。
+- `PUT /enterprise/quotas/...` 与 reset 的响应遵循同样规则（先写入、后按查看权限裁剪）。
+- 管理端接口始终 `usage_visible:true`。

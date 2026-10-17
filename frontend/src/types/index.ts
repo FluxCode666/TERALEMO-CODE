@@ -1,4 +1,4 @@
-import type { EnterpriseIdentity } from './enterprise'
+import type { EnterpriseIdentity, EnterpriseSummary } from './enterprise'
 export * from './enterprise'
 
 /**
@@ -105,7 +105,8 @@ export interface User {
   deleted_at?: string | null
 }
 
-export interface AdminUser extends User {
+export interface AdminUser extends Omit<User, 'enterprise'> {
+  enterprise: EnterpriseSummary | null
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null

@@ -106,7 +106,10 @@ func enterpriseDeleteScopeData(ctx context.Context, client *dbent.Client, enterp
 	if _, err := client.ExecContext(ctx, `UPDATE enterprise_quotas SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND scope_type = $2 AND scope_id = $3 AND deleted_at IS NULL`, enterpriseID, scopeType, scopeID); err != nil {
 		return translatePersistenceError(err, nil, nil)
 	}
-	_, err := client.ExecContext(ctx, `DELETE FROM enterprise_group_whitelists WHERE enterprise_id = $1 AND scope_type = $2 AND scope_id = $3`, enterpriseID, scopeType, scopeID)
+	if _, err := client.ExecContext(ctx, `DELETE FROM enterprise_group_whitelists WHERE enterprise_id = $1 AND scope_type = $2 AND scope_id = $3`, enterpriseID, scopeType, scopeID); err != nil {
+		return translatePersistenceError(err, nil, nil)
+	}
+	_, err := client.ExecContext(ctx, `DELETE FROM enterprise_group_whitelist_scopes WHERE enterprise_id = $1 AND scope_type = $2 AND scope_id = $3`, enterpriseID, scopeType, scopeID)
 	return translatePersistenceError(err, nil, nil)
 }
 

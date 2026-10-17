@@ -31,6 +31,38 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type identityReaderStub struct {
+	identity *service.EnterpriseIdentity
+	err      error
+}
+
+func (s identityReaderStub) Identity(context.Context, int64) (*service.EnterpriseIdentity, error) {
+	return s.identity, s.err
+}
+
+func assertAuthEnterpriseResponse(t *testing.T, raw []byte, envelope bool, identity *service.EnterpriseIdentity) {
+	t.Helper()
+	var payload map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	if envelope {
+		require.NoError(t, json.Unmarshal(payload["data"], &payload))
+	}
+	var user map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(payload["user"], &user), string(raw))
+	require.Contains(t, user, "enterprise")
+	if identity == nil {
+		require.JSONEq(t, "null", string(user["enterprise"]))
+		return
+	}
+	want := *identity
+	if !want.BalanceVisible {
+		want.Balance = nil
+	}
+	wantJSON, err := json.Marshal(want)
+	require.NoError(t, err)
+	require.JSONEq(t, string(wantJSON), string(user["enterprise"]))
+}
+
 func TestApplySuggestedProfileToCompletionResponse(t *testing.T) {
 	payload := map[string]any{
 		"access_token": "token",
@@ -466,6 +498,7 @@ func TestExchangePendingOAuthCompletionBindCurrentUserOwnershipConflict(t *testi
 
 func TestExchangePendingOAuthCompletionLoginFalseFalseBindsIdentityWithoutAdoption(t *testing.T) {
 	handler, client := newOAuthPendingFlowTestHandler(t, false)
+	handler.enterpriseIdentity = identityReaderStub{identity: &service.EnterpriseIdentity{ID: 8, Name: "Acme", Role: service.EnterpriseRoleMember}}
 	ctx := context.Background()
 
 	userEntity, err := client.User.Create().
@@ -511,6 +544,7 @@ func TestExchangePendingOAuthCompletionLoginFalseFalseBindsIdentityWithoutAdopti
 	handler.ExchangePendingOAuthCompletion(ginCtx)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
+	assertAuthEnterpriseResponse(t, recorder.Body.Bytes(), true, &service.EnterpriseIdentity{ID: 8, Name: "Acme", Role: service.EnterpriseRoleMember})
 
 	identity, err := client.AuthIdentity.Query().
 		Where(
@@ -1900,6 +1934,7 @@ func TestBindOIDCOAuthLoginBindsExistingUserAndConsumesSession(t *testing.T) {
 	handler.BindOIDCOAuthLogin(ginCtx)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
+	assertAuthEnterpriseResponse(t, recorder.Body.Bytes(), false, nil)
 
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
@@ -2365,6 +2400,7 @@ func TestLogin2FACompletesPendingOAuthBindAndConsumesSession(t *testing.T) {
 		totpCache:          totpCache,
 		totpEncryptor:      oauthPendingFlowTotpEncryptorStub{},
 	})
+	handler.enterpriseIdentity = identityReaderStub{identity: &service.EnterpriseIdentity{ID: 8, Name: "Acme", Role: service.EnterpriseRoleMember}}
 	ctx := context.Background()
 
 	passwordHash, err := handler.authService.HashPassword("secret-123")
@@ -2435,6 +2471,7 @@ func TestLogin2FACompletesPendingOAuthBindAndConsumesSession(t *testing.T) {
 	handler.Login2FA(ginCtx)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
+	assertAuthEnterpriseResponse(t, recorder.Body.Bytes(), true, &service.EnterpriseIdentity{ID: 8, Name: "Acme", Role: service.EnterpriseRoleMember})
 	payload := decodeJSONResponseData(t, recorder)
 	require.NotEmpty(t, payload["access_token"])
 	require.NotEmpty(t, payload["refresh_token"])
@@ -3103,6 +3140,10 @@ type oauthPendingFlowUserRepoOptions struct {
 }
 
 func (r *oauthPendingFlowUserRepo) Create(ctx context.Context, user *service.User) error {
+	// Match the production repository default for ordinary email registration.
+	if user.SignupSource == "" {
+		user.SignupSource = "email"
+	}
 	entity, err := r.client.User.Create().
 		SetEmail(user.Email).
 		SetUsername(user.Username).

@@ -80,6 +80,11 @@ func Status(v string) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldStatus, v))
 }
 
+// GroupPoolConfigured applies equality check predicate on the "group_pool_configured" field. It's identical to GroupPoolConfiguredEQ.
+func GroupPoolConfigured(v bool) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldGroupPoolConfigured, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v float64) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldBalance, v))
@@ -373,6 +378,16 @@ func StatusEqualFold(v string) predicate.Enterprise {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// GroupPoolConfiguredEQ applies the EQ predicate on the "group_pool_configured" field.
+func GroupPoolConfiguredEQ(v bool) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldGroupPoolConfigured, v))
+}
+
+// GroupPoolConfiguredNEQ applies the NEQ predicate on the "group_pool_configured" field.
+func GroupPoolConfiguredNEQ(v bool) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNEQ(FieldGroupPoolConfigured, v))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.

@@ -84,6 +84,20 @@ func (_u *EnterpriseUpdate) SetNillableStatus(v *string) *EnterpriseUpdate {
 	return _u
 }
 
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (_u *EnterpriseUpdate) SetGroupPoolConfigured(v bool) *EnterpriseUpdate {
+	_u.mutation.SetGroupPoolConfigured(v)
+	return _u
+}
+
+// SetNillableGroupPoolConfigured sets the "group_pool_configured" field if the given value is not nil.
+func (_u *EnterpriseUpdate) SetNillableGroupPoolConfigured(v *bool) *EnterpriseUpdate {
+	if v != nil {
+		_u.SetGroupPoolConfigured(*v)
+	}
+	return _u
+}
+
 // SetBalance sets the "balance" field.
 func (_u *EnterpriseUpdate) SetBalance(v float64) *EnterpriseUpdate {
 	_u.mutation.ResetBalance()
@@ -363,6 +377,9 @@ func (_u *EnterpriseUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(enterprise.FieldStatus, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.GroupPoolConfigured(); ok {
+		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)
 	}
@@ -526,6 +543,20 @@ func (_u *EnterpriseUpdateOne) SetStatus(v string) *EnterpriseUpdateOne {
 func (_u *EnterpriseUpdateOne) SetNillableStatus(v *string) *EnterpriseUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (_u *EnterpriseUpdateOne) SetGroupPoolConfigured(v bool) *EnterpriseUpdateOne {
+	_u.mutation.SetGroupPoolConfigured(v)
+	return _u
+}
+
+// SetNillableGroupPoolConfigured sets the "group_pool_configured" field if the given value is not nil.
+func (_u *EnterpriseUpdateOne) SetNillableGroupPoolConfigured(v *bool) *EnterpriseUpdateOne {
+	if v != nil {
+		_u.SetGroupPoolConfigured(*v)
 	}
 	return _u
 }
@@ -838,6 +869,9 @@ func (_u *EnterpriseUpdateOne) sqlSave(ctx context.Context) (_node *Enterprise, 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(enterprise.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GroupPoolConfigured(); ok {
+		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)

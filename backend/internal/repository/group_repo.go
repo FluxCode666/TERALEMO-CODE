@@ -464,6 +464,12 @@ func (r *groupRepository) Delete(ctx context.Context, id int64) error {
 		defer func() { _ = tx.Rollback() }()
 		client = tx.Client()
 	}
+	// Explicitly use FOR UPDATE: a soft-delete UPDATE alone takes a weaker row
+	// lock that does not conflict with a whitelist rewrite's FOR KEY SHARE.
+	var lockedID int64
+	if err := enterpriseQueryOne(ctx, client, `SELECT id FROM groups WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, []any{id}, func(s enterpriseScanner) error { return s.Scan(&lockedID) }); err != nil {
+		return translatePersistenceError(err, service.ErrGroupNotFound, nil)
+	}
 	count, err := client.Group.Delete().Where(group.IDEQ(id)).Exec(ctx)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrGroupNotFound, nil)

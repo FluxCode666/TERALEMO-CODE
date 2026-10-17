@@ -77,34 +77,46 @@ func EnterpriseMemberFromService(m *service.EnterpriseMember) *EnterpriseMember 
 }
 
 type EnterpriseQuota struct {
-	ScopeType       string    `json:"scope_type"`
-	ScopeID         int64     `json:"scope_id"`
-	DailyLimitUSD   *float64  `json:"daily_limit_usd"`
-	WeeklyLimitUSD  *float64  `json:"weekly_limit_usd"`
-	MonthlyLimitUSD *float64  `json:"monthly_limit_usd"`
-	TotalLimitUSD   *float64  `json:"total_limit_usd"`
-	DailyUsageUSD   float64   `json:"daily_usage_usd"`
-	WeeklyUsageUSD  float64   `json:"weekly_usage_usd"`
-	MonthlyUsageUSD float64   `json:"monthly_usage_usd"`
-	TotalUsageUSD   float64   `json:"total_usage_usd"`
-	DailyResetsAt   time.Time `json:"daily_resets_at"`
-	WeeklyResetsAt  time.Time `json:"weekly_resets_at"`
-	MonthlyResetsAt time.Time `json:"monthly_resets_at"`
+	ScopeType       string     `json:"scope_type"`
+	ScopeID         int64      `json:"scope_id"`
+	DailyLimitUSD   *float64   `json:"daily_limit_usd"`
+	WeeklyLimitUSD  *float64   `json:"weekly_limit_usd"`
+	MonthlyLimitUSD *float64   `json:"monthly_limit_usd"`
+	TotalLimitUSD   *float64   `json:"total_limit_usd"`
+	UsageVisible    bool       `json:"usage_visible"`
+	DailyUsageUSD   *float64   `json:"daily_usage_usd"`
+	WeeklyUsageUSD  *float64   `json:"weekly_usage_usd"`
+	MonthlyUsageUSD *float64   `json:"monthly_usage_usd"`
+	TotalUsageUSD   *float64   `json:"total_usage_usd"`
+	DailyResetsAt   *time.Time `json:"daily_resets_at"`
+	WeeklyResetsAt  *time.Time `json:"weekly_resets_at"`
+	MonthlyResetsAt *time.Time `json:"monthly_resets_at"`
 }
 
 func EnterpriseQuotaFromService(q *service.EnterpriseQuota) *EnterpriseQuota {
 	if q == nil {
 		return nil
 	}
+	out := &EnterpriseQuota{ScopeType: q.ScopeType, ScopeID: q.ScopeID, DailyLimitUSD: q.DailyLimitUSD, WeeklyLimitUSD: q.WeeklyLimitUSD, MonthlyLimitUSD: q.MonthlyLimitUSD, TotalLimitUSD: q.TotalLimitUSD, UsageVisible: q.UsageVisible == nil || *q.UsageVisible}
+	if !out.UsageVisible {
+		return out
+	}
 	now := timezone.Now()
 	day, week, month := timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now)
-	effective := func(start *time.Time, boundary time.Time, usage float64) float64 {
+	effective := func(start *time.Time, boundary time.Time, usage float64) *float64 {
 		if start == nil || start.Before(boundary) {
-			return 0
+			usage = 0
 		}
-		return usage
+		return &usage
 	}
-	return &EnterpriseQuota{ScopeType: q.ScopeType, ScopeID: q.ScopeID, DailyLimitUSD: q.DailyLimitUSD, WeeklyLimitUSD: q.WeeklyLimitUSD, MonthlyLimitUSD: q.MonthlyLimitUSD, TotalLimitUSD: q.TotalLimitUSD, DailyUsageUSD: effective(q.DailyWindowStart, day, q.DailyUsageUSD), WeeklyUsageUSD: effective(q.WeeklyWindowStart, week, q.WeeklyUsageUSD), MonthlyUsageUSD: effective(q.MonthlyWindowStart, month, q.MonthlyUsageUSD), TotalUsageUSD: q.TotalUsageUSD, DailyResetsAt: day.AddDate(0, 0, 1), WeeklyResetsAt: week.AddDate(0, 0, 7), MonthlyResetsAt: month.AddDate(0, 1, 0)}
+	out.DailyUsageUSD = effective(q.DailyWindowStart, day, q.DailyUsageUSD)
+	out.WeeklyUsageUSD = effective(q.WeeklyWindowStart, week, q.WeeklyUsageUSD)
+	out.MonthlyUsageUSD = effective(q.MonthlyWindowStart, month, q.MonthlyUsageUSD)
+	total := q.TotalUsageUSD
+	out.TotalUsageUSD = &total
+	dailyReset, weeklyReset, monthlyReset := day.AddDate(0, 0, 1), week.AddDate(0, 0, 7), month.AddDate(0, 1, 0)
+	out.DailyResetsAt, out.WeeklyResetsAt, out.MonthlyResetsAt = &dailyReset, &weeklyReset, &monthlyReset
+	return out
 }
 
 type EnterpriseGroup struct {

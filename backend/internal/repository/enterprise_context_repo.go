@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -28,7 +29,7 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	client := clientFromContext(ctx, r.client)
 	args := make([]any, 0, len(userIDs))
 	userPlaceholders := enterpriseContextPlaceholders(userIDs, &args)
-	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id
+	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id, e.group_pool_configured
  FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
  WHERE m.user_id IN (`+userPlaceholders+`) AND m.deleted_at IS NULL ORDER BY m.user_id`, args...)
 	if err != nil {
@@ -39,7 +40,7 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	for rows.Next() {
 		c := &service.EnterpriseMemberContext{GroupPoolIDs: []int64{}, GroupWhitelistIDs: []int64{}}
 		var userID int64
-		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID); err != nil {
+		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID, &c.GroupPoolConfigured); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -84,11 +85,12 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	}
 	departmentPlaceholders := enterpriseContextPlaceholders(departmentIDs, &args)
 	memberPlaceholders := enterpriseContextPlaceholders(memberIDs, &args)
-	rows, err = client.QueryContext(ctx, `SELECT w.enterprise_id, w.scope_type, w.scope_id, w.group_id FROM enterprise_group_whitelists w
- JOIN groups g ON g.id = w.group_id AND g.deleted_at IS NULL
- WHERE w.enterprise_id IN (`+enterprisePlaceholders+`) AND ((w.scope_type = 'enterprise' AND w.scope_id IN (`+enterprisePlaceholders+`))
- OR (w.scope_type = 'department' AND w.scope_id IN (`+departmentPlaceholders+`)) OR (w.scope_type = 'member' AND w.scope_id IN (`+memberPlaceholders+`)))
- ORDER BY w.enterprise_id, w.scope_type, w.scope_id, w.group_id`, args...)
+	rows, err = client.QueryContext(ctx, `SELECT s.enterprise_id, s.scope_type, s.scope_id, g.id FROM enterprise_group_whitelist_scopes s
+ LEFT JOIN enterprise_group_whitelists w ON w.enterprise_id = s.enterprise_id AND w.scope_type = s.scope_type AND w.scope_id = s.scope_id
+ LEFT JOIN groups g ON g.id = w.group_id AND g.deleted_at IS NULL
+ WHERE s.enterprise_id IN (`+enterprisePlaceholders+`) AND ((s.scope_type = 'enterprise' AND s.scope_id IN (`+enterprisePlaceholders+`))
+ OR (s.scope_type = 'department' AND s.scope_id IN (`+departmentPlaceholders+`)) OR (s.scope_type = 'member' AND s.scope_id IN (`+memberPlaceholders+`)))
+ ORDER BY s.enterprise_id, s.scope_type, s.scope_id, w.group_id`, args...)
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
@@ -100,12 +102,17 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	whitelists := make(map[scopeKey][]int64)
 	for rows.Next() {
 		var key scopeKey
-		var groupID int64
+		var groupID sql.NullInt64
 		if err := rows.Scan(&key.enterpriseID, &key.scopeType, &key.scopeID, &groupID); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
-		whitelists[key] = append(whitelists[key], groupID)
+		if _, ok := whitelists[key]; !ok {
+			whitelists[key] = []int64{}
+		}
+		if groupID.Valid {
+			whitelists[key] = append(whitelists[key], groupID.Int64)
+		}
 	}
 	err = rows.Err()
 	_ = rows.Close()
@@ -114,7 +121,6 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	}
 	for _, c := range out {
 		if ids := pools[c.EnterpriseID]; len(ids) > 0 {
-			c.GroupPoolConfigured = true
 			c.GroupPoolIDs = slices.Clone(ids)
 		}
 		keys := []scopeKey{{c.EnterpriseID, service.EnterpriseScopeEnterprise, c.EnterpriseID}, {c.EnterpriseID, service.EnterpriseScopeMember, c.MemberID}}
@@ -122,8 +128,8 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 			keys = append(keys, scopeKey{c.EnterpriseID, service.EnterpriseScopeDepartment, *c.DepartmentID})
 		}
 		for _, key := range keys {
-			ids := whitelists[key]
-			if len(ids) == 0 {
+			ids, configured := whitelists[key]
+			if !configured {
 				continue
 			}
 			if !c.GroupWhitelistConfigured {

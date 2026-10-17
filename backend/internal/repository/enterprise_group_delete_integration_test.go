@@ -49,8 +49,17 @@ func TestEnterpriseGroupDeleteWithTransactionClientWithoutTxContext(t *testing.T
 	for _, id := range []int64{enterprise.ID, other.ID} {
 		whitelists, err := groups.ListWhitelists(txCtx, id)
 		require.NoError(t, err)
-		require.Empty(t, whitelists)
+		require.Len(t, whitelists, 1)
+		require.Empty(t, whitelists[0].GroupIDs)
 	}
+	snapshot, err := NewEnterpriseRepository(client).GetMemberContextByUserID(txCtx, active.UserID)
+	require.NoError(t, err)
+	require.True(t, snapshot.GroupPoolConfigured)
+	require.True(t, snapshot.GroupWhitelistConfigured)
+	require.Empty(t, snapshot.GroupPoolIDs)
+	require.Empty(t, snapshot.GroupWhitelistIDs)
+	require.False(t, snapshot.AllowsGroup(groupID))
+	require.False(t, snapshot.AllowsGroup(groupID+1))
 	// The caller still owns a live, uncommitted transaction after Delete returns.
 	rows, err := tx.QueryContext(ctx, "SELECT deleted_at IS NOT NULL FROM groups WHERE id=$1", groupID)
 	require.NoError(t, err)

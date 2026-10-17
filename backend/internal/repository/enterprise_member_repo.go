@@ -44,9 +44,13 @@ func (r *enterpriseMemberRepository) Create(ctx context.Context, m *service.Ente
 			}
 		}
 		var userID int64
-		err := enterpriseQueryOne(ctx, client, `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, []any{m.UserID}, func(s enterpriseScanner) error { return s.Scan(&userID) })
+		var userRole string
+		err := enterpriseQueryOne(ctx, client, `SELECT id, role FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, []any{m.UserID}, func(s enterpriseScanner) error { return s.Scan(&userID, &userRole) })
 		if err != nil {
 			return translatePersistenceError(err, service.ErrUserNotFound, nil)
+		}
+		if userRole == service.RoleAdmin {
+			return service.ErrEnterpriseMemberAdminForbidden
 		}
 		query := `INSERT INTO enterprise_members (enterprise_id, user_id, department_id, role, status, title) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, joined_at, created_at, updated_at`
 		args := []any{m.EnterpriseID, m.UserID, m.DepartmentID, m.Role, m.Status, m.Title}
@@ -174,6 +178,6 @@ func (r *enterpriseMemberRepository) CountActiveOwners(ctx context.Context, ente
 		return 0, err
 	}
 	var count int64
-	err := enterpriseQueryOne(ctx, client, `SELECT COUNT(*) FROM enterprise_members WHERE enterprise_id = $1 AND role = $2 AND status = $3 AND deleted_at IS NULL`, []any{enterpriseID, service.EnterpriseRoleOwner, service.EnterpriseMemberStatusActive}, func(s enterpriseScanner) error { return s.Scan(&count) })
+	err := enterpriseQueryOne(ctx, client, `SELECT COUNT(*) FROM enterprise_members m JOIN users u ON u.id = m.user_id AND u.status = 'active' AND u.deleted_at IS NULL WHERE m.enterprise_id = $1 AND m.role = $2 AND m.status = $3 AND m.deleted_at IS NULL`, []any{enterpriseID, service.EnterpriseRoleOwner, service.EnterpriseMemberStatusActive}, func(s enterpriseScanner) error { return s.Scan(&count) })
 	return count, translatePersistenceError(err, nil, nil)
 }

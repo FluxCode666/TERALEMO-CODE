@@ -1611,12 +1611,15 @@ func (h *AuthHandler) transitionPendingOAuthAccountToChoiceState(
 	return session, nil
 }
 
-func writeOAuthTokenPairResponse(c *gin.Context, tokenPair *service.TokenPair) {
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
+func (h *AuthHandler) writeOAuthTokenPairResponse(c *gin.Context, tokenPair *service.TokenPair, user *service.User) {
+	userResponse, err := buildAuthUserResponse(c.Request.Context(), user, h.enterpriseIdentity)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, AuthResponse{
+		AccessToken: tokenPair.AccessToken, RefreshToken: tokenPair.RefreshToken,
+		ExpiresIn: tokenPair.ExpiresIn, TokenType: "Bearer", User: userResponse,
 	})
 }
 
@@ -1695,7 +1698,7 @@ func (h *AuthHandler) bindPendingOAuthLogin(c *gin.Context, provider string) {
 	}
 
 	clearCookies()
-	writeOAuthTokenPairResponse(c, tokenPair)
+	h.writeOAuthTokenPairResponse(c, tokenPair, user)
 }
 
 func respondPendingOAuthBindingApplyError(c *gin.Context, err error) {
@@ -1890,7 +1893,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 	// createPendingOAuthAccount = 注册新账户，需要把钉钉昵称同步到 users.username 作为初始值
 	h.maybeSyncDingTalkAfterRegistration(c.Request.Context(), session, user.ID)
 	clearCookies()
-	writeOAuthTokenPairResponse(c, tokenPair)
+	h.writeOAuthTokenPairResponse(c, tokenPair, user)
 }
 
 // ExchangePendingOAuthCompletion redeems a pending OAuth browser session into a frontend-safe payload.
@@ -1950,6 +1953,7 @@ func (h *AuthHandler) ExchangePendingOAuthCompletion(c *gin.Context) {
 
 	canIssueTokenPair := pendingOAuthCompletionCanIssueTokenPair(session, payload)
 	var loginUser *service.User
+	var loginUserResponse *authUserResponse
 	if canIssueTokenPair {
 		loginUser, err = h.userService.GetByID(c.Request.Context(), *session.TargetUserID)
 		if err != nil {
@@ -1964,6 +1968,11 @@ func (h *AuthHandler) ExchangePendingOAuthCompletion(c *gin.Context) {
 		}
 		if err := h.ensureBackendModeAllowsUser(c.Request.Context(), loginUser); err != nil {
 			clearCookies()
+			response.ErrorFrom(c, err)
+			return
+		}
+		loginUserResponse, err = buildAuthUserResponse(c.Request.Context(), loginUser, h.enterpriseIdentity)
+		if err != nil {
 			response.ErrorFrom(c, err)
 			return
 		}
@@ -2059,6 +2068,7 @@ func (h *AuthHandler) ExchangePendingOAuthCompletion(c *gin.Context) {
 		payload["refresh_token"] = tokenPair.RefreshToken
 		payload["expires_in"] = tokenPair.ExpiresIn
 		payload["token_type"] = "Bearer"
+		payload["user"] = loginUserResponse
 	}
 
 	clearCookies()

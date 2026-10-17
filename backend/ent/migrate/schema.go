@@ -871,6 +871,7 @@ var (
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "name", Type: field.TypeString, Size: 100},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "group_pool_configured", Type: field.TypeBool, Default: false},
 		{Name: "balance", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "total_recharged", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "low_balance_threshold", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
@@ -1048,6 +1049,32 @@ var (
 				Name:    "idx_enterprise_group_whitelists_enterprise",
 				Unique:  false,
 				Columns: []*schema.Column{EnterpriseGroupWhitelistsColumns[1]},
+			},
+		},
+	}
+	// EnterpriseGroupWhitelistScopesColumns holds the columns for the "enterprise_group_whitelist_scopes" table.
+	EnterpriseGroupWhitelistScopesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "scope_type", Type: field.TypeString, Size: 20},
+		{Name: "scope_id", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// EnterpriseGroupWhitelistScopesTable holds the schema information for the "enterprise_group_whitelist_scopes" table.
+	EnterpriseGroupWhitelistScopesTable = &schema.Table{
+		Name:       "enterprise_group_whitelist_scopes",
+		Columns:    EnterpriseGroupWhitelistScopesColumns,
+		PrimaryKey: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "uq_enterprise_group_whitelist_scopes_scope",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[2], EnterpriseGroupWhitelistScopesColumns[3]},
+			},
+			{
+				Name:    "idx_enterprise_group_whitelist_scopes_enterprise",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[1]},
 			},
 		},
 	}
@@ -2419,6 +2446,7 @@ var (
 		EnterpriseBalanceLogsTable,
 		EnterpriseDepartmentsTable,
 		EnterpriseGroupWhitelistsTable,
+		EnterpriseGroupWhitelistScopesTable,
 		EnterpriseMembersTable,
 		EnterpriseQuotasTable,
 		ErrorPassthroughRulesTable,
@@ -2529,6 +2557,9 @@ func init() {
 	EnterpriseGroupWhitelistsTable.ForeignKeys[0].RefTable = GroupsTable
 	EnterpriseGroupWhitelistsTable.Annotation = &entsql.Annotation{
 		Table: "enterprise_group_whitelists",
+	}
+	EnterpriseGroupWhitelistScopesTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_group_whitelist_scopes",
 	}
 	EnterpriseMembersTable.ForeignKeys[0].RefTable = EnterprisesTable
 	EnterpriseMembersTable.ForeignKeys[1].RefTable = UsersTable

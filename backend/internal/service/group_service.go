@@ -247,9 +247,7 @@ func (s *GroupService) Delete(ctx context.Context, id int64) error {
 	}
 	if s.authCacheInvalidator != nil {
 		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
-		for _, userID := range enterpriseUserIDs {
-			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
-		}
+		invalidateEnterpriseMembersAuthCache(ctx, enterpriseUserIDs, s.authCacheInvalidator)
 	}
 
 	return nil

@@ -213,6 +213,7 @@ func ProvideHandlers(
 ) *Handlers {
 	authHandler.enterpriseIdentity = enterprises
 	userHandler.enterpriseIdentity = enterprises
+	passkeyHandler.enterpriseIdentity = enterprises
 	return &Handlers{
 		Auth:             authHandler,
 		User:             userHandler,

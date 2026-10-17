@@ -33,6 +33,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
@@ -93,6 +94,7 @@ const (
 	TypeEnterpriseBalanceLog          = "EnterpriseBalanceLog"
 	TypeEnterpriseDepartment          = "EnterpriseDepartment"
 	TypeEnterpriseGroupWhitelist      = "EnterpriseGroupWhitelist"
+	TypeEnterpriseGroupWhitelistScope = "EnterpriseGroupWhitelistScope"
 	TypeEnterpriseMember              = "EnterpriseMember"
 	TypeEnterpriseQuota               = "EnterpriseQuota"
 	TypeErrorPassthroughRule          = "ErrorPassthroughRule"
@@ -20782,6 +20784,7 @@ type EnterpriseMutation struct {
 	deleted_at               *time.Time
 	name                     *string
 	status                   *string
+	group_pool_configured    *bool
 	balance                  *float64
 	addbalance               *float64
 	total_recharged          *float64
@@ -21091,6 +21094,42 @@ func (m *EnterpriseMutation) OldStatus(ctx context.Context) (v string, err error
 // ResetStatus resets all changes to the "status" field.
 func (m *EnterpriseMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetGroupPoolConfigured sets the "group_pool_configured" field.
+func (m *EnterpriseMutation) SetGroupPoolConfigured(b bool) {
+	m.group_pool_configured = &b
+}
+
+// GroupPoolConfigured returns the value of the "group_pool_configured" field in the mutation.
+func (m *EnterpriseMutation) GroupPoolConfigured() (r bool, exists bool) {
+	v := m.group_pool_configured
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupPoolConfigured returns the old "group_pool_configured" field's value of the Enterprise entity.
+// If the Enterprise object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseMutation) OldGroupPoolConfigured(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupPoolConfigured is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupPoolConfigured requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupPoolConfigured: %w", err)
+	}
+	return oldValue.GroupPoolConfigured, nil
+}
+
+// ResetGroupPoolConfigured resets all changes to the "group_pool_configured" field.
+func (m *EnterpriseMutation) ResetGroupPoolConfigured() {
+	m.group_pool_configured = nil
 }
 
 // SetBalance sets the "balance" field.
@@ -21543,7 +21582,7 @@ func (m *EnterpriseMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, enterprise.FieldCreatedAt)
 	}
@@ -21558,6 +21597,9 @@ func (m *EnterpriseMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, enterprise.FieldStatus)
+	}
+	if m.group_pool_configured != nil {
+		fields = append(fields, enterprise.FieldGroupPoolConfigured)
 	}
 	if m.balance != nil {
 		fields = append(fields, enterprise.FieldBalance)
@@ -21601,6 +21643,8 @@ func (m *EnterpriseMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case enterprise.FieldStatus:
 		return m.Status()
+	case enterprise.FieldGroupPoolConfigured:
+		return m.GroupPoolConfigured()
 	case enterprise.FieldBalance:
 		return m.Balance()
 	case enterprise.FieldTotalRecharged:
@@ -21636,6 +21680,8 @@ func (m *EnterpriseMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldName(ctx)
 	case enterprise.FieldStatus:
 		return m.OldStatus(ctx)
+	case enterprise.FieldGroupPoolConfigured:
+		return m.OldGroupPoolConfigured(ctx)
 	case enterprise.FieldBalance:
 		return m.OldBalance(ctx)
 	case enterprise.FieldTotalRecharged:
@@ -21695,6 +21741,13 @@ func (m *EnterpriseMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case enterprise.FieldGroupPoolConfigured:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupPoolConfigured(v)
 		return nil
 	case enterprise.FieldBalance:
 		v, ok := value.(float64)
@@ -21869,6 +21922,9 @@ func (m *EnterpriseMutation) ResetField(name string) error {
 		return nil
 	case enterprise.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case enterprise.FieldGroupPoolConfigured:
+		m.ResetGroupPoolConfigured()
 		return nil
 	case enterprise.FieldBalance:
 		m.ResetBalance()
@@ -25494,6 +25550,563 @@ func (m *EnterpriseGroupWhitelistMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown EnterpriseGroupWhitelist edge %s", name)
+}
+
+// EnterpriseGroupWhitelistScopeMutation represents an operation that mutates the EnterpriseGroupWhitelistScope nodes in the graph.
+type EnterpriseGroupWhitelistScopeMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int64
+	enterprise_id    *int64
+	addenterprise_id *int64
+	scope_type       *string
+	scope_id         *int64
+	addscope_id      *int64
+	created_at       *time.Time
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*EnterpriseGroupWhitelistScope, error)
+	predicates       []predicate.EnterpriseGroupWhitelistScope
+}
+
+var _ ent.Mutation = (*EnterpriseGroupWhitelistScopeMutation)(nil)
+
+// enterprisegroupwhitelistscopeOption allows management of the mutation configuration using functional options.
+type enterprisegroupwhitelistscopeOption func(*EnterpriseGroupWhitelistScopeMutation)
+
+// newEnterpriseGroupWhitelistScopeMutation creates new mutation for the EnterpriseGroupWhitelistScope entity.
+func newEnterpriseGroupWhitelistScopeMutation(c config, op Op, opts ...enterprisegroupwhitelistscopeOption) *EnterpriseGroupWhitelistScopeMutation {
+	m := &EnterpriseGroupWhitelistScopeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeEnterpriseGroupWhitelistScope,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withEnterpriseGroupWhitelistScopeID sets the ID field of the mutation.
+func withEnterpriseGroupWhitelistScopeID(id int64) enterprisegroupwhitelistscopeOption {
+	return func(m *EnterpriseGroupWhitelistScopeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *EnterpriseGroupWhitelistScope
+		)
+		m.oldValue = func(ctx context.Context) (*EnterpriseGroupWhitelistScope, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().EnterpriseGroupWhitelistScope.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withEnterpriseGroupWhitelistScope sets the old EnterpriseGroupWhitelistScope of the mutation.
+func withEnterpriseGroupWhitelistScope(node *EnterpriseGroupWhitelistScope) enterprisegroupwhitelistscopeOption {
+	return func(m *EnterpriseGroupWhitelistScopeMutation) {
+		m.oldValue = func(context.Context) (*EnterpriseGroupWhitelistScope, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m EnterpriseGroupWhitelistScopeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m EnterpriseGroupWhitelistScopeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *EnterpriseGroupWhitelistScopeMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().EnterpriseGroupWhitelistScope.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetEnterpriseID(i int64) {
+	m.enterprise_id = &i
+	m.addenterprise_id = nil
+}
+
+// EnterpriseID returns the value of the "enterprise_id" field in the mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) EnterpriseID() (r int64, exists bool) {
+	v := m.enterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseID returns the old "enterprise_id" field's value of the EnterpriseGroupWhitelistScope entity.
+// If the EnterpriseGroupWhitelistScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseGroupWhitelistScopeMutation) OldEnterpriseID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseID: %w", err)
+	}
+	return oldValue.EnterpriseID, nil
+}
+
+// AddEnterpriseID adds i to the "enterprise_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddEnterpriseID(i int64) {
+	if m.addenterprise_id != nil {
+		*m.addenterprise_id += i
+	} else {
+		m.addenterprise_id = &i
+	}
+}
+
+// AddedEnterpriseID returns the value that was added to the "enterprise_id" field in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedEnterpriseID() (r int64, exists bool) {
+	v := m.addenterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetEnterpriseID resets all changes to the "enterprise_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetEnterpriseID() {
+	m.enterprise_id = nil
+	m.addenterprise_id = nil
+}
+
+// SetScopeType sets the "scope_type" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetScopeType(s string) {
+	m.scope_type = &s
+}
+
+// ScopeType returns the value of the "scope_type" field in the mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) ScopeType() (r string, exists bool) {
+	v := m.scope_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeType returns the old "scope_type" field's value of the EnterpriseGroupWhitelistScope entity.
+// If the EnterpriseGroupWhitelistScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseGroupWhitelistScopeMutation) OldScopeType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeType: %w", err)
+	}
+	return oldValue.ScopeType, nil
+}
+
+// ResetScopeType resets all changes to the "scope_type" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetScopeType() {
+	m.scope_type = nil
+}
+
+// SetScopeID sets the "scope_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetScopeID(i int64) {
+	m.scope_id = &i
+	m.addscope_id = nil
+}
+
+// ScopeID returns the value of the "scope_id" field in the mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) ScopeID() (r int64, exists bool) {
+	v := m.scope_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopeID returns the old "scope_id" field's value of the EnterpriseGroupWhitelistScope entity.
+// If the EnterpriseGroupWhitelistScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseGroupWhitelistScopeMutation) OldScopeID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopeID: %w", err)
+	}
+	return oldValue.ScopeID, nil
+}
+
+// AddScopeID adds i to the "scope_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddScopeID(i int64) {
+	if m.addscope_id != nil {
+		*m.addscope_id += i
+	} else {
+		m.addscope_id = &i
+	}
+}
+
+// AddedScopeID returns the value that was added to the "scope_id" field in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedScopeID() (r int64, exists bool) {
+	v := m.addscope_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetScopeID resets all changes to the "scope_id" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetScopeID() {
+	m.scope_id = nil
+	m.addscope_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the EnterpriseGroupWhitelistScope entity.
+// If the EnterpriseGroupWhitelistScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseGroupWhitelistScopeMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the EnterpriseGroupWhitelistScopeMutation builder.
+func (m *EnterpriseGroupWhitelistScopeMutation) Where(ps ...predicate.EnterpriseGroupWhitelistScope) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the EnterpriseGroupWhitelistScopeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *EnterpriseGroupWhitelistScopeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.EnterpriseGroupWhitelistScope, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *EnterpriseGroupWhitelistScopeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (EnterpriseGroupWhitelistScope).
+func (m *EnterpriseGroupWhitelistScopeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *EnterpriseGroupWhitelistScopeMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.enterprise_id != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldEnterpriseID)
+	}
+	if m.scope_type != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldScopeType)
+	}
+	if m.scope_id != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldScopeID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		return m.EnterpriseID()
+	case enterprisegroupwhitelistscope.FieldScopeType:
+		return m.ScopeType()
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		return m.ScopeID()
+	case enterprisegroupwhitelistscope.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *EnterpriseGroupWhitelistScopeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		return m.OldEnterpriseID(ctx)
+	case enterprisegroupwhitelistscope.FieldScopeType:
+		return m.OldScopeType(ctx)
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		return m.OldScopeID(ctx)
+	case enterprisegroupwhitelistscope.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown EnterpriseGroupWhitelistScope field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *EnterpriseGroupWhitelistScopeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseID(v)
+		return nil
+	case enterprisegroupwhitelistscope.FieldScopeType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeType(v)
+		return nil
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopeID(v)
+		return nil
+	case enterprisegroupwhitelistscope.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedFields() []string {
+	var fields []string
+	if m.addenterprise_id != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldEnterpriseID)
+	}
+	if m.addscope_id != nil {
+		fields = append(fields, enterprisegroupwhitelistscope.FieldScopeID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		return m.AddedEnterpriseID()
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		return m.AddedScopeID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEnterpriseID(v)
+		return nil
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddScopeID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetField(name string) error {
+	switch name {
+	case enterprisegroupwhitelistscope.FieldEnterpriseID:
+		m.ResetEnterpriseID()
+		return nil
+	case enterprisegroupwhitelistscope.FieldScopeType:
+		m.ResetScopeType()
+		return nil
+	case enterprisegroupwhitelistscope.FieldScopeID:
+		m.ResetScopeID()
+		return nil
+	case enterprisegroupwhitelistscope.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *EnterpriseGroupWhitelistScopeMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *EnterpriseGroupWhitelistScopeMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown EnterpriseGroupWhitelistScope edge %s", name)
 }
 
 // EnterpriseMemberMutation represents an operation that mutates the EnterpriseMember nodes in the graph.

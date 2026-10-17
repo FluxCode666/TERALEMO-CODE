@@ -26,6 +26,8 @@ const (
 	FieldName = "name"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldGroupPoolConfigured holds the string denoting the group_pool_configured field in the database.
+	FieldGroupPoolConfigured = "group_pool_configured"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldTotalRecharged holds the string denoting the total_recharged field in the database.
@@ -70,6 +72,7 @@ var Columns = []string{
 	FieldDeletedAt,
 	FieldName,
 	FieldStatus,
+	FieldGroupPoolConfigured,
 	FieldBalance,
 	FieldTotalRecharged,
 	FieldLowBalanceThreshold,
@@ -116,6 +119,8 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultGroupPoolConfigured holds the default value on creation for the "group_pool_configured" field.
+	DefaultGroupPoolConfigured bool
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
 	// DefaultTotalRecharged holds the default value on creation for the "total_recharged" field.
@@ -169,6 +174,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByGroupPoolConfigured orders the results by the group_pool_configured field.
+func ByGroupPoolConfigured(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGroupPoolConfigured, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

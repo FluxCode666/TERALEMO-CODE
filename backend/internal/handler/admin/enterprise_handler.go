@@ -22,6 +22,7 @@ type enterpriseManagementAPI interface {
 	GetEnterprise(context.Context, service.EnterpriseActor, int64) (*service.Enterprise, error)
 	UpdateEnterprise(context.Context, service.EnterpriseActor, int64, service.UpdateEnterpriseInput) (*service.Enterprise, error)
 	DeleteEnterprise(context.Context, service.EnterpriseActor, int64) error
+	DissolveEnterprise(context.Context, service.EnterpriseActor, int64) error
 	AdjustBalance(context.Context, service.EnterpriseActor, int64, service.EnterpriseBalanceAdjustment) (*service.Enterprise, error)
 	ListBalanceLogs(context.Context, service.EnterpriseActor, int64, pagination.PaginationParams) ([]service.EnterpriseBalanceLog, *pagination.PaginationResult, error)
 	ListDepartments(context.Context, service.EnterpriseActor, int64) ([]service.EnterpriseDepartment, error)
@@ -267,7 +268,13 @@ func (h *EnterpriseHandler) updateEnterprise(c *gin.Context, a service.Enterpris
 	enterpriseSuccess(c, dto.EnterpriseFromService(item), err)
 }
 func (h *EnterpriseHandler) deleteEnterprise(c *gin.Context, a service.EnterpriseActor, id int64) {
-	enterpriseSuccess(c, gin.H{"message": "Enterprise deleted"}, h.management.DeleteEnterprise(c.Request.Context(), a, id))
+	var err error
+	if c.Query("dissolve") == "true" {
+		err = h.management.DissolveEnterprise(c.Request.Context(), a, id)
+	} else {
+		err = h.management.DeleteEnterprise(c.Request.Context(), a, id)
+	}
+	enterpriseSuccess(c, gin.H{"message": "Enterprise deleted"}, err)
 }
 
 type enterpriseBalanceRequest struct {

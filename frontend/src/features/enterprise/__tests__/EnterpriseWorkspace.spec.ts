@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import type { EnterpriseOverview, EnterprisePermissions, EnterpriseQuota, EnterpriseRole } from '@/types/enterprise'
+import type { Enterprise, EnterpriseOverview, EnterprisePermissions, EnterpriseQuota, EnterpriseRole } from '@/types/enterprise'
 import { defaultEnterpriseSettings } from '@/types/enterprise'
 import EnterpriseWorkspace from '../EnterpriseWorkspace.vue'
 import EnterpriseQuotaDisplay from '../components/EnterpriseQuotaDisplay.vue'
 
-const { api, showError } = vi.hoisted(() => ({
+const { api, getEnterprise, showError } = vi.hoisted(() => ({
   api: {
     overview: vi.fn(), departments: vi.fn(), createDepartment: vi.fn(), updateDepartment: vi.fn(), deleteDepartment: vi.fn(),
     members: vi.fn(), createMember: vi.fn(), updateMember: vi.fn(), deleteMember: vi.fn(),
@@ -16,6 +16,7 @@ const { api, showError } = vi.hoisted(() => ({
     usage: vi.fn(), usageStats: vi.fn(), usageTrend: vi.fn(), usageModels: vi.fn(), usageMembers: vi.fn(), usageDepartments: vi.fn(),
     auditLogs: vi.fn(), balanceLogs: vi.fn()
   },
+  getEnterprise: vi.fn(),
   showError: vi.fn()
 }))
 
@@ -25,7 +26,7 @@ vi.mock('@/api/enterprise', async () => {
 })
 
 vi.mock('@/api/admin/enterprises', () => ({
-  enterprisesAPI: { forEnterprise: () => api, get: vi.fn() }
+  enterprisesAPI: { forEnterprise: () => api, get: getEnterprise }
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -157,6 +158,69 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="enterprise-balance"]').exists()).toBe(true)
+  })
+
+  it('keeps the quota tab available when only member quota editing is permitted', async () => {
+    const value = overview('manager', {
+      enterprise_quota: null, department_quota_visible: false, department_quota: null,
+      member_quota_visible: false, member_quota: null
+    })
+    value.permissions.edit_member_quota = true
+    const wrapper = mountWorkspace(value)
+    await flushPromises()
+
+    expect(tabNames(wrapper)).toContain('quotas')
+  })
+
+  it('waits for fresh overview data and refreshes the current tab without remounting it', async () => {
+    const value = overview('owner')
+    const wrapper = mount(EnterpriseWorkspace, {
+      props: { overview: value },
+      global: { stubs: { EnterpriseSettingsPanel: { name: 'EnterpriseSettingsPanel', props: ['refreshKey'], template: '<div />' } } }
+    })
+    wrappers.push(wrapper)
+    await openTab(wrapper, 'settings')
+    const panel = wrapper.findComponent({ name: 'EnterpriseSettingsPanel' })
+    const instance = panel.vm
+    const refreshKey = panel.props('refreshKey')
+
+    await wrapper.get('button.btn-secondary').trigger('click')
+    expect(wrapper.emitted('updated')).toHaveLength(1)
+    expect(panel.props('refreshKey')).toBe(refreshKey)
+
+    await wrapper.setProps({ overview: { ...value, balance: 250 } })
+    expect(wrapper.get('[data-test="tab-settings"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.findComponent({ name: 'EnterpriseSettingsPanel' }).vm).toBe(instance)
+    expect(panel.props('refreshKey')).toBe(refreshKey + 1)
+  })
+
+  it('reloads the current administrator tab after refreshing enterprise details', async () => {
+    const enterprise: Enterprise = {
+      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '',
+      settings: { ...defaultEnterpriseSettings }, member_count: 0, department_count: 0,
+      created_at: '', updated_at: ''
+    }
+    getEnterprise.mockResolvedValue(enterprise)
+    const wrapper = mount(EnterpriseWorkspace, {
+      props: { admin: true, enterpriseId: 1 },
+      global: { stubs: { EnterpriseSettingsPanel: { name: 'EnterpriseSettingsPanel', props: ['refreshKey'], template: '<div />' }, EnterpriseBasicsForm: true } }
+    })
+    wrappers.push(wrapper)
+    await flushPromises()
+    await openTab(wrapper, 'settings')
+    const panel = wrapper.findComponent({ name: 'EnterpriseSettingsPanel' })
+    const instance = panel.vm
+    const refreshKey = panel.props('refreshKey')
+
+    getEnterprise.mockResolvedValue({ ...enterprise, balance: 200 })
+    await wrapper.get('button.btn-secondary').trigger('click')
+    await flushPromises()
+
+    expect(getEnterprise).toHaveBeenCalledTimes(2)
+    expect(panel.vm).toBe(instance)
+    expect(panel.props('refreshKey')).toBe(refreshKey + 1)
+    expect(wrapper.get('[data-test="tab-settings"]').attributes('aria-current')).toBe('page')
   })
 
   it('does not request members, settings, audit, or department rankings for an ordinary member', async () => {
