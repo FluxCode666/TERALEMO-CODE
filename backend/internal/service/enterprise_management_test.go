@@ -250,7 +250,7 @@ type enterpriseManagementTestFixture struct {
 
 func newEnterpriseManagementTestFixture(t *testing.T) *enterpriseManagementTestFixture {
 	e := &enterpriseManagementTestEnterpriseRepo{e: Enterprise{ID: 1, Name: "Acme", Status: EnterpriseStatusActive, Settings: DefaultEnterpriseSettings()}, ids: []int64{10, 20, 30}}
-	m := &enterpriseManagementTestMembers{t: t, owners: 1, items: map[int64]EnterpriseMember{10: {ID: 10, EnterpriseID: 1, UserID: 10, Role: EnterpriseRoleOwner, Status: EnterpriseMemberStatusActive}, 20: {ID: 20, EnterpriseID: 1, UserID: 20, Role: EnterpriseRoleMember, Status: EnterpriseMemberStatusActive, DepartmentID: enterpriseTestID(3)}}}
+	m := &enterpriseManagementTestMembers{t: t, owners: 1, items: map[int64]EnterpriseMember{10: {ID: 10, EnterpriseID: 1, UserID: 10, Role: EnterpriseRoleOwner, Status: EnterpriseMemberStatusActive, UserStatus: StatusActive}, 20: {ID: 20, EnterpriseID: 1, UserID: 20, Role: EnterpriseRoleMember, Status: EnterpriseMemberStatusActive, DepartmentID: enterpriseTestID(3)}}}
 	q := &enterpriseManagementTestQuotas{items: map[EnterpriseQuotaScope]EnterpriseQuota{{EnterpriseScopeEnterprise, 1}: {EnterpriseID: 1, ScopeType: EnterpriseScopeEnterprise, ScopeID: 1}, {EnterpriseScopeDepartment, 3}: {EnterpriseID: 1, ScopeType: EnterpriseScopeDepartment, ScopeID: 3}, {EnterpriseScopeMember, 20}: {EnterpriseID: 1, ScopeType: EnterpriseScopeMember, ScopeID: 20, DailyUsageUSD: 7}}}
 	a := &enterpriseManagementTestAudit{}
 	auth := &enterpriseManagementTestAuth{}

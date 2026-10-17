@@ -518,6 +518,8 @@ type ContentModerationService struct {
 	userRepo                 UserRepository
 	proxyRepo                ProxyRepository
 	authCacheInvalidator     APIKeyAuthCacheInvalidator
+	enterpriseMembers        contentModerationEnterpriseMemberReader
+	enterpriseAudit          contentModerationEnterpriseAuditWriter
 	emailService             *EmailService
 	httpClient               *http.Client
 	moderationProxyCache     atomic.Pointer[moderationProxyURLCacheEntry]
@@ -1998,9 +2000,8 @@ func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Co
 				slog.Warn("content_moderation.ban_update_user_failed", "user_id", *log.UserID, "error", err)
 				return false
 			}
-			if s.authCacheInvalidator != nil {
-				s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, *log.UserID)
-			}
+			invalidateEnterpriseMembersAuthCache(ctx, []int64{*log.UserID}, s.authCacheInvalidator)
+			s.auditModerationMemberDisabled(ctx, cfg, log)
 			autoBanJustApplied = true
 		}
 		log.AutoBanned = true

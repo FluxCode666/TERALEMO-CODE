@@ -21,6 +21,7 @@ type Enterprise struct {
 	Settings            service.EnterpriseSettings `json:"settings"`
 	MemberCount         int64                      `json:"member_count"`
 	DepartmentCount     int64                      `json:"department_count"`
+	ActiveOwnerCount    int                        `json:"active_owner_count"`
 	Quota               *EnterpriseQuota           `json:"quota,omitempty"`
 	CreatedAt           time.Time                  `json:"created_at"`
 	UpdatedAt           time.Time                  `json:"updated_at"`
@@ -30,7 +31,7 @@ func EnterpriseFromService(e *service.Enterprise) *Enterprise {
 	if e == nil {
 		return nil
 	}
-	return &Enterprise{ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
+	return &Enterprise{ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, ActiveOwnerCount: e.ActiveOwnerCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
 }
 
 type EnterpriseDepartment struct {

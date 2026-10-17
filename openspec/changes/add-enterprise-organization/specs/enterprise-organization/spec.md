@@ -49,7 +49,7 @@
 - **THEN** 系统 MUST 创建用户并加入企业，审计日志 MUST 记录 `member.create`
 
 ### Requirement: 移出与停用成员
-企业负责人和系统管理员 SHALL 能把成员移出企业或在企业内停用成员。部门负责人仅当 `manager_can_manage_members=true` 时可移出 / 停用本部门的 `member`。移出后该用户 MUST 恢复为普通用户，个人余额 MUST 恢复可用；历史使用记录 MUST 仍归属原企业。成员操作 MUST NOT 移出、停用或降级最后一个可用 `owner`；可用同时要求成员启用、用户账号 active 且未删除。此保护不阻止下文的管理员显式解散。
+企业负责人和系统管理员 SHALL 能把成员移出企业或在企业内停用成员。部门负责人仅当 `manager_can_manage_members=true` 时可移出 / 停用本部门的 `member`。移出后该用户 MUST 恢复为普通用户，个人余额 MUST 恢复可用；历史使用记录 MUST 仍归属原企业。成员操作 MUST NOT 移出、停用或降级最后一个可用 `owner`；可用同时要求成员启用且未删除、用户账号 active 且未删除。只有目标本身属于可用 owner 集合且操作会使集合为空时才拒绝；判定 MUST 在企业行锁事务内完成。此保护不阻止下文的管理员显式解散及内容审核自动封禁。
 
 #### Scenario: 移出最后一个负责人
 - **WHEN** 移出、停用或降级企业唯一启用的 `owner`
@@ -59,6 +59,16 @@
 - **WHEN** 成员被停用
 - **THEN** 该成员仍可登录面板，但其网关请求 MUST 被拒绝，错误码 `ENTERPRISE_MEMBER_DISABLED`
 
+#### Scenario: 移出或降级账号已停用的负责人
+- **WHEN** 企业有两个 owner，其中一个用户账号已停用，管理员或另一个 owner 移出或降级该不可用 owner
+- **THEN** 系统 MUST 允许操作，不返回 `ENTERPRISE_LAST_OWNER`，可用 owner 数量保持为 1
+
+#### Scenario: 平台内容审核自动封禁唯一可用负责人
+- **WHEN** 企业唯一可用 owner 命中内容审核自动封禁阈值
+- **THEN** 系统 MUST 停用该用户账号，并调用认证缓存延迟双删，不因最后 owner 身份豁免
+- **AND** 系统 MUST 独立尝试写入 `member.disabled_by_moderation` 审计，操作者身份为 `system`，操作者 ID 为 0，详情含 user_id、member_id 与触发原因摘要且不含审核原文；审计失败只记录 ERROR，MUST NOT 回滚封禁
+- **AND** 管理端企业列表与详情 MUST 返回整数 `active_owner_count:0`；列表 MUST 批量统计可用 owner 数量，避免 N+1
+
 ### Requirement: 企业状态
 企业 SHALL 有 `active`/`disabled` 两种状态。企业被停用时，全体成员的网关请求 MUST 被拒绝（错误码 `ENTERPRISE_DISABLED`），企业侧管理接口对非系统管理员 MUST 只读。删除企业 MUST 是软删除；默认仅当企业没有成员时允许。系统管理员 MAY 显式指定 dissolve=true 解散仍有成员的企业。解散 MUST 在一个事务内软删除全部成员、限额与部门，清理白名单和分组池配置，再软删除企业；限额归档行 MUST 保留用于在途请求按冻结身份结算。成员操作的最后 active owner 保护不阻止管理员显式解散。
 
@@ -67,7 +77,7 @@
 - **THEN** 系统 MUST 返回 409，错误码 `ENTERPRISE_NOT_EMPTY`
 
 ### Requirement: 审计日志
-系统 SHALL 为企业的成员增删、角色 / 部门 / 状态变更、部门增删改、限额变更、余额调整、设置变更写入审计日志，包含操作者用户 ID、操作者身份（`admin`/`owner`/`manager`）、动作、目标与变更详情。企业负责人和系统管理员 SHALL 能分页查看本企业审计日志。
+系统 SHALL 为企业的成员增删、角色 / 部门 / 状态变更、部门增删改、限额变更、余额调整、设置变更写入审计日志，包含操作者用户 ID、操作者身份（`admin`/`owner`/`manager`，平台自动操作为 `system`）、动作、目标与变更详情。企业负责人和系统管理员 SHALL 能分页查看本企业审计日志。
 
 #### Scenario: 调整成员限额
 - **WHEN** 企业负责人修改某员工的月度限额

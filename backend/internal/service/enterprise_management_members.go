@@ -243,7 +243,7 @@ func (s *EnterpriseService) UpdateMember(ctx context.Context, a EnterpriseActor,
 				return err
 			}
 		}
-		if before.Role == EnterpriseRoleOwner && before.Status == EnterpriseMemberStatusActive && (m.Role != EnterpriseRoleOwner || m.Status != EnterpriseMemberStatusActive) {
+		if enterpriseMemberIsAvailableOwner(&before) && (m.Role != EnterpriseRoleOwner || m.Status != EnterpriseMemberStatusActive) {
 			count, err := s.members.CountActiveOwners(ctx, id)
 			if err != nil {
 				return err
@@ -274,7 +274,7 @@ func (s *EnterpriseService) RemoveMember(ctx context.Context, a EnterpriseActor,
 		if err = enterpriseCheck(a, c, e, EnterprisePermissionManageMember, EnterprisePermissionTarget{Member: m}); err != nil {
 			return err
 		}
-		if m.Role == EnterpriseRoleOwner && m.Status == EnterpriseMemberStatusActive {
+		if enterpriseMemberIsAvailableOwner(m) {
 			count, err := s.members.CountActiveOwners(ctx, id)
 			if err != nil {
 				return err
@@ -293,4 +293,11 @@ func (s *EnterpriseService) RemoveMember(ctx context.Context, a EnterpriseActor,
 		s.invalidateQuota(ctx, EnterpriseScopeMember, memberID)
 	}
 	return err
+}
+
+// The member lookup runs under the enterprise lock and joins only users that
+// have not been deleted. A deleted account has an empty UserStatus, matching
+// CountActiveOwners.
+func enterpriseMemberIsAvailableOwner(m *EnterpriseMember) bool {
+	return m.Role == EnterpriseRoleOwner && m.Status == EnterpriseMemberStatusActive && m.UserStatus == StatusActive
 }

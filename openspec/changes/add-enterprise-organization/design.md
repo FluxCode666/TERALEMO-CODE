@@ -99,7 +99,7 @@ enterprise_balance_logs
 
 enterprise_audit_logs
   id BIGSERIAL PK, enterprise_id BIGINT NOT NULL
-  actor_user_id BIGINT NOT NULL, actor_role VARCHAR(20) NOT NULL   -- admin | owner | manager
+  actor_user_id BIGINT NOT NULL, actor_role VARCHAR(20) NOT NULL   -- admin | owner | manager | system
   action VARCHAR(64) NOT NULL                    -- 见 D9
   target_type VARCHAR(32) NOT NULL DEFAULT '', target_id BIGINT NULL
   detail JSONB NOT NULL DEFAULT '{}'
@@ -233,6 +233,8 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 - 企业 `disabled` 时企业侧所有写操作返回 403 `ENTERPRISE_DISABLED`；成员 `disabled` 时企业侧所有接口返回 403 `ENTERPRISE_MEMBER_DISABLED`。
 - 非企业成员访问 `/api/v1/enterprise/*` 返回 403 `ENTERPRISE_NOT_MEMBER`。
 - 系统管理员通过 `/api/v1/admin/enterprises/*` 拥有全部权限（含余额调整与分组池）。
+- 管理端与企业侧移出、停用或降级成员时，仅目标自身属于可用 owner 集合才执行最后 owner 保护。可用要求成员角色 owner、成员 active 且未删除、用户账号 active 且未删除；判定与变更在企业行锁事务内完成，账号已停用或删除的 owner 不占用此集合。
+- 内容审核自动封禁遵循平台风控优先，即使目标为唯一可用 owner 也停用用户账号。成功后写 `member.disabled_by_moderation` 企业审计并执行认证缓存延迟双删；审计失败仅记 ERROR，不回滚封禁，不获取企业行锁。
 - 权限判定实现为纯函数（输入：调用者成员上下文 + 企业设置 + 目标对象），便于表驱动单测。
 
 ### D6：API 契约
@@ -244,7 +246,7 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
 // Enterprise（管理端）
 { "id":1, "name":"Acme", "status":"active", "balance":120.5, "total_recharged":500,
   "low_balance_threshold":null, "contact_name":"", "contact_email":"", "contact_phone":"",
-  "notes":"", "settings":{...EnterpriseSettings}, "member_count":12, "department_count":3,
+  "notes":"", "settings":{...EnterpriseSettings}, "member_count":12, "department_count":3, "active_owner_count":1,
   "created_at":"...", "updated_at":"..." }
 // Department
 { "id":3, "enterprise_id":1, "name":"研发部", "sort_order":0, "member_count":5, "created_at":"..." }
@@ -275,6 +277,8 @@ JSON 中缺失的键 MUST 取上面的默认值（反序列化前先填默认值
   "actual_cost":0.01, "billing_type":0, "request_type":0, "stream":true,
   "duration_ms":1000, "first_token_ms":200, "created_at":"..." }
 ```
+
+管理端 Enterprise 的 `active_owner_count` 为非负整数，包含在列表与详情响应中（0 也必须返回），按 D5 可用 owner 口径统计；列表按当前页企业 ID 批量查询，避免 N+1。0 表示管理员需要为该企业恢复或补充可用负责人。
 
 **管理端 `/api/v1/admin/enterprises`**
 | 方法 路径 | 说明 |
@@ -387,7 +391,9 @@ Quota 列表与 PUT / reset 响应统一返回 `usage_visible`；无用量查看
 - 列表必须返回 `EnterpriseUsageLog` DTO。
 
 ### D9：审计 action
-`enterprise.create|update|delete`、`balance.adjust`、`department.create|update|delete`、`member.add|create|update|remove`、`quota.update|reset`、`settings.update`、`group_pool.update`、`group_whitelist.update`。`detail` 记录修改前后的关键字段。
+`enterprise.create|update|delete`、`balance.adjust`、`department.create|update|delete`、`member.add|create|update|remove|disabled_by_moderation`、`quota.update|reset`、`settings.update`、`group_pool.update`、`group_whitelist.update`。`detail` 记录修改前后的关键字段。
+
+内容审核自动封禁企业成员成功后，独立追加 `member.disabled_by_moderation`：`actor_role=system`、`actor_user_id=0`，目标为 member；`detail` 只包含 `user_id`、`member_id`、固定原因摘要、违规次数、封禁阈值及统计窗口小时数，不复制审核内容原文、内容摘录、命中关键词或上游响应/错误。成员查询或审计写入失败记录 ERROR，不回滚已完成的封禁；认证缓存仍通过延迟双删失效。
 
 ### D10：前端
 - 管理端：`/admin/enterprises` 列表页 + `/admin/enterprises/:id` 详情页（Tab：概览 / 部门 / 成员 / 限额 / 分组 / 使用记录 / 余额流水 / 审计 / 设置）；菜单加在 `AppSidebar.vue adminNavItems`。
@@ -420,6 +426,7 @@ type EnterpriseBillingCache interface {
 - **企业行热点**：同一企业所有成员的结算都要更新 `enterprises` 行与企业级限额行，高并发大企业可能出现行锁竞争。结算在 worker 池异步执行、事务很短，第一版可接受；后续可改为 Redis 累计 + 批量落库。
 - **限额超支**：前置检查按 `usage >= limit` 判断，不计本次预估，超支幅度取决于并发在途请求数，与现有平台配额一致。
 - **认证回填竞态（R8）**：认证快照 L1 15s / L2 300s。管理变更提交后立即失效，并在约 2 秒后通过独立、5 秒超时的后台 context 再删一次，覆盖“读旧 → 提交 → 删除 → 旧值回填”的常见窗口；不引入代际设施。慢于双删窗口的旧读取、进程重启或缓存失效失败仍可能留下旧快照，最长受现有 5 分钟缓存 TTL 约束；此方案不承诺即时、线性的权限撤销。
+- **平台自动封禁优先（A2）**：内容审核可使企业暂时没有可用 owner；管理端通过 `active_owner_count=0` 发现并恢复负责人。封禁与企业审计不构成原子事务，审计或成员查询故障仅记 ERROR，需运维排查；成员归属按封禁成功后的读取确定。此路径不反向获取企业行锁，保留原有平台风控行为。
 - **在途预留故障**（R17）：企业余额与三级限额前置检查保持 fail-closed；在途预留可配置关闭，scope 预留 Redis 操作失败时与个人模式一致放行。企业成员共享 `ent:{enterprise_id}` scope，句柄冻结 scope，依引用计数释放并支持流式续期，释放失败由 TTL 回收。预留关闭或故障窗口内的透支取决于同时在途请求数及这些请求的最终费用，没有固定金额上界。
 - **历史数据**：上线前的 `usage_logs` 没有企业字段，企业视图看不到加入企业前或上线前的记录（预期行为）。
 - **自然月与 30 天滚动不一致**：企业月度限额按自然月，与个人平台配额不同，需要在 UI 文案中注明。

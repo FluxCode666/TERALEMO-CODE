@@ -55,11 +55,17 @@ func (r *enterpriseRepository) Create(ctx context.Context, e *service.Enterprise
 }
 
 func (r *enterpriseRepository) GetByID(ctx context.Context, id int64) (*service.Enterprise, error) {
+	client := clientFromContext(ctx, r.client)
 	e := new(service.Enterprise)
-	err := enterpriseQueryOne(ctx, clientFromContext(ctx, r.client), `SELECT `+enterpriseSelectColumns+` FROM enterprises e WHERE e.id = $1 AND e.deleted_at IS NULL`, []any{id}, func(s enterpriseScanner) error { return enterpriseScan(s, e) })
+	err := enterpriseQueryOne(ctx, client, `SELECT `+enterpriseSelectColumns+` FROM enterprises e WHERE e.id = $1 AND e.deleted_at IS NULL`, []any{id}, func(s enterpriseScanner) error { return enterpriseScan(s, e) })
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrEnterpriseNotFound, nil)
 	}
+	counts, err := enterpriseActiveOwnerCounts(ctx, client, []int64{id})
+	if err != nil {
+		return nil, err
+	}
+	e.ActiveOwnerCount = counts[id]
 	return e, nil
 }
 
@@ -137,5 +143,47 @@ func (r *enterpriseRepository) List(ctx context.Context, params pagination.Pagin
 	if err := rows.Err(); err != nil {
 		return nil, nil, translatePersistenceError(err, nil, nil)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, nil, translatePersistenceError(err, nil, nil)
+	}
+	ids := make([]int64, len(items))
+	for i := range items {
+		ids[i] = items[i].ID
+	}
+	counts, err := enterpriseActiveOwnerCounts(ctx, client, ids)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range items {
+		items[i].ActiveOwnerCount = counts[items[i].ID]
+	}
 	return items, paginationResultFromTotal(total, params), nil
+}
+
+// Match CountActiveOwners without taking management locks. One grouped query
+// covers the current list page, including enterprises with no available owner.
+func enterpriseActiveOwnerCounts(ctx context.Context, client *dbent.Client, enterpriseIDs []int64) (map[int64]int, error) {
+	counts := make(map[int64]int, len(enterpriseIDs))
+	if len(enterpriseIDs) == 0 {
+		return counts, nil
+	}
+	args := []any{service.EnterpriseRoleOwner, service.EnterpriseMemberStatusActive}
+	placeholders := enterpriseContextPlaceholders(enterpriseIDs, &args)
+	rows, err := client.QueryContext(ctx, `SELECT m.enterprise_id, COUNT(*) FROM enterprise_members m
+ JOIN users u ON u.id = m.user_id AND u.status = 'active' AND u.deleted_at IS NULL
+ WHERE m.role = $1 AND m.status = $2 AND m.deleted_at IS NULL
+ AND m.enterprise_id IN (`+placeholders+`) GROUP BY m.enterprise_id`, args...)
+	if err != nil {
+		return nil, translatePersistenceError(err, nil, nil)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var enterpriseID int64
+		var count int
+		if err := rows.Scan(&enterpriseID, &count); err != nil {
+			return nil, err
+		}
+		counts[enterpriseID] = count
+	}
+	return counts, translatePersistenceError(rows.Err(), nil, nil)
 }

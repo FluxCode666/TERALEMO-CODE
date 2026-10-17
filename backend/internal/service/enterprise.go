@@ -13,38 +13,40 @@ type EnterpriseSettings = domain.EnterpriseSettings
 func DefaultEnterpriseSettings() EnterpriseSettings { return domain.DefaultEnterpriseSettings() }
 
 const (
-	EnterpriseRoleOwner                       = domain.EnterpriseRoleOwner
-	EnterpriseRoleManager                     = domain.EnterpriseRoleManager
-	EnterpriseRoleMember                      = domain.EnterpriseRoleMember
-	EnterpriseStatusActive                    = domain.EnterpriseStatusActive
-	EnterpriseStatusDisabled                  = domain.EnterpriseStatusDisabled
-	EnterpriseMemberStatusActive              = domain.EnterpriseMemberStatusActive
-	EnterpriseMemberStatusDisabled            = domain.EnterpriseMemberStatusDisabled
-	EnterpriseScopeEnterprise                 = domain.EnterpriseScopeEnterprise
-	EnterpriseScopeDepartment                 = domain.EnterpriseScopeDepartment
-	EnterpriseScopeMember                     = domain.EnterpriseScopeMember
-	EnterpriseBalanceOperationAdd             = domain.EnterpriseBalanceOperationAdd
-	EnterpriseBalanceOperationSubtract        = domain.EnterpriseBalanceOperationSubtract
-	EnterpriseQuotaWindowDaily                = domain.EnterpriseQuotaWindowDaily
-	EnterpriseQuotaWindowWeekly               = domain.EnterpriseQuotaWindowWeekly
-	EnterpriseQuotaWindowMonthly              = domain.EnterpriseQuotaWindowMonthly
-	EnterpriseQuotaWindowTotal                = domain.EnterpriseQuotaWindowTotal
-	EnterpriseAuditActionEnterpriseCreate     = domain.EnterpriseAuditActionEnterpriseCreate
-	EnterpriseAuditActionEnterpriseUpdate     = domain.EnterpriseAuditActionEnterpriseUpdate
-	EnterpriseAuditActionEnterpriseDelete     = domain.EnterpriseAuditActionEnterpriseDelete
-	EnterpriseAuditActionBalanceAdjust        = domain.EnterpriseAuditActionBalanceAdjust
-	EnterpriseAuditActionDepartmentCreate     = domain.EnterpriseAuditActionDepartmentCreate
-	EnterpriseAuditActionDepartmentUpdate     = domain.EnterpriseAuditActionDepartmentUpdate
-	EnterpriseAuditActionDepartmentDelete     = domain.EnterpriseAuditActionDepartmentDelete
-	EnterpriseAuditActionMemberAdd            = domain.EnterpriseAuditActionMemberAdd
-	EnterpriseAuditActionMemberCreate         = domain.EnterpriseAuditActionMemberCreate
-	EnterpriseAuditActionMemberUpdate         = domain.EnterpriseAuditActionMemberUpdate
-	EnterpriseAuditActionMemberRemove         = domain.EnterpriseAuditActionMemberRemove
-	EnterpriseAuditActionQuotaUpdate          = domain.EnterpriseAuditActionQuotaUpdate
-	EnterpriseAuditActionQuotaReset           = domain.EnterpriseAuditActionQuotaReset
-	EnterpriseAuditActionSettingsUpdate       = domain.EnterpriseAuditActionSettingsUpdate
-	EnterpriseAuditActionGroupPoolUpdate      = domain.EnterpriseAuditActionGroupPoolUpdate
-	EnterpriseAuditActionGroupWhitelistUpdate = domain.EnterpriseAuditActionGroupWhitelistUpdate
+	EnterpriseRoleOwner                             = domain.EnterpriseRoleOwner
+	EnterpriseRoleManager                           = domain.EnterpriseRoleManager
+	EnterpriseRoleMember                            = domain.EnterpriseRoleMember
+	EnterpriseAuditActorRoleSystem                  = domain.EnterpriseAuditActorRoleSystem
+	EnterpriseStatusActive                          = domain.EnterpriseStatusActive
+	EnterpriseStatusDisabled                        = domain.EnterpriseStatusDisabled
+	EnterpriseMemberStatusActive                    = domain.EnterpriseMemberStatusActive
+	EnterpriseMemberStatusDisabled                  = domain.EnterpriseMemberStatusDisabled
+	EnterpriseScopeEnterprise                       = domain.EnterpriseScopeEnterprise
+	EnterpriseScopeDepartment                       = domain.EnterpriseScopeDepartment
+	EnterpriseScopeMember                           = domain.EnterpriseScopeMember
+	EnterpriseBalanceOperationAdd                   = domain.EnterpriseBalanceOperationAdd
+	EnterpriseBalanceOperationSubtract              = domain.EnterpriseBalanceOperationSubtract
+	EnterpriseQuotaWindowDaily                      = domain.EnterpriseQuotaWindowDaily
+	EnterpriseQuotaWindowWeekly                     = domain.EnterpriseQuotaWindowWeekly
+	EnterpriseQuotaWindowMonthly                    = domain.EnterpriseQuotaWindowMonthly
+	EnterpriseQuotaWindowTotal                      = domain.EnterpriseQuotaWindowTotal
+	EnterpriseAuditActionEnterpriseCreate           = domain.EnterpriseAuditActionEnterpriseCreate
+	EnterpriseAuditActionEnterpriseUpdate           = domain.EnterpriseAuditActionEnterpriseUpdate
+	EnterpriseAuditActionEnterpriseDelete           = domain.EnterpriseAuditActionEnterpriseDelete
+	EnterpriseAuditActionBalanceAdjust              = domain.EnterpriseAuditActionBalanceAdjust
+	EnterpriseAuditActionDepartmentCreate           = domain.EnterpriseAuditActionDepartmentCreate
+	EnterpriseAuditActionDepartmentUpdate           = domain.EnterpriseAuditActionDepartmentUpdate
+	EnterpriseAuditActionDepartmentDelete           = domain.EnterpriseAuditActionDepartmentDelete
+	EnterpriseAuditActionMemberAdd                  = domain.EnterpriseAuditActionMemberAdd
+	EnterpriseAuditActionMemberCreate               = domain.EnterpriseAuditActionMemberCreate
+	EnterpriseAuditActionMemberUpdate               = domain.EnterpriseAuditActionMemberUpdate
+	EnterpriseAuditActionMemberRemove               = domain.EnterpriseAuditActionMemberRemove
+	EnterpriseAuditActionMemberDisabledByModeration = domain.EnterpriseAuditActionMemberDisabledByModeration
+	EnterpriseAuditActionQuotaUpdate                = domain.EnterpriseAuditActionQuotaUpdate
+	EnterpriseAuditActionQuotaReset                 = domain.EnterpriseAuditActionQuotaReset
+	EnterpriseAuditActionSettingsUpdate             = domain.EnterpriseAuditActionSettingsUpdate
+	EnterpriseAuditActionGroupPoolUpdate            = domain.EnterpriseAuditActionGroupPoolUpdate
+	EnterpriseAuditActionGroupWhitelistUpdate       = domain.EnterpriseAuditActionGroupWhitelistUpdate
 )
 
 var (
@@ -85,6 +87,7 @@ type Enterprise struct {
 	ContactName, ContactEmail, ContactPhone, Notes string
 	Settings                                       EnterpriseSettings
 	MemberCount, DepartmentCount                   int64
+	ActiveOwnerCount                               int `json:"active_owner_count"`
 	CreatedAt, UpdatedAt                           time.Time
 	DeletedAt                                      *time.Time
 }
