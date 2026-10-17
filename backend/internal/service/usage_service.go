@@ -7,6 +7,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -90,6 +91,22 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 	_, err = s.userRepo.GetByID(txCtx, req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
+	}
+
+	// This legacy writer only updates a personal wallet. Reject enterprise
+	// memberships (including disabled ones) before any log or money mutation.
+	client := s.entClient
+	if tx != nil {
+		client = tx.Client()
+	} else if existing := dbent.TxFromContext(txCtx); existing != nil {
+		client = existing.Client()
+	}
+	member, err := client.EnterpriseMember.Query().Where(enterprisemember.UserIDEQ(req.UserID), enterprisemember.DeletedAtIsNil()).Exist(txCtx)
+	if err != nil {
+		return nil, fmt.Errorf("check enterprise membership: %w", err)
+	}
+	if member {
+		return nil, ErrEnterpriseBillingLegacyUnsupported
 	}
 
 	// 创建使用日志

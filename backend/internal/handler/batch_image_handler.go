@@ -299,11 +299,15 @@ func batchImageOwnerFromContext(c *gin.Context) (service.BatchImageOwner, bool) 
 	if !ok || apiKey == nil || apiKey.ID <= 0 || apiKey.UserID <= 0 {
 		return service.BatchImageOwner{}, false
 	}
-	return service.BatchImageOwner{
+	owner := service.BatchImageOwner{
 		UserID:   apiKey.UserID,
 		APIKeyID: apiKey.ID,
 		GroupID:  apiKey.GroupID,
-	}, true
+	}
+	if apiKey.User != nil {
+		owner.Enterprise = apiKey.User.Enterprise
+	}
+	return owner, true
 }
 
 func batchImageError(c *gin.Context, err error) {

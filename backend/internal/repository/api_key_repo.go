@@ -86,7 +86,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	return r.attachEnterpriseContext(ctx, apiKeyEntityToService(m))
 }
 
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
@@ -124,7 +124,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	return r.attachEnterpriseContext(ctx, apiKeyEntityToService(m))
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
@@ -239,7 +239,21 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	return r.attachEnterpriseContext(ctx, apiKeyEntityToService(m))
+}
+
+// Authentication caches this snapshot together with the user. Never silently turn
+// a membership lookup failure into a personal wallet or unrestricted group access.
+func (r *apiKeyRepository) attachEnterpriseContext(ctx context.Context, key *service.APIKey) (*service.APIKey, error) {
+	if key == nil || key.User == nil {
+		return key, nil
+	}
+	membership, err := NewEnterpriseRepository(r.client).GetMemberContextByUserID(ctx, key.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("load api key enterprise membership: %w", err)
+	}
+	key.User.Enterprise = membership
+	return key, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fields service.APIKeyUpdateFields) error {

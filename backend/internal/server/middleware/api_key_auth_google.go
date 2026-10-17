@@ -113,6 +113,14 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if member := apiKey.User.Enterprise; member != nil && !member.Active() {
+			if member.EnterpriseStatus != service.EnterpriseStatusActive {
+				abortWithGoogleEnterpriseError(c, "ENTERPRISE_DISABLED", service.ErrEnterpriseGatewayDisabled.Message)
+			} else {
+				abortWithGoogleEnterpriseError(c, "ENTERPRISE_MEMBER_DISABLED", service.ErrEnterpriseGatewayMemberDisabled.Message)
+			}
+			return
+		}
 		if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			if code == "GROUP_DELETED" {
@@ -127,8 +135,15 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		if !validateAPIKeyGroupAllowed(apiKey) {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			MarkIngressRejected(c, IngressRejectGroupNotAllowed)
-			abortWithGoogleError(c, 403, "API Key 所属专属分组不再允许当前用户使用")
+			if apiKey.User.Enterprise != nil {
+				abortWithGoogleEnterpriseError(c, "ENTERPRISE_GROUP_NOT_ALLOWED", service.ErrEnterpriseGatewayGroupNotAllowed.Message)
+			} else {
+				abortWithGoogleError(c, 403, "API Key 所属专属分组不再允许当前用户使用")
+			}
 			return
+		}
+		if apiKey.User.Enterprise != nil {
+			c.Request = c.Request.WithContext(service.WithEnterpriseGatewayUser(c.Request.Context(), apiKey.User))
 		}
 
 		// 简易模式：跳过余额和订阅检查
@@ -200,7 +215,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 
 			c.Set(string(ContextKeySubscription), subscription)
 		} else {
-			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+			if apiKey.User.Enterprise == nil && apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
 				return
 			}
@@ -216,6 +231,14 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 		c.Next()
 	}
+}
+
+func abortWithGoogleEnterpriseError(c *gin.Context, code, message string) {
+	c.JSON(403, gin.H{"error": gin.H{
+		"code": 403, "message": message, "status": googleapi.HTTPStatusToGoogleStatus(403),
+		"details": []googleapi.ErrorDetailInfo{{Type: "type.googleapis.com/google.rpc.ErrorInfo", Reason: code, Domain: "sub2api"}},
+	}})
+	c.Abort()
 }
 
 // extractAPIKeyForGoogle extracts API key for Google/Gemini endpoints.

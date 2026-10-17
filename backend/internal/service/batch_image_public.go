@@ -76,9 +76,14 @@ type BatchImageReferenceInput struct {
 }
 
 type BatchImageOwner struct {
-	UserID   int64
-	APIKeyID int64
-	GroupID  *int64
+	UserID     int64
+	APIKeyID   int64
+	GroupID    *int64
+	Enterprise *EnterpriseMemberContext
+}
+
+type batchImageEnterpriseReader interface {
+	GetMemberContextByUserID(context.Context, int64) (*EnterpriseMemberContext, error)
 }
 
 type BatchImagePublicService struct {
@@ -92,6 +97,7 @@ type BatchImagePublicService struct {
 	BillingRepo       UsageBillingRepository
 	AuthCache         APIKeyAuthCacheInvalidator
 	Config            *config.Config
+	EnterpriseRepo    batchImageEnterpriseReader
 }
 
 type BatchImagePricingSnapshot struct {
@@ -198,6 +204,20 @@ func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRe
 }
 
 func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, idempotencyKey string) (*BatchImagePublicBatch, error) {
+	// Reject before any job/hold is created. Recheck membership because a Key's
+	// authentication snapshot can predate an administrator adding the member.
+	if owner.Enterprise != nil {
+		return nil, ErrEnterpriseGatewayFeatureUnsupported
+	}
+	if s.EnterpriseRepo != nil {
+		member, err := s.EnterpriseRepo.GetMemberContextByUserID(ctx, owner.UserID)
+		if err != nil {
+			return nil, ErrBillingServiceUnavailable.WithCause(err)
+		}
+		if member != nil {
+			return nil, ErrEnterpriseGatewayFeatureUnsupported
+		}
+	}
 	if !s.enabled() {
 		return nil, ErrBatchImageDisabled
 	}

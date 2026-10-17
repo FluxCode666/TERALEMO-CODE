@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -172,8 +173,27 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 }
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
+	if cmd.EnterpriseBalanceCost < 0 || math.IsNaN(cmd.EnterpriseBalanceCost) || math.IsInf(cmd.EnterpriseBalanceCost, 0) ||
+		(cmd.EnterpriseID != 0 && cmd.BalanceCost != 0) ||
+		(cmd.EnterpriseBalanceCost > 0 && (cmd.EnterpriseID <= 0 || cmd.EnterpriseMemberID <= 0 || cmd.BalanceCost != 0 || cmd.SubscriptionCost != 0)) {
+		return service.ErrBillingServiceUnavailable
+	}
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
 		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
+			return err
+		}
+	}
+
+	// Enterprise billing takes the wallet lock before sorted quota locks, then
+	// joins the existing API key -> account order. It never locks users.
+	if cmd.EnterpriseBalanceCost > 0 {
+		newBalance, err := deductUsageBillingEnterpriseBalance(ctx, tx, cmd.EnterpriseID, cmd.EnterpriseBalanceCost)
+		if err != nil {
+			return err
+		}
+		result.NewEnterpriseBalance = &newBalance
+		result.BalanceOverdrafted = newBalance < 0
+		if err := incrementUsageBillingEnterpriseQuotas(ctx, tx, cmd); err != nil {
 			return err
 		}
 	}

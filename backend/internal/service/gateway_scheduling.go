@@ -936,6 +936,9 @@ func (s *GatewayService) resolveGatewayGroup(ctx context.Context, groupID *int64
 		if err != nil {
 			return nil, nil, err
 		}
+		if err := s.checkEnterpriseResolvedGroup(ctx, group, *groupID); err != nil {
+			return nil, nil, err
+		}
 
 		if !group.ClaudeCodeOnly || IsClaudeCodeClient(ctx) {
 			return group, &currentID, nil

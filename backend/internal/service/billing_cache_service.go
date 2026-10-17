@@ -114,6 +114,9 @@ type BillingCacheService struct {
 	cfg                   *config.Config
 	circuitBreaker        *billingCircuitBreaker
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	enterpriseCache       EnterpriseBillingRuntimeCache
+	enterpriseBalanceRepo EnterpriseBalanceReader
+	enterpriseQuotaRepo   EnterpriseQuotaReader
 
 	cacheWriteChan     chan cacheWriteTask
 	cacheWriteWg       sync.WaitGroup
@@ -742,6 +745,11 @@ func (s *BillingCacheService) IncrementUserPlatformQuotaUsage(userID int64, plat
 // 订阅模式：检查缓存用量未超过限额（Group限额从参数传入）
 // platform 为请求的目标平台（如 "anthropic"），传空串 "" 时跳过 user × platform quota 检查。
 func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
+	if user != nil && user.Enterprise != nil {
+		if err := checkEnterpriseGatewayEligibility(user.Enterprise, group); err != nil {
+			return err
+		}
+	}
 	// 简易模式默认跳过所有计费检查. An explicit key-window opt-in keeps
 	// balance/subscription/platform checks bypassed while enforcing the three
 	// API-key monetary windows from the database source of truth.
@@ -760,6 +768,10 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 
 	if isSubscriptionMode {
 		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
+			return err
+		}
+	} else if user.Enterprise != nil {
+		if err := s.checkEnterpriseBillingEligibility(ctx, user.Enterprise, group, 0); err != nil {
 			return err
 		}
 	} else {
@@ -798,6 +810,11 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 // 返回的句柄可能为 nil（未登记任何预留）；调用方须在 handler 结束时调用 HandlerDone，预留在计费任务落库后释放。
 // 须在 CheckBillingEligibility 通过后调用；简易模式不校验。
 func (s *BillingCacheService) ReserveFixedCharge(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, amount float64) (*InflightReservation, error) {
+	if user != nil && user.Enterprise != nil {
+		if err := checkEnterpriseGatewayEligibility(user.Enterprise, group); err != nil {
+			return nil, err
+		}
+	}
 	if user == nil || amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
 		return nil, nil
 	}
@@ -805,7 +822,11 @@ func (s *BillingCacheService) ReserveFixedCharge(ctx context.Context, user *User
 		return nil, nil
 	}
 	subscriptionBill := group != nil && group.IsSubscriptionType() && subscription != nil
-	if !subscriptionBill {
+	if !subscriptionBill && user.Enterprise != nil {
+		if err := s.checkEnterpriseBillingEligibility(ctx, user.Enterprise, group, amount); err != nil {
+			return nil, err
+		}
+	} else if !subscriptionBill {
 		balance, err := s.GetUserBalance(ctx, user.ID)
 		if err != nil {
 			return nil, ErrBillingServiceUnavailable.WithCause(err)
