@@ -38,7 +38,7 @@ func (r *enterpriseAuditLogRepository) Create(ctx context.Context, log *service.
 	if err != nil {
 		return translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return translatePersistenceError(err, nil, nil)
@@ -67,7 +67,7 @@ func (r *enterpriseAuditLogRepository) List(ctx context.Context, enterpriseID in
 	if err != nil {
 		return nil, nil, translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.EnterpriseAuditLog, 0)
 	for rows.Next() {
 		var log service.EnterpriseAuditLog
@@ -92,7 +92,7 @@ func enterpriseAuditLogCount(ctx context.Context, client *dbent.Client, enterpri
 	if err != nil {
 		return 0, translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return 0, translatePersistenceError(rows.Err(), nil, nil)
 	}

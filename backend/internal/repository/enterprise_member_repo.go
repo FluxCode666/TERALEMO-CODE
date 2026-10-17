@@ -124,7 +124,7 @@ func (r *enterpriseMemberRepository) List(ctx context.Context, enterpriseID int6
 		return nil, nil, err
 	}
 	var where strings.Builder
-	where.WriteString(` WHERE m.enterprise_id = $1 AND m.deleted_at IS NULL`)
+	_, _ = where.WriteString(` WHERE m.enterprise_id = $1 AND m.deleted_at IS NULL`)
 	args := []any{enterpriseID}
 	if filters.Role != "" {
 		enterpriseAddFilter(&where, &args, `m.role = $%d`, filters.Role)
@@ -134,7 +134,7 @@ func (r *enterpriseMemberRepository) List(ctx context.Context, enterpriseID int6
 	}
 	if filters.DepartmentID != nil {
 		if *filters.DepartmentID == 0 {
-			where.WriteString(` AND m.department_id IS NULL`)
+			_, _ = where.WriteString(` AND m.department_id IS NULL`)
 		} else {
 			enterpriseAddFilter(&where, &args, `m.department_id = $%d`, *filters.DepartmentID)
 		}

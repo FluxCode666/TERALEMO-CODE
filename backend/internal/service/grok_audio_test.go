@@ -69,7 +69,7 @@ func TestGrokRealtimeAudioObservedSurvivesMalformedFrameAndAbnormalTermination(t
 					done <- relayResult{err: err}
 					return
 				}
-				defer client.CloseNow()
+				defer func() { _ = client.CloseNow() }()
 				observed, err := (&OpenAIGatewayService{}).ProxyGrokRealtimeConn(r.Context(), nil, client, &GrokRealtimeUpstream{conn: upstream})
 				done <- relayResult{observed: observed, err: err}
 			}))
@@ -78,7 +78,7 @@ func TestGrokRealtimeAudioObservedSurvivesMalformedFrameAndAbnormalTermination(t
 			defer cancel()
 			client, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 			require.NoError(t, err)
-			defer client.CloseNow()
+			defer func() { _ = client.CloseNow() }()
 			_, audio, err := client.Read(ctx)
 			require.NoError(t, err)
 			require.True(t, grokRealtimeEventHasAudio(audio), "audio must be delivered before the failing event")

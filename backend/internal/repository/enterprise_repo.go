@@ -112,7 +112,7 @@ func (r *enterpriseRepository) Delete(ctx context.Context, id int64) error {
 func (r *enterpriseRepository) List(ctx context.Context, params pagination.PaginationParams, filters service.EnterpriseListFilters) ([]service.Enterprise, *pagination.PaginationResult, error) {
 	client := clientFromContext(ctx, r.client)
 	var where strings.Builder
-	where.WriteString(` WHERE e.deleted_at IS NULL`)
+	_, _ = where.WriteString(` WHERE e.deleted_at IS NULL`)
 	args := []any{}
 	if filters.Status != "" {
 		enterpriseAddFilter(&where, &args, `e.status = $%d`, filters.Status)

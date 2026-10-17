@@ -60,8 +60,11 @@ func TestEnterpriseBillingMetadataAcrossProtocols(t *testing.T) {
 			}
 			var decoded map[string]any
 			require.NoError(t, json.Unmarshal([]byte(body), &decoded))
-			obj := decoded["error"].(map[string]any)
-			require.Equal(t, "monthly", obj["metadata"].(map[string]any)["window"])
+			obj, ok := decoded["error"].(map[string]any)
+			require.True(t, ok)
+			metadata, ok := obj["metadata"].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "monthly", metadata["window"])
 			require.Contains(t, body, "DEPARTMENT_QUOTA_EXCEEDED")
 		})
 	}

@@ -115,7 +115,11 @@ func (s *BillingCacheService) GetEnterpriseBalance(ctx context.Context, enterpri
 		if r.Err != nil {
 			return 0, r.Err
 		}
-		return r.Val.(float64), nil
+		balance, ok := r.Val.(float64)
+		if !ok {
+			return 0, fmt.Errorf("enterprise balance load returned %T", r.Val)
+		}
+		return balance, nil
 	}
 }
 
@@ -233,7 +237,11 @@ func (s *BillingCacheService) getEnterpriseBillingQuotas(ctx context.Context, me
 		if r.Err != nil {
 			return nil, r.Err
 		}
-		return r.Val.(map[EnterpriseQuotaScope]*EnterpriseQuota), nil
+		quotas, ok := r.Val.(map[EnterpriseQuotaScope]*EnterpriseQuota)
+		if !ok {
+			return nil, fmt.Errorf("enterprise quota load returned %T", r.Val)
+		}
+		return quotas, nil
 	}
 }
 

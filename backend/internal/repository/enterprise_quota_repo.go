@@ -106,7 +106,7 @@ func (r *enterpriseQuotaRepository) UpdateLimits(ctx context.Context, quota *ser
 		if err != nil {
 			return translatePersistenceError(err, enterpriseScopeNotFound(quota.ScopeType), nil)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		if !rows.Next() {
 			if err := rows.Err(); err != nil {
 				return translatePersistenceError(err, nil, nil)
@@ -179,7 +179,7 @@ func enterpriseQuotaQuery(ctx context.Context, client *dbent.Client, query strin
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.EnterpriseQuota, 0)
 	for rows.Next() {
 		var quota service.EnterpriseQuota

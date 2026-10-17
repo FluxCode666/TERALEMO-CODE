@@ -24,7 +24,7 @@ func (r *enterpriseRepository) GetBalance(ctx context.Context, enterpriseID int6
 	if err != nil {
 		return 0, translatePersistenceError(err, service.ErrEnterpriseNotFound, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
 			return 0, translatePersistenceError(err, nil, nil)
@@ -72,7 +72,7 @@ func (r *enterpriseRepository) AdjustBalance(ctx context.Context, enterpriseID i
 		if err != nil {
 			return translatePersistenceError(err, service.ErrEnterpriseNotFound, nil)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		if !rows.Next() {
 			if err := rows.Err(); err != nil {
 				return translatePersistenceError(err, nil, nil)
@@ -105,7 +105,7 @@ func (r *enterpriseBalanceLogRepository) List(ctx context.Context, enterpriseID 
 	if err != nil {
 		return nil, nil, translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.EnterpriseBalanceLog, 0)
 	for rows.Next() {
 		var log service.EnterpriseBalanceLog
@@ -126,7 +126,7 @@ func enterpriseBalanceLogCount(ctx context.Context, client *dbent.Client, enterp
 	if err != nil {
 		return 0, translatePersistenceError(err, nil, nil)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return 0, translatePersistenceError(rows.Err(), nil, nil)
 	}
