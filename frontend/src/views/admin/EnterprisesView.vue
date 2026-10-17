@@ -3,10 +3,10 @@
     <TablePageLayout>
       <template #actions><div class="flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('admin.enterprises.title') }}</h1><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.enterprises.description') }}</p></div><button class="btn btn-primary" data-test="enterprise-create-open" @click="openCreate">{{ t('admin.enterprises.create') }}</button></div></template>
       <template #filters>
-        <form class="card flex flex-wrap gap-3 p-4" @submit.prevent="page = 1; load()">
+        <form class="card flex flex-wrap gap-3 p-4" @submit.prevent="searchEnterprises">
           <input v-model.trim="search" class="input w-full sm:w-72" :aria-label="t('enterprise.search')" :placeholder="t('admin.enterprises.searchPlaceholder')" />
           <select v-model="status" class="input w-full sm:w-40" :aria-label="t('enterprise.status')"><option value="">{{ t('enterprise.all') }}</option><option value="active">{{ t('enterprise.active') }}</option><option value="disabled">{{ t('enterprise.disabled') }}</option></select>
-          <button class="btn btn-secondary" :disabled="busy">{{ t('enterprise.search') }}</button>
+          <button class="btn btn-secondary">{{ t('enterprise.search') }}</button>
           <p v-if="error" role="alert" class="w-full text-sm text-red-600 dark:text-red-400">{{ error }} <button type="button" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
         </form>
       </template>
@@ -57,7 +57,7 @@ import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { enterpriseErrorMessage } from '@/api/enterprise'
-import type { Enterprise, CreateEnterpriseRequest } from '@/types/enterprise'
+import type { Enterprise, EnterpriseQuery, CreateEnterpriseRequest } from '@/types/enterprise'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -69,10 +69,11 @@ import EnterpriseBasicsForm from '@/features/enterprise/components/EnterpriseBas
 import EnterpriseBalanceForm from '@/features/enterprise/components/EnterpriseBalanceForm.vue'
 import EnterpriseDeleteDialog from '@/features/enterprise/components/EnterpriseDeleteDialog.vue'
 const { t } = useI18n()
-const { busy, error, run } = useEnterpriseAction()
+const { busy, error, run, read } = useEnterpriseAction()
 const items = ref<Enterprise[]>([]), deleting = ref<Enterprise | null>(null)
 const editing = ref<Enterprise | null>(null), balanceTarget = ref<Enterprise | null>(null), statusTarget = ref<Enterprise | null>(null)
 const page = ref(1), pageSize = ref(20), total = ref(0), search = ref(''), status = ref('')
+let appliedFilters: Pick<EnterpriseQuery, 'search' | 'status'> = {}
 const createOpen = ref(false), validation = ref('')
 const form = reactive({ name: '', status: 'active' as 'active' | 'disabled', notes: '', contact_name: '', contact_email: '', contact_phone: '', threshold: '' as string | number })
 const ownerMode = ref('none'), ownerUserId = ref(0), ownerSearch = ref(''), searchingUsers = ref(false)
@@ -80,7 +81,18 @@ const owner = reactive({ email: '', password: '', username: '' })
 const users = ref<{ id: number; username: string; email: string }[]>([])
 const ownerModes = computed(() => [{ value: 'none', label: t('admin.enterprises.noOwner') }, { value: 'existing', label: t('enterprise.existingUser') }, { value: 'new', label: t('enterprise.newAccount') }])
 const columns = computed(() => [{ key: 'name', label: t('admin.enterprises.name') }, { key: 'status', label: t('admin.enterprises.status') }, { key: 'balance', label: t('admin.enterprises.balance') }, { key: 'member_count', label: t('admin.enterprises.members') }, { key: 'department_count', label: t('admin.enterprises.departments') }, { key: 'created_at', label: t('admin.enterprises.createdAt') }, { key: 'actions', label: t('enterprise.actions') }])
-async function load() { await run(async () => { const result = await enterprisesAPI.list({ page: page.value, page_size: pageSize.value, search: search.value || undefined, status: status.value || undefined }); items.value = result.items; total.value = result.total }) }
+async function load() {
+  const params = { ...appliedFilters, page: page.value, page_size: pageSize.value }
+  await read(signal => enterprisesAPI.list(params, { signal }), result => {
+    items.value = result.items
+    total.value = result.total
+  })
+}
+function searchEnterprises() {
+  appliedFilters = { search: search.value || undefined, status: status.value || undefined }
+  page.value = 1
+  void load()
+}
 function openCreate() { Object.assign(form, { name: '', status: 'active', notes: '', contact_name: '', contact_email: '', contact_phone: '', threshold: '' }); Object.assign(owner, { email: '', password: '', username: '' }); ownerMode.value = 'none'; ownerUserId.value = 0; ownerSearch.value = ''; users.value = []; validation.value = ''; createOpen.value = true }
 async function searchUsers() {
   searchingUsers.value = true

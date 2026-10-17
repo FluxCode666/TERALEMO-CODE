@@ -83,7 +83,7 @@ watch(tabs, value => { if (!value.includes(activeTab.value)) activeTab.value = '
 watch(() => props.overview, () => { if (!props.admin) refreshKey.value++ })
 async function refresh() {
   if (props.admin && props.enterpriseId) {
-    await read(() => enterprisesAPI.get(props.enterpriseId!), value => {
+    await read(signal => enterprisesAPI.get(props.enterpriseId!, { signal }), value => {
       adminEnterprise.value = value
       refreshKey.value++
     })

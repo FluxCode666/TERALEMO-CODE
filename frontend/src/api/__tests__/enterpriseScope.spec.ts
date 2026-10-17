@@ -6,6 +6,7 @@ const { get, post, put } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put:
 vi.mock('@/api/client', () => ({ apiClient: { get, post, put, delete: vi.fn() } }))
 
 import { createEnterpriseAPI, enterpriseAPI, enterpriseErrorMessage } from '@/api/enterprise'
+import { enterprisesAPI } from '@/api/admin/enterprises'
 
 describe('enterprise API scope and cancellation', () => {
   beforeEach(() => {
@@ -67,6 +68,19 @@ describe('enterprise API scope and cancellation', () => {
     expect(get).toHaveBeenLastCalledWith('/admin/enterprises/1/balance-logs', { params: { page: 3 }, signal: controller.signal })
     await api.allowedGroups({ signal: controller.signal })
     expect(get).toHaveBeenLastCalledWith('/admin/enterprises/1/allowed-groups', { params: undefined, signal: controller.signal })
+  })
+
+  it('passes cancellation to the administrator enterprise list and detail while preserving legacy request shapes', async () => {
+    const params = { page: 3, search: 'Acme', status: 'active' }
+    const controller = new AbortController()
+    await enterprisesAPI.list(params, { signal: controller.signal })
+    expect(get).toHaveBeenLastCalledWith('/admin/enterprises', { params, signal: controller.signal })
+    await enterprisesAPI.get(7, { signal: controller.signal })
+    expect(get).toHaveBeenLastCalledWith('/admin/enterprises/7', { signal: controller.signal })
+    await enterprisesAPI.list(params)
+    expect(get).toHaveBeenLastCalledWith('/admin/enterprises', { params })
+    await enterprisesAPI.get(7)
+    expect(get).toHaveBeenLastCalledWith('/admin/enterprises/7')
   })
 
   it.each([

@@ -223,6 +223,21 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     expect(wrapper.get('[data-test="tab-settings"]').attributes('aria-current')).toBe('page')
   })
 
+  it('cancels the administrator detail read when leaving the workspace and ignores a late failure', async () => {
+    let reject!: (reason: unknown) => void
+    getEnterprise.mockReturnValueOnce(new Promise<Enterprise>((_resolve, no) => { reject = no }))
+    const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 7 } })
+    await flushPromises()
+    const signal = getEnterprise.mock.calls.at(-1)![1].signal as AbortSignal
+    expect(getEnterprise).toHaveBeenLastCalledWith(7, { signal })
+    expect(signal.aborted).toBe(false)
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    reject(new Error('late detail failure'))
+    await flushPromises()
+    expect(showError).not.toHaveBeenCalled()
+  })
+
   it('does not request members, settings, audit, or department rankings for an ordinary member', async () => {
     const wrapper = mountWorkspace(overview('member'))
     await flushPromises()
