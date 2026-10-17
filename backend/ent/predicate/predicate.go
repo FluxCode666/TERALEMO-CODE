@@ -51,6 +51,30 @@ type ChannelMonitorRequestTemplate func(*sql.Selector)
 // CompositeModelRoute is the predicate function for compositemodelroute builders.
 type CompositeModelRoute func(*sql.Selector)
 
+// Enterprise is the predicate function for enterprise builders.
+type Enterprise func(*sql.Selector)
+
+// EnterpriseAllowedGroup is the predicate function for enterpriseallowedgroup builders.
+type EnterpriseAllowedGroup func(*sql.Selector)
+
+// EnterpriseAuditLog is the predicate function for enterpriseauditlog builders.
+type EnterpriseAuditLog func(*sql.Selector)
+
+// EnterpriseBalanceLog is the predicate function for enterprisebalancelog builders.
+type EnterpriseBalanceLog func(*sql.Selector)
+
+// EnterpriseDepartment is the predicate function for enterprisedepartment builders.
+type EnterpriseDepartment func(*sql.Selector)
+
+// EnterpriseGroupWhitelist is the predicate function for enterprisegroupwhitelist builders.
+type EnterpriseGroupWhitelist func(*sql.Selector)
+
+// EnterpriseMember is the predicate function for enterprisemember builders.
+type EnterpriseMember func(*sql.Selector)
+
+// EnterpriseQuota is the predicate function for enterprisequota builders.
+type EnterpriseQuota func(*sql.Selector)
+
 // ErrorPassthroughRule is the predicate function for errorpassthroughrule builders.
 type ErrorPassthroughRule func(*sql.Selector)
 

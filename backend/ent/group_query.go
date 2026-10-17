@@ -16,6 +16,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/enterprise"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
@@ -28,19 +30,21 @@ import (
 // GroupQuery is the builder for querying Group entities.
 type GroupQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []group.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.Group
-	withAPIKeys           *APIKeyQuery
-	withRedeemCodes       *RedeemCodeQuery
-	withSubscriptions     *UserSubscriptionQuery
-	withUsageLogs         *UsageLogQuery
-	withAccounts          *AccountQuery
-	withAllowedUsers      *UserQuery
-	withAccountGroups     *AccountGroupQuery
-	withUserAllowedGroups *UserAllowedGroupQuery
-	modifiers             []func(*sql.Selector)
+	ctx                         *QueryContext
+	order                       []group.OrderOption
+	inters                      []Interceptor
+	predicates                  []predicate.Group
+	withAllowedEnterprises      *EnterpriseQuery
+	withAPIKeys                 *APIKeyQuery
+	withRedeemCodes             *RedeemCodeQuery
+	withSubscriptions           *UserSubscriptionQuery
+	withUsageLogs               *UsageLogQuery
+	withAccounts                *AccountQuery
+	withAllowedUsers            *UserQuery
+	withEnterpriseAllowedGroups *EnterpriseAllowedGroupQuery
+	withAccountGroups           *AccountGroupQuery
+	withUserAllowedGroups       *UserAllowedGroupQuery
+	modifiers                   []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -75,6 +79,28 @@ func (_q *GroupQuery) Unique(unique bool) *GroupQuery {
 func (_q *GroupQuery) Order(o ...group.OrderOption) *GroupQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryAllowedEnterprises chains the current query on the "allowed_enterprises" edge.
+func (_q *GroupQuery) QueryAllowedEnterprises() *EnterpriseQuery {
+	query := (&EnterpriseClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, selector),
+			sqlgraph.To(enterprise.Table, enterprise.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.AllowedEnterprisesTable, group.AllowedEnterprisesPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryAPIKeys chains the current query on the "api_keys" edge.
@@ -202,6 +228,28 @@ func (_q *GroupQuery) QueryAllowedUsers() *UserQuery {
 			sqlgraph.From(group.Table, group.FieldID, selector),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, group.AllowedUsersTable, group.AllowedUsersPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryEnterpriseAllowedGroups chains the current query on the "enterprise_allowed_groups" edge.
+func (_q *GroupQuery) QueryEnterpriseAllowedGroups() *EnterpriseAllowedGroupQuery {
+	query := (&EnterpriseAllowedGroupClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, selector),
+			sqlgraph.To(enterpriseallowedgroup.Table, enterpriseallowedgroup.GroupColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, group.EnterpriseAllowedGroupsTable, group.EnterpriseAllowedGroupsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -440,23 +488,36 @@ func (_q *GroupQuery) Clone() *GroupQuery {
 		return nil
 	}
 	return &GroupQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]group.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.Group{}, _q.predicates...),
-		withAPIKeys:           _q.withAPIKeys.Clone(),
-		withRedeemCodes:       _q.withRedeemCodes.Clone(),
-		withSubscriptions:     _q.withSubscriptions.Clone(),
-		withUsageLogs:         _q.withUsageLogs.Clone(),
-		withAccounts:          _q.withAccounts.Clone(),
-		withAllowedUsers:      _q.withAllowedUsers.Clone(),
-		withAccountGroups:     _q.withAccountGroups.Clone(),
-		withUserAllowedGroups: _q.withUserAllowedGroups.Clone(),
+		config:                      _q.config,
+		ctx:                         _q.ctx.Clone(),
+		order:                       append([]group.OrderOption{}, _q.order...),
+		inters:                      append([]Interceptor{}, _q.inters...),
+		predicates:                  append([]predicate.Group{}, _q.predicates...),
+		withAllowedEnterprises:      _q.withAllowedEnterprises.Clone(),
+		withAPIKeys:                 _q.withAPIKeys.Clone(),
+		withRedeemCodes:             _q.withRedeemCodes.Clone(),
+		withSubscriptions:           _q.withSubscriptions.Clone(),
+		withUsageLogs:               _q.withUsageLogs.Clone(),
+		withAccounts:                _q.withAccounts.Clone(),
+		withAllowedUsers:            _q.withAllowedUsers.Clone(),
+		withEnterpriseAllowedGroups: _q.withEnterpriseAllowedGroups.Clone(),
+		withAccountGroups:           _q.withAccountGroups.Clone(),
+		withUserAllowedGroups:       _q.withUserAllowedGroups.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithAllowedEnterprises tells the query-builder to eager-load the nodes that are connected to
+// the "allowed_enterprises" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *GroupQuery) WithAllowedEnterprises(opts ...func(*EnterpriseQuery)) *GroupQuery {
+	query := (&EnterpriseClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withAllowedEnterprises = query
+	return _q
 }
 
 // WithAPIKeys tells the query-builder to eager-load the nodes that are connected to
@@ -522,6 +583,17 @@ func (_q *GroupQuery) WithAllowedUsers(opts ...func(*UserQuery)) *GroupQuery {
 		opt(query)
 	}
 	_q.withAllowedUsers = query
+	return _q
+}
+
+// WithEnterpriseAllowedGroups tells the query-builder to eager-load the nodes that are connected to
+// the "enterprise_allowed_groups" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *GroupQuery) WithEnterpriseAllowedGroups(opts ...func(*EnterpriseAllowedGroupQuery)) *GroupQuery {
+	query := (&EnterpriseAllowedGroupClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withEnterpriseAllowedGroups = query
 	return _q
 }
 
@@ -625,13 +697,15 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	var (
 		nodes       = []*Group{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [10]bool{
+			_q.withAllowedEnterprises != nil,
 			_q.withAPIKeys != nil,
 			_q.withRedeemCodes != nil,
 			_q.withSubscriptions != nil,
 			_q.withUsageLogs != nil,
 			_q.withAccounts != nil,
 			_q.withAllowedUsers != nil,
+			_q.withEnterpriseAllowedGroups != nil,
 			_q.withAccountGroups != nil,
 			_q.withUserAllowedGroups != nil,
 		}
@@ -656,6 +730,13 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
+	}
+	if query := _q.withAllowedEnterprises; query != nil {
+		if err := _q.loadAllowedEnterprises(ctx, query, nodes,
+			func(n *Group) { n.Edges.AllowedEnterprises = []*Enterprise{} },
+			func(n *Group, e *Enterprise) { n.Edges.AllowedEnterprises = append(n.Edges.AllowedEnterprises, e) }); err != nil {
+			return nil, err
+		}
 	}
 	if query := _q.withAPIKeys; query != nil {
 		if err := _q.loadAPIKeys(ctx, query, nodes,
@@ -699,6 +780,15 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 			return nil, err
 		}
 	}
+	if query := _q.withEnterpriseAllowedGroups; query != nil {
+		if err := _q.loadEnterpriseAllowedGroups(ctx, query, nodes,
+			func(n *Group) { n.Edges.EnterpriseAllowedGroups = []*EnterpriseAllowedGroup{} },
+			func(n *Group, e *EnterpriseAllowedGroup) {
+				n.Edges.EnterpriseAllowedGroups = append(n.Edges.EnterpriseAllowedGroups, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withAccountGroups; query != nil {
 		if err := _q.loadAccountGroups(ctx, query, nodes,
 			func(n *Group) { n.Edges.AccountGroups = []*AccountGroup{} },
@@ -716,6 +806,67 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 	return nodes, nil
 }
 
+func (_q *GroupQuery) loadAllowedEnterprises(ctx context.Context, query *EnterpriseQuery, nodes []*Group, init func(*Group), assign func(*Group, *Enterprise)) error {
+	edgeIDs := make([]driver.Value, len(nodes))
+	byID := make(map[int64]*Group)
+	nids := make(map[int64]map[*Group]struct{})
+	for i, node := range nodes {
+		edgeIDs[i] = node.ID
+		byID[node.ID] = node
+		if init != nil {
+			init(node)
+		}
+	}
+	query.Where(func(s *sql.Selector) {
+		joinT := sql.Table(group.AllowedEnterprisesTable)
+		s.Join(joinT).On(s.C(enterprise.FieldID), joinT.C(group.AllowedEnterprisesPrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(group.AllowedEnterprisesPrimaryKey[1]), edgeIDs...))
+		columns := s.SelectedColumns()
+		s.Select(joinT.C(group.AllowedEnterprisesPrimaryKey[1]))
+		s.AppendSelect(columns...)
+		s.SetDistinct(false)
+	})
+	if err := query.prepareQuery(ctx); err != nil {
+		return err
+	}
+	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
+		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]any, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
+				}
+				return append([]any{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []any) error {
+				outValue := values[0].(*sql.NullInt64).Int64
+				inValue := values[1].(*sql.NullInt64).Int64
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Group]struct{}{byID[outValue]: {}}
+					return assign(columns[1:], values[1:])
+				}
+				nids[inValue][byID[outValue]] = struct{}{}
+				return nil
+			}
+		})
+	})
+	neighbors, err := withInterceptors[[]*Enterprise](ctx, query, qr, query.inters)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected "allowed_enterprises" node returned %v`, n.ID)
+		}
+		for kn := range nodes {
+			assign(kn, n)
+		}
+	}
+	return nil
+}
 func (_q *GroupQuery) loadAPIKeys(ctx context.Context, query *APIKeyQuery, nodes []*Group, init func(*Group), assign func(*Group, *APIKey)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int64]*Group)
@@ -964,6 +1115,36 @@ func (_q *GroupQuery) loadAllowedUsers(ctx context.Context, query *UserQuery, no
 		for kn := range nodes {
 			assign(kn, n)
 		}
+	}
+	return nil
+}
+func (_q *GroupQuery) loadEnterpriseAllowedGroups(ctx context.Context, query *EnterpriseAllowedGroupQuery, nodes []*Group, init func(*Group), assign func(*Group, *EnterpriseAllowedGroup)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Group)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(enterpriseallowedgroup.FieldGroupID)
+	}
+	query.Where(predicate.EnterpriseAllowedGroup(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(group.EnterpriseAllowedGroupsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.GroupID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "group_id" returned %v for node %v`, fk, n)
+		}
+		assign(node, n)
 	}
 	return nil
 }

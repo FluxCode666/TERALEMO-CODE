@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/enterprise"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
@@ -1224,6 +1225,21 @@ func (_u *GroupUpdate) AddProfitSafetyBuffer(v float64) *GroupUpdate {
 	return _u
 }
 
+// AddAllowedEnterpriseIDs adds the "allowed_enterprises" edge to the Enterprise entity by IDs.
+func (_u *GroupUpdate) AddAllowedEnterpriseIDs(ids ...int64) *GroupUpdate {
+	_u.mutation.AddAllowedEnterpriseIDs(ids...)
+	return _u
+}
+
+// AddAllowedEnterprises adds the "allowed_enterprises" edges to the Enterprise entity.
+func (_u *GroupUpdate) AddAllowedEnterprises(v ...*Enterprise) *GroupUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAllowedEnterpriseIDs(ids...)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdate) AddAPIKeyIDs(ids ...int64) *GroupUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1317,6 +1333,27 @@ func (_u *GroupUpdate) AddAllowedUsers(v ...*User) *GroupUpdate {
 // Mutation returns the GroupMutation object of the builder.
 func (_u *GroupUpdate) Mutation() *GroupMutation {
 	return _u.mutation
+}
+
+// ClearAllowedEnterprises clears all "allowed_enterprises" edges to the Enterprise entity.
+func (_u *GroupUpdate) ClearAllowedEnterprises() *GroupUpdate {
+	_u.mutation.ClearAllowedEnterprises()
+	return _u
+}
+
+// RemoveAllowedEnterpriseIDs removes the "allowed_enterprises" edge to Enterprise entities by IDs.
+func (_u *GroupUpdate) RemoveAllowedEnterpriseIDs(ids ...int64) *GroupUpdate {
+	_u.mutation.RemoveAllowedEnterpriseIDs(ids...)
+	return _u
+}
+
+// RemoveAllowedEnterprises removes "allowed_enterprises" edges to Enterprise entities.
+func (_u *GroupUpdate) RemoveAllowedEnterprises(v ...*Enterprise) *GroupUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAllowedEnterpriseIDs(ids...)
 }
 
 // ClearAPIKeys clears all "api_keys" edges to the APIKey entity.
@@ -1925,6 +1962,63 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedProfitSafetyBuffer(); ok {
 		_spec.AddField(group.FieldProfitSafetyBuffer, field.TypeFloat64, value)
+	}
+	if _u.mutation.AllowedEnterprisesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAllowedEnterprisesIDs(); len(nodes) > 0 && !_u.mutation.AllowedEnterprisesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AllowedEnterprisesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -3427,6 +3521,21 @@ func (_u *GroupUpdateOne) AddProfitSafetyBuffer(v float64) *GroupUpdateOne {
 	return _u
 }
 
+// AddAllowedEnterpriseIDs adds the "allowed_enterprises" edge to the Enterprise entity by IDs.
+func (_u *GroupUpdateOne) AddAllowedEnterpriseIDs(ids ...int64) *GroupUpdateOne {
+	_u.mutation.AddAllowedEnterpriseIDs(ids...)
+	return _u
+}
+
+// AddAllowedEnterprises adds the "allowed_enterprises" edges to the Enterprise entity.
+func (_u *GroupUpdateOne) AddAllowedEnterprises(v ...*Enterprise) *GroupUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAllowedEnterpriseIDs(ids...)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdateOne) AddAPIKeyIDs(ids ...int64) *GroupUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -3520,6 +3629,27 @@ func (_u *GroupUpdateOne) AddAllowedUsers(v ...*User) *GroupUpdateOne {
 // Mutation returns the GroupMutation object of the builder.
 func (_u *GroupUpdateOne) Mutation() *GroupMutation {
 	return _u.mutation
+}
+
+// ClearAllowedEnterprises clears all "allowed_enterprises" edges to the Enterprise entity.
+func (_u *GroupUpdateOne) ClearAllowedEnterprises() *GroupUpdateOne {
+	_u.mutation.ClearAllowedEnterprises()
+	return _u
+}
+
+// RemoveAllowedEnterpriseIDs removes the "allowed_enterprises" edge to Enterprise entities by IDs.
+func (_u *GroupUpdateOne) RemoveAllowedEnterpriseIDs(ids ...int64) *GroupUpdateOne {
+	_u.mutation.RemoveAllowedEnterpriseIDs(ids...)
+	return _u
+}
+
+// RemoveAllowedEnterprises removes "allowed_enterprises" edges to Enterprise entities.
+func (_u *GroupUpdateOne) RemoveAllowedEnterprises(v ...*Enterprise) *GroupUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAllowedEnterpriseIDs(ids...)
 }
 
 // ClearAPIKeys clears all "api_keys" edges to the APIKey entity.
@@ -4158,6 +4288,63 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.AddedProfitSafetyBuffer(); ok {
 		_spec.AddField(group.FieldProfitSafetyBuffer, field.TypeFloat64, value)
+	}
+	if _u.mutation.AllowedEnterprisesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAllowedEnterprisesIDs(); len(nodes) > 0 && !_u.mutation.AllowedEnterprisesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AllowedEnterprisesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   group.AllowedEnterprisesTable,
+			Columns: group.AllowedEnterprisesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &EnterpriseAllowedGroupCreate{config: _u.config, mutation: newEnterpriseAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

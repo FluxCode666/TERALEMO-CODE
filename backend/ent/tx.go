@@ -44,6 +44,22 @@ type Tx struct {
 	ChannelMonitorRequestTemplate *ChannelMonitorRequestTemplateClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
+	// Enterprise is the client for interacting with the Enterprise builders.
+	Enterprise *EnterpriseClient
+	// EnterpriseAllowedGroup is the client for interacting with the EnterpriseAllowedGroup builders.
+	EnterpriseAllowedGroup *EnterpriseAllowedGroupClient
+	// EnterpriseAuditLog is the client for interacting with the EnterpriseAuditLog builders.
+	EnterpriseAuditLog *EnterpriseAuditLogClient
+	// EnterpriseBalanceLog is the client for interacting with the EnterpriseBalanceLog builders.
+	EnterpriseBalanceLog *EnterpriseBalanceLogClient
+	// EnterpriseDepartment is the client for interacting with the EnterpriseDepartment builders.
+	EnterpriseDepartment *EnterpriseDepartmentClient
+	// EnterpriseGroupWhitelist is the client for interacting with the EnterpriseGroupWhitelist builders.
+	EnterpriseGroupWhitelist *EnterpriseGroupWhitelistClient
+	// EnterpriseMember is the client for interacting with the EnterpriseMember builders.
+	EnterpriseMember *EnterpriseMemberClient
+	// EnterpriseQuota is the client for interacting with the EnterpriseQuota builders.
+	EnterpriseQuota *EnterpriseQuotaClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
 	ErrorPassthroughRule *ErrorPassthroughRuleClient
 	// Group is the client for interacting with the Group builders.
@@ -238,6 +254,14 @@ func (tx *Tx) init() {
 	tx.ChannelMonitorHistory = NewChannelMonitorHistoryClient(tx.config)
 	tx.ChannelMonitorRequestTemplate = NewChannelMonitorRequestTemplateClient(tx.config)
 	tx.CompositeModelRoute = NewCompositeModelRouteClient(tx.config)
+	tx.Enterprise = NewEnterpriseClient(tx.config)
+	tx.EnterpriseAllowedGroup = NewEnterpriseAllowedGroupClient(tx.config)
+	tx.EnterpriseAuditLog = NewEnterpriseAuditLogClient(tx.config)
+	tx.EnterpriseBalanceLog = NewEnterpriseBalanceLogClient(tx.config)
+	tx.EnterpriseDepartment = NewEnterpriseDepartmentClient(tx.config)
+	tx.EnterpriseGroupWhitelist = NewEnterpriseGroupWhitelistClient(tx.config)
+	tx.EnterpriseMember = NewEnterpriseMemberClient(tx.config)
+	tx.EnterpriseQuota = NewEnterpriseQuotaClient(tx.config)
 	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)

@@ -27,6 +27,14 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorrequesttemplate"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
+	"github.com/Wei-Shaw/sub2api/ent/enterprise"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseallowedgroup"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseauditlog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -126,6 +134,14 @@ func checkColumn(t, c string) error {
 			channelmonitorhistory.Table:         channelmonitorhistory.ValidColumn,
 			channelmonitorrequesttemplate.Table: channelmonitorrequesttemplate.ValidColumn,
 			compositemodelroute.Table:           compositemodelroute.ValidColumn,
+			enterprise.Table:                    enterprise.ValidColumn,
+			enterpriseallowedgroup.Table:        enterpriseallowedgroup.ValidColumn,
+			enterpriseauditlog.Table:            enterpriseauditlog.ValidColumn,
+			enterprisebalancelog.Table:          enterprisebalancelog.ValidColumn,
+			enterprisedepartment.Table:          enterprisedepartment.ValidColumn,
+			enterprisegroupwhitelist.Table:      enterprisegroupwhitelist.ValidColumn,
+			enterprisemember.Table:              enterprisemember.ValidColumn,
+			enterprisequota.Table:               enterprisequota.ValidColumn,
 			errorpassthroughrule.Table:          errorpassthroughrule.ValidColumn,
 			group.Table:                         group.ValidColumn,
 			idempotencyrecord.Table:             idempotencyrecord.ValidColumn,

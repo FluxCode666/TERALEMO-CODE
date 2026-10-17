@@ -32,6 +32,60 @@ func (_u *UsageLogUpdate) Where(ps ...predicate.UsageLog) *UsageLogUpdate {
 	return _u
 }
 
+// SetEnterpriseID sets the "enterprise_id" field.
+func (_u *UsageLogUpdate) SetEnterpriseID(v int64) *UsageLogUpdate {
+	_u.mutation.ResetEnterpriseID()
+	_u.mutation.SetEnterpriseID(v)
+	return _u
+}
+
+// SetNillableEnterpriseID sets the "enterprise_id" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableEnterpriseID(v *int64) *UsageLogUpdate {
+	if v != nil {
+		_u.SetEnterpriseID(*v)
+	}
+	return _u
+}
+
+// AddEnterpriseID adds value to the "enterprise_id" field.
+func (_u *UsageLogUpdate) AddEnterpriseID(v int64) *UsageLogUpdate {
+	_u.mutation.AddEnterpriseID(v)
+	return _u
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (_u *UsageLogUpdate) ClearEnterpriseID() *UsageLogUpdate {
+	_u.mutation.ClearEnterpriseID()
+	return _u
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (_u *UsageLogUpdate) SetEnterpriseDepartmentID(v int64) *UsageLogUpdate {
+	_u.mutation.ResetEnterpriseDepartmentID()
+	_u.mutation.SetEnterpriseDepartmentID(v)
+	return _u
+}
+
+// SetNillableEnterpriseDepartmentID sets the "enterprise_department_id" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableEnterpriseDepartmentID(v *int64) *UsageLogUpdate {
+	if v != nil {
+		_u.SetEnterpriseDepartmentID(*v)
+	}
+	return _u
+}
+
+// AddEnterpriseDepartmentID adds value to the "enterprise_department_id" field.
+func (_u *UsageLogUpdate) AddEnterpriseDepartmentID(v int64) *UsageLogUpdate {
+	_u.mutation.AddEnterpriseDepartmentID(v)
+	return _u
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (_u *UsageLogUpdate) ClearEnterpriseDepartmentID() *UsageLogUpdate {
+	_u.mutation.ClearEnterpriseDepartmentID()
+	return _u
+}
+
 // SetUserID sets the "user_id" field.
 func (_u *UsageLogUpdate) SetUserID(v int64) *UsageLogUpdate {
 	_u.mutation.SetUserID(v)
@@ -1135,6 +1189,24 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			}
 		}
 	}
+	if value, ok := _u.mutation.EnterpriseID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedEnterpriseID(); ok {
+		_spec.AddField(usagelog.FieldEnterpriseID, field.TypeInt64, value)
+	}
+	if _u.mutation.EnterpriseIDCleared() {
+		_spec.ClearField(usagelog.FieldEnterpriseID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.EnterpriseDepartmentID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedEnterpriseDepartmentID(); ok {
+		_spec.AddField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+	}
+	if _u.mutation.EnterpriseDepartmentIDCleared() {
+		_spec.ClearField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 	}
@@ -1544,6 +1616,60 @@ type UsageLogUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *UsageLogMutation
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (_u *UsageLogUpdateOne) SetEnterpriseID(v int64) *UsageLogUpdateOne {
+	_u.mutation.ResetEnterpriseID()
+	_u.mutation.SetEnterpriseID(v)
+	return _u
+}
+
+// SetNillableEnterpriseID sets the "enterprise_id" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableEnterpriseID(v *int64) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetEnterpriseID(*v)
+	}
+	return _u
+}
+
+// AddEnterpriseID adds value to the "enterprise_id" field.
+func (_u *UsageLogUpdateOne) AddEnterpriseID(v int64) *UsageLogUpdateOne {
+	_u.mutation.AddEnterpriseID(v)
+	return _u
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (_u *UsageLogUpdateOne) ClearEnterpriseID() *UsageLogUpdateOne {
+	_u.mutation.ClearEnterpriseID()
+	return _u
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (_u *UsageLogUpdateOne) SetEnterpriseDepartmentID(v int64) *UsageLogUpdateOne {
+	_u.mutation.ResetEnterpriseDepartmentID()
+	_u.mutation.SetEnterpriseDepartmentID(v)
+	return _u
+}
+
+// SetNillableEnterpriseDepartmentID sets the "enterprise_department_id" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableEnterpriseDepartmentID(v *int64) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetEnterpriseDepartmentID(*v)
+	}
+	return _u
+}
+
+// AddEnterpriseDepartmentID adds value to the "enterprise_department_id" field.
+func (_u *UsageLogUpdateOne) AddEnterpriseDepartmentID(v int64) *UsageLogUpdateOne {
+	_u.mutation.AddEnterpriseDepartmentID(v)
+	return _u
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (_u *UsageLogUpdateOne) ClearEnterpriseDepartmentID() *UsageLogUpdateOne {
+	_u.mutation.ClearEnterpriseDepartmentID()
+	return _u
 }
 
 // SetUserID sets the "user_id" field.
@@ -2678,6 +2804,24 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.EnterpriseID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedEnterpriseID(); ok {
+		_spec.AddField(usagelog.FieldEnterpriseID, field.TypeInt64, value)
+	}
+	if _u.mutation.EnterpriseIDCleared() {
+		_spec.ClearField(usagelog.FieldEnterpriseID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.EnterpriseDepartmentID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedEnterpriseDepartmentID(); ok {
+		_spec.AddField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+	}
+	if _u.mutation.EnterpriseDepartmentIDCleared() {
+		_spec.ClearField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)

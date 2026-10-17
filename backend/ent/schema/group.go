@@ -313,6 +313,9 @@ func (Group) Fields() []ent.Field {
 
 func (Group) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.From("allowed_enterprises", Enterprise.Type).
+			Ref("allowed_groups").
+			Through("enterprise_allowed_groups", EnterpriseAllowedGroup.Type),
 		edge.To("api_keys", APIKey.Type),
 		edge.To("redeem_codes", RedeemCode.Type),
 		edge.To("subscriptions", UserSubscription.Type),

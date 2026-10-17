@@ -150,6 +150,8 @@ const (
 	FieldProfitMinMargin = "profit_min_margin"
 	// FieldProfitSafetyBuffer holds the string denoting the profit_safety_buffer field in the database.
 	FieldProfitSafetyBuffer = "profit_safety_buffer"
+	// EdgeAllowedEnterprises holds the string denoting the allowed_enterprises edge name in mutations.
+	EdgeAllowedEnterprises = "allowed_enterprises"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -162,12 +164,19 @@ const (
 	EdgeAccounts = "accounts"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
+	// EdgeEnterpriseAllowedGroups holds the string denoting the enterprise_allowed_groups edge name in mutations.
+	EdgeEnterpriseAllowedGroups = "enterprise_allowed_groups"
 	// EdgeAccountGroups holds the string denoting the account_groups edge name in mutations.
 	EdgeAccountGroups = "account_groups"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the group in the database.
 	Table = "groups"
+	// AllowedEnterprisesTable is the table that holds the allowed_enterprises relation/edge. The primary key declared below.
+	AllowedEnterprisesTable = "enterprise_allowed_groups"
+	// AllowedEnterprisesInverseTable is the table name for the Enterprise entity.
+	// It exists in this package in order to avoid circular dependency with the "enterprise" package.
+	AllowedEnterprisesInverseTable = "enterprises"
 	// APIKeysTable is the table that holds the api_keys relation/edge.
 	APIKeysTable = "api_keys"
 	// APIKeysInverseTable is the table name for the APIKey entity.
@@ -206,6 +215,13 @@ const (
 	// AllowedUsersInverseTable is the table name for the User entity.
 	// It exists in this package in order to avoid circular dependency with the "user" package.
 	AllowedUsersInverseTable = "users"
+	// EnterpriseAllowedGroupsTable is the table that holds the enterprise_allowed_groups relation/edge.
+	EnterpriseAllowedGroupsTable = "enterprise_allowed_groups"
+	// EnterpriseAllowedGroupsInverseTable is the table name for the EnterpriseAllowedGroup entity.
+	// It exists in this package in order to avoid circular dependency with the "enterpriseallowedgroup" package.
+	EnterpriseAllowedGroupsInverseTable = "enterprise_allowed_groups"
+	// EnterpriseAllowedGroupsColumn is the table column denoting the enterprise_allowed_groups relation/edge.
+	EnterpriseAllowedGroupsColumn = "group_id"
 	// AccountGroupsTable is the table that holds the account_groups relation/edge.
 	AccountGroupsTable = "account_groups"
 	// AccountGroupsInverseTable is the table name for the AccountGroup entity.
@@ -295,6 +311,9 @@ var Columns = []string{
 }
 
 var (
+	// AllowedEnterprisesPrimaryKey and AllowedEnterprisesColumn2 are the table columns denoting the
+	// primary key for the allowed_enterprises relation (M2M).
+	AllowedEnterprisesPrimaryKey = []string{"enterprise_id", "group_id"}
 	// AccountsPrimaryKey and AccountsColumn2 are the table columns denoting the
 	// primary key for the accounts relation (M2M).
 	AccountsPrimaryKey = []string{"account_id", "group_id"}
@@ -739,6 +758,20 @@ func ByProfitSafetyBuffer(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProfitSafetyBuffer, opts...).ToFunc()
 }
 
+// ByAllowedEnterprisesCount orders the results by allowed_enterprises count.
+func ByAllowedEnterprisesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAllowedEnterprisesStep(), opts...)
+	}
+}
+
+// ByAllowedEnterprises orders the results by allowed_enterprises terms.
+func ByAllowedEnterprises(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAllowedEnterprisesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByAPIKeysCount orders the results by api_keys count.
 func ByAPIKeysCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -823,6 +856,20 @@ func ByAllowedUsers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByEnterpriseAllowedGroupsCount orders the results by enterprise_allowed_groups count.
+func ByEnterpriseAllowedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newEnterpriseAllowedGroupsStep(), opts...)
+	}
+}
+
+// ByEnterpriseAllowedGroups orders the results by enterprise_allowed_groups terms.
+func ByEnterpriseAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newEnterpriseAllowedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByAccountGroupsCount orders the results by account_groups count.
 func ByAccountGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -849,6 +896,13 @@ func ByUserAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newUserAllowedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newAllowedEnterprisesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AllowedEnterprisesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, AllowedEnterprisesTable, AllowedEnterprisesPrimaryKey...),
+	)
 }
 func newAPIKeysStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
@@ -890,6 +944,13 @@ func newAllowedUsersStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllowedUsersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, true, AllowedUsersTable, AllowedUsersPrimaryKey...),
+	)
+}
+func newEnterpriseAllowedGroupsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(EnterpriseAllowedGroupsInverseTable, EnterpriseAllowedGroupsColumn),
+		sqlgraph.Edge(sqlgraph.O2M, true, EnterpriseAllowedGroupsTable, EnterpriseAllowedGroupsColumn),
 	)
 }
 func newAccountGroupsStep() *sqlgraph.Step {
