@@ -16,6 +16,7 @@ import (
 
 // UserHandler handles user-related requests
 type UserHandler struct {
+	enterpriseIdentity    enterpriseIdentityReader
 	userService           *service.UserService
 	authService           *service.AuthService
 	emailService          *service.EmailService
@@ -85,6 +86,7 @@ type UpdateProfileRequest struct {
 
 type userProfileResponse struct {
 	dto.User
+	Enterprise        *service.EnterpriseIdentity            `json:"enterprise"`
 	AvatarURL         string                                 `json:"avatar_url,omitempty"`
 	AvatarSource      *userProfileSourceContext              `json:"avatar_source,omitempty"`
 	UsernameSource    *userProfileSourceContext              `json:"username_source,omitempty"`
@@ -535,7 +537,14 @@ func (h *UserHandler) buildUserProfileResponse(ctx context.Context, userID int64
 	if err != nil {
 		return userProfileResponse{}, err
 	}
-	return userProfileResponseFromService(user, identities), nil
+	profile := userProfileResponseFromService(user, identities)
+	if h.enterpriseIdentity != nil {
+		profile.Enterprise, err = h.enterpriseIdentity.Identity(ctx, userID)
+		if err != nil {
+			return userProfileResponse{}, err
+		}
+	}
+	return profile, nil
 }
 
 func userProfileResponseFromService(user *service.User, identities service.UserIdentitySummarySet) userProfileResponse {

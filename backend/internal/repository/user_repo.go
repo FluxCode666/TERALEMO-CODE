@@ -531,6 +531,14 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	}
 
 	q := r.client.User.Query()
+	if filters.EnterpriseID > 0 {
+		q = q.Where(func(s *entsql.Selector) {
+			members := entsql.Table("enterprise_members")
+			s.Where(entsql.Exists(entsql.Select(members.C("user_id")).From(members).
+				Where(entsql.And(entsql.ColumnsEQ(members.C("user_id"), s.C("id")),
+					entsql.EQ(members.C("enterprise_id"), filters.EnterpriseID), entsql.IsNull(members.C("deleted_at"))))))
+		})
+	}
 
 	if filters.Status != "" {
 		q = q.Where(dbuser.StatusEQ(filters.Status))

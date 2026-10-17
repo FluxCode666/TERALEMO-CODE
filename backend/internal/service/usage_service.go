@@ -328,6 +328,9 @@ func (s *UsageService) GetUsageTrendWithFilters(ctx context.Context, startTime, 
 		}
 		return trend, nil
 	}
+	if filters.EnterpriseID != 0 || filters.EnterpriseDepartmentID != 0 {
+		return nil, fmt.Errorf("enterprise usage filters require repository support")
+	}
 	trend, err := s.usageRepo.GetUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, filters.BillingType)
 	if err != nil {
 		return nil, fmt.Errorf("get usage trend with filters: %w", err)
@@ -357,6 +360,9 @@ func (s *UsageService) GetModelStatsWithFiltersBySource(ctx context.Context, sta
 		}
 		return stats, nil
 	}
+	if filters.EnterpriseID != 0 || filters.EnterpriseDepartmentID != 0 {
+		return nil, fmt.Errorf("enterprise usage filters require repository support")
+	}
 	type modelStatsBySourceRepo interface {
 		GetModelStatsWithFiltersBySource(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, requestType *int16, stream *bool, billingType *int8, source string) ([]usagestats.ModelStat, error)
 	}
@@ -385,6 +391,9 @@ func (s *UsageService) GetGroupStatsWithFilters(ctx context.Context, startTime, 
 			return nil, fmt.Errorf("get group stats with filters: %w", err)
 		}
 		return stats, nil
+	}
+	if filters.EnterpriseID != 0 || filters.EnterpriseDepartmentID != 0 {
+		return nil, fmt.Errorf("enterprise usage filters require repository support")
 	}
 	stats, err := s.usageRepo.GetGroupStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, filters.BillingType)
 	if err != nil {

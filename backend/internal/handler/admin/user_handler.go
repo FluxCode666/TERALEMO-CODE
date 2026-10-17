@@ -22,11 +22,13 @@ import (
 // UserWithConcurrency wraps AdminUser with current concurrency info
 type UserWithConcurrency struct {
 	dto.AdminUser
-	CurrentConcurrency int `json:"current_concurrency"`
+	Enterprise         *userEnterpriseSummary `json:"enterprise"`
+	CurrentConcurrency int                    `json:"current_concurrency"`
 }
 
 // UserHandler handles admin user management
 type UserHandler struct {
+	enterprises           service.EnterpriseRepository
 	adminService          service.AdminService
 	concurrencyService    *service.ConcurrencyService
 	userPlatformQuotaRepo service.UserPlatformQuotaRepository // T13 admin quota view
@@ -144,6 +146,14 @@ func (h *UserHandler) List(c *gin.Context) {
 			filters.APIKeyGroupID = id
 		}
 	}
+	if raw := strings.TrimSpace(c.Query("enterprise_id")); raw != "" {
+		id, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil || id <= 0 {
+			response.BadRequest(c, "Invalid enterprise ID")
+			return
+		}
+		filters.EnterpriseID = id
+	}
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if raw, ok := c.GetQuery("include_subscriptions"); ok {
@@ -171,10 +181,25 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	// Build response with concurrency info
+	enterpriseContexts := map[int64]*service.EnterpriseMemberContext{}
+	if h.enterprises != nil && len(users) > 0 {
+		ids := make([]int64, len(users))
+		for i := range users {
+			ids[i] = users[i].ID
+		}
+		enterpriseContexts, err = h.enterprises.GetMemberContextsByUserIDs(c.Request.Context(), ids)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 	out := make([]UserWithConcurrency, len(users))
 	for i := range users {
 		out[i] = UserWithConcurrency{
 			AdminUser: *dto.UserFromServiceAdmin(&users[i]),
+		}
+		if member := enterpriseContexts[users[i].ID]; member != nil {
+			out[i].Enterprise = &userEnterpriseSummary{ID: member.EnterpriseID, Name: member.EnterpriseName, Role: member.Role}
 		}
 		if info := loadInfo[users[i].ID]; info != nil {
 			out[i].CurrentConcurrency = info.CurrentConcurrency

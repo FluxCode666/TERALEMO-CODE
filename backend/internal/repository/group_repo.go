@@ -453,9 +453,31 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 }
 
 func (r *groupRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.client.Group.Delete().Where(group.IDEQ(id)).Exec(ctx)
+	client := clientFromContext(ctx, r.client)
+	tx, err := client.Tx(ctx)
+	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+		return translatePersistenceError(err, service.ErrGroupNotFound, nil)
+	}
+	// Transaction clients are also used without a TxContext by existing callers.
+	// In that case keep participating in their transaction, as deleteCascade does.
+	if err == nil {
+		defer func() { _ = tx.Rollback() }()
+		client = tx.Client()
+	}
+	count, err := client.Group.Delete().Where(group.IDEQ(id)).Exec(ctx)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrGroupNotFound, nil)
+	}
+	if count == 0 {
+		return service.ErrGroupNotFound
+	}
+	if err := deleteEnterpriseGroupReferences(ctx, client, id); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return translatePersistenceError(err, nil, nil)
+		}
 	}
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &id, nil); err != nil {
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group delete failed: group=%d err=%v", id, err)
@@ -954,6 +976,10 @@ func (r *groupRepository) deleteCascade(ctx context.Context, id int64, requireEm
 	}
 
 	// 3. Delete account_groups join rows.
+	if err := deleteEnterpriseGroupReferences(ctx, exec, id); err != nil {
+		return nil, err
+	}
+
 	if _, err := exec.ExecContext(ctx, "DELETE FROM account_groups WHERE group_id = $1", id); err != nil {
 		return nil, err
 	}

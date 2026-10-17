@@ -36,7 +36,10 @@ func enterpriseMemberFixture(t *testing.T, ctx context.Context, enterpriseID int
 }
 func enterpriseGroupFixture(t *testing.T, client *dbent.Client) int64 {
 	t.Helper()
-	return mustCreateGroup(t, client, &service.Group{Name: fmt.Sprintf("enterprise-group-%d", time.Now().UnixNano())}).ID
+	id := mustCreateGroup(t, client, &service.Group{Name: fmt.Sprintf("enterprise-group-%d", time.Now().UnixNano())}).ID
+	// 已提交的分组会污染按平台计数的其他套件（如 GroupRepoSuite）；事务内创建的分组随回滚消失，DELETE 无副作用。
+	t.Cleanup(func() { _, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM groups WHERE id=$1", id) })
+	return id
 }
 
 func TestEnterpriseRepositoryUniqueAndSoftDelete(t *testing.T) {

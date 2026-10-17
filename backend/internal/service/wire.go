@@ -857,6 +857,8 @@ func ProvideAPIKeyService(
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	NewNoopEnterpriseBillingCache,
+	NewEnterpriseService,
+	NewEnterpriseUsageService,
 	// Core services
 	ProvideAuthService,
 	NewPasskeyService,
@@ -868,8 +870,8 @@ var ProviderSet = wire.NewSet(
 	NewCompositeRouteResolver,
 	NewAccountService,
 	NewProxyService,
-	NewRedeemService,
-	NewPromoService,
+	ProvideRedeemService,
+	ProvidePromoService,
 	NewUsageService,
 	NewDashboardService,
 	ProvidePricingService,
@@ -1011,9 +1013,22 @@ func ProvideBalanceNotifyService(emailService *EmailService, settingRepo Setting
 }
 
 // ProvidePaymentService creates PaymentService and attaches notification email delivery.
-func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, notificationEmailService *NotificationEmailService) *PaymentService {
+func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, notificationEmailService *NotificationEmailService, enterprises EnterpriseRepository) *PaymentService {
 	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
+	svc.SetEnterpriseMembershipReader(enterprises)
 	svc.SetNotificationEmailService(notificationEmailService)
+	return svc
+}
+
+func ProvideRedeemService(redeemRepo RedeemCodeRepository, userRepo UserRepository, subscriptions *SubscriptionService, cache RedeemCache, billing *BillingCacheService, client *dbent.Client, auth APIKeyAuthCacheInvalidator, affiliate *AffiliateService, enterprises EnterpriseRepository) *RedeemService {
+	svc := NewRedeemService(redeemRepo, userRepo, subscriptions, cache, billing, client, auth, affiliate)
+	svc.SetEnterpriseMembershipReader(enterprises)
+	return svc
+}
+
+func ProvidePromoService(promos PromoCodeRepository, users UserRepository, billing *BillingCacheService, client *dbent.Client, auth APIKeyAuthCacheInvalidator, enterprises EnterpriseRepository) *PromoService {
+	svc := NewPromoService(promos, users, billing, client, auth)
+	svc.SetEnterpriseMembershipReader(enterprises)
 	return svc
 }
 

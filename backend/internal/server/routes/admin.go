@@ -31,6 +31,9 @@ func RegisterAdminRoutes(
 	admin.Use(gin.HandlerFunc(auditLog))
 	admin.Use(middleware.AdminComplianceGuard(settingService))
 	{
+		if h.Admin.Enterprise != nil {
+			h.Admin.Enterprise.RegisterAdminRoutes(admin.Group("/enterprises"))
+		}
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
 

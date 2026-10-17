@@ -19,6 +19,7 @@ import (
 
 // AuthHandler handles authentication-related requests
 type AuthHandler struct {
+	enterpriseIdentity   enterpriseIdentityReader
 	cfg                  *config.Config
 	authService          *service.AuthService
 	userService          *service.UserService
@@ -450,8 +451,16 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		runMode = h.cfg.RunMode
 	}
 
+	profile := userProfileResponseFromService(user, identities)
+	if h.enterpriseIdentity != nil {
+		profile.Enterprise, err = h.enterpriseIdentity.Identity(c.Request.Context(), subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 	response.Success(c, UserResponse{
-		userProfileResponse: userProfileResponseFromService(user, identities),
+		userProfileResponse: profile,
 		RunMode:             runMode,
 	})
 }

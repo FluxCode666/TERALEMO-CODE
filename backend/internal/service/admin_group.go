@@ -1205,7 +1205,13 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 	}
 
 	var groupKeys []string
+	var enterpriseUserIDs []int64
 	if s.authCacheInvalidator != nil {
+		var err error
+		enterpriseUserIDs, err = enterpriseGroupAffectedUserIDs(ctx, s.groupRepo, id)
+		if err != nil {
+			return err
+		}
 		keys, err := s.apiKeyRepo.ListKeysByGroupID(ctx, id)
 		if err == nil {
 			groupKeys = keys
@@ -1240,6 +1246,9 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
 			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
+		}
+		for _, userID := range enterpriseUserIDs {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 		}
 	}
 

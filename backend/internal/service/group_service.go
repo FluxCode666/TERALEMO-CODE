@@ -235,11 +235,21 @@ func (s *GroupService) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("get group: %w", err)
 	}
 
+	var enterpriseUserIDs []int64
 	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
+		enterpriseUserIDs, err = enterpriseGroupAffectedUserIDs(ctx, s.groupRepo, id)
+		if err != nil {
+			return err
+		}
 	}
 	if err := s.groupRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete group: %w", err)
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
+		for _, userID := range enterpriseUserIDs {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+		}
 	}
 
 	return nil

@@ -10,15 +10,15 @@
 
 ## W2 后端管理接口（主工作区，W1 之后）
 
-- [ ] 2.1 权限纯函数（D5）+ 表驱动单测，覆盖三种角色 × 设置开关 × 目标对象（本部门 / 他部门 / 本人 / owner）
-- [ ] 2.2 `EnterpriseService`：企业 CRUD（可选初始 owner）、部门 CRUD（非空不可删）、成员加入已有用户 / 新建用户（复用管理员建号核心逻辑，同事务创建成员与限额行）、成员更新（最后一个 owner 保护、manager 需部门）、移出（软删除成员与限额行、清理成员级白名单）、限额更新（≤ 上级）与重置、分组池与三级白名单（子集校验）、设置、余额调整、审计；所有变更后调用认证缓存失效与 `EnterpriseBillingCache`
-- [ ] 2.3 管理端 handler + 路由 `/api/v1/admin/enterprises/...`（D6），余额调整走幂等封装（参照 `UpdateBalance`）
-- [ ] 2.4 企业侧成员中间件（加载成员上下文，非成员 403，停用 403）+ handler + 路由 `/api/v1/enterprise/...`（D6），含 `overview`
-- [ ] 2.5 使用记录查询（D8）：`UsageLogFilters` 新字段贯穿列表 / 统计 / 趋势 / 模型 / 分组；修正 `shouldUsePreaggregatedTrend`、`shouldUseFastUsageLogTotal`；成员 / 部门排行仓储方法；`EnterpriseUsageLog` DTO；强制范围合并与越权 403
-- [ ] 2.6 `/auth/me` 与 `/user/profile` 返回 `enterprise` 对象（按可见性填 balance）
-- [ ] 2.7 个人钱包拦截：支付订单创建、余额类兑换码、余额类优惠码对企业成员返回 `ENTERPRISE_MEMBER_WALLET_DISABLED`
-- [ ] 2.8 分组删除时清理分组池与白名单；管理员用户列表 `enterprise_id` 过滤与企业摘要
-- [ ] 2.9 测试：service 单测（stub 窄接口）、handler 测试（权限越权、可见性开关、范围收敛不泄露、预聚合不被误用）、使用记录仓储集成测试（企业 / 部门过滤、排行）
+- [x] 2.1 权限纯函数（D5）+ 表驱动单测，覆盖三种角色 × 设置开关 × 目标对象（本部门 / 他部门 / 本人 / owner）
+- [x] 2.2 `EnterpriseService`：企业 CRUD（可选初始 owner）、部门 CRUD（非空不可删）、成员加入已有用户 / 新建用户（复用管理员建号核心逻辑，同事务创建成员与限额行）、成员更新（最后一个 owner 保护、manager 需部门）、移出（软删除成员与限额行、清理成员级白名单）、限额更新（≤ 上级）与重置、分组池与三级白名单（子集校验）、设置、余额调整、审计；所有变更后调用认证缓存失效与 `EnterpriseBillingCache`
+- [x] 2.3 管理端 handler + 路由 `/api/v1/admin/enterprises/...`（D6），余额调整走幂等封装（参照 `UpdateBalance`）
+- [x] 2.4 企业侧成员中间件（加载成员上下文，非成员 403，停用 403）+ handler + 路由 `/api/v1/enterprise/...`（D6），含 `overview`
+- [x] 2.5 使用记录查询（D8）：`UsageLogFilters` 新字段贯穿列表 / 统计 / 趋势 / 模型 / 分组；修正 `shouldUsePreaggregatedTrend`、`shouldUseFastUsageLogTotal`；成员 / 部门排行仓储方法；`EnterpriseUsageLog` DTO；强制范围合并与越权 403
+- [x] 2.6 `/auth/me` 与 `/user/profile` 返回 `enterprise` 对象（按可见性填 balance）
+- [x] 2.7 个人钱包拦截：支付订单创建、余额类兑换码、余额类优惠码对企业成员返回 `ENTERPRISE_MEMBER_WALLET_DISABLED`
+- [x] 2.8 分组删除时清理分组池与白名单；管理员用户列表 `enterprise_id` 过滤与企业摘要
+- [x] 2.9 测试：service 单测（stub 窄接口）、handler 测试（权限越权、可见性开关、范围收敛不泄露、预聚合不被误用）、使用记录仓储集成测试（企业 / 部门过滤、排行）
 
 ## W3 后端计费运行时（独立 worktree，W1 之后）
 
