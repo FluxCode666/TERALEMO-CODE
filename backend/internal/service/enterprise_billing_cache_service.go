@@ -176,11 +176,7 @@ func checkEnterpriseGatewayEligibility(member *EnterpriseMemberContext, group *G
 	if member.MemberStatus != EnterpriseMemberStatusActive {
 		return ErrEnterpriseGatewayMemberDisabled
 	}
-	groupID := int64(0)
-	if group != nil {
-		groupID = group.ID
-	}
-	if !member.AllowsGroup(groupID) {
+	if group == nil || group.ID <= 0 || !member.AllowsGroup(group.ID) {
 		return ErrEnterpriseGatewayGroupNotAllowed
 	}
 	return nil
@@ -286,7 +282,7 @@ func (r enterpriseInflightRenewer) RenewInflightBalance(ctx context.Context, _ i
 func (s *BillingCacheService) reserveEnterpriseInflight(ctx context.Context, user *User, amount float64, renew bool) (*InflightReservation, error) {
 	cache, ok := s.cache.(InflightScopeReservationCache)
 	if !ok || cache == nil {
-		return nil, ErrBillingServiceUnavailable.WithCause(errBillingCacheUnavailable)
+		return nil, nil
 	}
 	balance, err := s.GetEnterpriseBalance(ctx, user.Enterprise.EnterpriseID)
 	if err != nil {
@@ -305,7 +301,8 @@ func (s *BillingCacheService) reserveEnterpriseInflight(ctx context.Context, use
 	cancel()
 	if err != nil {
 		res.Release()
-		return nil, ErrBillingServiceUnavailable.WithCause(err)
+		logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation failed for %s (fail-open): %v", scope, err)
+		return nil, nil
 	}
 	if balance-pending < amount {
 		res.Release()

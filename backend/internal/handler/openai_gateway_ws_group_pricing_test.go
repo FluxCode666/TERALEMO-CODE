@@ -217,14 +217,15 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 		return k
 	}
 
-	t.Run("same group adopts the latest group and nothing else", func(t *testing.T) {
+	t.Run("same group adopts the latest group and user snapshot", func(t *testing.T) {
 		got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(ctx context.Context, key string) (*service.APIKey, error) {
 			require.Equal(t, "sk-conn", key)
 			return latestWith(nil), nil
 		}), conn)
 		require.NotSame(t, conn, got)
 		require.InDelta(t, 0.3, got.Group.RateMultiplier, 1e-12)
-		require.Same(t, conn.User, got.User, "only the group snapshot is refreshed")
+		require.NotSame(t, conn.User, got.User)
+		require.Equal(t, 123.0, got.User.Balance)
 		require.Equal(t, conn.ID, got.ID)
 		require.InDelta(t, 3.0, conn.Group.RateMultiplier, 1e-12, "the connection snapshot is never mutated")
 	})

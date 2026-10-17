@@ -121,6 +121,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			}
 			return
 		}
+		if apiKey.User.Enterprise != nil && (apiKey.GroupID == nil || apiKey.Group == nil) {
+			abortWithGoogleEnterpriseError(c, "ENTERPRISE_GROUP_NOT_ALLOWED", service.ErrEnterpriseGatewayGroupNotAllowed.Message)
+			return
+		}
 		if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			if code == "GROUP_DELETED" {

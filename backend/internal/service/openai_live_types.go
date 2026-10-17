@@ -42,6 +42,7 @@ type LiveCallRequest struct {
 type LiveCallIdentity struct {
 	EnterpriseID           int64
 	EnterpriseDepartmentID int64
+	EnterpriseMemberID     int64
 
 	APIKeyID        int64
 	UserID          int64
@@ -55,6 +56,7 @@ type LiveCallIdentity struct {
 type LiveCallRecord struct {
 	EnterpriseID           int64
 	EnterpriseDepartmentID int64
+	EnterpriseMemberID     int64
 
 	CallID          string
 	CallHash        string

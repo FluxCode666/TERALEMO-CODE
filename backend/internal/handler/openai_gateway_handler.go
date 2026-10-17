@@ -2170,6 +2170,9 @@ func (k *openAIWSTurnBillingAPIKeys) begin(ctx context.Context, apiKeyService *s
 		}
 	}
 	k.set(turn, turnKey)
+	if turnKey != nil {
+		ctx = service.WithEnterpriseGatewayUser(ctx, turnKey.User)
+	}
 	return withOpenAIWSTurnBillingGroup(ctx, turnKey), nil
 }
 
@@ -2196,9 +2199,9 @@ func (k *openAIWSTurnBillingAPIKeys) forTurn(turn int, conn *service.APIKey) *se
 	return conn
 }
 
-// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：分组取当前认证
-// 快照，其余字段与建连快照共享。同一企业身份的成员上下文必须刷新；钱包身份
-// 改变或已有企业成员无法刷新时返回 nil，由调用方关闭连接并要求重连。
+// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：刷新认证快照
+// 中的完整用户与兼容的分组。企业付款身份或部门改变，以及企业成员无法刷新
+// 时返回 nil，由调用方关闭连接并要求重连。
 func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAPIKeyLookup, conn *service.APIKey) *service.APIKey {
 	if conn == nil {
 		return conn
@@ -2235,8 +2238,12 @@ func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAP
 		if latest.User.ID != conn.User.ID || member.EnterpriseID != latestMember.EnterpriseID || member.MemberID != latestMember.MemberID {
 			return nil
 		}
-		// Freeze only the enterprise context. Personal user fields keep their old
-		// connection snapshot, and later cache refreshes cannot mutate this turn.
+		if (member.DepartmentID == nil) != (latestMember.DepartmentID == nil) ||
+			(member.DepartmentID != nil && *member.DepartmentID != *latestMember.DepartmentID) {
+			return nil
+		}
+		// Freeze the complete current user snapshot and its membership. An admitted
+		// turn keeps its payer and permissions even if the auth cache changes later.
 		memberSnapshot := *latestMember
 		memberSnapshot.GroupPoolIDs = append([]int64(nil), latestMember.GroupPoolIDs...)
 		memberSnapshot.GroupWhitelistIDs = append([]int64(nil), latestMember.GroupWhitelistIDs...)
@@ -2244,7 +2251,8 @@ func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAP
 			departmentID := *latestMember.DepartmentID
 			memberSnapshot.DepartmentID = &departmentID
 		}
-		userSnapshot := *conn.User
+		userSnapshot := *latest.User
+		userSnapshot.AllowedGroups = append([]int64(nil), latest.User.AllowedGroups...)
 		userSnapshot.Enterprise = &memberSnapshot
 		keySnapshot := *conn
 		keySnapshot.User = &userSnapshot
@@ -2261,6 +2269,11 @@ func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAP
 	}
 	keySnapshot := *turnKey
 	keySnapshot.Group = group
+	if member == nil && latest.User != nil {
+		userSnapshot := *latest.User
+		userSnapshot.AllowedGroups = append([]int64(nil), latest.User.AllowedGroups...)
+		keySnapshot.User = &userSnapshot
+	}
 	return &keySnapshot
 }
 
@@ -2286,7 +2299,7 @@ func (h *OpenAIGatewayHandler) checkOpenAIWSTurnEnterpriseBilling(ctx context.Co
 	if turnKey == nil || turnKey.User == nil || turnKey.User.Enterprise == nil {
 		return nil
 	}
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, turnKey.User, turnKey, turnKey.Group, subscription, service.QuotaPlatform(ctx, turnKey)); err != nil {
+	if err := h.billingCacheService.CheckEnterpriseSessionEligibility(ctx, turnKey.User, turnKey, turnKey.Group, subscription, service.QuotaPlatform(ctx, turnKey)); err != nil {
 		return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "enterprise billing check failed", err)
 	}
 	return nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
+	"log/slog"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -15,7 +15,7 @@ func deductUsageBillingEnterpriseBalance(ctx context.Context, tx *sql.Tx, enterp
 	err := tx.QueryRowContext(ctx, `
 		UPDATE enterprises
 		SET balance = balance - $1, updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
+		WHERE id = $2
 		RETURNING balance
 	`, amount, enterpriseID).Scan(&balance)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -26,8 +26,8 @@ func deductUsageBillingEnterpriseBalance(ctx context.Context, tx *sql.Tx, enterp
 
 // The materialized CTE acquires every required quota row lock in ascending id
 // order before UPDATE can execute. Never depend on an UPDATE plan's row order.
-// The cardinality guard makes missing quotas fail closed: no partial usage is
-// applied, and the caller rolls back the enterprise balance deduction as well.
+// Frozen scopes include soft-deleted archive rows. A missing row is an integrity
+// incident, but must not undo payment for usage already consumed upstream.
 func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) error {
 	expected := 2
 	if cmd.EnterpriseDepartmentID != 0 {
@@ -38,7 +38,7 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 	err := tx.QueryRowContext(ctx, `
 		WITH locked AS MATERIALIZED (
 			SELECT id FROM enterprise_quotas
-			WHERE enterprise_id = $2 AND deleted_at IS NULL
+			WHERE enterprise_id = $2
 				AND ((scope_type = 'enterprise' AND scope_id = $2)
 					OR (scope_type = 'department' AND scope_id = $3 AND $3 <> 0)
 					OR (scope_type = 'member' AND scope_id = $4))
@@ -54,17 +54,20 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 				monthly_window_start = CASE WHEN q.monthly_window_start IS NULL OR q.monthly_window_start < $7 THEN $7 ELSE q.monthly_window_start END,
 				updated_at = NOW()
 			FROM locked
-			WHERE q.id = locked.id AND (SELECT COUNT(*) FROM locked) = $8
+			WHERE q.id = locked.id
 			RETURNING q.id
 		)
 		SELECT COUNT(*) FROM updated
 	`, cmd.EnterpriseBalanceCost, cmd.EnterpriseID, cmd.EnterpriseDepartmentID, cmd.EnterpriseMemberID,
-		timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now), expected).Scan(&updated)
+		timezone.StartOfDay(now), timezone.StartOfWeek(now), timezone.StartOfMonth(now)).Scan(&updated)
 	if err != nil {
 		return err
 	}
 	if updated != expected {
-		return fmt.Errorf("enterprise billing quota rows missing: enterprise_id=%d got=%d want=%d: %w", cmd.EnterpriseID, updated, expected, service.ErrBillingServiceUnavailable)
+		slog.ErrorContext(ctx, "enterprise billing quota row count mismatch; enterprise payment retained",
+			"request_id", cmd.RequestID, "api_key_id", cmd.APIKeyID,
+			"enterprise_id", cmd.EnterpriseID, "department_id", cmd.EnterpriseDepartmentID, "member_id", cmd.EnterpriseMemberID,
+			"cost", cmd.EnterpriseBalanceCost, "updated_rows", updated, "expected_rows", expected)
 	}
 	return nil
 }

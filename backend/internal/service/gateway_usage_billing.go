@@ -1393,16 +1393,3 @@ func optionalSubscriptionID(subscription *UserSubscription) *int64 {
 	}
 	return nil
 }
-
-// applyEnterpriseUsageSnapshot captures the request membership, including subscription usage.
-func applyEnterpriseUsageSnapshot(log *UsageLog, user *User) {
-	if log == nil || user == nil || user.Enterprise == nil {
-		return
-	}
-	enterpriseID := user.Enterprise.EnterpriseID
-	log.EnterpriseID = &enterpriseID
-	if user.Enterprise.DepartmentID != nil {
-		departmentID := *user.Enterprise.DepartmentID
-		log.EnterpriseDepartmentID = &departmentID
-	}
-}

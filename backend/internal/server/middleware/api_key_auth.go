@@ -160,6 +160,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		if abortIfEnterpriseMembershipDisabled(c, apiKey.User.Enterprise) {
 			return
 		}
+		if apiKey.User.Enterprise != nil && (apiKey.GroupID == nil || apiKey.Group == nil) && abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+			return
+		}
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}
@@ -450,13 +453,8 @@ func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
 		return true
 	}
 	if apiKey.GroupID == nil || apiKey.Group == nil {
-		// Legacy ungrouped keys select from the global account pool. A configured
-		// enterprise scope must not bypass its group restrictions through that path.
-		member := apiKey.User.Enterprise
-		if member != nil && (member.GroupPoolConfigured || member.GroupWhitelistConfigured) {
-			return member.AllowsGroup(0)
-		}
-		return true
+		// Every enterprise request needs an explicit group, including legacy keys.
+		return apiKey.User.Enterprise == nil
 	}
 	group := apiKey.Group
 	if apiKey.User.Enterprise != nil && !apiKey.User.Enterprise.AllowsGroup(group.ID) {

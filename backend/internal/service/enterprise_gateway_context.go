@@ -1,6 +1,65 @@
 package service
 
-import "context"
+import (
+	"context"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+)
+
+// EnterpriseAllowsGroupForUser applies the same enterprise access predicate at
+// explicit group changes as authentication does at the original request group.
+func EnterpriseAllowsGroupForUser(user *User, group *Group) bool {
+	if user == nil || user.Enterprise == nil {
+		return true
+	}
+	if group == nil || !user.Enterprise.AllowsGroup(group.ID) {
+		return false
+	}
+	return group.IsSubscriptionType() || user.CanBindGroup(group.ID, group.IsExclusive)
+}
+
+// CheckEnterpriseSessionEligibility rechecks a frozen turn without incrementing
+// request RPM. Monetary windows and payer eligibility still apply to each turn.
+func (s *BillingCacheService) CheckEnterpriseSessionEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
+	if user == nil || user.Enterprise == nil {
+		return nil
+	}
+	if s == nil {
+		return ErrBillingServiceUnavailable
+	}
+	if err := checkEnterpriseGatewayEligibility(user.Enterprise, group); err != nil {
+		return err
+	}
+	if group == nil || !EnterpriseAllowsGroupForUser(user, group) {
+		return ErrEnterpriseGatewayGroupNotAllowed
+	}
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		if s.cfg.SimpleModeKeyRateLimitEnabled {
+			return s.checkSimpleModeAPIKeyRateLimits(ctx, apiKey)
+		}
+		return nil
+	}
+	if s.circuitBreaker != nil && !s.circuitBreaker.Allow() {
+		return ErrBillingServiceUnavailable
+	}
+	isSubscription := group.IsSubscriptionType() && subscription != nil
+	if isSubscription {
+		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
+			return err
+		}
+	} else {
+		if err := s.checkEnterpriseBillingEligibility(ctx, user.Enterprise, group, 0); err != nil {
+			return err
+		}
+		if err := s.checkUserPlatformQuotaEligibility(ctx, user.ID, platform); err != nil {
+			return err
+		}
+	}
+	if apiKey != nil && apiKey.HasRateLimits() {
+		return s.checkAPIKeyRateLimits(ctx, apiKey)
+	}
+	return nil
+}
 
 type enterpriseGatewayUserContextKey struct{}
 
@@ -26,13 +85,10 @@ func (s *GatewayService) checkEnterpriseResolvedGroup(ctx context.Context, group
 	if member.MemberStatus != EnterpriseMemberStatusActive {
 		return ErrEnterpriseGatewayMemberDisabled
 	}
-	if !member.AllowsGroup(group.ID) {
+	if !EnterpriseAllowsGroupForUser(user, group) {
 		return ErrEnterpriseGatewayGroupNotAllowed
 	}
 	if !group.IsSubscriptionType() {
-		if !user.CanBindGroup(group.ID, group.IsExclusive) {
-			return ErrEnterpriseGatewayGroupNotAllowed
-		}
 		return nil
 	}
 	// The original subscription was already authenticated. A fallback subscription

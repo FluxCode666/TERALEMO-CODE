@@ -67,6 +67,18 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
 	}
+	if apiKey.User != nil && apiKey.User.Enterprise != nil && isGrokVideoCreateEndpoint(endpoint) {
+		err := service.ErrEnterpriseGatewayFeatureUnsupported
+		h.errorResponse(c, http.StatusForbidden, err.Reason, "Asynchronous video tasks are unavailable for enterprise members.")
+		return
+	}
+	// Enterprise video submission is disabled. An owned task polled after its
+	// creator joined an enterprise therefore retains its original personal payer.
+	// Keep the authenticated key/user untouched for authorization and other calls.
+	historicalPersonalVideo := endpoint.IsVideoLookupRequest() && apiKey.User != nil && apiKey.User.Enterprise != nil
+	if historicalPersonalVideo {
+		apiKey = personalAsyncVideoBillingKey(apiKey)
+	}
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
@@ -153,6 +165,9 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	}
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
+	if historicalPersonalVideo {
+		subscription = nil
+	}
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 
 	userReleaseFunc, acquired := h.acquireResponsesUserSlot(c, subject.UserID, subject.Concurrency, false, &streamStarted, reqLog)
@@ -536,6 +551,17 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		)
 		return
 	}
+}
+
+func personalAsyncVideoBillingKey(key *service.APIKey) *service.APIKey {
+	if key == nil || key.User == nil || key.User.Enterprise == nil {
+		return key
+	}
+	copy := *key
+	user := *key.User
+	user.Enterprise = nil
+	copy.User = &user
+	return &copy
 }
 
 func (h *OpenAIGatewayHandler) ensureGrokMediaAccountEligibility(ctx context.Context, account *service.Account) (bool, string, error) {

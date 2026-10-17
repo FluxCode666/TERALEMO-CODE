@@ -280,6 +280,9 @@ func (s *BatchImageSettlementService) recordUsageLog(ctx context.Context, job *B
 		SessionID:             job.SessionID,
 		CreatedAt:             createdAt,
 	}
+	// These jobs froze a personal wallet at submission. Current membership must
+	// never reassign their capture/release or historical usage to an enterprise.
+	ApplyUsageLogPayerIdentity(usageLog, 0, 0)
 	writeUsageLogBestEffort(ctx, s.UsageLogRepo, usageLog, "service.batch_image_settlement")
 }
 
