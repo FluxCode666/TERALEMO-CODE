@@ -132,6 +132,7 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 		Stream:                req.Stream,
 		DurationMs:            req.DurationMs,
 	}
+	ApplyUsageLogPayerIdentity(usageLog, 0, 0)
 
 	inserted, err := s.usageRepo.Create(txCtx, usageLog)
 	if err != nil {

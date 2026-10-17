@@ -153,19 +153,21 @@ func TestEnterpriseInflightConcurrentMembers(t *testing.T) {
 	}
 }
 
-func TestEnterpriseInflightRedisDownFailsClosed(t *testing.T) {
+func TestEnterpriseInflightRedisReservationDownFailsOpen(t *testing.T) {
 	mr, cache := newEnterpriseCacheTest(t)
+	_, balanceCache := newEnterpriseCacheTest(t)
 	ctx := context.Background()
-	require.NoError(t, cache.SetEnterpriseBalance(ctx, 10, 1))
+	require.NoError(t, balanceCache.SetEnterpriseBalance(ctx, 10, 1))
 	cfg := &config.Config{}
 	cfg.Billing.InflightReservation.Enabled = true
 	svc := service.NewBillingCacheService(&billingCache{rdb: cache.rdb}, nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
-	svc.ConfigureEnterpriseBilling(cache, nil, nil)
+	svc.ConfigureEnterpriseBilling(balanceCache, nil, nil)
 	mr.Close()
 	user, _ := enterpriseInflightUsers()
-	_, err := svc.ReserveInflight(ctx, user, nil, nil, 0.1)
-	require.ErrorIs(t, err, service.ErrBillingServiceUnavailable)
+	res, err := svc.ReserveInflight(ctx, user, nil, nil, 0.1)
+	require.NoError(t, err)
+	require.Nil(t, res)
 }
 
 func TestEnterpriseReserveFixedChargeUsesEnterpriseBalanceAndQuotas(t *testing.T) {
@@ -182,13 +184,13 @@ func TestEnterpriseReserveFixedChargeUsesEnterpriseBalanceAndQuotas(t *testing.T
 	svc := service.NewBillingCacheService(&billingCache{rdb: cache.rdb}, nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 	svc.ConfigureEnterpriseBilling(cache, nil, nil)
-	_, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 0.6)
+	_, err := svc.ReserveFixedCharge(ctx, user, nil, &service.Group{ID: 5}, nil, 0.6)
 	require.ErrorIs(t, err, service.ErrEnterpriseBillingMemberQuotaExceeded)
-	res, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 0.4)
+	res, err := svc.ReserveFixedCharge(ctx, user, nil, &service.Group{ID: 5}, nil, 0.4)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	res.Release()
-	_, err = svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 2)
+	_, err = svc.ReserveFixedCharge(ctx, user, nil, &service.Group{ID: 5}, nil, 2)
 	require.ErrorIs(t, err, service.ErrEnterpriseBillingBalanceInsufficient)
 }
 

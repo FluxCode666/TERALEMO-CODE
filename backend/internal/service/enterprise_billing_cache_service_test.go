@@ -138,7 +138,7 @@ func TestEnterpriseBillingEligibilityAllQuotaScopesAndWindows(t *testing.T) {
 					}
 				}
 				svc := &BillingCacheService{enterpriseCache: &enterpriseRuntimeCacheStub{balance: 50, quotas: quotas}}
-				err := svc.CheckBillingEligibility(context.Background(), user, nil, nil, nil, "")
+				err := svc.CheckBillingEligibility(context.Background(), user, nil, &Group{ID: 5}, nil, "")
 				want := ErrEnterpriseBillingQuotaExceeded
 				if scope == EnterpriseScopeMember {
 					want = ErrEnterpriseBillingMemberQuotaExceeded
@@ -205,7 +205,7 @@ func TestEnterpriseBillingEligibilityCacheFallbackFailsClosed(t *testing.T) {
 			}
 			svc := &BillingCacheService{}
 			svc.ConfigureEnterpriseBilling(cache, balanceRepo, quotaRepo)
-			err := svc.CheckBillingEligibility(context.Background(), user, nil, nil, nil, "")
+			err := svc.CheckBillingEligibility(context.Background(), user, nil, &Group{ID: 5}, nil, "")
 			if tc.want != nil {
 				require.ErrorIs(t, err, tc.want)
 			} else {
@@ -267,7 +267,7 @@ func TestEnterpriseBillingEligibilityPersonalRPMStillEnforced(t *testing.T) {
 	user, quotas := enterpriseEligibilityFixture()
 	user.RPMLimit = 1
 	svc := &BillingCacheService{enterpriseCache: &enterpriseRuntimeCacheStub{balance: 50, quotas: quotas}, userRPMCache: &userRPMCacheStub{userCounts: []int{2}}}
-	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, nil, nil, nil, ""), ErrUserRPMExceeded)
+	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, nil, &Group{ID: 5}, nil, ""), ErrUserRPMExceeded)
 }
 
 func TestEnterpriseBillingEligibilityPersonalPlatformAndKeyStillEnforced(t *testing.T) {
@@ -275,12 +275,12 @@ func TestEnterpriseBillingEligibilityPersonalPlatformAndKeyStillEnforced(t *test
 	enterpriseCache := &enterpriseRuntimeCacheStub{balance: 50, quotas: quotas}
 	platformCache := &fakeZeroQuotaCache{}
 	svc := &BillingCacheService{cache: platformCache, enterpriseCache: enterpriseCache, userPlatformQuotaRepo: &fakeQuotaRepo{}, cfg: &config.Config{}}
-	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, nil, nil, nil, "anthropic"), ErrUserPlatformDailyQuotaExhausted)
+	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, nil, &Group{ID: 5}, nil, "anthropic"), ErrUserPlatformDailyQuotaExhausted)
 	require.True(t, platformCache.called)
 	now := time.Now().Unix()
 	personal := &enterprisePersonalCacheStub{rate: &APIKeyRateLimitCacheData{Usage5h: 2, Window5h: now, Window1d: now, Window7d: now}}
 	svc = &BillingCacheService{cache: personal, enterpriseCache: enterpriseCache}
-	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, &APIKey{ID: 2, RateLimit5h: 1}, nil, nil, ""), ErrAPIKeyRateLimit5hExceeded)
+	require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, &APIKey{ID: 2, RateLimit5h: 1}, &Group{ID: 5}, nil, ""), ErrAPIKeyRateLimit5hExceeded)
 }
 
 func TestEnterpriseBillingAccessChecksBeforeSubscriptionAndSimpleBypass(t *testing.T) {
@@ -316,16 +316,40 @@ func TestEnterpriseBillingAccessChecksBeforeSubscriptionAndSimpleBypass(t *testi
 
 func TestEnterpriseBillingUngroupedKeyCannotBypassRestrictions(t *testing.T) {
 	for _, configured := range []string{"none", "pool", "whitelist"} {
-		t.Run(configured, func(t *testing.T) {
-			user, _ := enterpriseEligibilityFixture()
-			user.Enterprise.GroupPoolConfigured = configured == "pool"
-			user.Enterprise.GroupWhitelistConfigured = configured == "whitelist"
-			err := checkEnterpriseGatewayEligibility(user.Enterprise, nil)
-			if configured == "none" {
-				require.NoError(t, err)
-			} else {
-				require.ErrorIs(t, err, ErrEnterpriseGatewayGroupNotAllowed)
+		for _, invalidGroup := range []struct {
+			name  string
+			group *Group
+		}{
+			{name: "missing"},
+			{name: "zero", group: &Group{}},
+			{name: "negative", group: &Group{ID: -1}},
+		} {
+			for _, mode := range []string{"balance", "simple", "subscription"} {
+				t.Run(configured+"/"+invalidGroup.name+"/"+mode, func(t *testing.T) {
+					user, _ := enterpriseEligibilityFixture()
+					user.Enterprise.GroupPoolConfigured = configured == "pool"
+					user.Enterprise.GroupWhitelistConfigured = configured == "whitelist"
+					cache := &enterpriseRuntimeCacheStub{balanceErr: errors.New("must not read balance"), quotaErr: errors.New("must not read quota")}
+					svc := &BillingCacheService{cfg: &config.Config{}, enterpriseCache: cache}
+					var subscription *UserSubscription
+					if mode == "simple" {
+						svc.cfg.RunMode = config.RunModeSimple
+					} else if mode == "subscription" {
+						subscription = &UserSubscription{ID: 1}
+					}
+					group := invalidGroup.group
+					if group != nil && mode == "subscription" {
+						group = &Group{ID: group.ID, SubscriptionType: SubscriptionTypeSubscription}
+					}
+					require.ErrorIs(t, checkEnterpriseGatewayEligibility(user.Enterprise, group), ErrEnterpriseGatewayGroupNotAllowed)
+					require.ErrorIs(t, svc.CheckBillingEligibility(context.Background(), user, nil, group, subscription, ""), ErrEnterpriseGatewayGroupNotAllowed)
+					res, err := svc.ReserveFixedCharge(context.Background(), user, nil, group, subscription, 1)
+					require.ErrorIs(t, err, ErrEnterpriseGatewayGroupNotAllowed)
+					require.Nil(t, res)
+					require.Zero(t, cache.balanceReads)
+					require.Zero(t, cache.quotaReads)
+				})
 			}
-		})
+		}
 	}
 }

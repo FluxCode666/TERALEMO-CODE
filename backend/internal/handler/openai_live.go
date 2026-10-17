@@ -166,9 +166,10 @@ func liveCallIdentity(
 		value := subscription.ID
 		subscriptionID = &value
 	}
-	var enterpriseID, departmentID int64
+	var enterpriseID, departmentID, memberID int64
 	if apiKey.User != nil && apiKey.User.Enterprise != nil {
 		enterpriseID = apiKey.User.Enterprise.EnterpriseID
+		memberID = apiKey.User.Enterprise.MemberID
 		if apiKey.User.Enterprise.DepartmentID != nil {
 			departmentID = *apiKey.User.Enterprise.DepartmentID
 		}
@@ -176,6 +177,7 @@ func liveCallIdentity(
 	return service.LiveCallIdentity{
 		EnterpriseID:           enterpriseID,
 		EnterpriseDepartmentID: departmentID,
+		EnterpriseMemberID:     memberID,
 
 		APIKeyID:        apiKey.ID,
 		UserID:          userID,

@@ -6,9 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,6 +138,39 @@ func TestEnterpriseAPIKeyMembershipLoadFailureIsClosed(t *testing.T) {
 	require.ErrorIs(t, err, failure)
 	_, _, err = svc.GetUserGroupVisibility(context.Background(), 1)
 	require.ErrorIs(t, err, failure)
+}
+
+type enterpriseAccessKeyRepo struct {
+	APIKeyRepository
+	key *APIKey
+}
+
+func (r *enterpriseAccessKeyRepo) GetByID(context.Context, int64) (*APIKey, error) {
+	return r.key, nil
+}
+
+func TestEnterpriseAPIKeyRequiresExplicitGroupOnCreateAndUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		groupID  *int64
+		existing *int64
+	}{
+		{name: "ungrouped key remains ungrouped"},
+		{name: "explicit zero", groupID: new(int64(0)), existing: new(int64(42))},
+		{name: "explicit negative", groupID: new(int64(-1)), existing: new(int64(42))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			user := &User{ID: 8, Enterprise: &EnterpriseMemberContext{}}
+			svc := &APIKeyService{userRepo: &visibilityUserRepo{user: user}, apiKeyRepo: &enterpriseAccessKeyRepo{key: &APIKey{ID: 1, UserID: 8, User: user, GroupID: tc.existing}}}
+			_, err := svc.Create(context.Background(), user.ID, CreateAPIKeyRequest{GroupID: tc.groupID})
+			require.ErrorIs(t, err, ErrEnterpriseGatewayGroupRequired)
+			require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+			require.Equal(t, "ENTERPRISE_GROUP_NOT_ALLOWED", infraerrors.Reason(err))
+			_, err = svc.Update(context.Background(), 1, user.ID, UpdateAPIKeyRequest{GroupID: tc.groupID})
+			require.ErrorIs(t, err, ErrEnterpriseGatewayGroupRequired)
+			require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+		})
+	}
 }
 
 func TestEnterpriseAPIKeyAuthSnapshotRoundTrip(t *testing.T) {

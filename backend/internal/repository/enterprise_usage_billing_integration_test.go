@@ -35,6 +35,36 @@ func newEnterpriseBillingFixture(t *testing.T) enterpriseBillingFixture {
 	t.Cleanup(func() {
 		_, _ = integrationDB.ExecContext(context.Background(), "DELETE FROM usage_logs WHERE api_key_id=$1", key.ID)
 	})
+	t.Cleanup(func() {
+		cleanupCtx := context.Background()
+		rows, err := integrationDB.QueryContext(cleanupCtx, `SELECT user_id FROM enterprise_members WHERE enterprise_id=$1`, e.ID)
+		require.NoError(t, err)
+		var userIDs []int64
+		for rows.Next() {
+			var userID int64
+			require.NoError(t, rows.Scan(&userID))
+			userIDs = append(userIDs, userID)
+		}
+		require.NoError(t, rows.Err())
+		require.NoError(t, rows.Close())
+		for _, query := range []string{
+			`DELETE FROM usage_logs WHERE user_id IN (SELECT user_id FROM enterprise_members WHERE enterprise_id=$1)`,
+			`DELETE FROM usage_billing_dedup WHERE api_key_id IN (SELECT id FROM api_keys WHERE user_id IN (SELECT user_id FROM enterprise_members WHERE enterprise_id=$1))`,
+			`DELETE FROM usage_billing_dedup_archive WHERE api_key_id IN (SELECT id FROM api_keys WHERE user_id IN (SELECT user_id FROM enterprise_members WHERE enterprise_id=$1))`,
+			`DELETE FROM api_keys WHERE user_id IN (SELECT user_id FROM enterprise_members WHERE enterprise_id=$1)`,
+			`DELETE FROM enterprise_quotas WHERE enterprise_id=$1`,
+			`DELETE FROM enterprise_members WHERE enterprise_id=$1`,
+			`DELETE FROM enterprise_departments WHERE enterprise_id=$1`,
+			`DELETE FROM enterprises WHERE id=$1`,
+		} {
+			_, err := integrationDB.ExecContext(cleanupCtx, query, e.ID)
+			require.NoError(t, err)
+		}
+		for _, userID := range userIDs {
+			_, err := integrationDB.ExecContext(cleanupCtx, `DELETE FROM users WHERE id=$1`, userID)
+			require.NoError(t, err)
+		}
+	})
 	_, err := integrationDB.ExecContext(ctx, `UPDATE enterprises SET balance = 10 WHERE id = $1`, e.ID)
 	require.NoError(t, err)
 	_, err = integrationDB.ExecContext(ctx, `UPDATE users SET balance = 100 WHERE id = $1`, m.UserID)
@@ -98,20 +128,118 @@ func TestUsageBillingEnterpriseAtomicDedupWindowsAndOverdraft(t *testing.T) {
 	require.Equal(t, 11.25, used, "a current natural window accumulates without resetting")
 }
 
-func TestUsageBillingEnterpriseMissingQuotaRollsBackBalanceAndDedup(t *testing.T) {
+func TestUsageBillingEnterpriseMissingQuotaKeepsBalanceDedupAndAvailableUsage(t *testing.T) {
 	ctx := context.Background()
 	f := newEnterpriseBillingFixture(t)
 	_, err := integrationDB.ExecContext(ctx, `DELETE FROM enterprise_quotas WHERE scope_type='department' AND scope_id=$1`, f.department.ID)
 	require.NoError(t, err)
 	cmd := f.command(1)
-	_, err = NewUsageBillingRepository(testEntClient(t), integrationDB).Apply(ctx, cmd)
-	require.ErrorIs(t, err, service.ErrBillingServiceUnavailable)
+	repo := NewUsageBillingRepository(testEntClient(t), integrationDB)
+	result, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.True(t, result.Applied)
 	var balance float64
 	var dedup int
 	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT balance FROM enterprises WHERE id=$1`, f.enterprise.ID).Scan(&balance))
-	require.Equal(t, 10.0, balance)
+	require.Equal(t, 9.0, balance)
 	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM usage_billing_dedup WHERE request_id=$1 AND api_key_id=$2`, cmd.RequestID, cmd.APIKeyID).Scan(&dedup))
-	require.Zero(t, dedup)
+	require.Equal(t, 1, dedup)
+	var updated int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM enterprise_quotas WHERE enterprise_id=$1 AND total_usage_usd=1`, f.enterprise.ID).Scan(&updated))
+	require.Equal(t, 2, updated, "available enterprise/member quotas still accumulate")
+	replay, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.False(t, replay.Applied)
+}
+
+func TestUsageBillingEnterpriseFrozenArchivedScopesStillSettle(t *testing.T) {
+	ctx := context.Background()
+	f := newEnterpriseBillingFixture(t)
+	cmd := f.command(1.25) // Freeze the payer before the membership is removed.
+	for _, query := range []string{
+		`UPDATE enterprise_members SET deleted_at=NOW() WHERE enterprise_id=$1`,
+		`UPDATE enterprise_departments SET deleted_at=NOW() WHERE enterprise_id=$1`,
+		`UPDATE enterprise_quotas SET deleted_at=NOW() WHERE enterprise_id=$1`,
+		`UPDATE enterprises SET deleted_at=NOW() WHERE id=$1`,
+	} {
+		_, err := integrationDB.ExecContext(ctx, query, f.enterprise.ID)
+		require.NoError(t, err)
+	}
+	repo := NewUsageBillingRepository(testEntClient(t), integrationDB)
+	result, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.True(t, result.Applied)
+	require.Equal(t, 8.75, *result.NewEnterpriseBalance)
+	var archivedUpdated int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM enterprise_quotas WHERE enterprise_id=$1 AND deleted_at IS NOT NULL
+		AND daily_usage_usd=1.25 AND weekly_usage_usd=1.25 AND monthly_usage_usd=1.25 AND total_usage_usd=1.25`, f.enterprise.ID).Scan(&archivedUpdated))
+	require.Equal(t, 3, archivedUpdated)
+	var personal float64
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT balance FROM users WHERE id=$1`, f.member.UserID).Scan(&personal))
+	require.Equal(t, 100.0, personal)
+	replay, err := repo.Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.False(t, replay.Applied)
+}
+
+func TestUsageBillingEnterpriseHistoricalBatchImageCaptureAndReleaseStayPersonal(t *testing.T) {
+	for _, mode := range []string{"capture", "release"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			f := newEnterpriseBillingFixture(t)
+			membership, err := NewEnterpriseRepository(testEntClient(t)).GetMemberContextByUserID(ctx, f.member.UserID)
+			require.NoError(t, err)
+			require.NotNil(t, membership, "the former personal payer has since joined an enterprise")
+			repo := NewUsageBillingRepository(testEntClient(t), integrationDB)
+			batchID := "historical-" + mode + "-" + uuid.NewString()
+			held, err := repo.ReserveBatchImageBalance(ctx, &service.BatchImageBalanceHoldCommand{
+				RequestID: service.BatchImageHoldRequestID(batchID), APIKeyID: f.key.ID, UserID: f.member.UserID,
+				BatchID: batchID, HoldAmount: 4,
+			})
+			require.NoError(t, err)
+			require.True(t, held.Applied)
+			require.Equal(t, 96.0, *held.NewBalance)
+			require.Equal(t, 4.0, *held.FrozenBalance)
+			cmd := &service.BatchImageBalanceHoldCommand{RequestID: service.BatchImageCaptureRequestID(batchID), APIKeyID: f.key.ID, UserID: f.member.UserID,
+				BatchID: batchID, HoldAmount: 4, ActualAmount: 2.5}
+			apply := repo.CaptureBatchImageBalance
+			wantBalance := 97.5
+			if mode == "release" {
+				apply, wantBalance = repo.ReleaseBatchImageBalance, 100
+				cmd.RequestID = service.BatchImageReleaseRequestID(batchID)
+				cmd.ActualAmount = 0
+			}
+			result, err := apply(ctx, cmd)
+			require.NoError(t, err)
+			require.True(t, result.Applied)
+			require.Equal(t, wantBalance, *result.NewBalance)
+			require.Zero(t, *result.FrozenBalance)
+			replay, err := apply(ctx, cmd)
+			require.NoError(t, err)
+			require.False(t, replay.Applied)
+			var enterpriseBalance, quotaUsage float64
+			require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT balance FROM enterprises WHERE id=$1`, f.enterprise.ID).Scan(&enterpriseBalance))
+			require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT SUM(total_usage_usd) FROM enterprise_quotas WHERE enterprise_id=$1`, f.enterprise.ID).Scan(&quotaUsage))
+			require.Equal(t, 10.0, enterpriseBalance)
+			require.Zero(t, quotaUsage)
+		})
+	}
+}
+
+func TestUsageBillingEnterpriseQuantizedCostReconcilesExactly(t *testing.T) {
+	ctx := context.Background()
+	f := newEnterpriseBillingFixture(t)
+	cmd := f.command(0.000078125)
+	cmd.APIKeyQuotaCost = cmd.EnterpriseBalanceCost
+	_, err := NewUsageBillingRepository(testEntClient(t), integrationDB).Apply(ctx, cmd)
+	require.NoError(t, err)
+	require.Equal(t, 0.00007813, cmd.EnterpriseBalanceCost)
+	var matching int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM enterprise_quotas q
+		JOIN enterprises e ON e.id=q.enterprise_id CROSS JOIN api_keys k
+		WHERE e.id=$1 AND k.id=$2 AND (10-e.balance)=q.daily_usage_usd AND q.daily_usage_usd=q.weekly_usage_usd
+		AND q.weekly_usage_usd=q.monthly_usage_usd AND q.monthly_usage_usd=q.total_usage_usd AND q.total_usage_usd=k.quota_used`, f.enterprise.ID, f.key.ID).Scan(&matching))
+	require.Equal(t, 3, matching, "all NUMERIC balances and quotas must reconcile without float epsilon")
 }
 
 func TestUsageBillingEnterpriseWithoutDepartmentUsesTwoScopes(t *testing.T) {

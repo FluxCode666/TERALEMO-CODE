@@ -24,7 +24,7 @@ func wsEnterpriseConnection() *service.APIKey {
 func wsEnterpriseLatest(conn *service.APIKey) *service.APIKey {
 	latest := *conn
 	user := *conn.User
-	user.Enterprise = wsEnterpriseMember(21)
+	user.Enterprise = wsEnterpriseMember(20)
 	user.Balance = 100
 	latest.User = &user
 	group := *conn.Group
@@ -42,15 +42,15 @@ func TestRefreshOpenAIWSTurnEnterpriseContext(t *testing.T) {
 	require.NotNil(t, got)
 	require.NotSame(t, conn, got)
 	require.NotSame(t, conn.User, got.User)
-	require.EqualValues(t, 21, *got.User.Enterprise.DepartmentID)
+	require.EqualValues(t, 20, *got.User.Enterprise.DepartmentID)
 	require.EqualValues(t, 20, *conn.User.Enterprise.DepartmentID)
-	require.Equal(t, conn.User.Balance, got.User.Balance, "only enterprise user context refreshes")
+	require.Equal(t, latest.User.Balance, got.User.Balance, "the complete authenticated user refreshes")
 	require.Equal(t, 0.3, got.Group.RateMultiplier)
 	require.Equal(t, 3.0, conn.Group.RateMultiplier)
 	latest.User.Enterprise.GroupWhitelistIDs[0] = 99
 	*latest.User.Enterprise.DepartmentID = 99
 	require.Equal(t, []int64{77}, got.User.Enterprise.GroupWhitelistIDs)
-	require.EqualValues(t, 21, *got.User.Enterprise.DepartmentID, "a later lookup mutation cannot change an admitted turn")
+	require.EqualValues(t, 20, *got.User.Enterprise.DepartmentID, "a later lookup mutation cannot change an admitted turn")
 }
 
 func TestRefreshOpenAIWSTurnEnterpriseFailureAndIdentityChangesClose(t *testing.T) {
@@ -65,6 +65,8 @@ func TestRefreshOpenAIWSTurnEnterpriseFailureAndIdentityChangesClose(t *testing.
 		{name: "joined enterprise", mutate: func(conn, _ *service.APIKey) { conn.User.Enterprise = nil }},
 		{name: "enterprise changed", mutate: func(_, latest *service.APIKey) { latest.User.Enterprise.EnterpriseID++ }},
 		{name: "membership recreated", mutate: func(_, latest *service.APIKey) { latest.User.Enterprise.MemberID++ }},
+		{name: "department changed", mutate: func(_, latest *service.APIKey) { latest.User.Enterprise.DepartmentID = new(int64(21)) }},
+		{name: "department removed", mutate: func(_, latest *service.APIKey) { latest.User.Enterprise.DepartmentID = nil }},
 		{name: "user changed", mutate: func(_, latest *service.APIKey) { latest.User.ID++ }},
 		{name: "key changed", mutate: func(_, latest *service.APIKey) { latest.ID++ }},
 	} {
@@ -103,18 +105,18 @@ func TestOpenAIWSTurnEnterpriseBeginFreezesContextAndRejectsIdentityChange(t *te
 	require.NoError(t, err)
 	var keys openAIWSTurnBillingAPIKeys
 	ctx := context.WithValue(context.Background(), ctxkey.Group, conn.Group)
-	require.NoError(t, repo.adminUpdate(apiKeyService, func(key *service.APIKey, _ *service.Group) { key.User.Enterprise = wsEnterpriseMember(21) }))
+	require.NoError(t, repo.adminUpdate(apiKeyService, func(key *service.APIKey, _ *service.Group) { key.User.Enterprise.GroupWhitelistIDs = []int64{77} }))
 	turnCtx, err := keys.begin(ctx, apiKeyService, 2, conn)
 	require.NoError(t, err)
 	turn2 := keys.forTurn(2, conn)
-	require.EqualValues(t, 21, *turn2.User.Enterprise.DepartmentID)
+	require.EqualValues(t, 20, *turn2.User.Enterprise.DepartmentID)
 	require.EqualValues(t, 20, *conn.User.Enterprise.DepartmentID)
 	require.Same(t, turn2.Group, turnCtx.Value(ctxkey.Group))
-	require.NoError(t, repo.adminUpdate(apiKeyService, func(key *service.APIKey, _ *service.Group) { key.User.Enterprise = wsEnterpriseMember(22) }))
+	require.NoError(t, repo.adminUpdate(apiKeyService, func(key *service.APIKey, _ *service.Group) { key.User.Enterprise.GroupWhitelistIDs = []int64{78} }))
 	_, err = keys.begin(ctx, apiKeyService, 3, conn)
 	require.NoError(t, err)
-	require.EqualValues(t, 21, *keys.forTurn(2, conn).User.Enterprise.DepartmentID, "previous turn keeps its own member snapshot")
-	require.EqualValues(t, 22, *keys.forTurn(3, conn).User.Enterprise.DepartmentID)
+	require.Equal(t, []int64{77}, keys.forTurn(2, conn).User.Enterprise.GroupWhitelistIDs, "previous turn keeps its own member snapshot")
+	require.Equal(t, []int64{78}, keys.forTurn(3, conn).User.Enterprise.GroupWhitelistIDs)
 	require.NoError(t, repo.adminUpdate(apiKeyService, func(key *service.APIKey, _ *service.Group) { key.User.Enterprise = nil }))
 	_, err = keys.begin(ctx, apiKeyService, 4, conn)
 	require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
@@ -220,7 +222,7 @@ func TestOpenAIWSTurnEnterpriseEligibilityRechecksBalanceQuotasAndAccess(t *test
 	require.NoError(t, h.checkOpenAIWSTurnEnterpriseBilling(context.Background(), key, nil), "personal turn must not touch billing dependencies")
 }
 
-func TestOpenAIResponsesWebSocket_EnterpriseDepartmentRefreshReachesUsageLog(t *testing.T) {
+func TestOpenAIResponsesWebSocket_EnterpriseDepartmentChangeRequiresReconnect(t *testing.T) {
 	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
 		t.Run(mode, func(t *testing.T) {
 			repo := newWSGroupPricingAPIKeyRepoStub(3)
@@ -228,13 +230,11 @@ func TestOpenAIResponsesWebSocket_EnterpriseDepartmentRefreshReachesUsageLog(t *
 			apiKeyService := newWSGroupPricingAPIKeyService(repo)
 			got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{firstPayload: wsGroupPricingFirst, secondPayload: wsGroupPricingSecond, ingressMode: mode, apiKeyService: apiKeyService, apiKeyCredential: wsGroupPricingKey, afterFirstUpstreamRequest: func(*service.ChannelService) error {
 				return repo.adminUpdate(apiKeyService, func(k *service.APIKey, _ *service.Group) { k.User.Enterprise = wsEnterpriseMember(21) })
-			}})
-			require.Len(t, got.logs, 2)
+			}, secondTurnCloseExpected: true, closeStatus: coderws.StatusPolicyViolation, closeReason: "please reconnect"})
+			require.Len(t, got.logs, 1)
 			require.NotNil(t, got.logs[0].EnterpriseDepartmentID)
-			require.NotNil(t, got.logs[1].EnterpriseDepartmentID)
 			require.EqualValues(t, 20, *got.logs[0].EnterpriseDepartmentID)
-			require.EqualValues(t, 21, *got.logs[1].EnterpriseDepartmentID)
-			require.EqualValues(t, 10, *got.logs[1].EnterpriseID)
+			require.EqualValues(t, 10, *got.logs[0].EnterpriseID)
 		})
 	}
 }

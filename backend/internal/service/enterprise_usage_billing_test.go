@@ -132,6 +132,36 @@ func TestEnterpriseGatewayUsageLogSnapshot(t *testing.T) {
 	require.Equal(t, int64(8), *log.EnterpriseDepartmentID, "log owns an immutable department snapshot")
 }
 
+func TestUsageLogPayerIdentityCapturesFrozenScopeAndClearsPersonalScope(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		enterprise, department int64
+	}{
+		{"personal", 0, 0},
+		{"personal_ignores_current_department", 0, 8},
+		{"enterprise_direct_member", 7, 0},
+		{"enterprise_department_member", 7, 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oldEnterprise, oldDepartment := int64(100), int64(200)
+			log := &UsageLog{EnterpriseID: &oldEnterprise, EnterpriseDepartmentID: &oldDepartment}
+			ApplyUsageLogPayerIdentity(log, tc.enterprise, tc.department)
+			if tc.enterprise == 0 {
+				require.Nil(t, log.EnterpriseID)
+				require.Nil(t, log.EnterpriseDepartmentID)
+				return
+			}
+			require.Equal(t, tc.enterprise, *log.EnterpriseID)
+			if tc.department == 0 {
+				require.Nil(t, log.EnterpriseDepartmentID)
+			} else {
+				require.Equal(t, tc.department, *log.EnterpriseDepartmentID)
+			}
+		})
+	}
+	require.NotPanics(t, func() { ApplyUsageLogPayerIdentity(nil, 7, 8) })
+}
+
 func TestEnterpriseOpenAIUsageLogSnapshot(t *testing.T) {
 	departmentID := int64(8)
 	logs := &openAIRecordUsageLogRepoStub{inserted: true}

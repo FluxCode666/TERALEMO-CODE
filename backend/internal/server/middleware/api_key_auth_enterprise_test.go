@@ -20,6 +20,7 @@ func TestAPIKeyAuthEnterpriseMembership(t *testing.T) {
 		name         string
 		enterprise   *service.EnterpriseMemberContext
 		subscription bool
+		ungrouped    bool
 		balance      float64
 		mode, path   string
 		status       int
@@ -32,6 +33,8 @@ func TestAPIKeyAuthEnterpriseMembership(t *testing.T) {
 		{name: "pool denies public group", enterprise: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive, GroupPoolConfigured: true, GroupPoolIDs: []int64{7}}, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
 		{name: "whitelist denies subscription before bypass", subscription: true, enterprise: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive, GroupWhitelistConfigured: true}, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
 		{name: "enterprise ignores depleted personal balance", enterprise: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive}, balance: -5, status: 200},
+		{name: "enterprise ungrouped key denied", ungrouped: true, enterprise: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive}, balance: 5, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
+		{name: "enterprise ungrouped simple key denied", ungrouped: true, mode: config.RunModeSimple, enterprise: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive}, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
 		{name: "personal still rejects depleted balance", status: 403, code: "INSUFFICIENT_BALANCE"},
 		{name: "personal positive balance unchanged", balance: 5, status: 200},
 	} {
@@ -41,6 +44,9 @@ func TestAPIKeyAuthEnterpriseMembership(t *testing.T) {
 				group.SubscriptionType = service.SubscriptionTypeSubscription
 			}
 			key := &service.APIKey{ID: 1, UserID: 8, GroupID: &group.ID, Key: "enterprise-key", Status: service.StatusActive, Group: group, User: &service.User{ID: 8, Status: service.StatusActive, Balance: tc.balance, Enterprise: tc.enterprise}}
+			if tc.ungrouped {
+				key.GroupID, key.Group = nil, nil
+			}
 			repo := &stubApiKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) { return key, nil }}
 			cfg := &config.Config{RunMode: config.RunModeStandard}
 			if tc.mode != "" {
@@ -69,20 +75,25 @@ func TestAPIKeyAuthEnterpriseMembership(t *testing.T) {
 func TestGoogleAPIKeyAuthEnterpriseMembership(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, tc := range []struct {
-		name   string
-		member *service.EnterpriseMemberContext
-		status int
-		code   string
+		name      string
+		member    *service.EnterpriseMemberContext
+		ungrouped bool
+		status    int
+		code      string
 	}{
 		{name: "enterprise disabled", member: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusDisabled}, status: 403, code: "ENTERPRISE_DISABLED"},
 		{name: "member disabled", member: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusDisabled}, status: 403, code: "ENTERPRISE_MEMBER_DISABLED"},
 		{name: "subscription not in whitelist", member: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive, GroupWhitelistConfigured: true}, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
 		{name: "enterprise skips empty personal balance", member: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive}, status: 200},
+		{name: "enterprise ungrouped key denied", ungrouped: true, member: &service.EnterpriseMemberContext{EnterpriseStatus: service.EnterpriseStatusActive, MemberStatus: service.EnterpriseMemberStatusActive}, status: 403, code: "ENTERPRISE_GROUP_NOT_ALLOWED"},
 		{name: "personal balance remains enforced", status: 403},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			group := &service.Group{ID: 42, Status: service.StatusActive, Hydrated: true, SubscriptionType: service.SubscriptionTypeSubscription}
 			key := &service.APIKey{ID: 1, UserID: 8, GroupID: &group.ID, Key: "enterprise-google-key", Status: service.StatusActive, Group: group, User: &service.User{ID: 8, Status: service.StatusActive, Enterprise: tc.member}}
+			if tc.ungrouped {
+				key.GroupID, key.Group = nil, nil
+			}
 			repo := &stubApiKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) { return key, nil }}
 			cfg := &config.Config{RunMode: config.RunModeStandard}
 			svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
@@ -110,7 +121,7 @@ func TestValidateAPIKeyGroupAllowedUngroupedEnterprise(t *testing.T) {
 		want   bool
 	}{
 		{name: "personal key unchanged", want: true},
-		{name: "unrestricted enterprise key unchanged", member: &service.EnterpriseMemberContext{}, want: true},
+		{name: "unrestricted enterprise key also requires explicit group", member: &service.EnterpriseMemberContext{}},
 		{name: "configured pool rejects global account pool", member: &service.EnterpriseMemberContext{GroupPoolConfigured: true, GroupPoolIDs: []int64{42}}},
 		{name: "configured whitelist rejects global account pool", member: &service.EnterpriseMemberContext{GroupWhitelistConfigured: true, GroupWhitelistIDs: []int64{42}}},
 		{name: "configured empty whitelist intersection rejects", member: &service.EnterpriseMemberContext{GroupWhitelistConfigured: true}},

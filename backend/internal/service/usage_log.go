@@ -220,6 +220,31 @@ type UsageLog struct {
 	Subscription *UserSubscription
 }
 
+// ApplyUsageLogPayerIdentity copies the frozen payer's enterprise scope into the
+// log. A zero enterprise ID explicitly denotes a personal payer, including
+// historical batch jobs, regardless of the user's current membership.
+func ApplyUsageLogPayerIdentity(log *UsageLog, enterpriseID, departmentID int64) {
+	if log == nil {
+		return
+	}
+	log.EnterpriseID, log.EnterpriseDepartmentID = nil, nil
+	if enterpriseID == 0 {
+		return
+	}
+	log.EnterpriseID = &enterpriseID
+	if departmentID != 0 {
+		log.EnterpriseDepartmentID = &departmentID
+	}
+}
+
+func applyEnterpriseUsageSnapshot(log *UsageLog, user *User) {
+	if user == nil || user.Enterprise == nil {
+		ApplyUsageLogPayerIdentity(log, 0, 0)
+		return
+	}
+	ApplyUsageLogPayerIdentity(log, user.Enterprise.EnterpriseID, valueOrZero(user.Enterprise.DepartmentID))
+}
+
 func (u *UsageLog) TotalTokens() int {
 	return u.InputTokens + u.OutputTokens + u.CacheCreationTokens + u.CacheReadTokens
 }

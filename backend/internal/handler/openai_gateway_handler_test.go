@@ -3173,7 +3173,17 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 			require.Contains(t, closeErr.Reason, reason)
 			require.Len(t, upstreamPayloadCh, turnCount-1, "rejected turn must not reach upstream")
 			_ = clientConn.CloseNow()
-			return openAIResponsesWSUsageLogResult{}
+			completedLogs := make([]*service.UsageLog, 0, turnCount-1)
+			for len(completedLogs) < turnCount-1 {
+				select {
+				case usageLog := <-usageRepo.created:
+					require.NotNil(t, usageLog)
+					completedLogs = append(completedLogs, usageLog)
+				case <-time.After(3 * time.Second):
+					t.Fatal("等待已完成 WebSocket turn 的 usage log 写入超时")
+				}
+			}
+			return openAIResponsesWSUsageLogResult{log: completedLogs[0], logs: completedLogs, clientEvents: clientEvents}
 		}
 		readCompleted()
 	}

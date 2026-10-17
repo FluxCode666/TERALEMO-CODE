@@ -45,6 +45,7 @@ type GatewayHandler struct {
 	geminiCompatService       *service.GeminiMessagesCompatService
 	antigravityGatewayService *service.AntigravityGatewayService
 	userService               *service.UserService
+	enterpriseIdentityReader  enterpriseUsageIdentityReader
 	billingCacheService       *service.BillingCacheService
 	usageService              *service.UsageService
 	apiKeyService             *service.APIKeyService
@@ -1035,6 +1036,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
 							return
 						}
+						if h.rejectEnterprisePromptTooLongFallback(c, apiKey.User, fallbackGroup, account, promptTooLongErr) {
+							return
+						}
 						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
 						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil, service.PlatformFromAPIKey(fallbackAPIKey)); err != nil {
 							status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
@@ -1710,6 +1714,10 @@ func (h *GatewayHandler) buildAPIKeyDailyUsage(c *gin.Context, userID, apiKeyID 
 
 // usageQuotaLimited 处理 quota_limited 模式的响应
 func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, apiKey *service.APIKey, usageData gin.H, dailyUsage any, modelStats any) {
+	identity, ok := h.enterpriseUsageIdentity(c, ctx, apiKey, apiKey.UserID)
+	if !ok {
+		return
+	}
 	resp := gin.H{
 		"mode":    "quota_limited",
 		"isValid": apiKey.Status == service.StatusAPIKeyActive || apiKey.Status == service.StatusAPIKeyQuotaExhausted || apiKey.Status == service.StatusAPIKeyExpired,
@@ -1798,11 +1806,16 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 		resp["model_stats"] = modelStats
 	}
 
+	applyEnterpriseUsageBalance(resp, identity)
 	c.JSON(http.StatusOK, resp)
 }
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
+	identity, ok := h.enterpriseUsageIdentity(c, ctx, apiKey, subject.UserID)
+	if !ok {
+		return
+	}
 	// 订阅模式
 	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
 		resp := gin.H{
@@ -1838,11 +1851,27 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 		if modelStats != nil {
 			resp["model_stats"] = modelStats
 		}
+		applyEnterpriseUsageBalance(resp, identity)
 		c.JSON(http.StatusOK, resp)
 		return
 	}
 
 	// 余额模式
+	if identity != nil {
+		resp := gin.H{"mode": "unrestricted", "isValid": true, "planName": identity.Name}
+		applyEnterpriseUsageBalance(resp, identity)
+		if usageData != nil {
+			resp["usage"] = usageData
+		}
+		if dailyUsage != nil {
+			resp["daily_usage"] = dailyUsage
+		}
+		if modelStats != nil {
+			resp["model_stats"] = modelStats
+		}
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	latestUser, err := h.userService.GetByID(ctx, subject.UserID)
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
