@@ -54,7 +54,7 @@ describe('enterprise personal model distribution', () => {
 })
 
 describe('enterprise horizontal rankings', () => {
-  it('sorts by cost, limits chart to ten and switches to a complete table', async () => {
+  it('sorts by cost, limits chart to ten and offers no full-table view', async () => {
     const wrapper = ranking()
     const chart = wrapper.getComponent(Bar)
     expect(chart.props('data').labels).toEqual(Array.from({ length: 10 }, (_, index) => `member-${11 - index}`))
@@ -62,9 +62,8 @@ describe('enterprise horizontal rankings', () => {
     const options = chart.props('options') as ChartOptions<'bar'>
     expect(options.indexAxis).toBe('y')
     expect(options.plugins!.tooltip!.callbacks!.label!.call({} as never, { dataIndex: 0 } as TooltipItem<'bar'>)).toEqual(['enterprise.requests: 12', `enterprise.tokens: ${(1100).toLocaleString()}`, 'enterprise.cost: $1.1000'])
-    await wrapper.get('button').trigger('click')
-    expect(wrapper.findComponent(Bar).exists()).toBe(false)
-    expect(wrapper.get('[data-test="usage-ranking-table"]').findAll('tbody tr')).toHaveLength(12)
+    expect(wrapper.find('[data-test="usage-ranking-table-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="usage-ranking-table"]').exists()).toBe(false)
   })
   it('renders empty and single rankings and updates axes for dark mode', async () => {
     expect(ranking([]).findComponent(Bar).exists()).toBe(false)

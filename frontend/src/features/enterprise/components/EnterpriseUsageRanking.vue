@@ -1,11 +1,10 @@
 <template>
   <Card class="min-w-0 p-4 sm:p-5" :aria-busy="view === 'trend' ? trendLoading : loading">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="font-medium text-foreground">{{ title }}</h3><div class="flex flex-wrap items-center gap-2"><Button v-if="view === 'share' && items.length" type="button" variant="outline" size="sm" data-test="usage-ranking-table-toggle" :aria-pressed="table" @click="table = !table">{{ t(table ? 'enterprise.usageAnalysis.viewChart' : 'enterprise.usageAnalysis.viewTable') }}</Button><EnterpriseUsageChartControls v-model:metric="metric" v-model:view="view" :title="title" /></div></div>
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="font-medium text-foreground">{{ title }}</h3><div class="flex flex-wrap items-center gap-2"><EnterpriseUsageChartControls v-model:metric="metric" v-model:view="view" :title="title" /></div></div>
     <EnterpriseUsageStackedTrend v-if="view === 'trend'" :title="title" :items="trendItems" :loading="trendLoading" :metric="metric" />
     <Skeleton v-else-if="loading" class="h-64 w-full" />
     <template v-else-if="items.length">
-      <Table v-if="table" data-test="usage-ranking-table"><TableHeader><TableRow><TableHead>{{ title }}</TableHead><TableHead>{{ t('enterprise.requests') }}</TableHead><TableHead>{{ t('enterprise.tokens') }}</TableHead><TableHead>{{ t('enterprise.cost') }}</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in sorted" :key="item.id"><TableCell>{{ item.label }}</TableCell><TableCell>{{ item.requests.toLocaleString() }}</TableCell><TableCell>{{ item.total_tokens.toLocaleString() }}</TableCell><TableCell>{{ usageMoney(item.actual_cost) }}</TableCell></TableRow></TableBody></Table>
-      <template v-else><p class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.topRanking', { count: Math.min(limit, items.length), total: items.length, metric: t(metric === 'actual_cost' ? 'enterprise.cost' : metric === 'tokens' ? 'enterprise.tokens' : 'enterprise.requests') }) }}</p><div class="relative w-full" :style="{ height: `${Math.max(180, displayed.length * 36)}px` }"><Bar :data="chartData" :options="options" :aria-label="title" role="img" /></div></template>
+      <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.topRanking', { count: Math.min(limit, items.length), total: items.length, metric: t(metric === 'actual_cost' ? 'enterprise.cost' : metric === 'tokens' ? 'enterprise.tokens' : 'enterprise.requests') }) }}</p><div class="relative w-full" :style="{ height: `${Math.max(180, displayed.length * 36)}px` }"><Bar :data="chartData" :options="options" :aria-label="title" role="img" /></div>
     </template>
     <p v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.empty') }}</p>
   </Card>
@@ -19,9 +18,7 @@ import { usageMetricValue, type UsageMetric, type UsageView, type UsageSeriesPoi
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend, type ChartOptions } from 'chart.js'
 import { Bar } from 'vue-chartjs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usageMoney, useEnterpriseUsageTheme } from '../useEnterpriseUsage'
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
@@ -31,7 +28,6 @@ const view = defineModel<UsageView>('view', { default: 'share' })
 const metric = ref<UsageMetric>('actual_cost')
 const { t } = useI18n()
 const theme = useEnterpriseUsageTheme()
-const table = ref(false)
 const sorted = computed(() => [...props.items].sort((a, b) => usageMetricValue(b, metric.value) - usageMetricValue(a, metric.value)))
 const displayed = computed(() => sorted.value.slice(0, props.limit))
 const chartData = computed(() => ({ labels: displayed.value.map(item => item.label), datasets: [{ label: t(metric.value === 'actual_cost' ? 'enterprise.cost' : metric.value === 'tokens' ? 'enterprise.tokens' : 'enterprise.requests'), data: displayed.value.map(item => usageMetricValue(item, metric.value)), backgroundColor: '#14b8a6', borderRadius: 4, maxBarThickness: 22 }] }))

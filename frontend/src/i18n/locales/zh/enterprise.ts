@@ -22,10 +22,10 @@ export default {
       "title": "限额管理",
       "description": "金额单位 USD · 当前时区 {timezone} · 留空表示不限，0 表示禁止调用。",
       "columns": {
-        "daily": "日限额 / 今日已用",
-        "weekly": "周限额 / 本周已用",
-        "monthly": "月限额 / 本月已用",
-        "total": "累计限额 / 累计已用"
+        "daily": "今日已用 / 日限额",
+        "weekly": "本周已用 / 周限额",
+        "monthly": "本月已用 / 月限额",
+        "total": "累计已用 / 累计限额"
       },
       "count": "共 {total} 项（本页可编辑 {editable} 项）",
       "hidden": "隐藏",
@@ -194,7 +194,6 @@ export default {
       "details": "用量明细",
       "recordCount": "共 {count} 条明细",
       "viewTable": "查看完整表格",
-      "viewChart": "查看图表",
       "topRanking": "按{metric}排序 · 前 {count} / 共 {total} 项",
       "distributionMetric": "模型分布指标",
       "legend": "模型图例",

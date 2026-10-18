@@ -22,10 +22,10 @@ export default {
       "title": "Quota management",
       "description": "Amounts in USD · Current timezone {timezone} · Leave blank for unlimited; 0 disables calls.",
       "columns": {
-        "daily": "Daily limit / Used today",
-        "weekly": "Weekly limit / Used this week",
-        "monthly": "Monthly limit / Used this month",
-        "total": "Total limit / Total used"
+        "daily": "Used today / Daily limit",
+        "weekly": "Used this week / Weekly limit",
+        "monthly": "Used this month / Monthly limit",
+        "total": "Total used / Total limit"
       },
       "count": "{total} items ({editable} editable on this page)",
       "hidden": "Hidden",
@@ -194,7 +194,6 @@ export default {
       "details": "Usage details",
       "recordCount": "{count} records",
       "viewTable": "View full table",
-      "viewChart": "View chart",
       "topRanking": "Sorted by {metric} · Top {count} of {total}",
       "distributionMetric": "Model distribution metric",
       "legend": "Model legend",
