@@ -121,19 +121,20 @@ func EnterpriseQuotaFromService(q *service.EnterpriseQuota) *EnterpriseQuota {
 }
 
 type EnterpriseGroup struct {
-	ID               int64  `json:"id"`
-	Name             string `json:"name"`
-	Platform         string `json:"platform"`
-	IsExclusive      bool   `json:"is_exclusive"`
-	SubscriptionType string `json:"subscription_type"`
-	Status           string `json:"status"`
+	ID               int64   `json:"id"`
+	Name             string  `json:"name"`
+	Platform         string  `json:"platform"`
+	IsExclusive      bool    `json:"is_exclusive"`
+	SubscriptionType string  `json:"subscription_type"`
+	Status           string  `json:"status"`
+	RateMultiplier   float64 `json:"rate_multiplier"`
 }
 
 func EnterpriseGroupFromService(g *service.Group) *EnterpriseGroup {
 	if g == nil {
 		return nil
 	}
-	return &EnterpriseGroup{ID: g.ID, Name: g.Name, Platform: g.Platform, IsExclusive: g.IsExclusive, SubscriptionType: g.SubscriptionType, Status: g.Status}
+	return &EnterpriseGroup{ID: g.ID, Name: g.Name, Platform: g.Platform, IsExclusive: g.IsExclusive, SubscriptionType: g.SubscriptionType, Status: g.Status, RateMultiplier: g.RateMultiplier}
 }
 
 type EnterpriseGroupWhitelist struct {

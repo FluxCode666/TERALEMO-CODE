@@ -1,3 +1,4 @@
+import { selectOption } from './selectOption'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import EnterpriseMemberForm from '../components/EnterpriseMemberForm.vue'
@@ -30,7 +31,7 @@ describe('EnterpriseMemberForm identity and role validation', () => {
 
   it('requires a department for the manager role', async () => {
     const wrapper = mount(EnterpriseMemberForm, { props: { departments } })
-    await wrapper.get('[data-test="member-role"]').setValue('manager')
+    await selectOption(wrapper, '[data-test="member-role"]', 'enterprise.roles.manager')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.get('[data-test="member-validation"]').text()).toBe('enterprise.validationManagerDepartment')
     expect(wrapper.emitted('submit')).toBeUndefined()
@@ -50,8 +51,8 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     await flushPromises()
     expect(listUsers).toHaveBeenCalledWith(1, 50, { search: 'alice', role: 'user' })
     expect(wrapper.find('[data-test="member-user"] option[value="43"]').exists()).toBe(false)
-    await wrapper.get('[data-test="member-user"]').setValue('42')
-    await wrapper.get('[data-test="member-department"]').setValue('3')
+    await selectOption(wrapper, '[data-test="member-user"]', 'Alice · alice@example.com')
+    await selectOption(wrapper, '[data-test="member-department"]', '研发部')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ user_id: 42, department_id: 3, role: 'member', title: '' })
     expect(wrapper.find('[data-test="member-email"]').exists()).toBe(false)
@@ -80,7 +81,7 @@ describe('EnterpriseMemberForm identity and role validation', () => {
   it('preserves an existing member without a department when the operator has a department', async () => {
     const member = { id: 7, enterprise_id: 1, user_id: 42, email: 'alice@example.com', username: 'Alice', department_id: null, department_name: null, role: 'member' as const, status: 'active' as const, title: 'Engineer', joined_at: '', user_status: 'active' as const }
     const wrapper = mount(EnterpriseMemberForm, { props: { member, departments, departmentId: 3 } })
-    expect((wrapper.get('[data-test="member-department"]').element as HTMLSelectElement).value).toBe('0')
+    expect(wrapper.get('[data-test="member-department"]').text()).toContain('enterprise.noDepartment')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ department_id: 0, role: 'member', status: 'active', title: 'Engineer' })
     wrapper.unmount()

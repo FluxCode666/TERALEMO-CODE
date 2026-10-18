@@ -14,7 +14,6 @@ const wrappers: VueWrapper[] = []
 const settings = vi.fn()
 const updateSettings = vi.fn()
 const api = { settings, updateSettings } as unknown as EnterpriseResourceAPI
-const keys = Object.keys(defaultEnterpriseSettings) as (keyof EnterpriseSettings)[]
 
 function mountSettings(admin = true) {
   const wrapper = mount(EnterpriseSettingsPanel, {
@@ -25,7 +24,7 @@ function mountSettings(admin = true) {
 }
 
 function checkbox(wrapper: VueWrapper, key: keyof EnterpriseSettings) {
-  return wrapper.findAll('input[type="checkbox"]')[keys.indexOf(key)]
+  return wrapper.get(`[data-test="setting-${key}"]`)
 }
 
 afterEach(() => { for (const wrapper of wrappers.splice(0)) wrapper.unmount() })
@@ -42,17 +41,17 @@ describe('Enterprise settings refresh', () => {
     const wrapper = mountSettings()
     await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, balance_visible_to_member: true } })
 
-    expect((checkbox(wrapper, 'balance_visible_to_member').element as HTMLInputElement).checked).toBe(true)
+    expect(checkbox(wrapper, 'balance_visible_to_member').attributes('aria-checked')).toBe('true')
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
   })
 
   it('preserves edited fields, merges other server changes, and saves the merged snapshot', async () => {
     const wrapper = mountSettings()
-    await checkbox(wrapper, 'balance_visible_to_member').setValue(true)
+    await checkbox(wrapper, 'balance_visible_to_member').trigger('click')
     await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, manager_can_manage_members: true } })
 
-    expect((checkbox(wrapper, 'balance_visible_to_member').element as HTMLInputElement).checked).toBe(true)
-    expect((checkbox(wrapper, 'manager_can_manage_members').element as HTMLInputElement).checked).toBe(true)
+    expect(checkbox(wrapper, 'balance_visible_to_member').attributes('aria-checked')).toBe('true')
+    expect(checkbox(wrapper, 'manager_can_manage_members').attributes('aria-checked')).toBe('true')
     expect(wrapper.get('[role="status"]').text()).toBe('enterprise.settingsRefreshedWithEdits')
 
     await wrapper.get('form').trigger('submit')
@@ -75,6 +74,6 @@ describe('Enterprise settings refresh', () => {
     await flushPromises()
 
     expect(settings).toHaveBeenCalledTimes(2)
-    expect((checkbox(wrapper, 'balance_visible_to_member').element as HTMLInputElement).checked).toBe(true)
+    expect(checkbox(wrapper, 'balance_visible_to_member').attributes('aria-checked')).toBe('true')
   })
 })

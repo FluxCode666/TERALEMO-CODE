@@ -1,129 +1,78 @@
 <template>
-  <section class="space-y-5">
-    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('enterprise.usage') }}</h2>
-    <form class="card flex flex-wrap items-end gap-3 p-4" @submit.prevent="searchUsage">
-      <label><span class="input-label">{{ t('enterprise.startDate') }}</span><input v-model="filters.start_date" class="input" type="date" /></label>
-      <label><span class="input-label">{{ t('enterprise.endDate') }}</span><input v-model="filters.end_date" class="input" type="date" /></label>
-      <label v-if="canFilterMembers"><span class="input-label">{{ t('enterprise.members') }}</span><select v-model="filters.user_id" class="input"><option value="">{{ t('enterprise.all') }}</option><option v-for="member in members" :key="member.id" :value="member.user_id">{{ member.username || member.email }}</option></select></label>
-      <label v-if="canFilterDepartments"><span class="input-label">{{ t('enterprise.department') }}</span><select v-model="filters.department_id" class="input"><option value="">{{ t('enterprise.all') }}</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label>
-      <label><span class="input-label">{{ t('enterprise.model') }}</span><input v-model.trim="filters.model" class="input w-full sm:w-44" /></label>
-      <label><span class="input-label">{{ t('enterprise.apiKey') }} ID</span><input v-model="filters.api_key_id" class="input w-full sm:w-32" type="number" min="1" step="1" /></label>
-      <button class="btn btn-primary" :disabled="busy">{{ t('enterprise.search') }}</button>
-      <button type="button" class="btn btn-secondary" :disabled="busy" @click="resetFilters">{{ t('enterprise.reset') }}</button>
+  <section class="min-w-0 space-y-5">
+    <!-- Sticky is relative to the nearest scrolling ancestor, including AppLayout main. -->
+    <form class="usage-filters sticky top-0 z-40 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900" :aria-label="t('enterprise.usageAnalysis.filters')" @submit.prevent="searchUsage">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2"><span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('enterprise.usageAnalysis.filters') }}</span><button v-for="period in periods" :key="period" type="button" class="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:border-primary-400 hover:text-primary-600 dark:border-dark-600 dark:text-gray-300 dark:hover:text-primary-400" :data-test="`usage-period-${period}`" @click="setPeriod(period)">{{ t(`enterprise.usageAnalysis.${period}`) }}</button></div>
+        <button type="button" class="text-sm font-medium text-primary-600 dark:text-primary-400 sm:hidden" :aria-expanded="filtersExpanded" aria-controls="enterprise-usage-filters" @click="filtersExpanded = !filtersExpanded">{{ t(filtersExpanded ? 'enterprise.usageAnalysis.collapse' : 'enterprise.usageAnalysis.expand') }}</button>
+      </div>
+      <div id="enterprise-usage-filters" class="mt-3 grid max-h-[40vh] grid-cols-1 gap-3 overflow-y-auto sm:max-h-[60vh] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" :class="{ 'hidden sm:grid': !filtersExpanded }">
+        <label><span class="input-label">{{ t('enterprise.startDate') }}</span><input v-model="filters.start_date" class="input w-full" type="date" /></label>
+        <label><span class="input-label">{{ t('enterprise.endDate') }}</span><input v-model="filters.end_date" class="input w-full" type="date" /></label>
+        <label v-if="canFilterMembers"><span class="input-label">{{ t('enterprise.members') }}</span><select v-model="filters.user_id" class="input w-full"><option value="">{{ t('enterprise.all') }}</option><option v-for="member in members" :key="member.id" :value="member.user_id">{{ member.username || member.email }}</option></select></label>
+        <label v-if="canFilterDepartments"><span class="input-label">{{ t('enterprise.department') }}</span><select v-model="filters.department_id" class="input w-full"><option value="">{{ t('enterprise.all') }}</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label>
+        <label><span class="input-label">{{ t('enterprise.model') }}</span><input v-model.trim="filters.model" class="input w-full" /></label>
+        <label><span class="input-label">{{ t('enterprise.apiKey') }} ID</span><input v-model="filters.api_key_id" class="input w-full" type="number" min="1" step="1" /></label>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-3"><button class="btn btn-primary">{{ t('enterprise.search') }}</button><button type="button" class="btn btn-secondary" @click="resetFilters">{{ t('enterprise.reset') }}</button><span class="text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.snapshotHint') }}</span><span v-if="busy" role="status" class="text-xs text-primary-600 dark:text-primary-400">{{ t('common.loading') }}</span></div>
+      <p v-if="validation" role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ validation }}</p>
     </form>
-    <p v-if="validation || error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation || error }} <button v-if="error" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
-    <div v-if="stats" class="grid gap-4 sm:grid-cols-3"><StatCard :title="t('enterprise.requests')" :value="stats.total_requests" :icon="RequestsIcon" /><StatCard :title="t('enterprise.tokens')" :value="stats.total_tokens" :icon="TokensIcon" icon-variant="warning" /><StatCard :title="t('enterprise.cost')" :value="money(stats.total_actual_cost)" :icon="CostIcon" icon-variant="success" /></div>
-    <div class="card p-4 sm:p-5">
-      <h3 class="mb-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.trend') }}</h3>
-      <div v-if="trend.length" class="relative h-64 w-full min-w-0"><Line :data="chartData" :options="chartOptions" :height="256" :aria-label="t('enterprise.trend')" role="img" /></div>
-      <p v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.empty') }}</p>
-      <details v-if="trend.length" class="mt-4 text-sm"><summary class="cursor-pointer text-gray-600 dark:text-gray-300">{{ t('enterprise.detail') }}</summary><DataTable :columns="trendColumns" :data="trend"><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></details>
+    <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <button type="button" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
+    <div v-if="summaryAction.busy.value && !stats" class="grid gap-4 sm:grid-cols-3" :aria-label="t('common.loading')"><div v-for="index in 3" :key="index" class="h-28 animate-pulse rounded-xl bg-gray-100 dark:bg-dark-800" /></div>
+    <div v-if="stats" class="grid gap-4 sm:grid-cols-3" :aria-busy="summaryAction.busy.value"><StatCard :title="t('enterprise.requests')" :value="stats.total_requests" :icon="RequestsIcon" /><StatCard :title="t('enterprise.tokens')" :value="stats.total_tokens" :icon="TokensIcon" icon-variant="warning" /><StatCard :title="t('enterprise.cost')" :value="usageMoney(stats.total_actual_cost)" :icon="CostIcon" icon-variant="success" /></div>
+    <p v-if="stats" class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.averageCost') }}: <span class="font-medium tabular-nums text-gray-700 dark:text-gray-200">{{ usageMoney(stats.total_requests ? stats.total_actual_cost / stats.total_requests : 0) }}</span></p>
+    <EnterpriseUsageTrend :items="trend" :loading="summaryAction.busy.value" />
+    <EnterpriseUsageDistribution :items="models" :loading="summaryAction.busy.value" />
+    <div v-if="canFilterMembers || canFilterDepartments" class="grid min-w-0 gap-5 xl:grid-cols-2">
+      <EnterpriseUsageRanking v-if="canFilterMembers" data-test="usage-member-ranking" :title="t('enterprise.memberRanking')" :items="memberChartItems" :loading="summaryAction.busy.value" />
+      <EnterpriseUsageRanking v-if="canFilterDepartments" data-test="usage-department-ranking" :title="t('enterprise.departmentRanking')" :items="departmentChartItems" :loading="summaryAction.busy.value" />
     </div>
-    <div class="card overflow-hidden"><h3 class="p-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.modelDistribution') }}</h3><DataTable :columns="modelColumns" :data="models" :loading="busy"><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></div>
-    <div v-if="canFilterMembers" class="card overflow-hidden"><h3 class="p-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.memberRanking') }}</h3><DataTable :columns="memberColumns" :data="memberRanking" :loading="busy"><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></div>
-    <div v-if="canFilterDepartments" class="card overflow-hidden"><h3 class="p-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.departmentRanking') }}</h3><DataTable :columns="departmentColumns" :data="departmentRanking" :loading="busy"><template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template><template #cell-actual_cost="{ value }">{{ money(value) }}</template></DataTable></div>
-    <DataTable :columns="columns" :data="rows" :loading="busy">
-      <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
-      <template #cell-user="{ row }"><span>{{ row.user?.username || row.user?.email }}</span><p class="text-xs text-gray-500">{{ row.user?.email }}</p></template>
-      <template #cell-api_key="{ row }">{{ row.api_key?.name || '—' }}</template>
-      <template #cell-department_id="{ value }">{{ departments.find(item => item.id === value)?.name || (value ? `#${value}` : t('enterprise.noDepartment')) }}</template>
-      <template #cell-actual_cost="{ value }">{{ money(value) }}</template>
-      <template #cell-tokens="{ row }">{{ (row.input_tokens + row.output_tokens + row.cache_creation_tokens + row.cache_read_tokens).toLocaleString() }}</template>
-    </DataTable>
+    <EnterpriseUsageDetails :rows="rows" :departments="departments" :total="total" :loading="rowAction.busy.value" :admin="admin" @sort="sortRows" />
     <Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; loadRows()" @update:page-size="pageSize = $event; page = 1; loadRows()" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
-import type { ChartData, ChartOptions } from 'chart.js'
-import { Line } from 'vue-chartjs'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
-import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseUsageLog, EnterpriseUsageStats, EnterpriseUsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage, EnterpriseQuery } from '@/types/enterprise'
-import DataTable from '@/components/common/DataTable.vue'
+import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseUsageLog, EnterpriseUsageStats, EnterpriseUsageTrend as UsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage, EnterpriseQuery } from '@/types/enterprise'
 import Pagination from '@/components/common/Pagination.vue'
 import StatCard from '@/components/common/StatCard.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { formatDateTime } from '@/utils/format'
+import EnterpriseUsageTrend from './EnterpriseUsageTrend.vue'
+import EnterpriseUsageDistribution from './EnterpriseUsageDistribution.vue'
+import EnterpriseUsageRanking from './EnterpriseUsageRanking.vue'
+import EnterpriseUsageDetails from './EnterpriseUsageDetails.vue'
 import { loadMemberOptions } from '../memberOptions'
 import { useEnterpriseAction } from '../useEnterpriseAction'
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
+import { usageDateRange, usageMoney, type UsagePeriod } from '../useEnterpriseUsage'
 const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const { t } = useI18n()
 const RequestsIcon = () => h(Icon, { name: 'chart', size: 'lg' })
 const TokensIcon = () => h(Icon, { name: 'bolt', size: 'lg' })
 const CostIcon = () => h(Icon, { name: 'dollar', size: 'lg' })
-const rowAction = useEnterpriseAction()
-const summaryAction = useEnterpriseAction()
-const optionAction = useEnterpriseAction()
+const rowAction = useEnterpriseAction(), summaryAction = useEnterpriseAction(), optionAction = useEnterpriseAction()
 const busy = computed(() => rowAction.busy.value || summaryAction.busy.value || optionAction.busy.value)
 const error = computed(() => rowAction.error.value || summaryAction.error.value || optionAction.error.value)
 const page = ref(1), pageSize = ref(20), total = ref(0)
-const rows = ref<EnterpriseUsageLog[]>([]), stats = ref<EnterpriseUsageStats | null>(null), trend = ref<EnterpriseUsageTrend[]>([]), models = ref<EnterpriseUsageModel[]>([])
+const rows = ref<EnterpriseUsageLog[]>([]), stats = ref<EnterpriseUsageStats | null>(null), trend = ref<UsageTrend[]>([]), models = ref<EnterpriseUsageModel[]>([])
 const memberRanking = ref<EnterpriseMemberUsage[]>([]), departmentRanking = ref<EnterpriseDepartmentUsage[]>([])
 const departments = ref<EnterpriseDepartment[]>([]), members = ref<EnterpriseMember[]>([])
 const filters = reactive({ start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' })
+const filtersExpanded = ref(false)
+const periods: UsagePeriod[] = ['today', 'last7', 'last30', 'month']
+const sort = reactive<{ sort_by: 'created_at' | 'model'; sort_order: 'asc' | 'desc' }>({ sort_by: 'created_at', sort_order: 'desc' })
 let appliedQuery: EnterpriseQuery = {}
 const validation = ref('')
 const canFilterMembers = computed(() => props.admin || !!props.overview?.permissions.view_members)
 const canFilterDepartments = computed(() => props.admin || !!props.overview?.permissions.view_department_usage)
-const money = (value: number) => `$${value.toFixed(4)}`
-const metricColumns = computed(() => [{ key: 'requests', label: t('enterprise.requests') }, { key: 'total_tokens', label: t('enterprise.tokens') }, { key: 'actual_cost', label: t('enterprise.cost') }])
-const modelColumns = computed(() => [{ key: 'model', label: t('enterprise.model') }, ...metricColumns.value])
-const memberColumns = computed(() => [{ key: 'username', label: t('enterprise.username') }, { key: 'email', label: t('enterprise.email') }, { key: 'department_name', label: t('enterprise.department') }, ...metricColumns.value])
-const departmentColumns = computed(() => [{ key: 'department_name', label: t('enterprise.department') }, ...metricColumns.value])
-const trendColumns = computed(() => [{ key: 'date', label: t('enterprise.createdAt') }, ...metricColumns.value])
-const columns = computed(() => [{ key: 'created_at', label: t('enterprise.createdAt') }, { key: 'user', label: t('enterprise.members') }, { key: 'department_id', label: t('enterprise.department') }, { key: 'api_key', label: t('enterprise.apiKey') }, { key: 'model', label: t('enterprise.model') }, { key: 'tokens', label: t('enterprise.tokens') }, { key: 'actual_cost', label: t('enterprise.cost') }])
-const darkMode = ref(document.documentElement.classList.contains('dark'))
-const themeObserver = new MutationObserver(() => { darkMode.value = document.documentElement.classList.contains('dark') })
-onMounted(() => themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }))
-onUnmounted(() => themeObserver.disconnect())
-const chartData = computed<ChartData<'line'>>(() => ({
-  labels: trend.value.map(item => item.date),
-  datasets: [{
-    label: t('enterprise.cost'),
-    data: trend.value.map(item => item.actual_cost),
-    borderColor: '#14b8a6',
-    backgroundColor: '#14b8a6',
-    borderWidth: 2,
-    // A single bucket has no line segment: keep its point visible inside the plot.
-    pointRadius: trend.value.length === 1 ? 5 : 3,
-    pointHoverRadius: 7,
-    pointHitRadius: 12,
-    tension: 0.25
-  }]
-}))
-const chartOptions = computed<ChartOptions<'line'>>(() => {
-  const textColor = darkMode.value ? '#cbd5e1' : '#475569'
-  const gridColor = darkMode.value ? 'rgba(148, 163, 184, 0.15)' : '#e5e7eb'
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { intersect: false, mode: 'index' },
-    plugins: {
-      legend: { display: true, labels: { color: textColor, usePointStyle: true } },
-      tooltip: {
-        callbacks: {
-          label: context => `${context.dataset.label}: ${money(context.parsed.y ?? 0)}`,
-          afterBody: items => {
-            const point = trend.value[items[0]?.dataIndex ?? -1]
-            return point ? [
-              `${t('enterprise.requests')}: ${point.requests.toLocaleString()}`,
-              `${t('enterprise.tokens')}: ${point.total_tokens.toLocaleString()}`
-            ] : []
-          }
-        }
-      }
-    },
-    scales: {
-      x: { offset: true, ticks: { color: textColor }, grid: { color: gridColor } },
-      y: { beginAtZero: true, grace: '10%', ticks: { color: textColor }, grid: { color: gridColor } }
-    }
-  }
-})
-function query(): EnterpriseQuery { return { start_date: filters.start_date || undefined, end_date: filters.end_date || undefined, user_id: filters.user_id ? Number(filters.user_id) : undefined, department_id: filters.department_id ? Number(filters.department_id) : undefined, model: filters.model || undefined, api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined } }
+const memberChartItems = computed(() => memberRanking.value.map(item => ({ ...item, id: item.user_id, label: item.username || item.email || `#${item.user_id}` })))
+const departmentChartItems = computed(() => departmentRanking.value.map(item => ({ ...item, id: item.department_id ?? 'none', label: item.department_name || t('enterprise.noDepartment') })))
+function setPeriod(period: UsagePeriod) { Object.assign(filters, usageDateRange(period)); validation.value = '' }
+function query(): EnterpriseQuery {
+  return { start_date: filters.start_date || undefined, end_date: filters.end_date || undefined, user_id: canFilterMembers.value && filters.user_id ? Number(filters.user_id) : undefined, department_id: canFilterDepartments.value && filters.department_id ? Number(filters.department_id) : undefined, model: filters.model || undefined, api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined }
+}
 function validate() {
   validation.value = ''
   if (filters.start_date && filters.end_date) {
@@ -133,8 +82,13 @@ function validate() {
   return !validation.value
 }
 async function loadRows() {
-  const params = { ...appliedQuery, page: page.value, page_size: pageSize.value }
+  const params = { ...appliedQuery, ...sort, page: page.value, page_size: pageSize.value }
   await rowAction.read(signal => props.api.usage(params, { signal }), result => { rows.value = result.items; total.value = result.total })
+}
+function sortRows(key: string, order: 'asc' | 'desc') {
+  if (key !== 'model' && key !== 'created_at') return
+  sort.sort_by = key; sort.sort_order = order; page.value = 1
+  void loadRows()
 }
 async function load() {
   const params = { ...appliedQuery }
@@ -150,14 +104,16 @@ async function load() {
 }
 function searchUsage() {
   if (!validate()) return
-  appliedQuery = query()
-  page.value = 1
+  appliedQuery = query(); page.value = 1
+  // A failed new search must not combine previous statistics with new rows.
+  rows.value = []; total.value = 0; stats.value = null; trend.value = []; models.value = []
+  memberRanking.value = []; departmentRanking.value = []
   void load()
 }
 function resetFilters() { Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); searchUsage() }
 async function reload() {
   await Promise.all([
-    optionAction.read(signal => Promise.all([props.api.departments({ signal }), canFilterMembers.value ? loadMemberOptions(props.api, signal) : Promise.resolve([])]), ([departmentRows, memberRows]) => { departments.value = departmentRows; members.value = memberRows }),
+    optionAction.read(signal => Promise.all([canFilterDepartments.value ? props.api.departments({ signal }) : Promise.resolve([]), canFilterMembers.value ? loadMemberOptions(props.api, signal) : Promise.resolve([])]), ([departmentRows, memberRows]) => { departments.value = departmentRows; members.value = memberRows }),
     load()
   ])
 }

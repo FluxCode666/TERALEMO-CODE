@@ -12,7 +12,7 @@ const { api, getEnterprise, showError } = vi.hoisted(() => ({
     members: vi.fn(), createMember: vi.fn(), updateMember: vi.fn(), deleteMember: vi.fn(),
     quotas: vi.fn(), updateQuota: vi.fn(), resetQuota: vi.fn(),
     groups: vi.fn(), allowedGroups: vi.fn(), updateAllowedGroups: vi.fn(),
-    groupWhitelists: vi.fn(), updateGroupWhitelist: vi.fn(),
+    groupWhitelists: vi.fn(), updateGroupWhitelist: vi.fn(), effectiveGroups: vi.fn(),
     settings: vi.fn(), updateSettings: vi.fn(),
     usage: vi.fn(), usageStats: vi.fn(), usageTrend: vi.fn(), usageModels: vi.fn(), usageMembers: vi.fn(), usageDepartments: vi.fn(),
     auditLogs: vi.fn(), balanceLogs: vi.fn()
@@ -127,13 +127,14 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     api.auditLogs.mockResolvedValue(page)
     api.balanceLogs.mockResolvedValue(page)
     api.usageStats.mockResolvedValue({ total_requests: 0, total_tokens: 0, total_actual_cost: 0 })
+    api.effectiveGroups.mockResolvedValue({ member_id: 7, pool: { configured: false, group_ids: [] }, levels: { enterprise: { configured: false }, department: null, member: { configured: false } }, restricted: false, effective_group_ids: null, groups: [] })
     api.settings.mockResolvedValue({ ...defaultEnterpriseSettings })
   })
 
   it.each([
-    ['owner', ['overview', 'departments', 'members', 'quotas', 'groups', 'usage', 'audit', 'settings']],
-    ['manager', ['overview', 'departments', 'members', 'quotas', 'groups', 'usage']],
-    ['member', ['overview', 'departments', 'quotas', 'groups', 'usage']]
+    ['owner', ['overview', 'organization', 'quotas', 'groups', 'usage', 'audit', 'settings']],
+    ['manager', ['overview', 'organization', 'quotas', 'groups', 'usage']],
+    ['member', ['overview', 'organization', 'quotas', 'groups', 'usage']]
   ] as const)('renders only permitted tabs for %s', async (role, expected) => {
     const wrapper = mountWorkspace(overview(role))
     await flushPromises()
@@ -259,7 +260,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     if (activeOwnerCount === 0) {
       expect(warning.text()).toContain('admin.enterprises.noActiveOwner')
       expect(warning.text()).toContain('admin.enterprises.noActiveOwnerHint')
-      await wrapper.get('[data-test="tab-members"]').trigger('click')
+      await wrapper.get('[data-test="tab-organization"]').trigger('click')
       await flushPromises()
       expect(wrapper.find('[data-test="enterprise-owner-warning"]').exists()).toBe(true)
       getEnterprise.mockResolvedValue({ ...enterprise, active_owner_count: 1 })
@@ -296,7 +297,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
   it('does not request members, settings, audit, or department rankings for an ordinary member', async () => {
     const wrapper = mountWorkspace(overview('member'))
     await flushPromises()
-    for (const name of ['departments', 'quotas', 'groups', 'usage']) await openTab(wrapper, name)
+    for (const name of ['organization', 'quotas', 'groups', 'usage']) await openTab(wrapper, name)
 
     expect(api.departments).toHaveBeenCalled()
     expect(api.quotas).toHaveBeenCalled()
@@ -339,10 +340,10 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const wrapper = mountWorkspace(value)
     await flushPromises()
 
-    expect(tabNames(wrapper)).toContain('members')
+    expect(tabNames(wrapper)).toContain('organization')
     expect(tabNames(wrapper)).not.toContain('settings')
     expect(tabNames(wrapper)).not.toContain('audit')
-    await openTab(wrapper, 'members')
+    await openTab(wrapper, 'organization')
     expect(api.members).toHaveBeenCalled()
     expect(api.settings).not.toHaveBeenCalled()
     expect(api.auditLogs).not.toHaveBeenCalled()
@@ -368,10 +369,10 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const wrapper = mountWorkspace(value)
     await flushPromises()
 
-    await openTab(wrapper, 'departments')
+    await openTab(wrapper, 'organization')
     expect(wrapper.find('[data-test="organization-create"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).props('readonly')).toBe(true)
-    await openTab(wrapper, 'members')
+    await openTab(wrapper, 'organization')
     expect(wrapper.find('[data-test="organization-create"]').exists()).toBe(false)
     await openTab(wrapper, 'quotas')
     expect(wrapper.findComponent({ name: 'EnterpriseQuotaPanel' }).props('readonly')).toBe(true)
@@ -402,7 +403,7 @@ describe('EnterpriseQuotaDisplay four quota windows', () => {
     wrappers.push(wrapper)
 
     const daily = wrapper.findAll('dl > div')[0]
-    expect(daily.text()).toContain('$1.0000 / $0')
+    expect(daily.text()).toContain('$1.0000 / enterprise.quotaSections.disabled')
     expect(daily.text()).not.toContain('enterprise.unlimited')
   })
 })

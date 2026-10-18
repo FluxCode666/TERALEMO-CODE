@@ -1,6 +1,6 @@
 <template>
   <form class="space-y-4" @submit.prevent="save">
-    <label class="block"><span class="input-label">{{ t('enterprise.operation') }}</span><select v-model="form.operation" class="input"><option value="add">{{ t('enterprise.addBalance') }}</option><option value="subtract">{{ t('enterprise.subtractBalance') }}</option></select></label>
+    <label class="block"><span class="input-label">{{ t('enterprise.operation') }}</span><Select v-model="form.operation" :options="operationOptions" :aria-label="t('enterprise.operation')" data-test="balance-operation" /></label>
     <label class="block"><span class="input-label">{{ t('enterprise.amount') }}</span><input v-model="form.amount" class="input" type="number" min="0" step="any" data-test="enterprise-balance-amount" /></label>
     <label class="block"><span class="input-label">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="input" rows="3"></textarea></label>
     <p v-if="validation || error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation || error }}</p>
@@ -8,13 +8,15 @@
   </form>
 </template>
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Select from '@/components/common/Select.vue'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 const props = defineProps<{ enterpriseId: number }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
+const operationOptions = computed(() => [{ value: 'add', label: t('enterprise.addBalance') }, { value: 'subtract', label: t('enterprise.subtractBalance') }])
 const { busy, error, run } = useEnterpriseAction()
 const form = reactive({ operation: 'add' as 'add' | 'subtract', amount: '', notes: '' })
 const validation = ref('')

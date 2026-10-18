@@ -78,7 +78,7 @@ describe('enterprise usage display', () => {
     const { wrapper, api } = await mountUsage([singleDay])
     expect(api.usageTrend).toHaveBeenCalledWith({ granularity: 'day' }, expect.objectContaining({ signal: expect.any(AbortSignal) }))
     const line = wrapper.getComponent(Line)
-    expect(line.props('data')).toMatchObject({ labels: ['2026-10-18'], datasets: [{ data: [0.08] }] })
+    expect(line.props('data')).toMatchObject({ labels: ['2026-10-18'], datasets: [{ data: [0.08], yAxisID: 'y' }, { data: [4], yAxisID: 'requests' }] })
     expect(line.props('height')).toBe(256)
     expect(line.element.parentElement?.classList.contains('h-64')).toBe(true)
     expect(line.element.parentElement?.classList.contains('relative')).toBe(true)

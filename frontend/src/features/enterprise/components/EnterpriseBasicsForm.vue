@@ -3,7 +3,7 @@
     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('enterprise.basicInfo') }}</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <label><span class="input-label">{{ t('enterprise.name') }}</span><input v-model.trim="form.name" class="input" maxlength="100" required data-test="enterprise-basic-name" /></label>
-      <label><span class="input-label">{{ t('enterprise.status') }}</span><select v-model="form.status" class="input"><option value="active">{{ t('enterprise.active') }}</option><option value="disabled">{{ t('enterprise.disabled') }}</option></select></label>
+      <label><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></label>
       <label><span class="input-label">{{ t('enterprise.contactName') }}</span><input v-model.trim="form.contact_name" class="input" maxlength="100" /></label>
       <label><span class="input-label">{{ t('enterprise.contactEmail') }}</span><input v-model.trim="form.contact_email" class="input" type="email" maxlength="255" /></label>
       <label><span class="input-label">{{ t('enterprise.contactPhone') }}</span><input v-model.trim="form.contact_phone" class="input" maxlength="50" /></label>
@@ -15,14 +15,16 @@
   </form>
 </template>
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Select from '@/components/common/Select.vue'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import type { Enterprise } from '@/types/enterprise'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 const props = defineProps<{ enterprise: Enterprise }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
+const statusOptions = computed(() => ['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) })))
 const { busy, error, run } = useEnterpriseAction()
 const form = reactive({ name: props.enterprise.name, status: props.enterprise.status, contact_name: props.enterprise.contact_name, contact_email: props.enterprise.contact_email, contact_phone: props.enterprise.contact_phone, notes: props.enterprise.notes })
 const threshold = ref<string | number>(props.enterprise.low_balance_threshold === null ? '' : String(props.enterprise.low_balance_threshold))

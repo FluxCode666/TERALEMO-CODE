@@ -100,6 +100,16 @@ describe('enterprise API contract', () => {
     expect(get).toHaveBeenCalledWith('/enterprise/groups', { params: undefined })
   })
 
+  it('queries effective groups for both user and admin routes using member record IDs', async () => {
+    const signal = new AbortController().signal
+    const effective = { member_id: 7, restricted: false, effective_group_ids: null, groups: [] }
+    get.mockResolvedValue({ data: effective })
+    expect(await enterpriseAPI.effectiveGroups(7, { signal })).toEqual(effective)
+    expect(get).toHaveBeenLastCalledWith('/enterprise/group-whitelists/effective', { params: { member_id: 7 }, signal })
+    await enterprises.forEnterprise(12).effectiveGroups(7, { signal })
+    expect(get).toHaveBeenLastCalledWith('/admin/enterprises/12/group-whitelists/effective', { params: { member_id: 7 }, signal })
+  })
+
   it('wraps whitelist group IDs and quota reset windows in the documented payloads', async () => {
     await enterpriseAPI.updateGroupWhitelist('member', 7, [])
     expect(put).toHaveBeenLastCalledWith('/enterprise/group-whitelists/member/7', { group_ids: [] })

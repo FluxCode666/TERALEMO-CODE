@@ -2,11 +2,32 @@ export default {
   "enterprise": {
     "title": "我的企业",
     "overview": "概览",
+    "organization": "组织架构",
     "departments": "部门",
     "members": "成员",
     "quotas": "限额",
-    "groups": "分组",
-    "usage": "使用记录",
+    "groups": "可调用分组",
+    "usageAnalysis": {
+      "filters": "筛选条件",
+      "today": "今天",
+      "last7": "近 7 天",
+      "last30": "近 30 天",
+      "month": "本月",
+      "collapse": "收起筛选",
+      "expand": "展开筛选",
+      "snapshotHint": "调整条件后点击搜索，统计与明细同步更新。",
+      "averageCost": "平均每次费用",
+      "details": "用量明细",
+      "recordCount": "共 {count} 条明细",
+      "viewTable": "查看完整表格",
+      "viewChart": "查看图表",
+      "topRanking": "按费用排序 · 前 {count} / 共 {total} 项",
+      "distributionMetric": "模型分布指标",
+      "legend": "模型图例",
+      "requestId": "请求 ID",
+      "mediaType": "媒体类型"
+    },
+    "usage": "用量分析",
     "balanceLogs": "余额流水",
     "audit": "审计",
     "settings": "设置",
@@ -67,10 +88,10 @@ export default {
     "limitAmount": "上限",
     "resetUsage": "重置用量",
     "resetConfirm": "确定重置选中的用量窗口？已产生的费用不会退还。",
-    "groupPool": "企业可用分组池",
-    "groupPoolHint": "分组池由系统管理员配置。非空时，企业成员的个人分组授权在企业期间被忽略；空池按个人分组规则。",
-    "whitelist": "分组白名单",
-    "whitelistHint": "不选分组表示该层级不限制。实际可用分组为分组池与企业、部门、成员各级已配置白名单的交集。",
+    "groupPool": "企业可用分组",
+    "groupPoolHint": "以下分组由系统管理员为企业开放。未限定时，成员按个人分组权限调用。",
+    "whitelist": "允许调用的分组",
+    "whitelistHint": "选择允许调用的分组，或沿用上级设置。",
     "availableGroups": "可选分组",
     "reset": "重置",
     "operation": "操作类型",
@@ -113,6 +134,104 @@ export default {
     "refresh": "刷新",
     "view": "查看",
     "personalWalletDisabled": "企业成员由企业统一付费。",
+    "organizationUi": {
+      "directMembers": "直属企业（无部门）",
+      "collapse": "收起部门",
+      "expand": "展开部门",
+      "membersHint": "选择左侧部门查看成员，选择企业可查看全部成员。",
+      "directoryHint": "企业部门名单，成员管理权限由企业负责人配置。",
+      "searchMembers": "搜索员工姓名或邮箱",
+      "emptyMembers": "当前范围没有匹配成员，可调整筛选条件。",
+      "sortHint": "数字越小越靠前；部门保持一级结构。",
+      "myIdentity": "我的身份"
+    },
+    "quotaSections": {
+      "enterprise": {
+        "title": "企业限额",
+        "description": "企业全体成员共享的消费上限。"
+      },
+      "department": {
+        "title": "部门限额",
+        "description": "各部门共享的消费上限，可在此调整和查看。"
+      },
+      "member": {
+        "title": "员工限额",
+        "description": "按部门查看员工的个人消费上限；人数较多的部门默认折叠。"
+      },
+      "disabled": "已禁用",
+      "empty": "当前没有可查看的限额。限额与用量可见性由企业权限控制。"
+    },
+    "groupAccess": {
+      "rateUnknown": "倍率未提供",
+      "availableTitle": "企业可用分组",
+      "availableHint": "配置允许企业成员调用哪些分组。以下分组由系统管理员为企业开放。",
+      "editAvailable": "编辑企业可用分组",
+      "adminHint": "选择向企业开放的分组；清空后，成员按个人分组权限调用。",
+      "personalRules": "未限定，成员按个人分组权限。",
+      "noAvailable": "当前没有向企业开放的分组。",
+      "exclusive": "专属",
+      "subscription": "订阅",
+      "mode": "允许调用的分组",
+      "inherit": "不限制（沿用上级）",
+      "selected": "仅允许选中的分组",
+      "inheritHint": "沿用上级允许调用的分组，不额外限制。",
+      "configureHint": "为所选对象设置允许调用的分组，下级仍可进一步缩小范围。",
+      "noCandidates": "当前没有可选分组，请联系负责人调整上级允许范围。",
+      "selectRequired": "请至少选择一个分组，或切换为“不限制（沿用上级）”。",
+      "sections": {
+        "enterprise": "企业允许调用的分组",
+        "department": "部门允许调用的分组",
+        "member": "员工允许调用的分组"
+      },
+      "effectiveTitle": "查看员工最终可调用分组",
+      "myGroups": "我可调用的分组",
+      "selectMember": "请选择员工",
+      "noEffective": "当前没有可调用的分组",
+      "restrictions": {
+        "available": "受企业可用分组限制",
+        "enterprise": "受企业规则限制",
+        "department": "受部门规则限制",
+        "member": "受员工规则限制"
+      }
+    },
+    "settingsUi": {
+      "balance": "余额可见性",
+      "visibility": "限额与用量可见性",
+      "management": "部门管理权限",
+      "hints": {
+        "balance_visible_to_manager": "向部门负责人展示企业共享余额。",
+        "balance_visible_to_member": "向普通员工展示企业共享余额。",
+        "member_quota_visible_to_member": "允许员工查看自己的限额及已用金额。",
+        "member_quota_visible_to_manager": "允许部门负责人查看本部门员工的限额及已用金额。",
+        "department_quota_visible_to_manager": "允许部门负责人查看本部门共享限额及已用金额。",
+        "manager_can_manage_members": "允许部门负责人在本部门新增、编辑和移出普通员工。",
+        "manager_can_edit_member_quota": "允许部门负责人修改本部门普通员工的消费上限。",
+        "manager_can_edit_member_groups": "允许部门负责人修改本部门普通员工允许调用的分组。"
+      }
+    },
+    "auditUi": {
+      "admin": "系统管理员",
+      "actions": {
+        "enterprise_create": "创建企业",
+        "enterprise_update": "编辑企业",
+        "enterprise_delete": "删除企业",
+        "balance_adjust": "调整余额",
+        "department_create": "新增部门",
+        "department_update": "编辑部门",
+        "department_delete": "删除部门",
+        "member_add": "新增成员",
+        "member_create": "创建成员账号",
+        "member_update": "编辑成员",
+        "member_remove": "移出成员",
+        "member_disabled_by_moderation": "系统停用成员",
+        "quota_update": "调整限额",
+        "quota_reset": "重置用量",
+        "settings_update": "更新设置",
+        "group_pool_update": "更新企业可用分组",
+        "group_whitelist_update": "更新允许调用的分组",
+        "other": "其他操作"
+      }
+    },
     "roles": {
       "owner": "企业负责人",
       "manager": "部门负责人",
@@ -126,7 +245,7 @@ export default {
       "department_quota_visible_to_manager": "部门负责人可见本部门限额与用量",
       "manager_can_manage_members": "部门负责人可管理本部门员工",
       "manager_can_edit_member_quota": "部门负责人可调整本部门员工限额",
-      "manager_can_edit_member_groups": "部门负责人可调整本部门员工分组白名单"
+      "manager_can_edit_member_groups": "部门负责人可调整本部门员工可调用分组"
     },
     "errors": {
       "generic": "企业操作失败，请稍后重试。",
@@ -150,7 +269,7 @@ export default {
       "DEPARTMENT_QUOTA_EXCEEDED": "部门消费限额已用尽，请联系企业负责人。",
       "MEMBER_QUOTA_EXCEEDED": "你的消费限额已用尽，请联系负责人调整。",
       "ENTERPRISE_QUOTA_EXCEEDS_PARENT": "此限额不能超过上级同一周期的限额。",
-      "ENTERPRISE_GROUP_OUT_OF_SCOPE": "所选分组超出企业分组池或上级白名单范围。",
+      "ENTERPRISE_GROUP_OUT_OF_SCOPE": "所选分组超出企业或上级允许调用的范围。",
       "ENTERPRISE_GROUP_NOT_ALLOWED": "企业当前未授权使用此分组，请联系负责人。",
       "ENTERPRISE_MEMBER_WALLET_DISABLED": "企业成员由企业统一付费，暂不可使用个人充值、购买或余额兑换。",
       "ENTERPRISE_FEATURE_UNSUPPORTED": "企业成员暂不支持使用此功能。",

@@ -12,7 +12,7 @@
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <button class="underline" @click="refresh">{{ t('enterprise.retry') }}</button></p>
     <div v-if="busy && !enterprise" class="h-40 animate-pulse rounded-xl bg-gray-100 dark:bg-dark-800"></div>
     <template v-if="enterprise">
-      <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-dark-700" :aria-label="t('enterprise.title')">
+      <nav class="flex gap-1 overflow-x-auto rounded-t-xl border-b bg-gray-50 px-2 dark:bg-dark-800/50 border-gray-200 dark:border-dark-700" :aria-label="t('enterprise.title')">
         <button v-for="tab in tabs" :key="tab" :data-test="`tab-${tab}`" :aria-current="activeTab === tab ? 'page' : undefined" class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors" :class="activeTab === tab ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'" @click="activeTab = tab">{{ t(`enterprise.${tab}`) }}</button>
       </nav>
       <section v-if="activeTab === 'overview'" class="space-y-5">
@@ -28,13 +28,14 @@
             <StatCard :title="t('enterprise.monthCost')" :value="money(overview.stats.month_cost)" :icon="MonthCostIcon" />
           </template>
         </div>
-        <div class="card flex flex-wrap items-center justify-between gap-4 p-5"><div><span class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.status') }}</span><p class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ t(enterprise.status === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</p></div><button v-if="admin" class="btn btn-primary" @click="balanceOpen = true">{{ t('enterprise.adjustBalance') }}</button></div>
-        <EnterpriseQuotaDisplay v-if="enterpriseQuota" data-test="enterprise-quota" :quota="enterpriseQuota" :title="t('enterprise.enterpriseScope')" />
-        <EnterpriseQuotaDisplay v-if="overview?.department_quota_visible && overview.department_quota" data-test="department-quota" :quota="overview.department_quota" :title="t('enterprise.departmentScope')" />
-        <EnterpriseQuotaDisplay v-if="overview?.member_quota_visible && overview.member_quota" data-test="member-quota" :quota="overview.member_quota" :title="t('enterprise.memberScope')" />
-        <p v-if="enterpriseQuota || overview?.member_quota || overview?.department_quota" class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.quotaHint') }}</p>
+        <div class="card flex flex-wrap items-center justify-between gap-4 p-5"><div class="flex flex-wrap items-center gap-6"><div><span class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.status') }}</span><p class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ t(enterprise.status === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</p></div><div v-if="overview"><span class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.organizationUi.myIdentity') }}</span><p class="mt-1 font-medium text-gray-900 dark:text-gray-100">{{ t(`enterprise.roles.${overview.me.role}`) }} · {{ overview.me.department_name || t('enterprise.noDepartment') }}</p></div></div><button v-if="admin" class="btn btn-primary" @click="balanceOpen = true">{{ t('enterprise.adjustBalance') }}</button></div>
+        <EnterpriseAdminQuotaSummary v-if="admin" :api="api" :quota="enterpriseQuota" :refresh-key="refreshKey" @manage="activeTab = 'quotas'" />
+        <div v-else class="grid gap-4 xl:grid-cols-3"><EnterpriseQuotaDisplay v-if="enterpriseQuota" data-test="enterprise-quota" :quota="enterpriseQuota" :title="t('enterprise.quotaSections.enterprise.title')" compact />
+        <EnterpriseQuotaDisplay v-if="overview?.department_quota_visible && overview.department_quota" data-test="department-quota" :quota="overview.department_quota" :title="t('enterprise.quotaSections.department.title')" compact />
+        <EnterpriseQuotaDisplay v-if="overview?.member_quota_visible && overview.member_quota" data-test="member-quota" :quota="overview.member_quota" :title="t('enterprise.quotaSections.member.title')" compact />
+        </div><p v-if="enterpriseQuota || overview?.member_quota || overview?.department_quota" class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.quotaHint') }}</p>
       </section>
-      <EnterpriseOrganizationPanel v-else-if="activeTab === 'departments' || activeTab === 'members'" :key="activeTab" :mode="activeTab" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
+      <EnterpriseOrganizationPanel v-else-if="activeTab === 'organization'" :enterprise-name="enterprise.name" :member-count="adminEnterprise?.member_count" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseQuotaPanel v-else-if="activeTab === 'quotas'" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseGroupsPanel v-else-if="activeTab === 'groups'" :api="api" :enterprise-id="enterprise.id" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
@@ -57,6 +58,7 @@ import StatCard from '@/components/common/StatCard.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import EnterpriseOrganizationPanel from './components/EnterpriseOrganizationPanel.vue'
+import EnterpriseAdminQuotaSummary from './components/EnterpriseAdminQuotaSummary.vue'
 import EnterpriseQuotaDisplay from './components/EnterpriseQuotaDisplay.vue'
 import EnterpriseQuotaPanel from './components/EnterpriseQuotaPanel.vue'
 import EnterpriseGroupsPanel from './components/EnterpriseGroupsPanel.vue'
@@ -86,8 +88,7 @@ const balance = computed(() => props.admin ? adminEnterprise.value?.balance ?? n
 const enterpriseQuota = computed(() => props.admin ? adminEnterprise.value?.quota : props.overview?.enterprise_quota)
 const tabs = computed(() => {
   const permissions = props.overview?.permissions
-  const result = ['overview', 'departments']
-  if (props.admin || permissions?.view_members) result.push('members')
+  const result = ['overview', 'organization']
   if (props.admin || props.overview?.enterprise_quota || (props.overview?.department_quota_visible && props.overview.department_quota) || (props.overview?.member_quota_visible && props.overview.member_quota) || permissions?.edit_quotas || permissions?.edit_member_quota) result.push('quotas')
   result.push('groups', 'usage')
   if (props.admin) result.push('balanceLogs')

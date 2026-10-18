@@ -53,7 +53,7 @@ describe.each([true, false])('enterprise dates with desktop viewport %s', deskto
       members: vi.fn().mockResolvedValue(page([member(timestamp)]))
     } as unknown as EnterpriseResourceAPI
     const wrapper = track(mount(EnterpriseOrganizationPanel, {
-      props: { api, mode: 'members' }, global: { stubs }
+      props: { api, mode: 'members', admin: true }, global: { stubs }
     }))
     await flushPromises()
 

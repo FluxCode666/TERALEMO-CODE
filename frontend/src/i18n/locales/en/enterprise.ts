@@ -2,11 +2,32 @@ export default {
   "enterprise": {
     "title": "My enterprise",
     "overview": "Overview",
+    "organization": "Organization",
     "departments": "Departments",
     "members": "Members",
     "quotas": "Quotas",
-    "groups": "Groups",
-    "usage": "Usage",
+    "groups": "Allowed groups",
+    "usageAnalysis": {
+      "filters": "Filters",
+      "today": "Today",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "month": "This month",
+      "collapse": "Collapse filters",
+      "expand": "Expand filters",
+      "snapshotHint": "Click Search to update statistics and details together.",
+      "averageCost": "Average cost per request",
+      "details": "Usage details",
+      "recordCount": "{count} records",
+      "viewTable": "View full table",
+      "viewChart": "View chart",
+      "topRanking": "Sorted by cost · Top {count} of {total}",
+      "distributionMetric": "Model distribution metric",
+      "legend": "Model legend",
+      "requestId": "Request ID",
+      "mediaType": "Media type"
+    },
+    "usage": "Usage analytics",
     "balanceLogs": "Balance history",
     "audit": "Audit",
     "settings": "Settings",
@@ -113,6 +134,104 @@ export default {
     "refresh": "Refresh",
     "view": "View",
     "personalWalletDisabled": "Your enterprise pays for your usage.",
+    "organizationUi": {
+      "directMembers": "Direct members (no department)",
+      "collapse": "Collapse departments",
+      "expand": "Expand departments",
+      "membersHint": "Select a department to view its members, or the enterprise to view everyone.",
+      "directoryHint": "Enterprise department directory. Member management is controlled by your enterprise owner.",
+      "searchMembers": "Search employee name or email",
+      "emptyMembers": "No members match this scope. Try changing the filters.",
+      "sortHint": "Lower numbers appear first. Departments have one level.",
+      "myIdentity": "My membership"
+    },
+    "quotaSections": {
+      "enterprise": {
+        "title": "Enterprise quota",
+        "description": "Spending limits shared by all enterprise members."
+      },
+      "department": {
+        "title": "Department quotas",
+        "description": "View and adjust the spending limits shared by each department."
+      },
+      "member": {
+        "title": "Employee quotas",
+        "description": "Individual spending limits grouped by department. Larger departments start collapsed."
+      },
+      "disabled": "Disabled",
+      "empty": "No quotas are visible here. Quota and usage visibility depends on enterprise permissions."
+    },
+    "groupAccess": {
+      "rateUnknown": "Rate unavailable",
+      "availableTitle": "Groups available to the enterprise",
+      "availableHint": "Configure which groups enterprise members can call. These groups are made available by a system administrator.",
+      "editAvailable": "Edit available groups",
+      "adminHint": "Select the groups available to this enterprise. Clear the selection to use members’ personal group permissions.",
+      "personalRules": "Unrestricted. Members use their personal group permissions.",
+      "noAvailable": "No groups are available to this enterprise.",
+      "exclusive": "Exclusive",
+      "subscription": "Subscription",
+      "mode": "Allowed groups",
+      "inherit": "Unrestricted (inherit parent)",
+      "selected": "Allow selected groups only",
+      "inheritHint": "Inherit the groups allowed by the parent, with no additional restriction.",
+      "configureHint": "Choose the allowed groups for this target. Lower levels can narrow this selection further.",
+      "noCandidates": "No groups can be selected. Ask the owner to adjust the parent rules.",
+      "selectRequired": "Select at least one group, or choose “Unrestricted (inherit parent)”.",
+      "sections": {
+        "enterprise": "Groups allowed for the enterprise",
+        "department": "Groups allowed for departments",
+        "member": "Groups allowed for employees"
+      },
+      "effectiveTitle": "View an employee’s final allowed groups",
+      "myGroups": "Groups I can call",
+      "selectMember": "Select an employee",
+      "noEffective": "No groups are currently allowed",
+      "restrictions": {
+        "available": "Limited by enterprise availability",
+        "enterprise": "Limited by enterprise rules",
+        "department": "Limited by department rules",
+        "member": "Limited by employee rules"
+      }
+    },
+    "settingsUi": {
+      "balance": "Balance visibility",
+      "visibility": "Quota and usage visibility",
+      "management": "Department management permissions",
+      "hints": {
+        "balance_visible_to_manager": "Show the shared enterprise balance to department managers.",
+        "balance_visible_to_member": "Show the shared enterprise balance to employees.",
+        "member_quota_visible_to_member": "Let employees view their own limits and recorded usage.",
+        "member_quota_visible_to_manager": "Let managers view limits and usage for their department’s employees.",
+        "department_quota_visible_to_manager": "Let managers view their department’s shared limits and usage.",
+        "manager_can_manage_members": "Let managers add, edit, and remove employees in their own department.",
+        "manager_can_edit_member_quota": "Let managers adjust spending limits for employees in their department.",
+        "manager_can_edit_member_groups": "Let managers adjust allowed groups for employees in their department."
+      }
+    },
+    "auditUi": {
+      "admin": "System administrator",
+      "actions": {
+        "enterprise_create": "Create enterprise",
+        "enterprise_update": "Update enterprise",
+        "enterprise_delete": "Delete enterprise",
+        "balance_adjust": "Adjust balance",
+        "department_create": "Create department",
+        "department_update": "Update department",
+        "department_delete": "Delete department",
+        "member_add": "Add member",
+        "member_create": "Create member account",
+        "member_update": "Update member",
+        "member_remove": "Remove member",
+        "member_disabled_by_moderation": "Disable member by moderation",
+        "quota_update": "Update quota",
+        "quota_reset": "Reset usage",
+        "settings_update": "Update settings",
+        "group_pool_update": "Update available groups",
+        "group_whitelist_update": "Update allowed groups",
+        "other": "Other action"
+      }
+    },
     "roles": {
       "owner": "Enterprise owner",
       "manager": "Department manager",

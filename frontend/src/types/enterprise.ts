@@ -1,4 +1,4 @@
-import type { BasePaginationResponse } from '@/types'
+import type { BasePaginationResponse, UsageLog } from '@/types'
 
 export type EnterpriseRole = 'owner' | 'manager' | 'member'
 export type EnterpriseStatus = 'active' | 'disabled'
@@ -124,8 +124,20 @@ export interface EnterpriseGroup {
   is_exclusive: boolean
   subscription_type: string
   status: string
+  rate_multiplier?: number
 }
 export interface EnterpriseGroupWhitelist { scope_type: EnterpriseScope; scope_id: number; group_ids: number[] }
+export interface EnterpriseGroupLevel { configured: boolean; group_ids: number[] }
+export interface EnterpriseEffectiveGroups {
+  member_id: number
+  user_id: number
+  department_id: number | null
+  pool: EnterpriseGroupLevel
+  levels: { enterprise: EnterpriseGroupLevel; department: EnterpriseGroupLevel | null; member: EnterpriseGroupLevel }
+  restricted: boolean
+  effective_group_ids: number[] | null
+  groups: EnterpriseGroup[]
+}
 export interface EnterpriseBalanceLog {
   id: number; type: 'add' | 'subtract'; amount: number; balance_before: number; balance_after: number
   operator_user_id: number | null; operator_email: string; notes: string; created_at: string
@@ -134,12 +146,17 @@ export interface EnterpriseAuditLog {
   id: number; actor_user_id: number; actor_email: string; actor_role: 'admin' | EnterpriseRole
   action: string; target_type: string; target_id: number | null; detail: Record<string, unknown>; created_at: string
 }
-export interface EnterpriseUsageLog {
-  id: number; user: { id: number; username: string; email: string }; department_id: number | null
-  api_key: { id: number; name: string } | null; group: { id: number; name: string } | null; model: string
-  input_tokens: number; output_tokens: number; cache_creation_tokens: number; cache_read_tokens: number
-  actual_cost: number; billing_type: number; request_type: number; stream: boolean
-  duration_ms: number; first_token_ms: number | null; created_at: string
+// New fields remain optional for compatibility with older enterprise backends.
+export interface EnterpriseUsageLog extends Partial<Omit<UsageLog, 'user' | 'api_key' | 'group' | 'subscription'>> {
+  id: number
+  model: string
+  created_at: string
+  user?: { id: number; username: string; email: string } | null
+  department_id?: number | null
+  department_name?: string | null
+  api_key?: { id: number; name: string } | null
+  group?: { id: number; name: string; platform?: string } | null
+  media_type?: string | null
 }
 // Aggregates follow the existing usage statistics DTOs; D6 specifies ranking fields explicitly.
 export interface EnterpriseUsageStats {
@@ -150,7 +167,7 @@ export interface EnterpriseUsageTrend { date: string; requests: number; actual_c
 export interface EnterpriseUsageModel { model: string; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseMemberUsage { user_id: number; username: string; email: string; department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseDepartmentUsage { department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
-export interface EnterpriseQuery { page?: number; page_size?: number; search?: string; status?: string; role?: EnterpriseRole; department_id?: number; user_id?: number; api_key_id?: number; model?: string; start_date?: string; end_date?: string; granularity?: 'day' | 'hour'; action?: string; scope_type?: EnterpriseScope }
+export interface EnterpriseQuery { member_id?: number; page?: number; page_size?: number; search?: string; status?: string; role?: EnterpriseRole; department_id?: number; user_id?: number; api_key_id?: number; model?: string; start_date?: string; end_date?: string; granularity?: 'day' | 'hour'; action?: string; scope_type?: EnterpriseScope; sort_by?: 'created_at' | 'model'; sort_order?: 'asc' | 'desc' }
 export type EnterpriseOwnerInput = { user_id: number; email?: never; password?: never; username?: never } | { user_id?: never; email: string; password: string; username?: string }
 export type CreateEnterpriseRequest = Pick<Enterprise, 'name'> & Partial<Pick<Enterprise, 'status' | 'notes' | 'contact_name' | 'contact_email' | 'contact_phone' | 'low_balance_threshold' | 'settings'>> & { owner?: EnterpriseOwnerInput }
 export type UpdateEnterpriseRequest = Omit<Partial<CreateEnterpriseRequest>, 'owner'>

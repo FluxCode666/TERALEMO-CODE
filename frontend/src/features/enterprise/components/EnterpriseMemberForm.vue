@@ -10,10 +10,7 @@
         <input id="enterprise-user-search" v-model.trim="search" class="input" @keydown.enter.prevent="searchUsers" />
         <button type="button" class="btn btn-secondary" :disabled="searching" @click="searchUsers">{{ t('enterprise.search') }}</button>
       </div>
-      <select v-model="userId" class="input" :aria-label="t('enterprise.selectUser')" data-test="member-user">
-        <option :value="0">{{ t('enterprise.selectUser') }}</option>
-        <option v-for="user in users" :key="user.id" :value="user.id">{{ user.username || user.email }} · {{ user.email }}</option>
-      </select>
+      <Select v-model="userId" :options="userOptions" :aria-label="t('enterprise.selectUser')" data-test="member-user" />
     </div>
     <template v-if="!member && mode === 'new'">
       <label class="block"><span class="input-label">{{ t('enterprise.email') }}</span><input v-model.trim="form.email" class="input" type="email" autocomplete="off" data-test="member-email" /></label>
@@ -21,26 +18,27 @@
       <label class="block"><span class="input-label">{{ t('enterprise.password') }}</span><input v-model="form.password" class="input" type="password" autocomplete="new-password" data-test="member-password" /></label>
     </template>
     <label v-if="!limitedManager" class="block"><span class="input-label">{{ t('enterprise.department') }}</span>
-      <select v-model="form.department_id" class="input" data-test="member-department"><option :value="0">{{ t('enterprise.noDepartment') }}</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select>
+      <Select v-model="form.department_id" :options="departmentOptions" :aria-label="t('enterprise.department')" data-test="member-department" />
     </label>
     <label v-if="!limitedManager" class="block"><span class="input-label">{{ t('enterprise.role') }}</span>
-      <select v-model="form.role" class="input" data-test="member-role"><option v-for="role in roles" :key="role" :value="role">{{ t(`enterprise.roles.${role}`) }}</option></select>
+      <Select v-model="form.role" :options="roleOptions" :aria-label="t('enterprise.role')" data-test="member-role" />
     </label>
     <label class="block"><span class="input-label">{{ t('enterprise.titleField') }}</span><input v-model.trim="form.title" class="input" maxlength="100" /></label>
-    <label v-if="member" class="block"><span class="input-label">{{ t('enterprise.status') }}</span><select v-model="form.status" class="input"><option value="active">{{ t('enterprise.active') }}</option><option value="disabled">{{ t('enterprise.disabled') }}</option></select></label>
+    <label v-if="member" class="block"><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="member-status" /></label>
     <p v-if="validation" role="alert" class="text-sm text-red-600 dark:text-red-400" data-test="member-validation">{{ validation }}</p>
     <button type="submit" class="btn btn-primary" :disabled="busy" data-test="member-submit">{{ t('enterprise.save') }}</button>
   </form>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Select from '@/components/common/Select.vue'
 import { adminAPI } from '@/api/admin'
 import { enterpriseErrorMessage } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember } from '@/types/enterprise'
 
-const props = defineProps<{ admin?: boolean; member?: EnterpriseMember; departments: EnterpriseDepartment[]; limitedManager?: boolean; departmentId?: number | null; busy?: boolean }>()
+const props = defineProps<{ admin?: boolean; member?: EnterpriseMember; departments: EnterpriseDepartment[]; limitedManager?: boolean; departmentId?: number | null; defaultDepartmentId?: number; busy?: boolean }>()
 const emit = defineEmits<{ submit: [payload: Record<string, unknown>] }>()
 const { t } = useI18n()
 const roles = ['owner', 'manager', 'member'] as const
@@ -52,8 +50,13 @@ const userId = ref(0)
 const validation = ref('')
 const initialDepartment = props.member
   ? props.member.department_id ?? 0
-  : props.limitedManager ? props.departmentId ?? 0 : 0
+  : props.limitedManager ? props.departmentId ?? 0 : props.defaultDepartmentId ?? 0
 const form = reactive({ email: '', username: '', password: '', department_id: initialDepartment, role: props.member?.role ?? 'member', title: props.member?.title ?? '', status: props.member?.status ?? 'active' })
+
+const userOptions = computed(() => [{ value: 0, label: t('enterprise.selectUser') }, ...users.value.map(user => ({ value: user.id, label: `${user.username || user.email} · ${user.email}` }))])
+const departmentOptions = computed(() => [{ value: 0, label: t('enterprise.noDepartment') }, ...props.departments.map(item => ({ value: item.id, label: item.name }))])
+const roleOptions = computed(() => roles.map(value => ({ value, label: t(`enterprise.roles.${value}`) })))
+const statusOptions = computed(() => ['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) })))
 
 async function searchUsers() {
   searching.value = true

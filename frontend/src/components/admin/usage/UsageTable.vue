@@ -20,6 +20,8 @@
       <DataTable
         :columns="columns"
         :data="data"
+        :mobile-layout="mobileLayout"
+        :sticky-first-column="stickyFirstColumn"
         :loading="loading"
         :server-side-sort="serverSideSort"
         :default-sort-key="defaultSortKey"
@@ -592,6 +594,8 @@ import type { Column } from '@/components/common/types'
 
 interface Props {
   data: AdminUsageLog[]
+  mobileLayout?: 'cards' | 'table'
+  stickyFirstColumn?: boolean
   loading?: boolean
   columns: Column[]
   serverSideSort?: boolean
@@ -604,6 +608,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  mobileLayout: 'cards',
+  stickyFirstColumn: true,
   loading: false,
   serverSideSort: false,
   defaultSortKey: '',

@@ -272,9 +272,10 @@ import Icon from '@/components/icons/Icon.vue'
 const { t } = useI18n()
 
 const desktopViewportQuery = '(min-width: 768px)'
-const isDesktopViewport = ref(
+const desktopViewportMatches = ref(
   typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
 )
+const isDesktopViewport = computed(() => props.mobileLayout === 'table' || desktopViewportMatches.value)
 
 const emit = defineEmits<{
   sort: [key: string, order: 'asc' | 'desc']
@@ -404,9 +405,9 @@ const attachDesktopTableTracking = () => {
 onMounted(() => {
   if (typeof window !== 'undefined') {
     desktopViewportMediaQuery = window.matchMedia(desktopViewportQuery)
-    isDesktopViewport.value = desktopViewportMediaQuery.matches
+    desktopViewportMatches.value = desktopViewportMediaQuery.matches
     desktopViewportListener = (event: MediaQueryListEvent) => {
-      isDesktopViewport.value = event.matches
+      desktopViewportMatches.value = event.matches
     }
     if (typeof desktopViewportMediaQuery.addEventListener === 'function') {
       desktopViewportMediaQuery.addEventListener('change', desktopViewportListener)
@@ -432,6 +433,8 @@ onUnmounted(() => {
 interface Props {
   columns: Column[]
   data: any[]
+  /** Keep wide analytical tables scrollable on small screens; cards remain the default. */
+  mobileLayout?: 'cards' | 'table'
   loading?: boolean
   stickyFirstColumn?: boolean
   stickyActionsColumn?: boolean
@@ -474,6 +477,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  mobileLayout: 'cards',
   loading: false,
   stickyFirstColumn: true,
   stickyActionsColumn: true,

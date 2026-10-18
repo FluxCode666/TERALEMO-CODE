@@ -1,3 +1,4 @@
+import { selectOption } from './selectOption'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import EnterprisesView from '@/views/admin/EnterprisesView.vue'
@@ -59,7 +60,7 @@ describe('Enterprise administrator creation', () => {
     await searchInput.trigger('keydown.enter')
     await flushPromises()
     expect(listUsers).toHaveBeenCalledWith(1, 50, { search: 'alice', role: 'user' })
-    await wrapper.get('[data-test="owner-user"]').setValue('42')
+    await selectOption(wrapper, '[data-test="owner-user"]', 'Alice · alice@example.com')
     await wrapper.get('[data-test="enterprise-create-form"]').trigger('submit')
     await flushPromises()
     expect(createEnterprise).toHaveBeenCalledWith(expect.objectContaining({ owner: { user_id: 42 } }))
@@ -108,7 +109,7 @@ describe('Enterprise administrator creation', () => {
     expect(adjustBalance).not.toHaveBeenCalled()
     expect(balanceForm.text()).toContain('enterprise.validationAmount')
     await balanceForm.get('[data-test="enterprise-balance-amount"]').setValue('25.5')
-    await balanceForm.get('select').setValue('subtract')
+    await selectOption(wrapper, '[data-test="balance-operation"]', 'enterprise.subtractBalance')
     await balanceForm.get('form').trigger('submit')
     await flushPromises()
     expect(adjustBalance).toHaveBeenCalledWith(1, { operation: 'subtract', amount: 25.5, notes: '' })

@@ -4,8 +4,8 @@
       <template #actions><div class="flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('admin.enterprises.title') }}</h1><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.enterprises.description') }}</p></div><button class="btn btn-primary" data-test="enterprise-create-open" @click="openCreate">{{ t('admin.enterprises.create') }}</button></div></template>
       <template #filters>
         <form class="card flex flex-wrap gap-3 p-4" @submit.prevent="searchEnterprises">
-          <input v-model.trim="search" class="input w-full sm:w-72" :aria-label="t('enterprise.search')" :placeholder="t('admin.enterprises.searchPlaceholder')" />
-          <select v-model="status" class="input w-full sm:w-40" :aria-label="t('enterprise.status')"><option value="">{{ t('enterprise.all') }}</option><option value="active">{{ t('enterprise.active') }}</option><option value="disabled">{{ t('enterprise.disabled') }}</option></select>
+          <SearchInput v-model="search" class="sm:max-w-sm" :aria-label="t('enterprise.search')" :placeholder="t('admin.enterprises.searchPlaceholder')" />
+          <Select v-model="status" :options="[{ value: '', label: t('enterprise.all') }, ...statusOptions]" class="w-full sm:w-40" :aria-label="t('enterprise.status')" data-test="enterprise-status-filter" />
           <button class="btn btn-secondary">{{ t('enterprise.search') }}</button>
           <p v-if="error" role="alert" class="w-full text-sm text-red-600 dark:text-red-400">{{ error }} <button type="button" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
         </form>
@@ -17,6 +17,7 @@
           <template #cell-balance="{ value }">${{ value.toFixed(4) }}</template>
           <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
           <template #cell-actions="{ row }"><div class="flex flex-wrap gap-3"><RouterLink :to="`/admin/enterprises/${row.id}`" class="text-primary-600 dark:text-primary-400">{{ t('admin.enterprises.open') }}</RouterLink><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-edit-${row.id}`" @click="editing = row">{{ t('enterprise.edit') }}</button><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-balance-${row.id}`" @click="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</button><button class="text-amber-700 dark:text-amber-400" :data-test="`enterprise-status-${row.id}`" @click="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</button><button class="text-red-600 dark:text-red-400" :data-test="`enterprise-delete-${row.id}`" @click="deleting = row">{{ t('admin.enterprises.delete') }}</button></div></template>
+          <template #empty><EmptyState :title="t('enterprise.empty')" :description="t('admin.enterprises.description')" /></template>
         </DataTable>
       </template>
       <template #pagination><Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" /></template>
@@ -25,7 +26,7 @@
       <form class="space-y-5" data-test="enterprise-create-form" @submit.prevent="create">
         <div class="grid gap-4 sm:grid-cols-2">
           <label><span class="input-label">{{ t('enterprise.name') }}</span><input v-model.trim="form.name" class="input" maxlength="100" required data-test="enterprise-name" /></label>
-          <label><span class="input-label">{{ t('enterprise.status') }}</span><select v-model="form.status" class="input"><option value="active">{{ t('enterprise.active') }}</option><option value="disabled">{{ t('enterprise.disabled') }}</option></select></label>
+          <label><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></label>
           <label><span class="input-label">{{ t('enterprise.contactName') }}</span><input v-model.trim="form.contact_name" class="input" maxlength="100" /></label>
           <label><span class="input-label">{{ t('enterprise.contactEmail') }}</span><input v-model.trim="form.contact_email" class="input" type="email" maxlength="255" /></label>
           <label><span class="input-label">{{ t('enterprise.contactPhone') }}</span><input v-model.trim="form.contact_phone" class="input" maxlength="50" /></label>
@@ -37,7 +38,7 @@
           <div class="flex flex-wrap gap-4"><label v-for="mode in ownerModes" :key="mode.value" class="flex items-center gap-2 text-sm dark:text-gray-200"><input v-model="ownerMode" type="radio" :value="mode.value" />{{ mode.label }}</label></div>
           <div v-if="ownerMode === 'existing'" class="space-y-3">
             <div class="flex gap-2"><input v-model.trim="ownerSearch" class="input" :aria-label="t('enterprise.searchUsers')" :placeholder="t('enterprise.searchUsers')" @keydown.enter.prevent="searchUsers" /><button type="button" class="btn btn-secondary" :disabled="searchingUsers" @click="searchUsers">{{ t('enterprise.search') }}</button></div>
-            <select v-model="ownerUserId" class="input" :aria-label="t('enterprise.selectUser')" data-test="owner-user"><option :value="0">{{ t('enterprise.selectUser') }}</option><option v-for="user in users" :key="user.id" :value="user.id">{{ user.username || user.email }} · {{ user.email }}</option></select>
+            <Select v-model="ownerUserId" :options="ownerOptions" :aria-label="t('enterprise.selectUser')" data-test="owner-user" />
           </div>
           <div v-else-if="ownerMode === 'new'" class="grid gap-4 sm:grid-cols-2"><label><span class="input-label">{{ t('enterprise.email') }}</span><input v-model.trim="owner.email" class="input" type="email" autocomplete="off" data-test="owner-email" /></label><label><span class="input-label">{{ t('enterprise.username') }}</span><input v-model.trim="owner.username" class="input" autocomplete="off" /></label><label class="sm:col-span-2"><span class="input-label">{{ t('enterprise.password') }}</span><input v-model="owner.password" class="input" type="password" autocomplete="new-password" data-test="owner-password" /></label></div>
         </fieldset>
@@ -55,6 +56,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Select from '@/components/common/Select.vue'
+import SearchInput from '@/components/common/SearchInput.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { adminAPI } from '@/api/admin'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { enterpriseErrorMessage } from '@/api/enterprise'
@@ -72,6 +76,7 @@ import EnterpriseDeleteDialog from '@/features/enterprise/components/EnterpriseD
 import EnterpriseOwnerWarning from '@/features/enterprise/components/EnterpriseOwnerWarning.vue'
 import { formatDateTime } from '@/utils/format'
 const { t } = useI18n()
+const statusOptions = computed(() => ['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) })))
 const { busy, error, run, read } = useEnterpriseAction()
 const items = ref<Enterprise[]>([]), deleting = ref<Enterprise | null>(null)
 const editing = ref<Enterprise | null>(null), balanceTarget = ref<Enterprise | null>(null), statusTarget = ref<Enterprise | null>(null)
@@ -82,6 +87,7 @@ const form = reactive({ name: '', status: 'active' as 'active' | 'disabled', not
 const ownerMode = ref('none'), ownerUserId = ref(0), ownerSearch = ref(''), searchingUsers = ref(false)
 const owner = reactive({ email: '', password: '', username: '' })
 const users = ref<{ id: number; username: string; email: string }[]>([])
+const ownerOptions = computed(() => [{ value: 0, label: t('enterprise.selectUser') }, ...users.value.map(user => ({ value: user.id, label: `${user.username || user.email} · ${user.email}` }))])
 const ownerModes = computed(() => [{ value: 'none', label: t('admin.enterprises.noOwner') }, { value: 'existing', label: t('enterprise.existingUser') }, { value: 'new', label: t('enterprise.newAccount') }])
 const columns = computed(() => [{ key: 'name', label: t('admin.enterprises.name') }, { key: 'status', label: t('admin.enterprises.status') }, { key: 'balance', label: t('admin.enterprises.balance') }, { key: 'member_count', label: t('admin.enterprises.members') }, { key: 'department_count', label: t('admin.enterprises.departments') }, { key: 'created_at', label: t('admin.enterprises.createdAt') }, { key: 'actions', label: t('enterprise.actions') }])
 async function load() {

@@ -1,3 +1,4 @@
+import { selectOption } from '@/features/enterprise/__tests__/selectOption'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { Enterprise, EnterprisePage } from '@/types/enterprise'
@@ -97,8 +98,8 @@ describe('administrator enterprise latest reads', () => {
     await flushPromises()
     const signal = listEnterprises.mock.calls[0][1].signal as AbortSignal
     await wrapper.get('input[aria-label="enterprise.search"]').setValue('Acme')
-    await wrapper.get('select[aria-label="enterprise.status"]').setValue('disabled')
-    expect(wrapper.get('form button').attributes('disabled')).toBeUndefined()
+    await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.disabled')
+    expect(wrapper.get('form button.btn-secondary').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(signal.aborted).toBe(true)
@@ -115,14 +116,13 @@ describe('administrator enterprise latest reads', () => {
     const old = deferred<EnterprisePage<Enterprise>>(), latest = deferred<EnterprisePage<Enterprise>>()
     listEnterprises.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise)
     const search = wrapper.get('input[aria-label="enterprise.search"]')
-    const status = wrapper.get('select[aria-label="enterprise.status"]')
     await search.setValue('old')
-    await status.setValue('active')
+    await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.active')
     await wrapper.get('form').trigger('submit')
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 1, page_size: 20, search: 'old', status: 'active' }, expect.anything())
     await search.setValue('latest')
-    await status.setValue('disabled')
-    expect(wrapper.get('form button').attributes('disabled')).toBeUndefined()
+    await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.disabled')
+    expect(wrapper.get('form button.btn-secondary').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 1, page_size: 20, search: 'latest', status: 'disabled' }, expect.anything())
     latest.resolve(page(9, 25))
@@ -138,13 +138,12 @@ describe('administrator enterprise latest reads', () => {
     const wrapper = mountList()
     await flushPromises()
     const search = wrapper.get('input[aria-label="enterprise.search"]')
-    const status = wrapper.get('select[aria-label="enterprise.status"]')
     await search.setValue('applied')
-    await status.setValue('active')
+    await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.active')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     await search.setValue('draft')
-    await status.setValue('disabled')
+    await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.disabled')
     await changePage(wrapper, 2)
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 2, page_size: 20, search: 'applied', status: 'active' }, expect.anything())
 
