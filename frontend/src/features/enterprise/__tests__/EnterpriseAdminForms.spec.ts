@@ -15,7 +15,7 @@ vi.mock('@/api/enterprise', () => ({ enterpriseErrorMessage: () => 'enterprise.e
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: vi.fn(), showError }) }))
 vi.mock('vue-i18n', async (importOriginal) => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
 
-const dialog = { props: ['show'], template: '<div v-if="show"><slot /></div>' }
+const dialog = { name: 'EnterpriseDialog', props: ['show'], template: '<div v-if="show"><slot /></div>' }
 const stubs = {
   AppLayout: { template: '<div><slot /></div>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
@@ -36,6 +36,7 @@ describe('Enterprise administrator creation', () => {
   it('creates an enterprise without an initial owner when no owner is selected', async () => {
     const wrapper = mount(EnterprisesView, { global: { stubs } })
     await flushPromises()
+    expect(wrapper.get('[data-layout="wide"]').classes()).toContain('max-w-full')
     await wrapper.get('[data-test="enterprise-create-open"]').trigger('click')
     await wrapper.get('[data-test="enterprise-name"]').setValue('Acme')
     await wrapper.get('[data-test="enterprise-create-form"]').trigger('submit')
@@ -148,7 +149,9 @@ describe('Enterprise quota forms', () => {
     await wrapper.get('form').trigger('submit')
     expect(updateQuota).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('enterprise.validationQuota')
-    await wrapper.get('[data-test="quota-reset-member-7"]').trigger('click')
+    wrapper.getComponent({ name: 'EnterpriseDialog' }).vm.$emit('close')
+    await flushPromises()
+    await clickMenuItem(wrapper, '[data-test="quota-menu-member-7"]', '[data-test="quota-reset-member-7"]')
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
     const dialog = wrapper.getComponent({ name: 'EnterpriseConfirm' })
     expect(dialog.attributes('title')).toBe('enterprise.resetUsage')

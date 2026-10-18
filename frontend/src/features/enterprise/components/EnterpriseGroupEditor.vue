@@ -5,6 +5,7 @@
       <Label v-for="option in modes" :key="option.value" class="flex cursor-pointer items-center gap-3 rounded-ui-md border p-4" :class="mode === option.value ? 'border-primary bg-primary/5' : ''" :data-test="`group-mode-${option.value}`"><RadioGroupItem :value="option.value" :data-test="`group-radio-${option.value}`" />{{ option.label }}</Label>
     </RadioGroup>
     <template v-if="mode === 'selected'">
+      <div v-if="editable" class="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" :disabled="busy || !groups.length" data-test="group-select-all" @click="selection = groups.map(group => group.id)">{{ t('enterprise.groupAccess.selectAll') }}</Button><Button type="button" variant="ghost" size="sm" :disabled="busy || !selection.length" data-test="group-clear" @click="selection = []">{{ t('enterprise.groupAccess.clear') }}</Button></div>
       <EnterpriseGroupCards v-model="selection" :groups="groups" selectable :disabled="!editable || busy" />
       <p v-if="!groups.length" class="text-sm text-muted-foreground">{{ t('enterprise.groupAccess.noCandidates') }}</p>
       <p v-if="staleIds.length" class="text-sm text-amber-700 dark:text-amber-400">{{ t('enterprise.inactiveWhitelistGroups', { groups: staleIds.map(id => `#${id}`).join(', ') }) }}</p>

@@ -78,3 +78,11 @@ describe('Enterprise settings refresh', () => {
     expect(checkbox(wrapper, 'balance_visible_to_member').attributes('aria-checked')).toBe('true')
   })
 })
+
+it('hides the retired member-group switch and always sends false for its legacy setting', async () => {
+  const wrapper = mountSettings()
+  await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, manager_can_edit_member_groups: true } })
+  expect(wrapper.find('[data-test="setting-manager_can_edit_member_groups"]').exists()).toBe(false)
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(updateEnterprise).toHaveBeenCalledWith(1, { settings: { ...defaultEnterpriseSettings, manager_can_edit_member_groups: false } })
+})

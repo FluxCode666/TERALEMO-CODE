@@ -1,5 +1,62 @@
 export default {
   "enterprise": {
+    "passwordReset": {
+      "title": "Reset password",
+      "method": "Reset method",
+      "auto": "Generate automatically",
+      "manual": "Set manually",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "minLength": "Use at least 8 characters for the new password.",
+      "mismatch": "The passwords do not match.",
+      "sessions": "Resetting the password immediately invalidates all signed-in sessions for this member.",
+      "submit": "Confirm reset",
+      "success": "Password reset. All previous sessions have been invalidated.",
+      "once": "This password is shown only once. Copy and store it securely before closing; it cannot be viewed again.",
+      "copy": "Copy password",
+      "copied": "Password copied",
+      "copyFailed": "Copy failed. Select and copy the password manually.",
+      "saved": "I have stored it securely"
+    },
+    "quotaTable": {
+      "title": "Quota management",
+      "description": "Amounts in USD · Current timezone {timezone} · Leave blank for unlimited; 0 disables calls.",
+      "columns": {
+        "daily": "Daily limit / Used today",
+        "weekly": "Weekly limit / Used this week",
+        "monthly": "Monthly limit / Used this month",
+        "total": "Total limit / Total used"
+      },
+      "count": "{total} items ({editable} editable on this page)",
+      "hidden": "Hidden",
+      "status": {
+        "normal": "Used",
+        "warning": "Near limit",
+        "exceeded": "Limit exceeded",
+        "disabled": "Disabled",
+        "unlimited": "Unlimited",
+        "hidden": "Hidden"
+      },
+      "search": "Search by name or username",
+      "me": "(me)",
+      "selectPage": "Select all editable members on this page",
+      "selectMember": "Select member {name}",
+      "toggleDepartment": "Expand or collapse department {name}",
+      "selected": "{count} selected",
+      "batch": "Set quotas in bulk",
+      "deselect": "Clear selection",
+      "fieldsRequired": "Select at least one quota window to change.",
+      "result": "{updated} updated, {failed} failed.",
+      "edit": "Edit quotas",
+      "editHint": "Set limits in USD. Blank means unlimited; 0 disables calls. Bulk updates change only the checked windows.",
+      "statistics": "How quotas are measured",
+      "balanceOnly": "Only enterprise balance spending is counted. Subscription group spending is excluded.",
+      "periods": "Daily windows use calendar days, weeks start on Monday, and monthly windows use calendar months. The total never resets automatically; use “Reset used quota” to clear it.",
+      "timezone": "All windows use the current application timezone: {timezone}.",
+      "subtree": "A parent department’s usage includes every descendant department.",
+      "delay": "Usage is recorded asynchronously after a call ends and may be delayed by a few seconds."
+    },
+    "close": "Close",
     "orgTree": {
       "search": "Search members / departments",
       "searchDepartments": "Search departments",
@@ -99,8 +156,8 @@ export default {
     "organization": "Organization",
     "departments": "Departments",
     "members": "Members",
-    "quotas": "Quotas",
-    "groups": "Allowed groups",
+    "quotas": "Quota management",
+    "groups": "Member callable groups",
     "usageAnalysis": {
       "byDay": "Daily",
       "byHour": "Hourly",
@@ -278,29 +335,34 @@ export default {
         "description": "View and adjust the spending limits shared by each department."
       },
       "member": {
-        "title": "Employee quotas",
-        "description": "Individual spending limits grouped by department. Larger departments start collapsed."
+        "title": "Member quotas",
+        "description": "View and adjust individual member limits, including bulk updates."
       },
       "disabled": "Disabled",
       "empty": "No quotas are visible here. Quota visibility depends on enterprise permissions."
     },
     "groupAccess": {
+      "title": "Member callable groups",
+      "description": "Configure the groups all members of this enterprise can call.",
+      "companyConfiguration": "Group access for all members",
+      "selectAll": "Select all",
+      "clear": "Clear",
       "rateUnknown": "Rate unavailable",
       "availableTitle": "Groups available to the enterprise",
-      "availableHint": "Configure which groups enterprise members can call. These groups are made available by a system administrator.",
+      "availableHint": "These groups are made available by a system administrator and are shown here for reference.",
       "editAvailable": "Edit available groups",
       "adminHint": "Select the groups available to this enterprise. Clear the selection to use members’ personal group permissions.",
-      "personalRules": "Unrestricted. Members use their personal group permissions.",
+      "personalRules": "The administrator has not restricted groups. Members use their personal group permissions.",
       "noAvailable": "No groups are available to this enterprise.",
       "exclusive": "Exclusive",
       "subscription": "Subscription",
       "mode": "Allowed groups",
-      "inherit": "Unrestricted (inherit parent)",
-      "selected": "Allow selected groups only",
-      "inheritHint": "Inherit the groups allowed by the parent, with no additional restriction.",
+      "inherit": "All available groups",
+      "selected": "Specific groups",
+      "inheritHint": "Allow all groups made available to this enterprise. If no pool is configured, personal group permissions apply.",
       "configureHint": "Choose the allowed groups for this target. Lower levels can narrow this selection further.",
-      "noCandidates": "No groups can be selected. Ask the owner to adjust the parent rules.",
-      "selectRequired": "Select at least one group, or choose “Unrestricted (inherit parent)”.",
+      "noCandidates": "No groups are available to select. Ask an administrator to configure the enterprise pool.",
+      "selectRequired": "Select at least one group, or choose “All available groups”.",
       "sections": {
         "enterprise": "Groups allowed for the enterprise",
         "department": "Groups allowed for departments",
@@ -361,6 +423,8 @@ export default {
       "manager_can_edit_member_groups": "Managers can edit member group whitelists in their department and its descendants"
     },
     "errors": {
+      "ENTERPRISE_PASSWORD_RESET_FORBIDDEN": "You cannot reset this member’s password.",
+      "ENTERPRISE_GROUP_SCOPE_DISABLED": "Only enterprise-level group configuration is supported.",
       "generic": "The enterprise operation failed. Please try again.",
       "ENTERPRISE_NOT_FOUND": "The enterprise was not found or has been deleted.",
       "ENTERPRISE_DEPARTMENT_NOT_FOUND": "The department was not found. Refresh and try again.",

@@ -40,9 +40,12 @@ export interface EnterpriseIdentity extends EnterpriseSummary {
   frozen_balance: number | null
 }
 export type QuotaLimits = Record<`${QuotaWindow}_limit_usd`, number | null>
+export interface BatchMemberQuotaRequest extends Partial<QuotaLimits> { member_ids: number[]; fields: QuotaWindow[] }
+export interface BatchMemberQuotaResult { updated: number[]; failed: { member_id: number; code: string; message: string }[] }
 export interface EnterpriseQuota extends QuotaLimits {
   scope_type: EnterpriseScope
   scope_id: number
+  usage_visible?: boolean
   daily_usage_usd: number | null
   weekly_usage_usd: number | null
   monthly_usage_usd: number | null
@@ -98,6 +101,7 @@ export interface EnterpriseMember {
   joined_at: string
   department_path_names?: string[]
   last_login_at?: string | null
+  password_resettable?: boolean
   user_status: EnterpriseStatus
 }
 export interface EnterprisePermissions {

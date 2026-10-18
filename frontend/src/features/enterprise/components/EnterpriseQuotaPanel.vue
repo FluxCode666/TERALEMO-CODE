@@ -1,154 +1,130 @@
-<template>
-  <section class="shadcn-scope space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.quotas') }}</h2><p class="text-sm text-muted-foreground">{{ t('enterprise.quotaHint') }}</p></div>
-    <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
-    <div v-if="busy && !quotas.length" class="grid gap-4" aria-busy="true"><Skeleton v-for="n in 3" :key="n" class="h-40" /></div>
-    <template v-else>
-      <section v-for="kind in ['enterprise'] as const" :key="kind" class="space-y-3" :data-test="`quota-section-${kind}`">
-        <div><h2 class="text-lg font-semibold text-foreground">{{ t(`enterprise.quotaSections.${kind}.title`) }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t(`enterprise.quotaSections.${kind}.description`) }}</p></div>
-        <EnterpriseQuotaDisplay v-for="row in quotas.filter(item => item.scope_type === kind)" :key="row.scope_id" :quota="row" :title="scopeLabel(row)">
-          <template #actions><Button variant="ghost" v-if="canEdit(row)" class="text-primary" :data-test="`quota-edit-${row.scope_type}-${row.scope_id}`" @click="edit(row)">{{ t('enterprise.edit') }}</Button><Button variant="ghost" v-if="canReset" class="text-red-600 dark:text-red-400" :data-test="`quota-reset-${row.scope_type}-${row.scope_id}`" @click="resetTarget = row; resetWindows = ['total']">{{ t('enterprise.resetUsage') }}</Button></template>
-        </EnterpriseQuotaDisplay>
-        <Card v-if="!quotas.some(item => item.scope_type === kind)" class="rounded-ui-lg border bg-card text-card-foreground shadow-sm"><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('enterprise.quotaSections.empty')" /></Card>
-      </section>
-      <section class="space-y-3" data-test="quota-section-department">
-        <div><h2 class="text-lg font-semibold">{{ t('enterprise.quotaSections.department.title') }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t('enterprise.quotaSections.department.description') }}</p></div>
-        <div role="tree" :aria-label="t('enterprise.quotaSections.department.title')">
-          <Collapsible v-for="item in visibleDepartmentRows" :key="item.department.id" :open="departmentOpen[item.department.id] !== false" :style="{ marginLeft: `${item.level * 20}px` }" class="mb-2 border-l pl-3" role="treeitem" :aria-level="item.level + 1" :aria-expanded="departmentOpen[item.department.id] !== false" :data-test="`quota-department-${item.department.id}`" @update:open="value => departmentOpen[item.department.id] = value">
-            <CollapsibleTrigger class="flex w-full items-center justify-between gap-3 py-3 text-left text-sm font-medium"><span>{{ item.department.name }}</span><ChevronDown class="size-4 shrink-0" /></CollapsibleTrigger>
-            <CollapsibleContent v-if="departmentQuota(item.department.id)" class="pb-3"><EnterpriseQuotaDisplay :quota="departmentQuota(item.department.id)!" :title="scopeLabel(departmentQuota(item.department.id)!)"><template #actions><Button v-if="canEdit(departmentQuota(item.department.id)!)" variant="ghost" :data-test="`quota-edit-department-${item.department.id}`" @click="edit(departmentQuota(item.department.id)!)">{{ t('enterprise.edit') }}</Button><Button v-if="canReset" variant="ghost" class="text-destructive" :data-test="`quota-reset-department-${item.department.id}`" @click="resetTarget = departmentQuota(item.department.id)!; resetWindows = ['total']">{{ t('enterprise.resetUsage') }}</Button></template></EnterpriseQuotaDisplay></CollapsibleContent>
-          </Collapsible>
-        </div>
-        <Card v-if="!departmentRows.length"><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('enterprise.quotaSections.empty')" /></Card>
-      </section>
-      <section class="space-y-3" data-test="quota-section-member">
-        <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.quotaSections.member.title') }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t('enterprise.quotaSections.member.description') }}</p></div><Input type="search" v-model="memberSearch" class="sm:max-w-xs" :aria-label="t('enterprise.organizationUi.searchMembers')" :placeholder="t('enterprise.organizationUi.searchMembers')" /></div>
-        <Collapsible v-for="section in visibleMemberSections" :key="section.id" :style="{ marginLeft: `${section.level * 20}px` }" :data-test="`quota-member-department-${section.id}`" class="rounded-xl border border-gray-200 bg-gray-50/50 dark:border-dark-700 dark:bg-dark-900/30" :open="memberSectionOpen(section.id, section.rows.length)" @update:open="value => sectionOpen[section.id] = value">
-          <CollapsibleTrigger data-test="quota-member-toggle" class="flex w-full items-center justify-between px-4 py-4 text-left text-sm font-medium text-foreground">{{ section.name }} <span class="ml-2 text-muted-foreground">{{ section.rows.length }}</span><ChevronDown class="size-4" /></CollapsibleTrigger>
-          <CollapsibleContent class="space-y-3 overflow-hidden px-3 pb-3 data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none"><EnterpriseQuotaDisplay v-for="row in section.rows" :key="row.scope_id" :quota="row" :title="scopeLabel(row)"><template #actions><Button variant="ghost" v-if="canEdit(row)" class="text-primary" :data-test="`quota-edit-member-${row.scope_id}`" @click="edit(row)">{{ t('enterprise.edit') }}</Button><Button variant="ghost" v-if="canReset" class="text-red-600 dark:text-red-400" :data-test="`quota-reset-member-${row.scope_id}`" @click="resetTarget = row; resetWindows = ['total']">{{ t('enterprise.resetUsage') }}</Button></template></EnterpriseQuotaDisplay></CollapsibleContent>
-        </Collapsible>
-        <Card v-if="!memberSections.length" class="rounded-ui-lg border bg-card text-card-foreground shadow-sm"><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('enterprise.quotaSections.empty')" /></Card>
-      </section>
-    </template>
-    <EnterpriseDialog :show="!!editing" :title="t('enterprise.quotas')" @close="editing = null">
-      <form class="space-y-4" @submit.prevent="save">
-        <p class="text-sm text-muted-foreground">{{ t('enterprise.quotaHint') }}</p>
-        <Label v-for="window in windows" :key="window" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t(`enterprise.${window}`) }} (USD)</span><Input v-model="limits[window]" type="number" min="0" step="any"  :placeholder="t('enterprise.unlimited')" :data-test="`quota-${window}`" /></Label>
-        <p v-if="validation" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation }}</p>
-        <Button variant="default"  :disabled="busy">{{ t('enterprise.save') }}</Button>
-      </form>
-    </EnterpriseDialog>
-    <EnterpriseConfirm :busy="busy" :show="!!resetTarget" :disabled="!resetWindows.length" :title="t('enterprise.resetUsage')" :message="t('enterprise.resetConfirm')" danger @cancel="resetTarget = null" @confirm="reset">
-      <div class="flex flex-wrap gap-4"><div v-for="window in windows" :key="window" class="flex items-center gap-2"><Switch :model-value="resetWindows.includes(window)" :aria-label="t(`enterprise.${window}`)" :data-test="`quota-reset-window-${window}`" @update:model-value="selected => setResetWindow(window, selected)" /><span>{{ t(`enterprise.${window}`) }}</span></div></div>
-    </EnterpriseConfirm>
-  </section>
-</template>
-
 <script setup lang="ts">
-import { Skeleton } from '@/components/ui/skeleton'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown } from '@lucide/vue'
-import { Card } from '@/components/ui/card'
-
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EnterpriseResourceAPI } from '@/api/enterprise'
-import type { EnterpriseQuota, EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, QuotaWindow, QuotaLimits } from '@/types/enterprise'
-import EnterpriseDialog from '@/features/enterprise/components/EnterpriseDialog.vue'
-import EnterpriseConfirm from '@/features/enterprise/components/EnterpriseConfirm.vue'
-import EnterpriseQuotaDisplay from './EnterpriseQuotaDisplay.vue'
+import { Info, RefreshCw, Search } from '@lucide/vue'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
-import EnterpriseEmpty from '@/features/enterprise/components/EnterpriseEmpty.vue'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { EnterpriseResourceAPI } from '@/api/enterprise'
+import type { EnterpriseQuota, EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, QuotaWindow, QuotaLimits, BatchMemberQuotaResult } from '@/types/enterprise'
+import { getBrowserTimeZone } from '@/utils/format'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 import { loadMemberOptions } from '../memberOptions'
 import { buildDepartmentTree, departmentAncestors, departmentSubtreeIds } from '../departmentTree'
+import { quotaWindows as windows, quotaLimitBody, type QuotaTableRow } from '../quotaPresentation'
+import EnterpriseDialog from './EnterpriseDialog.vue'
+import EnterpriseConfirm from './EnterpriseConfirm.vue'
+import EnterprisePagination from './EnterprisePagination.vue'
+import EnterpriseQuotaTable from './EnterpriseQuotaTable.vue'
 const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseName?: string; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
 const { busy, error, run, read } = useEnterpriseAction()
+const timezone = getBrowserTimeZone()
 const quotas = ref<EnterpriseQuota[]>([]), departments = ref<EnterpriseDepartment[]>([]), members = ref<EnterpriseMember[]>([])
-const editing = ref<EnterpriseQuota | null>(null), resetTarget = ref<EnterpriseQuota | null>(null)
+const loaded = ref(false), editing = ref<EnterpriseQuota | null>(null), resetTarget = ref<EnterpriseQuota | null>(null)
 const resetWindows = ref<QuotaWindow[]>(['total'])
-const windows: QuotaWindow[] = ['daily', 'weekly', 'monthly', 'total']
 const limits = reactive<Record<QuotaWindow, string | number>>({ daily: '', weekly: '', monthly: '', total: '' })
-const validation = ref('')
-const canReset = computed(() => !props.readonly && (props.admin || props.overview?.permissions.edit_quotas))
-const memberSearch = ref('')
-const sectionOpen = reactive<Record<number, boolean>>({})
+const validation = ref(''), memberSearch = ref(''), page = ref(1), pageSize = ref(10)
 const departmentOpen = reactive<Record<number, boolean>>({})
-const flatDepartments = computed(() => {
-  const result: { department: EnterpriseDepartment; level: number; ancestors: number[] }[] = []
-  const visit = (nodes: ReturnType<typeof buildDepartmentTree>, level = 0, ancestors: number[] = []) => nodes.forEach(node => { result.push({ department: node.department, level, ancestors }); visit(node.children, level + 1, [...ancestors, node.department.id]) })
-  visit(buildDepartmentTree(departments.value)); return result
-})
-function departmentQuota(id: number) { return quotas.value.find(row => row.scope_type === 'department' && row.scope_id === id) }
-const departmentRows = computed(() => {
-  const needed = new Set(quotas.value.filter(row => row.scope_type === 'department').flatMap(row => [row.scope_id, ...departmentAncestors(departments.value, row.scope_id).map(department => department.id)]))
-  return flatDepartments.value.filter(item => needed.has(item.department.id))
-})
-const visibleDepartmentRows = computed(() => departmentRows.value.filter(item => item.ancestors.every(id => departmentOpen[id] !== false)))
-function memberSectionOpen(id: number, length: number) { return !!memberSearch.value || (sectionOpen[id] ?? length <= 5) }
-const memberSections = computed(() => {
-  const sections = new Map<number, { id: number; name: string; rows: EnterpriseQuota[] }>()
-  for (const row of quotas.value.filter(item => item.scope_type === 'member')) {
-    const member = members.value.find(item => item.id === row.scope_id)
-    const name = member ? `${member.username} ${member.email}` : props.overview?.me.member_id === row.scope_id ? props.overview.me.title : `#${row.scope_id}`
-    if (memberSearch.value && !name.toLowerCase().includes(memberSearch.value.toLowerCase())) continue
-    const id = member?.department_id ?? (props.overview?.me.member_id === row.scope_id ? props.overview.me.department_id : null) ?? 0
-    if (!sections.has(id)) sections.set(id, { id, name: departments.value.find(item => item.id === id)?.name || (id ? props.overview?.me.department_name : null) || t('enterprise.noDepartment'), rows: [] })
-    sections.get(id)!.rows.push(row)
-  }
-  const items = [...sections.values()]
-  const needed = new Set(items.flatMap(item => departmentAncestors(departments.value, item.id).map(row => row.id)))
-  const ordered = flatDepartments.value.filter(item => needed.has(item.department.id)).map(item => ({ id: item.department.id, name: item.department.name, rows: sections.get(item.department.id)?.rows ?? [], level: item.level, ancestors: item.ancestors }))
-  for (const item of items) if (!ordered.some(row => row.id === item.id)) ordered.push({ ...item, level: 0, ancestors: [] })
-  return ordered
-})
-const visibleMemberSections = computed(() => memberSections.value.filter(section => !!memberSearch.value || section.ancestors.every(id => memberSectionOpen(id, memberSections.value.find(item => item.id === id)?.rows.length ?? 0))))
-function setResetWindow(window: QuotaWindow, selected: boolean) {
-  resetWindows.value = selected ? [...new Set([...resetWindows.value, window])] : resetWindows.value.filter(item => item !== window)
-}
-function scopeLabel(quota: EnterpriseQuota) {
-  if (quota.scope_type === 'enterprise') return props.enterpriseName || props.overview?.enterprise?.name || t('enterprise.enterpriseScope')
-  const name = quota.scope_type === 'department' ? departments.value.find(item => item.id === quota.scope_id)?.name : quota.scope_type === 'member' ? (members.value.find(item => item.id === quota.scope_id)?.username || members.value.find(item => item.id === quota.scope_id)?.email) : ''
-  return `${t(`enterprise.${quota.scope_type}Scope`)}${name ? ` · ${name}` : ` #${quota.scope_id}`}`
-}
+const selected = ref<number[]>([]), batchOpen = ref(false), batchFields = ref<QuotaWindow[]>(['daily']), batchResult = ref<BatchMemberQuotaResult>()
+const canReset = computed(() => !props.readonly && !!(props.admin || props.overview?.permissions.edit_quotas))
 function canEdit(quota: EnterpriseQuota) {
   if (props.readonly) return false
   if (props.admin || props.overview?.permissions.edit_quotas) return true
   return quota.scope_type === 'member' && !!props.overview?.permissions.edit_member_quota && members.value.some(member => member.id === quota.scope_id && member.role === 'member' && departmentSubtreeIds(departments.value, props.overview?.me.department_id).has(member.department_id ?? 0))
 }
-async function load() {
-  await read(signal => Promise.all([
-    props.api.quotas(undefined, { signal }),
-    props.api.departments({ signal }),
-    props.admin || props.overview?.permissions.view_members || props.overview?.permissions.edit_member_quota ? loadMemberOptions(props.api, signal) : Promise.resolve([])
-  ]), ([rows, departmentRows, memberRows]) => {
-    quotas.value = rows
-    departments.value = departmentRows
-    members.value = memberRows
+const enterpriseRows = computed<QuotaTableRow[]>(() => quotas.value.filter(row => row.scope_type === 'enterprise').map(quota => ({ id: quota.scope_id, label: props.enterpriseName || props.overview?.enterprise.name || t('enterprise.enterpriseScope'), quota })))
+const departmentRows = computed(() => {
+  const needed = new Set(quotas.value.filter(row => row.scope_type === 'department').flatMap(row => [row.scope_id, ...departmentAncestors(departments.value, row.scope_id).map(department => department.id)]))
+  const result: (QuotaTableRow & { ancestors: number[] })[] = []
+  const visit = (nodes: ReturnType<typeof buildDepartmentTree>, level = 0, ancestors: number[] = []) => nodes.forEach(node => {
+    if (needed.has(node.department.id)) result.push({ id: node.department.id, label: node.department.name, level, ancestors, quota: quotas.value.find(row => row.scope_type === 'department' && row.scope_id === node.department.id), hasChildren: node.children.some(child => needed.has(child.department.id)), expanded: departmentOpen[node.department.id] !== false })
+    visit(node.children, level + 1, [...ancestors, node.department.id])
   })
+  visit(buildDepartmentTree(departments.value))
+  for (const quota of quotas.value.filter(row => row.scope_type === 'department')) if (!result.some(row => row.id === quota.scope_id)) result.push({ id: quota.scope_id, label: props.overview?.me.department_id === quota.scope_id ? props.overview.me.department_name || `#${quota.scope_id}` : `#${quota.scope_id}`, quota, ancestors: [] })
+  return result
+})
+const visibleDepartmentRows = computed(() => departmentRows.value.filter(row => row.ancestors.every(id => departmentOpen[id] !== false)))
+function memberLabel(id: number) { const member = members.value.find(row => row.id === id); return member?.username || member?.email || (props.overview?.me.member_id === id ? t('enterprise.quotaTable.me') : `#${id}`) }
+const memberRows = computed<QuotaTableRow[]>(() => quotas.value.filter(row => row.scope_type === 'member').map(quota => {
+  const member = members.value.find(row => row.id === quota.scope_id)
+  return { id: quota.scope_id, quota, label: memberLabel(quota.scope_id), username: member?.username ? `@${member.username}` : undefined, self: props.overview?.me.member_id === quota.scope_id }
+}))
+const filteredMembers = computed(() => memberRows.value.filter(row => `${row.label} ${row.username ?? ''}`.toLocaleLowerCase().includes(memberSearch.value.trim().toLocaleLowerCase())))
+const pageMembers = computed(() => filteredMembers.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
+const sections = computed(() => [
+  { kind: 'enterprise', rows: enterpriseRows.value, total: enterpriseRows.value.length },
+  { kind: 'department', rows: visibleDepartmentRows.value, total: departmentRows.value.length },
+  { kind: 'member', rows: pageMembers.value, total: filteredMembers.value.length }
+])
+const selectedEditable = computed(() => selected.value.filter(id => memberRows.value.some(row => row.id === id && row.quota && canEdit(row.quota))))
+function editableCount(rows: QuotaTableRow[]) { return rows.filter(row => row.quota && canEdit(row.quota)).length }
+function select(id: number, checked: boolean) { selected.value = checked ? [...new Set([...selected.value, id])] : selected.value.filter(item => item !== id) }
+function selectPage(checked: boolean) { pageMembers.value.filter(row => row.quota && canEdit(row.quota)).forEach(row => select(row.id, checked)) }
+watch([memberSearch, pageSize], () => { page.value = 1 })
+watch(filteredMembers, rows => { page.value = Math.min(page.value, Math.max(1, Math.ceil(rows.length / pageSize.value))) })
+watch(selectedEditable, ids => { if (ids.length !== selected.value.length) selected.value = ids })
+async function load() {
+  await read(signal => Promise.all([props.api.quotas(undefined, { signal }), props.api.departments({ signal }), props.admin || props.overview?.permissions.view_members || props.overview?.permissions.edit_member_quota ? loadMemberOptions(props.api, signal) : Promise.resolve([])]), ([rows, departmentRows, memberRows]) => { quotas.value = rows; departments.value = departmentRows; members.value = memberRows; loaded.value = true })
 }
+async function changed() { emit('updated'); await load() }
 function edit(quota: EnterpriseQuota) {
+  if (!canEdit(quota)) return
   editing.value = quota; validation.value = ''
-  for (const window of windows) limits[window] = quota[`${window}_limit_usd`] === null ? '' : String(quota[`${window}_limit_usd`])
+  for (const window of windows) limits[window] = quota[`${window}_limit_usd`] ?? ''
 }
+function openBatch() {
+  if (!selectedEditable.value.length) return
+  batchResult.value = undefined; batchFields.value = ['daily']; validation.value = ''; windows.forEach(window => { limits[window] = '' }); batchOpen.value = true
+}
+function setField(window: QuotaWindow, checked: boolean) { batchFields.value = checked ? [...new Set([...batchFields.value, window])] : batchFields.value.filter(item => item !== window) }
 async function save() {
-  if (!editing.value || !canEdit(editing.value)) return
-  if (windows.some(window => String(limits[window]).trim() !== '' && (!Number.isFinite(Number(limits[window])) || Number(limits[window]) < 0))) { validation.value = t('enterprise.validationQuota'); return }
-  const body = Object.fromEntries(windows.map(window => [`${window}_limit_usd`, String(limits[window]).trim() === '' ? null : Number(limits[window])])) as QuotaLimits
-  const target = editing.value
-  if (await run(() => props.api.updateQuota(target.scope_type, target.scope_id, body), t('enterprise.saved'))) { editing.value = null; emit('updated'); await load() }
+  const fields = batchOpen.value ? batchFields.value : windows
+  if (!fields.length) { validation.value = t('enterprise.quotaTable.fieldsRequired'); return }
+  const body = quotaLimitBody(limits, fields)
+  if (!body) { validation.value = t('enterprise.validationQuota'); return }
+  if (batchOpen.value) {
+    if (!selectedEditable.value.length || batchResult.value) return
+    if (await run(async () => { batchResult.value = await props.api.batchMemberQuotas({ member_ids: [...selectedEditable.value], fields: [...fields], ...body }) })) { selected.value = batchResult.value!.failed.map(row => row.member_id); await changed() }
+  } else {
+    const target = editing.value
+    if (!target || !canEdit(target)) return
+    if (await run(() => props.api.updateQuota(target.scope_type, target.scope_id, body as QuotaLimits), t('enterprise.saved'))) { editing.value = null; await changed() }
+  }
 }
 async function reset() {
-  if (!resetTarget.value || !resetWindows.value.length || !canReset.value) return
   const target = resetTarget.value
-  if (await run(() => props.api.resetQuota(target.scope_type, target.scope_id, resetWindows.value), t('enterprise.saved'))) { resetTarget.value = null; emit('updated'); await load() }
+  if (!target || !resetWindows.value.length || !canReset.value) return
+  if (await run(() => props.api.resetQuota(target.scope_type, target.scope_id, resetWindows.value), t('enterprise.saved'))) { resetTarget.value = null; await changed() }
 }
+function closeEdit() { if (!busy.value) { editing.value = null; batchOpen.value = false } }
 onMounted(load)
 watch(() => props.refreshKey, load)
 </script>
+<template>
+  <section class="shadcn-scope min-w-0 space-y-6" :aria-busy="busy">
+    <header class="flex flex-wrap items-start justify-between gap-4"><div class="min-w-0 flex-1"><p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">QUOTAS</p><h2 class="mt-2 text-3xl font-semibold tracking-tight">{{ t('enterprise.quotaTable.title') }}</h2><p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ t('enterprise.quotaTable.description', { timezone }) }}</p></div><Button variant="outline" :disabled="busy" data-test="quota-refresh" @click="load"><RefreshCw class="mr-2 size-4" />{{ t('enterprise.refresh') }}</Button></header>
+    <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }} <Button variant="ghost" @click="load">{{ t('enterprise.retry') }}</Button></p>
+    <div v-if="busy && !loaded" class="space-y-4"><Skeleton v-for="n in 3" :key="n" class="h-40" /></div>
+    <template v-else>
+      <Card v-for="section in sections" :key="section.kind" class="min-w-0 overflow-hidden" :data-test="`quota-section-${section.kind}`">
+        <CardHeader class="flex flex-wrap flex-row items-start justify-between gap-3 space-y-0 p-4 sm:p-5"><div><CardTitle class="text-base">{{ t(`enterprise.quotaSections.${section.kind}.title`) }}</CardTitle><CardDescription class="mt-1">{{ t('enterprise.quotaTable.count', { total: section.total, editable: editableCount(section.rows) }) }}</CardDescription></div><div v-if="section.kind === 'member'" class="relative w-full sm:w-64"><Search class="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" /><Input v-model="memberSearch" type="search" class="pl-9" :placeholder="t('enterprise.quotaTable.search')" :aria-label="t('enterprise.quotaTable.search')" /></div></CardHeader>
+        <div v-if="section.kind === 'member' && selectedEditable.length" class="mx-4 mb-4 flex flex-wrap items-center gap-2 rounded-ui-md border border-primary/20 bg-primary/5 p-3 text-sm" data-test="quota-batch-toolbar"><span class="mr-auto">{{ t('enterprise.quotaTable.selected', { count: selectedEditable.length }) }}</span><Button variant="outline" size="sm" :disabled="busy" data-test="quota-batch-open" @click="openBatch">{{ t('enterprise.quotaTable.batch') }}</Button><Button variant="ghost" size="sm" :disabled="busy" @click="selected = []">{{ t('enterprise.quotaTable.deselect') }}</Button></div>
+        <EnterpriseQuotaTable :kind="section.kind" :rows="section.rows" :can-edit="canEdit" :can-reset="canReset" :selectable="section.kind === 'member'" :selected="selectedEditable" :busy="busy" @edit="edit" @reset="row => { resetTarget = row; resetWindows = ['total'] }" @toggle="id => departmentOpen[id] = departmentOpen[id] === false" @select="select" @select-page="selectPage" />
+        <div v-if="section.kind === 'member' && filteredMembers.length" class="border-t p-4"><EnterprisePagination v-model:page="page" v-model:page-size="pageSize" :total="filteredMembers.length" /></div>
+      </Card>
+    </template>
+    <aside class="flex items-start gap-3 rounded-ui-lg border bg-muted/30 p-4 sm:p-5" data-test="quota-statistics-note"><Info class="mt-0.5 size-5 shrink-0 text-muted-foreground" /><div class="space-y-2 text-sm leading-relaxed text-muted-foreground"><h3 class="font-medium text-foreground">{{ t('enterprise.quotaTable.statistics') }}</h3><p>{{ t('enterprise.quotaTable.balanceOnly') }}</p><p>{{ t('enterprise.quotaTable.periods') }}</p><p>{{ t('enterprise.quotaTable.timezone', { timezone }) }}</p><p>{{ t('enterprise.quotaTable.subtree') }}</p><p>{{ t('enterprise.quotaTable.delay') }}</p></div></aside>
+    <EnterpriseDialog :show="!!editing || batchOpen" :title="t(batchOpen ? 'enterprise.quotaTable.batch' : 'enterprise.quotaTable.edit')" @close="closeEdit">
+      <div v-if="batchOpen && batchResult" class="space-y-4" data-test="quota-batch-result"><p role="status">{{ t('enterprise.quotaTable.result', { updated: batchResult.updated.length, failed: batchResult.failed.length }) }}</p><ul v-if="batchResult.failed.length" class="space-y-2"><li v-for="failure in batchResult.failed" :key="failure.member_id" class="rounded-ui-md border border-destructive/20 p-3 text-sm"><p class="font-medium">{{ memberLabel(failure.member_id) }}</p><p class="mt-1 break-words text-destructive">{{ failure.message || t('enterprise.errors.generic') }}</p></li></ul><Button :disabled="busy" @click="closeEdit">{{ t('enterprise.close') }}</Button></div>
+      <form v-else class="space-y-4" data-test="quota-edit-form" @submit.prevent="save"><p class="text-sm text-muted-foreground">{{ t('enterprise.quotaTable.editHint') }}</p><div v-for="window in windows" :key="window" class="space-y-2"><Label class="flex items-center gap-2"><Checkbox v-if="batchOpen" :model-value="batchFields.includes(window)" :data-test="`quota-batch-field-${window}`" :disabled="busy" @update:model-value="setField(window, $event === true)" /><span>{{ t(`enterprise.${window}`) }} (USD)</span></Label><Input v-model="limits[window]" :disabled="busy || batchOpen && !batchFields.includes(window)" type="number" min="0" step="any" :aria-label="`${t(`enterprise.${window}`)} (USD)`" :placeholder="t('enterprise.unlimited')" :data-test="`quota-${window}`" /></div><p v-if="validation || error" role="alert" class="text-sm text-destructive">{{ validation || error }}</p><Button :disabled="busy" data-test="quota-save">{{ t('enterprise.save') }}</Button></form>
+    </EnterpriseDialog>
+    <EnterpriseConfirm :busy="busy" :show="!!resetTarget" :disabled="!resetWindows.length" :title="t('enterprise.resetUsage')" :message="t('enterprise.resetConfirm')" danger @cancel="resetTarget = null" @confirm="reset"><div class="flex flex-wrap gap-4"><Label v-for="window in windows" :key="window" class="flex items-center gap-2"><Switch :model-value="resetWindows.includes(window)" :aria-label="t(`enterprise.${window}`)" :data-test="`quota-reset-window-${window}`" @update:model-value="checked => resetWindows = checked ? [...new Set([...resetWindows, window])] : resetWindows.filter(item => item !== window)" />{{ t(`enterprise.${window}`) }}</Label></div></EnterpriseConfirm>
+  </section>
+</template>

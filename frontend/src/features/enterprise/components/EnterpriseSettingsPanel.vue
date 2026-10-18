@@ -32,17 +32,17 @@ const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; enterpr
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
 const { busy, error, run, read } = useEnterpriseAction()
-const form = reactive<EnterpriseSettings>({ ...defaultEnterpriseSettings, ...props.settings })
+const form = reactive<EnterpriseSettings>({ ...defaultEnterpriseSettings, ...props.settings, manager_can_edit_member_groups: false })
 const keys = Object.keys(defaultEnterpriseSettings) as (keyof EnterpriseSettings)[]
 const settingGroups: { key: string; keys: (keyof EnterpriseSettings)[] }[] = [
   { key: 'balance', keys: ['balance_visible_to_manager', 'balance_visible_to_member'] },
   { key: 'visibility', keys: ['member_quota_visible_to_member', 'member_quota_visible_to_manager', 'department_quota_visible_to_manager'] },
-  { key: 'management', keys: ['manager_can_manage_members', 'manager_can_edit_member_quota', 'manager_can_edit_member_groups'] }
+  { key: 'management', keys: ['manager_can_manage_members', 'manager_can_edit_member_quota'] }
 ]
 let serverSettings: EnterpriseSettings = { ...form }
 const preservedEdits = ref(false)
 function applySettings(settings: EnterpriseSettings | null | undefined) {
-  const latest = { ...defaultEnterpriseSettings, ...settings }
+  const latest = { ...defaultEnterpriseSettings, ...settings, manager_can_edit_member_groups: false }
   const dirtyKeys = keys.filter(key => form[key] !== serverSettings[key])
   for (const key of keys) {
     if (!dirtyKeys.includes(key)) form[key] = latest[key]
@@ -55,7 +55,7 @@ async function load() {
 }
 async function save() {
   if (props.readonly) return
-  const settings = { ...form }
+  const settings = { ...form, manager_can_edit_member_groups: false }
   if (await run(() => props.admin ? enterprisesAPI.update(props.enterpriseId, { settings }) : props.api.updateSettings(settings), t('enterprise.saved'))) {
     serverSettings = settings
     preservedEdits.value = false

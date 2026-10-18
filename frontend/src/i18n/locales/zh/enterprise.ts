@@ -1,5 +1,62 @@
 export default {
   "enterprise": {
+    "passwordReset": {
+      "title": "重置密码",
+      "method": "重置方式",
+      "auto": "自动生成",
+      "manual": "手动设置",
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码",
+      "minLength": "新密码至少需要 8 个字符。",
+      "mismatch": "两次输入的密码不一致。",
+      "sessions": "重置后该成员所有已登录会话会立即失效。",
+      "submit": "确认重置",
+      "success": "密码已重置，原有登录会话已失效。",
+      "once": "新密码仅在本次结果中显示一次，关闭后无法再次查看，请立即复制并妥善保管。",
+      "copy": "复制密码",
+      "copied": "密码已复制",
+      "copyFailed": "复制失败，请手动选择并复制密码。",
+      "saved": "我已妥善保存"
+    },
+    "quotaTable": {
+      "title": "限额管理",
+      "description": "金额单位 USD · 当前时区 {timezone} · 留空表示不限，0 表示禁止调用。",
+      "columns": {
+        "daily": "日限额 / 今日已用",
+        "weekly": "周限额 / 本周已用",
+        "monthly": "月限额 / 本月已用",
+        "total": "累计限额 / 累计已用"
+      },
+      "count": "共 {total} 项（本页可编辑 {editable} 项）",
+      "hidden": "隐藏",
+      "status": {
+        "normal": "已使用",
+        "warning": "接近上限",
+        "exceeded": "已超限",
+        "disabled": "已禁用",
+        "unlimited": "不限",
+        "hidden": "隐藏"
+      },
+      "search": "按姓名或用户名搜索",
+      "me": "（我）",
+      "selectPage": "全选当前页可编辑成员",
+      "selectMember": "选择成员 {name}",
+      "toggleDepartment": "展开或收起部门 {name}",
+      "selected": "已选 {count} 项",
+      "batch": "批量设置限额",
+      "deselect": "取消选择",
+      "fieldsRequired": "请至少勾选一个要修改的档位。",
+      "result": "已更新 {updated} 项，失败 {failed} 项。",
+      "edit": "编辑限额",
+      "editHint": "填写四档上限（USD），留空表示不限，0 表示禁止调用。批量设置只修改勾选的档位。",
+      "statistics": "统计口径",
+      "balanceOnly": "仅统计企业余额模式的消费，订阅分组的消费不计入。",
+      "periods": "日按自然日、周从周一开始、月按自然月；累计不自动重置，可通过“重置已用额度”清零。",
+      "timezone": "以上时间按应用当前时区 {timezone} 计算。",
+      "subtree": "上级部门的用量包含全部下级部门。",
+      "delay": "用量在调用结束后异步写入，可能有数秒延迟。"
+    },
+    "close": "关闭",
     "orgTree": {
       "search": "搜索成员 / 部门",
       "searchDepartments": "搜索部门",
@@ -99,8 +156,8 @@ export default {
     "organization": "组织架构",
     "departments": "部门",
     "members": "成员",
-    "quotas": "限额",
-    "groups": "可调用分组",
+    "quotas": "限额管理",
+    "groups": "成员可调用分组",
     "usageAnalysis": {
       "byDay": "按天",
       "byHour": "按小时",
@@ -278,29 +335,34 @@ export default {
         "description": "各部门共享的消费上限，可在此调整和查看。"
       },
       "member": {
-        "title": "员工限额",
-        "description": "按部门查看员工的个人消费上限；人数较多的部门默认折叠。"
+        "title": "成员限额",
+        "description": "查看和批量调整成员的个人消费上限。"
       },
       "disabled": "已禁用",
       "empty": "当前没有可查看的限额。限额可见性由企业权限控制。"
     },
     "groupAccess": {
+      "title": "成员可调用分组",
+      "description": "配置本企业全体成员可以调用的分组。",
+      "companyConfiguration": "全体成员的分组配置",
+      "selectAll": "全选",
+      "clear": "清空",
       "rateUnknown": "倍率未提供",
       "availableTitle": "企业可用分组",
-      "availableHint": "配置允许企业成员调用哪些分组。以下分组由系统管理员为企业开放。",
+      "availableHint": "以下分组由系统管理员为企业开放，在此仅供查看。",
       "editAvailable": "编辑企业可用分组",
       "adminHint": "选择向企业开放的分组；清空后，成员按个人分组权限调用。",
-      "personalRules": "未限定，成员按个人分组权限。",
+      "personalRules": "管理员未限定分组，成员按个人分组权限调用。",
       "noAvailable": "当前没有向企业开放的分组。",
       "exclusive": "专属",
       "subscription": "订阅",
       "mode": "允许调用的分组",
-      "inherit": "不限制（沿用上级）",
-      "selected": "仅允许选中的分组",
-      "inheritHint": "沿用上级允许调用的分组，不额外限制。",
+      "inherit": "全部可用分组",
+      "selected": "指定分组",
+      "inheritHint": "允许全体成员调用管理员为企业开放的全部分组；管理员未限定时按个人分组权限调用。",
       "configureHint": "为所选对象设置允许调用的分组，下级仍可进一步缩小范围。",
-      "noCandidates": "当前没有可选分组，请联系负责人调整上级允许范围。",
-      "selectRequired": "请至少选择一个分组，或切换为“不限制（沿用上级）”。",
+      "noCandidates": "当前没有可选分组，请联系管理员为企业开放分组。",
+      "selectRequired": "请至少选择一个分组，或切换为“全部可用分组”。",
       "sections": {
         "enterprise": "企业允许调用的分组",
         "department": "部门允许调用的分组",
@@ -361,6 +423,8 @@ export default {
       "manager_can_edit_member_groups": "部门负责人可调整本部门及全部下级部门员工可调用分组"
     },
     "errors": {
+      "ENTERPRISE_PASSWORD_RESET_FORBIDDEN": "无权重置该成员的密码。",
+      "ENTERPRISE_GROUP_SCOPE_DISABLED": "仅支持企业级分组配置。",
       "generic": "企业操作失败，请稍后重试。",
       "ENTERPRISE_NOT_FOUND": "企业不存在或已被删除。",
       "ENTERPRISE_DEPARTMENT_NOT_FOUND": "部门不存在，请刷新后重试。",

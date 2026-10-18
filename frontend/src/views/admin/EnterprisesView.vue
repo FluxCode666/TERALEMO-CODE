@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="shadcn-scope min-w-0 space-y-5 text-foreground">
+    <div class="shadcn-scope w-full max-w-full min-w-0 space-y-5 text-foreground" data-layout="wide">
       <header><div class="shadcn-scope flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-bold text-foreground">{{ t('admin.enterprises.title') }}</h1><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.enterprises.description') }}</p></div><Button variant="default"  data-test="enterprise-create-open" @click="openCreate">{{ t('admin.enterprises.create') }}</Button></div></header>
       <section>
         <Card><form class="flex flex-wrap gap-3 p-4" @submit.prevent="searchEnterprises">

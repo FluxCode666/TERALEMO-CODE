@@ -143,6 +143,21 @@ describe('enterprise API contract', () => {
     }
   })
 
+  it('sends both password reset methods and selected quota fields on enterprise and admin routes', async () => {
+    const body = { member_ids: [7, 8], fields: ['daily', 'total'] as const, daily_limit_usd: 0, total_limit_usd: null }
+    for (const [api, base] of [[enterpriseAPI, '/enterprise'], [enterprises.forEnterprise(12), '/admin/enterprises/12']] as const) {
+      post.mockResolvedValue({ data: { generated_password: 'Generated123' } })
+      expect(await api.resetMemberPassword(7, {})).toEqual({ generated_password: 'Generated123' })
+      expect(post).toHaveBeenLastCalledWith(`${base}/members/7/reset-password`, {})
+      await api.resetMemberPassword(7, { password: 'Manual123' })
+      expect(post).toHaveBeenLastCalledWith(`${base}/members/7/reset-password`, { password: 'Manual123' })
+      const response = { updated: [7], failed: [{ member_id: 8, code: 'ENTERPRISE_QUOTA_EXCEEDS_PARENT', message: 'Parent limit exceeded' }] }
+      put.mockResolvedValue({ data: response })
+      expect(await api.batchMemberQuotas({ ...body, fields: [...body.fields] })).toEqual(response)
+      expect(put).toHaveBeenLastCalledWith(`${base}/quotas/members/batch`, body)
+    }
+  })
+
   it('propagates enterprise errors with their code and metadata intact', async () => {
     const error = {
       status: 429,
@@ -225,4 +240,8 @@ describe('enterprise errors', () => {
   it.each([null, undefined, new Error('sensitive upstream error'), { code: 'UNKNOWN_ERROR' }])('uses the friendly fallback for an unknown error: %o', (error) => {
     expect(enterpriseErrorMessage(error, translate)).toBe('translated:enterprise.errors.generic')
   })
+})
+
+it.each(['ENTERPRISE_PASSWORD_RESET_FORBIDDEN', 'ENTERPRISE_GROUP_SCOPE_DISABLED'])('maps %s to a friendly message', code => {
+  expect(enterpriseErrorMessage({ code }, key => key)).toBe(`enterprise.errors.${code}`)
 })

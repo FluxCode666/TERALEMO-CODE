@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="shadcn-scope min-w-0 space-y-6 text-foreground">
+  <div ref="root" class="shadcn-scope mx-auto w-full min-w-0 space-y-6 text-foreground motion-safe:transition-[max-width] motion-safe:duration-300 motion-reduce:transition-none" :class="wideLayout ? 'max-w-full' : 'max-w-6xl'" :data-layout="wideLayout ? 'wide' : 'narrow'">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0 flex-1"><h1 class="max-w-full break-words text-2xl font-bold text-foreground">{{ enterprise?.name || t('enterprise.title') }}</h1><p v-if="overview" class="mt-1 break-words text-sm text-muted-foreground">{{ t(`enterprise.roles.${overview.me.role}`) }} · {{ overview.me.department_name || t('enterprise.noDepartment') }}</p></div>
       <div class="flex flex-wrap items-center gap-3" data-test="enterprise-header-actions">
@@ -102,6 +102,7 @@ const tabs = computed(() => {
   return result
 })
 const activeTab = ref('overview')
+const wideLayout = computed(() => ['organization', 'usage'].includes(activeTab.value))
 const root = ref<HTMLElement | null>(null)
 const motion = useMotion(root)
 async function animateTab() { await nextTick(); motion.stop(); motion.fadeIn('[data-tab-content]'); motion.stagger('[data-metric]') }

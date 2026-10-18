@@ -21,6 +21,8 @@ import EnterpriseDialog from './EnterpriseDialog.vue'
 import EnterpriseConfirm from './EnterpriseConfirm.vue'
 import EnterpriseMemberForm from './EnterpriseMemberForm.vue'
 import EnterpriseImportWizard from './EnterpriseImportWizard.vue'
+import EnterprisePasswordResetDialog from './EnterprisePasswordResetDialog.vue'
+import { canResetMemberPassword } from '../memberPassword'
 const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseName?: string; memberCount?: number; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number; mode?: string }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
@@ -40,6 +42,9 @@ const canCreateMembers = computed(() => managerManagementEnabled.value && canVie
 const canManageMembers = computed(() => managerManagementEnabled.value && !props.readonly && !!(props.admin || props.overview?.permissions.manage_members))
 const canImport = computed(() => canCreateMembers.value && canManageMembers.value)
 function canManageMember(member: EnterpriseMember) { return canManageMembers.value && (!limitedManager.value || member.role === 'member' && managerIds.value.has(member.department_id ?? 0)) }
+const passwordTarget = ref<EnterpriseMember>()
+function canResetPassword(member: EnterpriseMember) { return canResetMemberPassword(member, { admin: props.admin, readonly: props.readonly, overview: props.overview, departments: departments.value }) }
+function openPasswordReset(member: EnterpriseMember) { if (canResetPassword(member)) passwordTarget.value = member }
 const selectedMember = computed(() => visibleMembers.value.find(row => `member-${row.id}` === selected.value))
 const directoryCount = computed(() => props.memberCount ?? (canViewMembers.value ? visibleMembers.value.length : undefined))
 const nodes = computed(() => {
@@ -105,8 +110,9 @@ watch(() => props.refreshKey, load)
     <div v-if="!loaded && busy" class="grid gap-4 lg:grid-cols-[minmax(18rem,2fr)_3fr]"><Skeleton class="h-96" /><Skeleton class="h-96" /></div>
     <div v-else class="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(18rem,2fr)_3fr]">
       <Card class="min-w-0 overflow-hidden"><div class="border-b px-4 py-3 text-sm font-semibold">{{ t('enterprise.organization') }}</div><ScrollArea class="h-[26rem] lg:h-[min(68dvh,48rem)]"><div class="w-full overflow-x-auto p-2"><div class="min-w-max"><EnterpriseTree v-model="selected" :nodes="nodes" :search="search" :label="t('enterprise.organization')" /></div></div></ScrollArea></Card>
-      <EnterpriseOrganizationDetail :selected="selected" :enterprise-name="enterpriseName || overview?.enterprise.name || t('enterprise.enterpriseScope')" :departments="visibleDepartments" :members="visibleMembers" :member-count="directoryCount" :can-manage-departments="canManageDepartments" :can-create-members="canCreateMembers" :can-view-members="canViewMembers" :can-edit-member="!!selectedMember && canManageMember(selectedMember)" :busy="busy" @select="selected = $event" @edit-member="openMember" @toggle-member="toggleMember" @remove-member="row => deleting = { kind: 'member', row }" @create-member="id => openMember(undefined, id)" @create-department="id => openDepartment(undefined, false, id)" @edit-department="openDepartment" @delete-department="row => deleting = { kind: 'department', row }" />
+      <EnterpriseOrganizationDetail :selected="selected" :enterprise-name="enterpriseName || overview?.enterprise.name || t('enterprise.enterpriseScope')" :departments="visibleDepartments" :members="visibleMembers" :member-count="directoryCount" :can-manage-departments="canManageDepartments" :can-create-members="canCreateMembers" :can-view-members="canViewMembers" :can-edit-member="!!selectedMember && canManageMember(selectedMember)" :can-reset-password="!!selectedMember && canResetPassword(selectedMember)" @reset-password="openPasswordReset" :busy="busy" @select="selected = $event" @edit-member="openMember" @toggle-member="toggleMember" @remove-member="row => deleting = { kind: 'member', row }" @create-member="id => openMember(undefined, id)" @create-department="id => openDepartment(undefined, false, id)" @edit-department="openDepartment" @delete-department="row => deleting = { kind: 'department', row }" />
     </div>
+    <EnterprisePasswordResetDialog v-if="passwordTarget" :api="api" :member="passwordTarget" @close="passwordTarget = undefined" @updated="changed" />
     <EnterpriseDialog :show="formOpen" :title="t(formKind === 'member' ? editingMember ? 'enterprise.editMember' : 'enterprise.orgTree.newMember' : moving ? 'enterprise.orgTree.move' : editingDepartment ? 'enterprise.editDepartment' : 'enterprise.orgTree.newDepartment')" @close="formOpen = false">
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
       <EnterpriseMemberForm v-if="formOpen && formKind === 'member'" :admin="admin" :member="editingMember" :departments="visibleDepartments" :limited-manager="limitedManager" :department-id="overview?.me.department_id" :default-department-id="defaultDepartment" :busy="busy" @submit="saveMember" />

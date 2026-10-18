@@ -7,7 +7,7 @@ import type {
   EnterpriseUsageModelTrend, EnterpriseUsageMemberTrend, EnterpriseUsageDepartmentTrend,
   EnterpriseAuditLog, EnterpriseBalanceLog, EnterprisePage, EnterpriseQuery, EnterpriseScope,
   EnterpriseImportRow, EnterpriseImportPreview, EnterpriseImportResult,
-  QuotaLimits, QuotaWindow, CreateEnterpriseMemberRequest, CreateEnterpriseAccountMemberRequest, UpdateEnterpriseMemberRequest
+  BatchMemberQuotaRequest, BatchMemberQuotaResult, QuotaLimits, QuotaWindow, CreateEnterpriseMemberRequest, CreateEnterpriseAccountMemberRequest, UpdateEnterpriseMemberRequest
 } from '@/types/enterprise'
 
 /** Resources available on both enterprise and administrator routes. */
@@ -26,8 +26,10 @@ function createEnterpriseResourceAPI(base: string) {
     members: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterprisePage<EnterpriseMember>>('/members', params, options),
     createMember: (body: CreateEnterpriseMemberRequest) => post<EnterpriseMember>('/members', body),
     updateMember: (id: number, body: UpdateEnterpriseMemberRequest) => put<EnterpriseMember>(`/members/${id}`, body),
+    resetMemberPassword: (id: number, body: { password?: string }) => post<{ generated_password?: string }>(`/members/${id}/reset-password`, body),
     deleteMember: (id: number) => remove(`/members/${id}`),
     quotas: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseQuota[]>('/quotas', params, options),
+    batchMemberQuotas: (body: BatchMemberQuotaRequest) => put<BatchMemberQuotaResult>('/quotas/members/batch', body),
     updateQuota: (scope: EnterpriseScope, id: number, body: QuotaLimits) => put<EnterpriseQuota>(`/quotas/${scope}/${id}`, body),
     resetQuota: (scope: EnterpriseScope, id: number, windows: QuotaWindow[]) => post<EnterpriseQuota>(`/quotas/${scope}/${id}/reset`, { windows }),
     groups: (options?: FetchOptions) => get<EnterpriseGroup[]>('/groups', undefined, options),
@@ -73,6 +75,7 @@ export type EnterpriseAdminResourceAPI = ReturnType<typeof createEnterpriseAPI>
 export type EnterpriseResourceAPI = EnterpriseAdminResourceAPI | typeof enterpriseAPI
 
 const enterpriseErrorCodes = new Set([
+  'ENTERPRISE_PASSWORD_RESET_FORBIDDEN', 'ENTERPRISE_GROUP_SCOPE_DISABLED',
   'ENTERPRISE_DEPARTMENT_CYCLE', 'ENTERPRISE_DEPARTMENT_DEPTH_EXCEEDED',
   'ENTERPRISE_NOT_FOUND', 'ENTERPRISE_DEPARTMENT_NOT_FOUND', 'ENTERPRISE_MEMBER_NOT_FOUND',
   'ENTERPRISE_NAME_EXISTS', 'ENTERPRISE_DEPARTMENT_NAME_EXISTS', 'ENTERPRISE_MEMBER_EXISTS',

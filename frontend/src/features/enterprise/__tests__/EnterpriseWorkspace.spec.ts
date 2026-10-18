@@ -463,3 +463,26 @@ describe('EnterpriseQuotaDisplay four quota windows', () => {
     expect(daily.text()).not.toContain('enterprise.unlimited')
   })
 })
+
+it('declares narrow and wide tab layouts with a reduced-motion-safe width transition', async () => {
+  const wrapper = mountWorkspace(overview('owner'))
+  await flushPromises()
+  for (const name of ['overview', 'quotas', 'groups', 'settings', 'audit', 'organization', 'usage']) {
+    await openTab(wrapper, name)
+    const wide = ['organization', 'usage'].includes(name)
+    expect(wrapper.attributes('data-layout')).toBe(wide ? 'wide' : 'narrow')
+    expect(wrapper.classes()).toContain(wide ? 'max-w-full' : 'max-w-6xl')
+  }
+  expect(wrapper.classes()).toContain('motion-safe:transition-[max-width]')
+  expect(wrapper.classes()).toContain('motion-reduce:transition-none')
+})
+
+it('applies the same layout declarations to administrator enterprise details including balance logs', async () => {
+  getEnterprise.mockResolvedValue({ id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 0, total_recharged: 100, member_count: 0, department_count: 0, settings: { ...defaultEnterpriseSettings } })
+  const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 1 }, global: { stubs: { EnterpriseOrganizationPanel: true, EnterpriseUsagePanel: true, EnterpriseQuotaPanel: true, EnterpriseGroupsPanel: true, EnterpriseSettingsPanel: true, EnterpriseLogsPanel: true, EnterpriseBasicsForm: true, EnterpriseAdminQuotaSummary: true } } })
+  wrappers.push(wrapper); await flushPromises()
+  for (const name of ['overview', 'quotas', 'groups', 'settings', 'audit', 'balanceLogs', 'organization', 'usage']) {
+    await openTab(wrapper, name)
+    expect(wrapper.attributes('data-layout')).toBe(['organization', 'usage'].includes(name) ? 'wide' : 'narrow')
+  }
+})
