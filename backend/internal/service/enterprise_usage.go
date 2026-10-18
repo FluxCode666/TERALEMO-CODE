@@ -180,16 +180,35 @@ type EnterpriseUsageStats struct {
 	TotalActualCost float64 `json:"total_actual_cost"`
 }
 type EnterpriseUsageTrend struct {
-	Date        string  `json:"date"`
-	Requests    int64   `json:"requests"`
-	TotalTokens int64   `json:"total_tokens"`
-	ActualCost  float64 `json:"actual_cost"`
+	Date                string  `json:"date"`
+	Requests            int64   `json:"requests"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	TotalTokens         int64   `json:"total_tokens"`
+	Cost                float64 `json:"cost"`
+	ActualCost          float64 `json:"actual_cost"`
 }
 type EnterpriseUsageModel struct {
-	Model       string  `json:"model"`
-	Requests    int64   `json:"requests"`
-	TotalTokens int64   `json:"total_tokens"`
-	ActualCost  float64 `json:"actual_cost"`
+	Model               string  `json:"model"`
+	Requests            int64   `json:"requests"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	TotalTokens         int64   `json:"total_tokens"`
+	Cost                float64 `json:"cost"`
+	ActualCost          float64 `json:"actual_cost"`
+}
+type EnterpriseUsageAPIKeyOption struct {
+	ID   int64               `json:"id"`
+	Name string              `json:"name"`
+	User EnterpriseUsageUser `json:"user"`
+}
+type EnterpriseUsageModelOption struct {
+	Model    string `json:"model"`
+	Requests int64  `json:"requests"`
 }
 type EnterpriseMemberUsage struct {
 	UserID         int64   `json:"user_id"`
@@ -220,6 +239,21 @@ type EnterpriseUsageRankingRepository interface {
 type enterpriseUsageAnalyticsReader interface {
 	GetUsageTrendWithUsageFilters(context.Context, time.Time, time.Time, string, usagestats.UsageLogFilters) ([]usagestats.TrendDataPoint, error)
 	GetModelStatsWithUsageFiltersBySource(context.Context, time.Time, time.Time, usagestats.UsageLogFilters, string) ([]usagestats.ModelStat, error)
+}
+type EnterpriseUsageOptionsRepository interface {
+	GetEnterpriseUsageAPIKeyOptions(context.Context, usagestats.UsageLogFilters, string, int) ([]EnterpriseUsageAPIKeyOption, error)
+	GetEnterpriseUsageModelOptions(context.Context, usagestats.UsageLogFilters, string, int) ([]EnterpriseUsageModelOption, error)
+}
+
+// NormalizeEnterpriseUsageOptionsLimit bounds both HTTP and internal callers.
+func NormalizeEnterpriseUsageOptionsLimit(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
 }
 
 type EnterpriseUsageService struct{ repo UsageLogRepository }
@@ -327,7 +361,11 @@ func (s *EnterpriseUsageService) Trend(ctx context.Context, scope EnterpriseUsag
 	}
 	out := make([]EnterpriseUsageTrend, 0, len(rows))
 	for _, v := range rows {
-		out = append(out, EnterpriseUsageTrend{v.Date, v.Requests, v.TotalTokens, v.ActualCost})
+		out = append(out, EnterpriseUsageTrend{
+			Date: v.Date, Requests: v.Requests, InputTokens: v.InputTokens, OutputTokens: v.OutputTokens,
+			CacheCreationTokens: v.CacheCreationTokens, CacheReadTokens: v.CacheReadTokens,
+			TotalTokens: v.TotalTokens, Cost: v.Cost, ActualCost: v.ActualCost,
+		})
 	}
 	return out, nil
 }
@@ -346,9 +384,43 @@ func (s *EnterpriseUsageService) Models(ctx context.Context, scope EnterpriseUsa
 	}
 	out := make([]EnterpriseUsageModel, 0, len(rows))
 	for _, v := range rows {
-		out = append(out, EnterpriseUsageModel{v.Model, v.Requests, v.TotalTokens, v.ActualCost})
+		out = append(out, EnterpriseUsageModel{
+			Model: v.Model, Requests: v.Requests, InputTokens: v.InputTokens, OutputTokens: v.OutputTokens,
+			CacheCreationTokens: v.CacheCreationTokens, CacheReadTokens: v.CacheReadTokens,
+			TotalTokens: v.TotalTokens, Cost: v.Cost, ActualCost: v.ActualCost,
+		})
 	}
 	return out, nil
+}
+func (s *EnterpriseUsageService) APIKeyOptions(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters, search string, limit int) ([]EnterpriseUsageAPIKeyOption, error) {
+	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	r, ok := s.repo.(EnterpriseUsageOptionsRepository)
+	if !ok {
+		return nil, fmt.Errorf("enterprise usage options repository unavailable")
+	}
+	return r.GetEnterpriseUsageAPIKeyOptions(ctx, f, strings.TrimSpace(search), NormalizeEnterpriseUsageOptionsLimit(limit))
+}
+func (s *EnterpriseUsageService) ModelOptions(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters, search string, limit int) ([]EnterpriseUsageModelOption, error) {
+	if filters.StartTime == nil {
+		end := time.Now()
+		if filters.EndTime != nil {
+			end = *filters.EndTime
+		}
+		start := end.AddDate(0, 0, -90)
+		filters.StartTime = &start
+	}
+	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	r, ok := s.repo.(EnterpriseUsageOptionsRepository)
+	if !ok {
+		return nil, fmt.Errorf("enterprise usage options repository unavailable")
+	}
+	return r.GetEnterpriseUsageModelOptions(ctx, f, strings.TrimSpace(search), NormalizeEnterpriseUsageOptionsLimit(limit))
 }
 func (s *EnterpriseUsageService) Members(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) ([]EnterpriseMemberUsage, error) {
 	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())

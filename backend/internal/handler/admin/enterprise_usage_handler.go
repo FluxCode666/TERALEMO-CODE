@@ -20,13 +20,15 @@ type enterpriseUsageAPI interface {
 	Stats(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters) (*service.EnterpriseUsageStats, error)
 	Trend(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters, string) ([]service.EnterpriseUsageTrend, error)
 	Models(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters) ([]service.EnterpriseUsageModel, error)
+	APIKeyOptions(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters, string, int) ([]service.EnterpriseUsageAPIKeyOption, error)
+	ModelOptions(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters, string, int) ([]service.EnterpriseUsageModelOption, error)
 	Members(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters) ([]service.EnterpriseMemberUsage, error)
 	Departments(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters) ([]service.EnterpriseDepartmentUsage, error)
 	OverviewStats(context.Context, service.EnterpriseUsageScope) (float64, float64, error)
 }
 
 func (h *EnterpriseHandler) registerUsageRoutes(g *gin.RouterGroup, admin bool) {
-	for _, route := range []struct{ path, kind string }{{"/usage", "list"}, {"/usage/stats", "stats"}, {"/usage/trend", "trend"}, {"/usage/models", "models"}, {"/usage/members", "members"}, {"/usage/departments", "departments"}} {
+	for _, route := range []struct{ path, kind string }{{"/usage", "list"}, {"/usage/stats", "stats"}, {"/usage/trend", "trend"}, {"/usage/models", "models"}, {"/usage/api-key-options", "api-key-options"}, {"/usage/model-options", "model-options"}, {"/usage/members", "members"}, {"/usage/departments", "departments"}} {
 		kind := route.kind
 		g.GET(route.path, h.bind(admin, func(c *gin.Context, a service.EnterpriseActor, id int64) { h.usageQuery(c, a, id, kind) }))
 	}
@@ -90,6 +92,30 @@ func (h *EnterpriseHandler) usageQuery(c *gin.Context, a service.EnterpriseActor
 	scope := enterpriseUsageScope(c, a, id)
 	ctx := c.Request.Context()
 	switch kind {
+	case "api-key-options", "model-options":
+		limit := 20
+		if raw, exists := c.GetQuery("limit"); exists {
+			value, err := strconv.Atoi(raw)
+			if err != nil || value <= 0 {
+				response.BadRequest(c, "Invalid limit")
+				return
+			}
+			limit = service.NormalizeEnterpriseUsageOptionsLimit(value)
+		}
+		search := strings.TrimSpace(c.Query("search"))
+		if kind == "api-key-options" {
+			items, err := h.usage.APIKeyOptions(ctx, scope, filters, search, limit)
+			if items == nil {
+				items = []service.EnterpriseUsageAPIKeyOption{}
+			}
+			enterpriseSuccess(c, items, err)
+		} else {
+			items, err := h.usage.ModelOptions(ctx, scope, filters, search, limit)
+			if items == nil {
+				items = []service.EnterpriseUsageModelOption{}
+			}
+			enterpriseSuccess(c, items, err)
+		}
 	case "list":
 		p := enterprisePagination(c)
 		p.SortBy, p.SortOrder = c.Query("sort_by"), c.Query("sort_order")

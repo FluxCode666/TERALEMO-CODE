@@ -20,10 +20,10 @@ func (*enterpriseSensitiveUsageRepository) GetStatsWithFilters(context.Context, 
 	return &usagestats.UsageStats{TotalRequests: 1, TotalTokens: 2, TotalActualCost: 3, TotalAccountCost: &accountCost, UpstreamEndpoints: []usagestats.EndpointStat{{Endpoint: "private-upstream"}}, EndpointPaths: []usagestats.EndpointStat{{Endpoint: "private-path"}}}, nil
 }
 func (*enterpriseSensitiveUsageRepository) GetUsageTrendWithUsageFilters(context.Context, time.Time, time.Time, string, usagestats.UsageLogFilters) ([]usagestats.TrendDataPoint, error) {
-	return []usagestats.TrendDataPoint{{Date: "2026-10-17", Requests: 1, TotalTokens: 2, ActualCost: 3, Cost: 999}}, nil
+	return []usagestats.TrendDataPoint{{Date: "2026-10-17", Requests: 1, TotalTokens: 2, ActualCost: 3, Cost: 4}}, nil
 }
 func (*enterpriseSensitiveUsageRepository) GetModelStatsWithUsageFiltersBySource(context.Context, time.Time, time.Time, usagestats.UsageLogFilters, string) ([]usagestats.ModelStat, error) {
-	return []usagestats.ModelStat{{Model: "public-model", Requests: 1, TotalTokens: 2, ActualCost: 3, AccountCost: 999, Cost: 999}}, nil
+	return []usagestats.ModelStat{{Model: "public-model", Requests: 1, TotalTokens: 2, ActualCost: 3, AccountCost: 999, Cost: 4}}, nil
 }
 
 func TestEnterpriseUsageAggregatesWhitelistSensitiveSourceFields(t *testing.T) {
@@ -63,6 +63,10 @@ func TestEnterpriseUsageMissingCapabilitiesCannotFallBackToLegacyQueries(t *test
 	_, err = svc.Trend(ctx, scope, usagestats.UsageLogFilters{}, "day")
 	require.ErrorContains(t, err, "repository unavailable")
 	_, err = svc.Models(ctx, scope, usagestats.UsageLogFilters{})
+	require.ErrorContains(t, err, "repository unavailable")
+	_, err = svc.APIKeyOptions(ctx, scope, usagestats.UsageLogFilters{}, "", 20)
+	require.ErrorContains(t, err, "repository unavailable")
+	_, err = svc.ModelOptions(ctx, scope, usagestats.UsageLogFilters{}, "", 20)
 	require.ErrorContains(t, err, "repository unavailable")
 	_, err = svc.Members(ctx, scope, usagestats.UsageLogFilters{})
 	require.ErrorContains(t, err, "repository unavailable")
