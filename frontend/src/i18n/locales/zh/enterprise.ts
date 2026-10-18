@@ -174,6 +174,7 @@ export default {
 
       "allTime": "全部时间",
       "filters": "筛选条件",
+      "last24": "近 24 小时",
       "today": "今天",
       "last7": "近 7 天",
       "last30": "近 30 天",

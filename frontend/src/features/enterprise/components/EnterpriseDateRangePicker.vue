@@ -8,18 +8,21 @@ import { CalendarDays, ChevronDown } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RangeCalendar } from '@/components/ui/range-calendar'
-import { usageDateRange, type UsagePeriod } from '../useEnterpriseUsage'
+import { usageDateRange, usageTimeRange, type UsagePeriod } from '../useEnterpriseUsage'
 
-const props = defineProps<{ startDate: string; endDate: string }>()
+const props = defineProps<{ startDate: string; endDate: string; startTime?: string; endTime?: string }>()
 const emit = defineEmits<{ 'update:startDate': [value: string]; 'update:endDate': [value: string] }>()
 const selectedPeriod = defineModel<UsagePeriod | null>('period', { default: null })
 const { t, locale } = useI18n()
 const open = ref(false)
 const wide = useMediaQuery('(min-width: 768px)')
 const range = shallowRef<DateRange>({ start: undefined, end: undefined })
-const periods: UsagePeriod[] = ['today', 'last7', 'last30', 'month', 'lastMonth']
+const periods: UsagePeriod[] = ['last24', 'today', 'last7', 'last30', 'month', 'lastMonth']
+const previewTimeRange = ref(usageTimeRange())
 const calendarLocale = computed(() => locale.value === 'zh' ? 'zh-CN' : locale.value)
-const fullLabel = computed(() => props.startDate || props.endDate ? `${props.startDate || '…'} – ${props.endDate || '…'}` : t('enterprise.usageAnalysis.allTime'))
+const fullLabel = computed(() => selectedPeriod.value === 'last24'
+  ? `${props.startTime || previewTimeRange.value.start_time} – ${props.endTime || previewTimeRange.value.end_time}`
+  : props.startDate || props.endDate ? `${props.startDate || '…'} – ${props.endDate || '…'}` : t('enterprise.usageAnalysis.allTime'))
 const label = computed(() => {
   if (selectedPeriod.value) return t(`enterprise.usageAnalysis.${selectedPeriod.value}`)
   if (props.startDate && props.endDate && props.startDate.slice(0, 4) === props.endDate.slice(0, 4)) {
@@ -29,6 +32,10 @@ const label = computed(() => {
 })
 watch([() => props.startDate, () => props.endDate], () => {
   if (!selectedPeriod.value) return
+  if (selectedPeriod.value === 'last24') {
+    if (props.startDate || props.endDate) selectedPeriod.value = null
+    return
+  }
   const value = usageDateRange(selectedPeriod.value)
   if (props.startDate !== value.start_date || props.endDate !== value.end_date) selectedPeriod.value = null
 })
@@ -46,6 +53,11 @@ function commit(start: string, end: string, period: UsagePeriod | null = null) {
   open.value = false
 }
 function preset(period: UsagePeriod) {
+  if (period === 'last24') {
+    previewTimeRange.value = usageTimeRange()
+    commit('', '', period)
+    return
+  }
   const value = usageDateRange(period)
   commit(value.start_date, value.end_date, period)
 }

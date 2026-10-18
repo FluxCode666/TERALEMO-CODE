@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { Enterprise, EnterpriseOverview, EnterprisePermissions, EnterpriseQuota, EnterpriseRole } from '@/types/enterprise'
 import { defaultEnterpriseSettings } from '@/types/enterprise'
 import EnterpriseWorkspace from '../EnterpriseWorkspace.vue'
+import { getEnterpriseTabs, type EnterpriseSection } from '../navigation'
 import EnterpriseQuotaDisplay from '../components/EnterpriseQuotaDisplay.vue'
 import EnterpriseDetailView from '@/views/admin/EnterpriseDetailView.vue'
 
@@ -110,11 +111,12 @@ function mountWorkspace(value: EnterpriseOverview) {
 }
 
 function tabNames(wrapper: VueWrapper) {
-  return wrapper.findAll('[data-test^="tab-"]').map(tab => tab.attributes('data-test')!.slice(4))
+  return getEnterpriseTabs(wrapper.props('overview'), wrapper.props('admin'))
 }
 
 async function openTab(wrapper: VueWrapper, name: string) {
-  await wrapper.get(`[data-test="tab-${name}"]`).trigger('click')
+  if (wrapper.props('admin')) await wrapper.get(`[data-test="tab-${name}"]`).trigger('click')
+  else await wrapper.setProps({ section: name as EnterpriseSection })
   await flushPromises()
 }
 
@@ -141,17 +143,15 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     expect(tabNames(wrapper).sort()).toEqual([...expected].sort())
   })
 
-  it('switches shadcn Tabs with selected state and lazy content', async () => {
+  it('用户侧按子页渲染，隐藏 Tab 栏并保留懒加载', async () => {
     const wrapper = mountWorkspace(overview('owner'))
     await flushPromises()
-    expect(wrapper.get('[role="tablist"]').exists()).toBe(true)
-    expect(wrapper.get('[data-test="tab-overview"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).exists()).toBe(false)
     await openTab(wrapper, 'organization')
-    expect(wrapper.get('[data-test="tab-organization"]').attributes('aria-selected')).toBe('true')
-    expect(wrapper.get('[data-test="tab-overview"]').attributes('aria-selected')).toBe('false')
-    expect(wrapper.get('[role="tabpanel"]').exists()).toBe(true)
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).exists()).toBe(true)
+    expect(wrapper.find('[data-tab-content]').exists()).toBe(true)
   })
 
   it('hides forbidden tabs and all invisible null overview cards instead of showing zero', async () => {
@@ -226,7 +226,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     expect(panel.props('refreshKey')).toBe(refreshKey)
 
     await wrapper.setProps({ overview: { ...value, balance: 250 } })
-    expect(wrapper.get('[data-test="tab-settings"]').attributes('aria-current')).toBe('page')
+    expect(wrapper.props('section')).toBe('settings')
     expect(wrapper.findComponent({ name: 'EnterpriseSettingsPanel' }).vm).toBe(instance)
     expect(panel.props('refreshKey')).toBe(refreshKey + 1)
   })
@@ -254,6 +254,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     await wrapper.get('[data-test="enterprise-refresh"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.get('[role="tablist"]').exists()).toBe(true)
     expect(getEnterprise).toHaveBeenCalledTimes(2)
     expect(panel.vm).toBe(instance)
     expect(panel.props('refreshKey')).toBe(refreshKey + 1)

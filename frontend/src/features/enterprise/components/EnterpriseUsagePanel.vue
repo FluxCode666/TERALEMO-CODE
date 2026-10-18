@@ -5,16 +5,16 @@
       <form class="usage-filters sticky z-20 rounded-xl border bg-card p-3 text-card-foreground shadow-sm sm:p-4" :aria-label="t('enterprise.usageAnalysis.filters')" @submit.prevent="searchUsage">
         <div v-if="isSticky" class="flex min-w-0 items-center gap-3">
           <Badge variant="secondary" class="shrink-0"><SlidersHorizontal class="mr-1 size-3" />{{ t('enterprise.usageAnalysis.filters') }}</Badge>
-          <p data-test="usage-filter-summary" class="min-w-0 flex-1 truncate text-sm text-muted-foreground" :title="filterSummary" aria-live="polite">{{ filterSummary }}</p>
+          <p data-test="usage-filter-summary" class="min-w-0 flex-1 truncate text-sm text-muted-foreground" :title="summaryTitle" aria-live="polite">{{ filterSummary }}</p>
           <span v-if="busy" role="status" class="sr-only">{{ t('common.loading') }}</span>
           <Button type="button" variant="ghost" size="sm" data-test="usage-expand-filters" class="shrink-0" :aria-expanded="showFilters" aria-controls="enterprise-usage-filters" @click="expanded = !expanded">{{ t(showFilters ? 'enterprise.usageAnalysis.collapse' : 'enterprise.usageAnalysis.expand') }}</Button>
         </div>
         <div v-if="showFilters" id="enterprise-usage-filters" :class="{ 'mt-3': isSticky }">
           <div class="flex min-w-0 flex-wrap items-center gap-2" data-test="usage-filter-controls">
-            <div class="w-fit max-w-full shrink-0"><EnterpriseDateRangePicker v-model:start-date="filters.start_date" v-model:end-date="filters.end_date" v-model:period="datePeriod" /></div>
+            <div class="w-fit max-w-full shrink-0"><EnterpriseDateRangePicker v-model:start-date="filters.start_date" v-model:end-date="filters.end_date" v-model:period="datePeriod" :start-time="rollingRange.start_time" :end-time="rollingRange.end_time" /></div>
             <EnterpriseUsageCombobox v-if="canFilterMembers" v-model="filters.user_id" class="w-40 max-w-full shrink-0" data-test="usage-member" :label="t('enterprise.members')" :options="memberOptions" :selected-label="memberOptions.find(item => item.value === filters.user_id)?.label" />
             <div v-if="canFilterDepartments" class="w-44 max-w-full shrink-0"><EnterpriseUsageDepartmentTree v-model="filters.department_id" :departments="departments" :root-id="departmentRoot" /></div>
-            <EnterpriseUsageCombobox v-model="filters.model" class="w-40 max-w-full shrink-0" data-test="usage-model" :label="t('enterprise.model')" :search-options="searchModels" :search-scope="`${filters.start_date}:${filters.end_date}`" />
+            <EnterpriseUsageCombobox v-model="filters.model" class="w-40 max-w-full shrink-0" data-test="usage-model" :label="t('enterprise.model')" :search-options="searchModels" :search-scope="JSON.stringify(draftDateQuery)" />
             <EnterpriseUsageCombobox v-model="filters.api_key_id" class="w-44 max-w-full shrink-0" data-test="usage-api-key" :label="t('enterprise.apiKey')" :search-options="searchKeys" :selected-label="selectedKey?.label" @select="selectedKey = $event" />
             <ToggleGroup type="single" :model-value="granularity" size="sm" class="h-10 shrink-0 gap-0 rounded-md border p-1" data-test="usage-granularity" :aria-label="t('admin.dashboard.granularity')" @update:model-value="changeGranularity">
               <ToggleGroupItem value="day" class="h-8 px-2.5" data-test="usage-granularity-day">{{ t('enterprise.usageAnalysis.byDay') }}</ToggleGroupItem>
@@ -77,7 +77,7 @@ import EnterpriseUsageDistribution from './EnterpriseUsageDistribution.vue'
 import EnterpriseUsageRanking from './EnterpriseUsageRanking.vue'
 import EnterpriseUsageDetails from './EnterpriseUsageDetails.vue'
 import { useEnterpriseStickyFilters } from '../useEnterpriseStickyFilters'
-import type { UsagePeriod } from '../useEnterpriseUsage'
+import { usageTimeRange, type UsagePeriod } from '../useEnterpriseUsage'
 import { loadMemberOptions } from '../memberOptions'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
@@ -85,7 +85,7 @@ const { t } = useI18n()
 const route = inject(routeLocationKey, undefined)
 const root = ref<HTMLElement>()
 const motion = useMotion(root)
-const granularity = ref<'day' | 'hour'>('day')
+const granularity = ref<'day' | 'hour'>('hour')
 const hourNotice = ref(false)
 const modelView = ref<UsageView>('share'), memberView = ref<UsageView>('share'), departmentView = ref<UsageView>('share')
 const modelTrend = ref<UsageSeriesPoint[]>([]), memberTrend = ref<UsageSeriesPoint[]>([]), departmentTrend = ref<UsageSeriesPoint[]>([])
@@ -96,7 +96,7 @@ async function searchKeys(search: string, signal: AbortSignal): Promise<Enterpri
   return (await usageOptions.value.keys(search, signal)).map(item => ({ value: String(item.id), label: `${item.name} · ${item.user.username || item.user.email}` }))
 }
 async function searchModels(search: string, signal: AbortSignal): Promise<EnterpriseUsageOption[]> {
-  return (await usageOptions.value.models(search, signal, { start_date: filters.start_date || undefined, end_date: filters.end_date || undefined })).map(item => ({ value: item.model, label: item.model, detail: t('enterprise.usageAnalysis.optionRequests', { count: item.requests.toLocaleString() }) }))
+  return (await usageOptions.value.models(search, signal, draftDateQuery.value)).map(item => ({ value: item.model, label: item.model, detail: t('enterprise.usageAnalysis.optionRequests', { count: item.requests.toLocaleString() }) }))
 }
 const rowAction = useEnterpriseAction(), summaryAction = useEnterpriseAction(), trendAction = useEnterpriseAction(), optionAction = useEnterpriseAction(), breakdownAction = useEnterpriseAction()
 const busy = computed(() => rowAction.busy.value || summaryAction.busy.value || trendAction.busy.value || optionAction.busy.value || breakdownAction.busy.value)
@@ -106,10 +106,15 @@ const rows = ref<EnterpriseUsageLog[]>([]), stats = ref<EnterpriseUsageStats | n
 const memberRanking = ref<EnterpriseMemberUsage[]>([]), departmentRanking = ref<EnterpriseDepartmentUsage[]>([])
 const departments = ref<EnterpriseDepartment[]>([]), members = ref<EnterpriseMember[]>([])
 const filters = reactive({ start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' })
-const datePeriod = ref<UsagePeriod | null>(null)
+const datePeriod = ref<UsagePeriod | null>('last24')
+const rollingRange = ref(usageTimeRange())
+const isRollingRange = computed(() => datePeriod.value === 'last24' && !filters.start_date && !filters.end_date)
+const draftDateQuery = computed(() => isRollingRange.value ? rollingRange.value : { ...(filters.start_date ? { start_date: filters.start_date } : {}), ...(filters.end_date ? { end_date: filters.end_date } : {}) })
+watch(datePeriod, period => { if (period === 'last24') rollingRange.value = usageTimeRange() }, { flush: 'sync' })
 const { sentinel, headerHeight, isSticky, expanded, showFilters } = useEnterpriseStickyFilters()
 const sort = reactive<{ sort_by: 'created_at' | 'model'; sort_order: 'asc' | 'desc' }>({ sort_by: 'created_at', sort_order: 'desc' })
-const appliedQuery = ref<EnterpriseQuery>({})
+const appliedQuery = ref<EnterpriseQuery>({ ...rollingRange.value })
+const appliedRollingRange = ref(true)
 const validation = ref('')
 const allowsHourly = computed(() => usageAllowsHourly(appliedQuery.value))
 const departmentRoot = computed(() => !props.admin && props.overview?.me?.role === 'manager' ? props.overview.me.department_id : undefined)
@@ -126,19 +131,20 @@ const departmentChartItems = computed(() => departmentRanking.value.map(item => 
 const memberOptions = computed(() => members.value.map(member => ({ value: String(member.user_id), label: member.username || member.email, detail: member.username ? member.email : undefined })))
 const filterSummary = computed(() => {
   const query = appliedQuery.value
-  const dates = query.start_date || query.end_date ? `${query.start_date || '…'} – ${query.end_date || '…'}` : t('enterprise.usageAnalysis.allTime')
+  const dates = appliedRollingRange.value ? t('enterprise.usageAnalysis.last24') : query.start_date || query.end_date ? `${query.start_date || '…'} – ${query.end_date || '…'}` : t('enterprise.usageAnalysis.allTime')
   return [dates, t(granularity.value === 'hour' ? 'enterprise.usageAnalysis.byHour' : 'enterprise.usageAnalysis.byDay'),
     query.user_id ? members.value.find(member => member.user_id === query.user_id)?.username || members.value.find(member => member.user_id === query.user_id)?.email || `#${query.user_id}` : '',
     query.department_id ? departmentLabel(query.department_id) : '',
     query.model, query.api_key_id ? appliedKeyLabel.value || `${t('enterprise.apiKey')} #${query.api_key_id}` : ''
   ].filter(Boolean).join(' · ')
 })
+const summaryTitle = computed(() => appliedRollingRange.value ? `${filterSummary.value} (${appliedQuery.value.start_time} – ${appliedQuery.value.end_time})` : filterSummary.value)
 function departmentLabel(id: number) {
   const department = departments.value.find(item => item.id === id)
   return department?.path_names?.join(' / ') || department?.name || `#${id}`
 }
 function query(): EnterpriseQuery {
-  return { start_date: filters.start_date || undefined, end_date: filters.end_date || undefined, user_id: canFilterMembers.value && filters.user_id ? Number(filters.user_id) : undefined, department_id: canFilterDepartments.value && allowedDepartmentIds.value.has(Number(filters.department_id)) ? Number(filters.department_id) : undefined, model: filters.model || undefined, api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined }
+  return { ...draftDateQuery.value, user_id: canFilterMembers.value && filters.user_id ? Number(filters.user_id) : undefined, department_id: canFilterDepartments.value && allowedDepartmentIds.value.has(Number(filters.department_id)) ? Number(filters.department_id) : undefined, model: filters.model || undefined, api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined }
 }
 function validate() {
   validation.value = ''
@@ -171,6 +177,8 @@ async function load() {
 }
 function searchUsage() {
   if (!validate()) return
+  if (isRollingRange.value) rollingRange.value = usageTimeRange()
+  appliedRollingRange.value = isRollingRange.value
   appliedQuery.value = query(); page.value = 1
   hourNotice.value = granularity.value === 'hour' && !allowsHourly.value
   if (hourNotice.value) granularity.value = 'day'
@@ -182,8 +190,14 @@ function searchUsage() {
   modelTrend.value = []; memberTrend.value = []; departmentTrend.value = []
   void load()
 }
-function resetFilters() { selectedKey.value = undefined; datePeriod.value = null; Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); searchUsage() }
+function resetFilters() { selectedKey.value = undefined; datePeriod.value = 'last24'; granularity.value = 'hour'; Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); searchUsage() }
 async function reload() {
+  // Refresh the applied rolling window without applying any staged filter edits.
+  if (appliedRollingRange.value) {
+    const times = usageTimeRange()
+    appliedQuery.value = { ...appliedQuery.value, ...times }
+    if (isRollingRange.value) rollingRange.value = times
+  }
   await Promise.all([
     optionAction.read(signal => Promise.all([canFilterDepartments.value ? props.api.departments({ signal }) : Promise.resolve([]), canFilterMembers.value ? loadMemberOptions(props.api, signal) : Promise.resolve([])]), ([departmentRows, memberRows]) => { departments.value = departmentRows; members.value = memberRows }),
     load()

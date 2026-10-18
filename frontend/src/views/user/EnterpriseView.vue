@@ -7,7 +7,7 @@
       <p class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
       <Button variant="outline" type="button"  @click="loadOverview">{{ t('enterprise.retry') }}</Button>
     </Card>
-    <EnterpriseWorkspace v-if="overview" :overview="overview" @updated="handleUpdated" />
+    <EnterpriseWorkspace v-if="overview" :overview="overview" :section="section" @navigate="navigate" @updated="handleUpdated" />
   </div></AppLayout>
 </template>
 
@@ -16,45 +16,40 @@ import { Card } from '@/components/ui/card'
 
 import { Button } from '@/components/ui/button'
 
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-import { enterpriseAPI, enterpriseErrorMessage } from '@/api/enterprise'
+import { useEnterpriseStore } from '@/stores/enterprise'
+import { enterpriseErrorMessage } from '@/api/enterprise'
+import { enterpriseSectionPath, type EnterpriseSection } from '@/features/enterprise/navigation'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import EnterpriseWorkspace from '@/features/enterprise/EnterpriseWorkspace.vue'
-import type { EnterpriseOverview } from '@/types/enterprise'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const overview = ref<EnterpriseOverview | null>(null)
-const loading = ref(true)
-const errorMessage = ref('')
-let overviewController: AbortController | undefined
+const enterpriseStore = useEnterpriseStore()
+const { overview, loading, error } = storeToRefs(enterpriseStore)
+const route = useRoute()
+const router = useRouter()
+const section = computed(() => route.meta.enterpriseSection ?? 'overview')
+const errorMessage = computed(() => error.value ? enterpriseErrorMessage(error.value, t) : '')
 let disposed = false
 let identityRefreshSequence = 0
 
-async function loadOverview() {
-  if (disposed) return
-  overviewController?.abort()
-  const controller = new AbortController()
-  overviewController = controller
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    const result = await enterpriseAPI.overview({ signal: controller.signal })
-    if (disposed || controller.signal.aborted) return
-    overview.value = result
-  } catch (error) {
-    if (disposed || controller.signal.aborted) return
-    errorMessage.value = enterpriseErrorMessage(error, t)
-  } finally {
-    if (!disposed && overviewController === controller) loading.value = false
-  }
+function navigate(value: EnterpriseSection) {
+  void router.push(enterpriseSectionPath(value))
+}
+
+function loadOverview() {
+  return enterpriseStore.ensureLoaded()
 }
 
 async function handleUpdated() {
   const sequence = ++identityRefreshSequence
+  enterpriseStore.invalidate(false)
   try {
     await authStore.refreshUser()
   } catch (error) {
@@ -63,10 +58,16 @@ async function handleUpdated() {
   if (!disposed && sequence === identityRefreshSequence) await loadOverview()
 }
 
-onBeforeUnmount(() => {
-  disposed = true
-  overviewController?.abort()
+// Permissions can change after a mutation or the periodic user refresh, without
+// another navigation. Revalidate the current section against the fresh overview.
+watch([overview, section], () => {
+  if (overview.value && !enterpriseStore.stale && !enterpriseStore.tabs.includes(section.value)) {
+    void router.replace(enterpriseSectionPath(enterpriseStore.tabs[0] ?? 'overview'))
+  }
 })
-
+watch(() => enterpriseStore.canAccess, allowed => {
+  if (!allowed) void router.replace('/dashboard')
+})
+onBeforeUnmount(() => { disposed = true })
 onMounted(loadOverview)
 </script>

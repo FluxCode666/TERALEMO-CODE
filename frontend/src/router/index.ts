@@ -5,6 +5,8 @@
 
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useEnterpriseStore } from '@/stores/enterprise'
+import { canAccessEnterprise, enterpriseSections, enterpriseSectionPath } from '@/features/enterprise/navigation'
 import { useAppStore } from '@/stores/app'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import { useAdminComplianceStore } from '@/stores/adminCompliance'
@@ -209,6 +211,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/user/EnterpriseView.vue'),
     meta: { requiresAuth: true, requiresEnterprise: true, titleKey: 'enterprise.title', descriptionKey: 'enterprise.description' }
   },
+  ...enterpriseSections.map(section => ({
+    path: enterpriseSectionPath(section),
+    name: `Enterprise-${section}`,
+    component: () => import('@/views/user/EnterpriseView.vue'),
+    meta: { requiresAuth: true, requiresEnterprise: true, enterpriseSection: section, titleKey: `enterprise.${section}` }
+  })),
   {
     path: '/keys',
     name: 'Keys',
@@ -844,9 +852,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const enterprise = authStore.user?.enterprise
-  const canManageEnterprise = !!enterprise && (
-    authStore.isAdmin || enterprise.role === 'owner' || enterprise.role === 'manager'
-  )
+  const canManageEnterprise = canAccessEnterprise(enterprise, authStore.isAdmin)
 
   // This check also covers public payment callbacks that can open a payment form.
   if (authStore.isAuthenticated && authStore.user?.enterprise && to.meta.requiresPersonalWallet) {
@@ -924,6 +930,21 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresEnterprise && !canManageEnterprise) {
     next('/dashboard')
     return
+  }
+
+  if (to.meta.requiresEnterprise) {
+    const enterpriseStore = useEnterpriseStore()
+    await enterpriseStore.ensureLoaded()
+    // Auth may have changed while overview was loading.
+    if (!canAccessEnterprise(authStore.user?.enterprise, authStore.isAdmin)) {
+      next('/dashboard')
+      return
+    }
+    const first = enterpriseStore.tabs[0] ?? 'overview'
+    if (!to.meta.enterpriseSection || (enterpriseStore.overview && !enterpriseStore.tabs.includes(to.meta.enterpriseSection))) {
+      next(enterpriseSectionPath(first))
+      return
+    }
   }
 
   // Check admin requirement

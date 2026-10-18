@@ -6,8 +6,17 @@ import type { Column } from '@/components/common/types'
 export const usageNumber = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) ? value : 0
 export const usageMoney = (value: unknown) => `$${usageNumber(value).toFixed(4)}`
 export const usageColors = ['#14b8a6', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16']
-export type UsagePeriod = 'today' | 'last7' | 'last30' | 'month' | 'lastMonth'
-export function usageDateRange(period: UsagePeriod, now = new Date()) {
+export type UsagePeriod = 'last24' | 'today' | 'last7' | 'last30' | 'month' | 'lastMonth'
+/** A rolling interval uses elapsed time, including across daylight saving changes. */
+export function usageTimeRange(now = new Date()) {
+  const timestamp = (value: Date) => {
+    const pad = (part: number, length = 2) => String(part).padStart(length, '0')
+    const offset = -value.getTimezoneOffset()
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}.${pad(value.getMilliseconds(), 3)}${offset >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`
+  }
+  return { start_time: timestamp(new Date(now.getTime() - 86400000)), end_time: timestamp(now) }
+}
+export function usageDateRange(period: Exclude<UsagePeriod, 'last24'>, now = new Date()) {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   if (period === 'month') start.setDate(1)

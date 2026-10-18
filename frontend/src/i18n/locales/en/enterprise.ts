@@ -174,6 +174,7 @@ export default {
 
       "allTime": "All time",
       "filters": "Filters",
+      "last24": "Last 24 hours",
       "today": "Today",
       "last7": "Last 7 days",
       "last30": "Last 30 days",

@@ -4,6 +4,7 @@
  */
 
 import 'vue-router'
+import type { EnterpriseSection } from '@/features/enterprise/navigation'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -15,6 +16,7 @@ declare module 'vue-router' {
 
     /** Requires an enterprise owner/manager, or a system admin with enterprise membership. */
     requiresEnterprise?: boolean
+    enterpriseSection?: EnterpriseSection
 
     /** Personal payments, balance redemption and unsupported wallet flows. */
     requiresPersonalWallet?: boolean

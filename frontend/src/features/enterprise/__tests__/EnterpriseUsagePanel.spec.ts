@@ -76,7 +76,7 @@ afterEach(() => {
 describe('enterprise usage display', () => {
   it('maps the backend single-day token breakdown into the personal trend chart', async () => {
     const { wrapper, api } = await mountUsage([singleDay])
-    expect(api.usageTrend).toHaveBeenCalledWith({ granularity: 'day' }, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(api.usageTrend).toHaveBeenCalledWith(expect.objectContaining({ granularity: 'hour', start_time: expect.any(String), end_time: expect.any(String) }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
     const line = wrapper.getComponent(Line)
     expect(line.props('data')).toMatchObject({ labels: ['2026-10-18'], datasets: [{ data: [1000] }, { data: [2000] }, { data: [1000] }, { data: [2000] }, { data: [50], yAxisID: 'yPercent' }] })
     expect(line.element.parentElement?.classList.contains('h-48')).toBe(true)

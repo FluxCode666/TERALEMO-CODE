@@ -1,9 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
+import { useEnterpriseStore } from '@/stores/enterprise'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { EnterpriseOverview } from '@/types/enterprise'
 import EnterpriseView from '../EnterpriseView.vue'
 
-const { overview, refreshUser } = vi.hoisted(() => ({ overview: vi.fn(), refreshUser: vi.fn() }))
+const { overview, refreshUser, auth, route, router } = vi.hoisted(() => ({
+  overview: vi.fn(), refreshUser: vi.fn(),
+  auth: { user: { id: 42, role: 'user', enterprise: { id: 1, role: 'manager' } }, isAdmin: false },
+  route: { meta: { enterpriseSection: 'overview' } },
+  router: { push: vi.fn(), replace: vi.fn() }
+}))
+vi.mock('vue-router', () => ({ useRoute: () => reactive(route), useRouter: () => router }))
 
 vi.mock('@/api/client', () => ({ apiClient: {} }))
 
@@ -22,14 +31,14 @@ vi.mock('vue-i18n', async () => {
 })
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ refreshUser })
+  useAuthStore: () => Object.assign(reactive(auth), { refreshUser })
 }))
 
 vi.mock('@/features/enterprise/EnterpriseWorkspace.vue', () => ({
   default: {
     name: 'EnterpriseWorkspace',
-    props: ['overview'],
-    emits: ['updated'],
+    props: ['overview', 'section'],
+    emits: ['updated', 'navigate'],
     data: () => ({ activeTab: 'overview' }),
     template: '<div data-test="workspace"><span>{{ overview.enterprise.name }}</span><button @click="$emit(\'updated\')">updated</button></div>'
   }
@@ -77,8 +86,14 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+afterEach(() => { useEnterpriseStore().$dispose() })
+
 describe('EnterpriseView overview lifecycle', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
+    router.push.mockReset()
+    router.replace.mockReset()
+    route.meta.enterpriseSection = 'overview'
     overview.mockReset()
     overview.mockResolvedValue(memberOverview)
     refreshUser.mockReset()
@@ -87,6 +102,7 @@ describe('EnterpriseView overview lifecycle', () => {
 
   it('loads the dedicated overview endpoint and passes server permissions and nulls to the workspace', async () => {
     const wrapper = mountView()
+    await wrapper.vm.$nextTick()
     expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true)
     await flushPromises()
 
@@ -168,17 +184,21 @@ describe('EnterpriseView overview lifecycle', () => {
     wrapper.unmount()
   })
 
-  it('aborts the pending overview request when unmounted', async () => {
+  it('离开页面时保留共享请求，再次进入复用缓存', async () => {
     const pending = deferred<EnterpriseOverview>()
     overview.mockReturnValueOnce(pending.promise)
     const wrapper = mountView()
     const signal = overview.mock.calls[0]?.[0]?.signal as AbortSignal
     expect(signal.aborted).toBe(false)
     wrapper.unmount()
-    expect(signal.aborted).toBe(true)
-    pending.reject(new Error('request canceled'))
+    expect(signal.aborted).toBe(false)
+    pending.resolve(memberOverview)
+    await flushPromises()
+    const remounted = mountView()
     await flushPromises()
     expect(overview).toHaveBeenCalledTimes(1)
+    expect(remounted.find('[data-test="workspace"]').exists()).toBe(true)
+    remounted.unmount()
   })
 
   it('does not start a follow-up overview request after unmounting during identity refresh', async () => {
@@ -216,4 +236,26 @@ describe('EnterpriseView overview lifecycle', () => {
     wrapper.unmount()
   })
 
+})
+
+
+it('按当前子路由挂载并通过路由跳转，刷新后纠正失去权限的子页', async () => {
+  setActivePinia(createPinia())
+  route.meta.enterpriseSection = 'organization'
+  overview.mockResolvedValue(memberOverview)
+  const wrapper = mountView()
+  await flushPromises()
+  const workspace = wrapper.findComponent({ name: 'EnterpriseWorkspace' })
+  expect(workspace.props('section')).toBe('organization')
+  workspace.vm.$emit('navigate', 'quotas')
+  expect(router.push).toHaveBeenCalledWith('/enterprise/quotas')
+  reactive(route).meta.enterpriseSection = 'settings'
+  await flushPromises()
+  expect(router.replace).toHaveBeenCalledWith('/enterprise/overview')
+  expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).vm).toBe(workspace.vm)
+  useEnterpriseStore().invalidate()
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).props('section')).toBe('settings')
+  expect(router.replace).toHaveBeenCalledWith('/enterprise/overview')
+  wrapper.unmount()
 })

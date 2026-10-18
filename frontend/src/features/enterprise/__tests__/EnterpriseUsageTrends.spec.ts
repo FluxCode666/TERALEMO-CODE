@@ -72,6 +72,9 @@ describe('global enterprise usage granularity', () => {
   })
   it('disables unbounded and >31-day hourly ranges and automatically falls back on submitted ranges', async () => {
     const { wrapper, api } = await setup()
+    expect(wrapper.get('[data-test="usage-granularity-hour"]').attributes('disabled')).toBeUndefined()
+    wrapper.getComponent(DateRangePicker).vm.$emit('update:period', null)
+    await wrapper.get('form').trigger('submit'); await flushPromises()
     expect(wrapper.get('[data-test="usage-granularity-hour"]').attributes('disabled')).toBeDefined()
     await dates(wrapper, '2026-10-01', '2026-10-31')
     expect(wrapper.get('[data-test="usage-granularity-hour"]').attributes('disabled')).toBeUndefined()

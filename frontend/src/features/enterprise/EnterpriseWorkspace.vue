@@ -12,9 +12,9 @@
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" data-test="enterprise-refresh" @click="refresh">{{ t('enterprise.retry') }}</Button></p>
     <div v-if="busy && !enterprise" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true"><Skeleton v-for="n in 4" :key="n" class="h-36" /></div>
     <template v-if="enterprise">
-      <Tabs v-model="activeTab" :unmount-on-hide="true" class="min-w-0">
-        <div class="overflow-x-auto pb-1"><TabsList class="h-auto min-w-max justify-start" :aria-label="t('enterprise.title')"><TabsTrigger v-for="tab in tabs" :key="tab" :value="tab" :data-test="`tab-${tab}`" :aria-current="activeTab === tab ? 'page' : undefined" @click="activeTab = tab">{{ t(`enterprise.${tab}`) }}</TabsTrigger></TabsList></div>
-        <TabsContent :value="activeTab" class="mt-5" data-tab-content>
+      <component :is="admin ? Tabs : 'div'" :model-value="admin ? activeTab : undefined" :unmount-on-hide="admin ? true : undefined" class="min-w-0" @update:model-value="selectTab">
+        <div v-if="admin" class="overflow-x-auto pb-1"><TabsList class="h-auto min-w-max justify-start" :aria-label="t('enterprise.title')"><TabsTrigger v-for="tab in tabs" :key="tab" :value="tab" :data-test="`tab-${tab}`" :aria-current="activeTab === tab ? 'page' : undefined" @click="activeTab = tab">{{ t(`enterprise.${tab}`) }}</TabsTrigger></TabsList></div>
+        <component :is="admin ? TabsContent : 'div'" :value="admin ? activeTab : undefined" :class="admin ? 'mt-5' : undefined" data-tab-content>
       <section v-if="activeTab === 'overview'" class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <EnterpriseMetric v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="balance" currency />
@@ -38,8 +38,8 @@
       <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
       <EnterpriseLogsPanel v-else-if="activeTab === 'audit' || activeTab === 'balanceLogs'" :key="activeTab" :api="api" :kind="activeTab" :enterprise="enterprise" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
       <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" :refresh-key="refreshKey" @updated="updated" /></div>
-        </TabsContent>
-      </Tabs>
+        </component>
+      </component>
     </template>
     <EnterpriseDialog :show="balanceOpen" :title="t('enterprise.adjustBalance')" @close="balanceOpen = false">
       <EnterpriseBalanceForm v-if="balanceOpen && enterpriseId" :enterprise-id="enterpriseId" @updated="balanceOpen = false; updated()" />
@@ -76,8 +76,9 @@ import EnterpriseBasicsForm from './components/EnterpriseBasicsForm.vue'
 import EnterpriseBalanceForm from './components/EnterpriseBalanceForm.vue'
 import EnterpriseOwnerWarning from './components/EnterpriseOwnerWarning.vue'
 import { useEnterpriseAction } from './useEnterpriseAction'
-const props = defineProps<{ admin?: boolean; enterpriseId?: number; overview?: EnterpriseOverview }>()
-const emit = defineEmits<{ updated: [] }>()
+import { getEnterpriseTabs, type EnterpriseSection, type EnterpriseTab } from './navigation'
+const props = defineProps<{ admin?: boolean; enterpriseId?: number; overview?: EnterpriseOverview; section?: EnterpriseSection }>()
+const emit = defineEmits<{ updated: []; navigate: [section: EnterpriseSection] }>()
 const { t } = useI18n()
 const { busy, error, read } = useEnterpriseAction()
 const adminEnterprise = ref<Enterprise | null>(null)
@@ -87,17 +88,18 @@ const readonly = computed(() => !props.admin && (enterprise.value?.status !== 'a
 const balanceVisible = computed(() => props.admin || props.overview?.balance_visible)
 const balance = computed(() => props.admin ? adminEnterprise.value?.balance ?? null : props.overview?.balance ?? null)
 const enterpriseQuota = computed(() => props.admin ? adminEnterprise.value?.quota : props.overview?.enterprise_quota)
-const tabs = computed(() => {
-  const permissions = props.overview?.permissions
-  const result = ['overview', 'organization']
-  if (props.admin || props.overview?.enterprise_quota || (props.overview?.department_quota_visible && props.overview.department_quota) || (props.overview?.member_quota_visible && props.overview.member_quota) || permissions?.edit_quotas || permissions?.edit_member_quota) result.push('quotas')
-  result.push('groups', 'usage')
-  if (props.admin) result.push('balanceLogs')
-  if (props.admin || permissions?.view_audit_logs) result.push('audit')
-  if (props.admin || permissions?.edit_settings) result.push('settings')
-  return result
+const tabs = computed(() => getEnterpriseTabs(props.overview, props.admin))
+const selectedTab = ref<EnterpriseTab>('overview')
+const activeTab = computed<EnterpriseTab>({
+  get: () => props.admin ? selectedTab.value : (props.section && tabs.value.includes(props.section) ? props.section : 'overview'),
+  set: value => {
+    if (props.admin) selectedTab.value = value
+    else if (value !== 'balanceLogs') emit('navigate', value)
+  }
 })
-const activeTab = ref('overview')
+function selectTab(value: string | number) {
+  if (tabs.value.includes(value as EnterpriseTab)) activeTab.value = value as EnterpriseTab
+}
 const wideLayout = computed(() => ['organization', 'usage'].includes(activeTab.value))
 const root = ref<HTMLElement | null>(null)
 const motion = useMotion(root)

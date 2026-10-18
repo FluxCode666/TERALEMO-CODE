@@ -78,7 +78,9 @@ describe('enterprise usage analysis queries', () => {
     await wrapper.setProps({ refreshKey: 1 }); await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining(snapshot), expect.anything())
     await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
-    expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: undefined, end_date: undefined, model: undefined, api_key_id: undefined }), expect.anything())
+    expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ start_time: expect.any(String), end_time: expect.any(String), model: undefined, api_key_id: undefined }), expect.anything())
+    expect(requests.usageStats.mock.calls.at(-1)![0]).not.toHaveProperty('start_date')
+    expect(requests.usageStats.mock.calls.at(-1)![0]).not.toHaveProperty('end_date')
   })
 
   it('computes local calendar quick ranges across a month and year boundary', () => {

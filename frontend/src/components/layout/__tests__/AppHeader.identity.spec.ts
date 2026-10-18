@@ -15,10 +15,11 @@ const mocks = vi.hoisted(() => ({
     isSimpleMode: false,
   },
   push: vi.fn(),
+  route: { name: 'Dashboard', meta: {} as { titleKey?: string }, params: {} },
 }))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.push }),
-  useRoute: () => ({ name: 'Dashboard', meta: {}, params: {} }),
+  useRoute: () => mocks.route,
 }))
 vi.mock('@/stores', () => ({
   useAuthStore: () => mocks.auth,
@@ -62,6 +63,7 @@ beforeEach(() => {
   mocks.auth.user = { email: 'member@example.com', username: 'Member', role: 'user', balance: 0, enterprise: null }
   mocks.auth.isAdmin = false
   mocks.push.mockReset()
+  mocks.route.meta = {}
 })
 
 describe('AppHeader 企业身份', () => {
@@ -144,4 +146,15 @@ describe('AppHeader 企业身份', () => {
     expect(mocks.push).not.toHaveBeenCalled()
     wrapper.unmount()
   })
+})
+
+
+it.each([
+  ['overview', '概览'], ['organization', '组织架构'], ['quotas', '限额管理'],
+  ['groups', '成员可调用分组'], ['usage', '用量分析'], ['audit', '审计'], ['settings', '设置']
+])('顶栏使用企业 %s 子页的标题', (section, expected) => {
+  mocks.route.meta = { titleKey: `enterprise.${section}` }
+  const wrapper = render()
+  expect(wrapper.get('h1').text()).toBe(expected)
+  wrapper.unmount()
 })

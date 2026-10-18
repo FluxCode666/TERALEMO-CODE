@@ -9,8 +9,13 @@ export interface UsageDepartment extends EnterpriseDepartment {
 }
 export interface UsageDepartmentNode { department: UsageDepartment; children: UsageDepartmentNode[] }
 
-/** An unbounded range cannot safely be requested at hourly resolution. Dates are inclusive. */
-export function usageAllowsHourly(query: Pick<EnterpriseQuery, 'start_date' | 'end_date'>) {
+/** Time intervals take precedence and are exclusive at the end; calendar dates are inclusive. */
+export function usageAllowsHourly(query: Pick<EnterpriseQuery, 'start_date' | 'end_date' | 'start_time' | 'end_time'>) {
+  if (query.start_time || query.end_time) {
+    if (!query.start_time || !query.end_time) return false
+    const duration = Date.parse(query.end_time) - Date.parse(query.start_time)
+    return Number.isFinite(duration) && duration > 0 && duration <= 31 * 86400000
+  }
   if (!query.start_date || !query.end_date) return false
   const days = (Date.parse(query.end_date) - Date.parse(query.start_date)) / 86400000 + 1
   return Number.isFinite(days) && days >= 1 && days <= 31

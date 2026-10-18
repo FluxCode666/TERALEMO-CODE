@@ -92,7 +92,8 @@ describe('enterprise usage sticky filters', () => {
     await intersect(false, 900)
     expect(wrapper.find('[data-test="usage-filter-summary"]').exists()).toBe(false)
     await intersect(false, 50)
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间 · 按天')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('近 24 小时 · 按小时')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').attributes('title')).toContain('2026-10-17T12:00:00')
     expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
     expect(wrapper.get('form').classes()).toContain('z-20')
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
@@ -128,7 +129,7 @@ describe('enterprise usage sticky filters', () => {
       expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: '2026-10-01', end_date: '2026-10-10', user_id: 42, department_id: 3, model: 'gpt-5.4', api_key_id: 8 }), expect.anything())
     }
     await intersect(false, 0)
-    const snapshot = '2026-10-01 – 2026-10-10 · 按天 · Alice · 研发 · gpt-5.4 · Production · Alice'
+    const snapshot = '2026-10-01 – 2026-10-10 · 按小时 · Alice · 研发 · gpt-5.4 · Production · Alice'
     expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
     wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'draft-model')
@@ -137,7 +138,7 @@ describe('enterprise usage sticky filters', () => {
     expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
     expect(api.usageStats).toHaveBeenCalledTimes(2)
     await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间 · 按天')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('近 24 小时 · 按小时')
     expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
     expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0000')
   })
@@ -152,7 +153,7 @@ describe('enterprise usage sticky filters', () => {
     expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-01 – 2026-10-10 · 按小时')
   })
 
-  it('preserves shortcut names across sticky collapse and clears them on reset', async () => {
+  it('preserves shortcut names across sticky collapse and restores the rolling preset on reset', async () => {
     const { wrapper, api } = await setup()
     const picker = wrapper.getComponent(DateRangePicker)
     picker.vm.$emit('update:startDate', '2026-10-12'); picker.vm.$emit('update:endDate', '2026-10-18')
@@ -162,12 +163,12 @@ describe('enterprise usage sticky filters', () => {
     await wrapper.get('form').trigger('submit'); await flushPromises()
     expect(api.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: '2026-10-12', end_date: '2026-10-18' }), expect.anything())
     await intersect(false, 0)
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-12 – 2026-10-18 · 按天')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-12 – 2026-10-18 · 按小时')
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
     expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('近 7 天')
     await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
-    expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('全部时间')
+    expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('近 24 小时')
   })
 
   it('validates reversed or excessive ranges before issuing requests', async () => {

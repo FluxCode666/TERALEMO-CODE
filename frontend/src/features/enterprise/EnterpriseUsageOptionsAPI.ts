@@ -1,4 +1,5 @@
 import { apiClient } from '@/api/client'
+import type { EnterpriseQuery } from '@/types/enterprise'
 
 export interface EnterpriseUsageOption { value: string; label: string; detail?: string }
 interface UsageKeyOption { id: number; name: string; user: { id: number; username: string; email: string } }
@@ -14,6 +15,6 @@ export function createEnterpriseUsageOptionsAPI(admin: boolean, enterpriseId?: n
   }
   return {
     keys: (search: string, signal: AbortSignal) => get<UsageKeyOption[]>('api-key', search, signal),
-    models: (search: string, signal: AbortSignal, dates: { start_date?: string; end_date?: string }) => get<UsageModelOption[]>('model', search, signal, dates)
+    models: (search: string, signal: AbortSignal, dates: Pick<EnterpriseQuery, 'start_date' | 'end_date' | 'start_time' | 'end_time'>) => get<UsageModelOption[]>('model', search, signal, dates)
   }
 }

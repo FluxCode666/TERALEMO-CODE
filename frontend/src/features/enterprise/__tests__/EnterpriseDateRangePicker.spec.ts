@@ -26,6 +26,22 @@ async function setup(wide = true, startDate = '', endDate = '') {
   return wrapper
 }
 describe('enterprise date range picker', () => {
+  it('places the rolling preset first and keeps exact timestamps in its title', async () => {
+    const wrapper = await setup()
+    const content = wrapper.getComponent(PopoverContent)
+    expect(content.findAll('button')[0].attributes('data-test')).toBe('usage-period-last24')
+    await content.get('[data-test="usage-period-last24"]').trigger('click')
+    expect(wrapper.emitted('update:period')?.at(-1)).toEqual(['last24'])
+    expect(wrapper.emitted('update:startDate')?.at(-1)).toEqual([''])
+    expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual([''])
+    const trigger = wrapper.get('[data-test="usage-date-range"]')
+    expect(trigger.text()).toBe('近 24 小时')
+    expect(trigger.attributes('title')).toContain('2026-10-17T12:00:00')
+    await wrapper.setProps({ startTime: '2026-10-17T12:34:56+08:00', endTime: '2026-10-18T12:34:56+08:00' })
+    expect(trigger.attributes('title')).toBe('2026-10-17T12:34:56+08:00 – 2026-10-18T12:34:56+08:00')
+    await wrapper.setProps({ startDate: '2026-10-01', endDate: '2026-10-09' })
+    expect(trigger.text()).toBe('10-01 – 10-09')
+  })
   it.each([
     ['today', '2026-10-18', '2026-10-18', '今天'], ['last7', '2026-10-12', '2026-10-18', '近 7 天'],
     ['last30', '2026-09-19', '2026-10-18', '近 30 天'], ['month', '2026-10-01', '2026-10-18', '本月'],
