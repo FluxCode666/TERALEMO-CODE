@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Info, RefreshCw, Search } from '@lucide/vue'
+import { Info, Search } from '@lucide/vue'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -109,7 +109,7 @@ watch(() => props.refreshKey, load)
 </script>
 <template>
   <section class="shadcn-scope min-w-0 space-y-6" :aria-busy="busy">
-    <header class="flex flex-wrap items-start justify-between gap-4"><div class="min-w-0 flex-1"><p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">QUOTAS</p><h2 class="mt-2 text-3xl font-semibold tracking-tight">{{ t('enterprise.quotaTable.title') }}</h2><p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ t('enterprise.quotaTable.description', { timezone }) }}</p></div><Button variant="outline" :disabled="busy" data-test="quota-refresh" @click="load"><RefreshCw class="mr-2 size-4" />{{ t('enterprise.refresh') }}</Button></header>
+    <header class="flex flex-wrap items-start justify-between gap-4"><div class="min-w-0 flex-1"><p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">QUOTAS</p><h2 class="mt-2 text-3xl font-semibold tracking-tight">{{ t('enterprise.quotaTable.title') }}</h2><p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ t('enterprise.quotaTable.description', { timezone }) }}</p></div></header>
     <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }} <Button variant="ghost" @click="load">{{ t('enterprise.retry') }}</Button></p>
     <div v-if="busy && !loaded" class="space-y-4"><Skeleton v-for="n in 3" :key="n" class="h-40" /></div>
     <template v-else>
