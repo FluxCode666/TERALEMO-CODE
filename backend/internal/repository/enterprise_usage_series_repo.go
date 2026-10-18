@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -43,8 +44,12 @@ func (r *usageLogRepository) GetEnterpriseUsageSeries(ctx context.Context, filte
 	if top > 20 {
 		top = 20
 	}
+	// Explicitly align labels with the application timezone, independently of
+	// the database session and the offsets supplied in the requested interval.
+	dateExpression := fmt.Sprintf("ul.created_at AT TIME ZONE $%d", len(args)+1)
+	args = append(args, timezone.Location().String())
 	query := fmt.Sprintf(`WITH buckets AS (
- SELECT TO_CHAR(ul.created_at,'%s') AS date, %s AS entity, %s AS label,
+ SELECT TO_CHAR(%s,'%s') AS date, %s AS entity, %s AS label,
  COUNT(*) AS requests,
  COALESCE(SUM(ul.input_tokens+ul.output_tokens+ul.cache_creation_tokens+ul.cache_read_tokens),0) AS total_tokens,
  COALESCE(SUM(ul.actual_cost),0) AS actual_cost
@@ -57,7 +62,7 @@ func (r *usageLogRepository) GetEnterpriseUsageSeries(ctx context.Context, filte
  requests,total_tokens,actual_cost FROM buckets
  )
  SELECT date,entity,label,SUM(requests),SUM(total_tokens),SUM(actual_cost)
- FROM folded GROUP BY date,entity,label ORDER BY date,entity,label`, safeDateFormat(granularity), entity, label, joins, where, len(args)+1)
+ FROM folded GROUP BY date,entity,label ORDER BY date,entity,label`, dateExpression, safeDateFormat(granularity), entity, label, joins, where, len(args)+1)
 	args = append(args, top)
 	rows, err := r.sql.QueryContext(ctx, query, args...)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
@@ -58,6 +59,23 @@ func enterpriseUsageFilters(c *gin.Context) (usagestats.UsageLogFilters, bool) {
 	if len(filters.Model) > 200 {
 		response.BadRequest(c, "model is too long")
 		return filters, false
+	}
+	query := c.Request.URL.Query()
+	if query.Has("start_time") || query.Has("end_time") {
+		if !query.Has("start_time") || !query.Has("end_time") {
+			response.ErrorFrom(c, infraerrors.BadRequest("INVALID_DATE_RANGE", "start_time and end_time must be provided together"))
+			return filters, false
+		}
+		for key, target := range map[string]**time.Time{"start_time": &filters.StartTime, "end_time": &filters.EndTime} {
+			value, err := time.Parse(time.RFC3339, strings.TrimSpace(query.Get(key)))
+			if err != nil {
+				response.ErrorFrom(c, infraerrors.BadRequest("INVALID_DATE_RANGE", "Invalid "+key+"; use RFC3339 with a timezone"))
+				return filters, false
+			}
+			*target = &value
+		}
+		// Precise times take precedence, including over invalid legacy dates.
+		return filters, true
 	}
 	for key, target := range map[string]**time.Time{"start_date": &filters.StartTime, "end_date": &filters.EndTime} {
 		raw := strings.TrimSpace(c.Query(key))

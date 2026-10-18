@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
@@ -290,10 +291,16 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 	}
 
 	dateFormat := safeDateFormat(granularity)
+	dateExpression := "created_at"
+	args := []any{startTime, endTime}
+	if len(enterpriseFilters) > 0 && enterpriseFilters[0].EnterpriseID > 0 {
+		dateExpression += " AT TIME ZONE $3"
+		args = append(args, timezone.Location().String())
+	}
 
 	query := fmt.Sprintf(`
 		SELECT
-			TO_CHAR(created_at, '%s') as date,
+			TO_CHAR(%s, '%s') as date,
 			COUNT(*) as requests,
 			COALESCE(SUM(input_tokens), 0) as input_tokens,
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -304,9 +311,7 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 			COALESCE(SUM(actual_cost), 0) as actual_cost
 		FROM usage_logs
 		WHERE created_at >= $1 AND created_at < $2
-	`, dateFormat)
-
-	args := []any{startTime, endTime}
+	`, dateExpression, dateFormat)
 	if len(enterpriseFilters) > 0 {
 		query, args = appendEnterpriseUsageQueryFilter(query, args, enterpriseFilters[0], "")
 	}

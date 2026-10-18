@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
@@ -40,14 +39,9 @@ func (s *EnterpriseUsageService) SeriesTrend(ctx context.Context, scope Enterpri
 	if err != nil {
 		return nil, err
 	}
-	if granularity == "" {
-		granularity = "day"
-	}
-	if granularity != "day" && granularity != "hour" {
-		return nil, infraerrors.BadRequest("INVALID_ARGUMENT", "granularity must be day or hour")
-	}
-	if granularity == "hour" && f.EndTime.Sub(*f.StartTime) > 31*24*time.Hour {
-		return nil, infraerrors.BadRequest("INVALID_DATE_RANGE", "hourly usage range must be at most 31 days")
+	granularity, err = normalizeEnterpriseUsageGranularity(granularity, f)
+	if err != nil {
+		return nil, err
 	}
 	if top <= 0 {
 		top = 8

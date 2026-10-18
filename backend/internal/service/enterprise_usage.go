@@ -349,11 +349,9 @@ func (s *EnterpriseUsageService) Trend(ctx context.Context, scope EnterpriseUsag
 	if err != nil {
 		return nil, err
 	}
-	if granularity == "" {
-		granularity = "day"
-	}
-	if granularity != "hour" && granularity != "day" {
-		return nil, infraerrors.BadRequest("INVALID_ARGUMENT", "granularity must be day or hour")
+	granularity, err = normalizeEnterpriseUsageGranularity(granularity, f)
+	if err != nil {
+		return nil, err
 	}
 	r, ok := s.repo.(enterpriseUsageAnalyticsReader)
 	if !ok {
@@ -373,6 +371,20 @@ func (s *EnterpriseUsageService) Trend(ctx context.Context, scope EnterpriseUsag
 	}
 	return out, nil
 }
+
+func normalizeEnterpriseUsageGranularity(granularity string, filters usagestats.UsageLogFilters) (string, error) {
+	if granularity == "" {
+		granularity = "day"
+	}
+	if granularity != "hour" && granularity != "day" {
+		return "", infraerrors.BadRequest("INVALID_ARGUMENT", "granularity must be day or hour")
+	}
+	if granularity == "hour" && filters.EndTime.Sub(*filters.StartTime) > 31*24*time.Hour {
+		return "", infraerrors.BadRequest("INVALID_DATE_RANGE", "hourly usage range must be at most 31 days")
+	}
+	return granularity, nil
+}
+
 func (s *EnterpriseUsageService) Models(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) ([]EnterpriseUsageModel, error) {
 	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
