@@ -47,7 +47,7 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     await wrapper.get('form').trigger('submit')
     expect(wrapper.get('[data-test="member-validation"]').text()).toBe('enterprise.validationUser')
     await wrapper.get('#enterprise-user-search').setValue('alice')
-    await wrapper.get('button[type="button"]').trigger('click')
+    await wrapper.get('[data-test="member-search"]').trigger('click')
     await flushPromises()
     expect(listUsers).toHaveBeenCalledWith(1, 50, { search: 'alice', role: 'user' })
     expect(wrapper.find('[data-test="member-user"] option[value="43"]').exists()).toBe(false)

@@ -1,51 +1,46 @@
-<template>
-  <div class="card min-w-0 p-4 sm:p-5" :aria-busy="loading">
-    <h3 class="mb-4 font-medium text-gray-900 dark:text-white">{{ t('enterprise.trend') }}</h3>
-    <div v-if="loading" class="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-dark-800" />
-    <div v-else-if="items.length" class="relative h-64 w-full min-w-0"><Line :data="chartData" :options="chartOptions" :height="256" :aria-label="t('enterprise.trend')" role="img" /></div>
-    <p v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.empty') }}</p>
-    <details v-if="items.length && !loading" class="mt-4 text-sm"><summary class="cursor-pointer text-gray-600 dark:text-gray-300">{{ t('enterprise.usageAnalysis.viewTable') }}</summary><DataTable :columns="columns" :data="items"><template #cell-actual_cost="{ value }">{{ usageMoney(value) }}</template></DataTable></details>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
-import type { ChartData, ChartOptions } from 'chart.js'
-import { Line } from 'vue-chartjs'
-import DataTable from '@/components/common/DataTable.vue'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import type { EnterpriseUsageTrend } from '@/types/enterprise'
-import { usageMoney, useEnterpriseUsageTheme } from '../useEnterpriseUsage'
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
-const props = defineProps<{ items: EnterpriseUsageTrend[]; loading: boolean }>()
+import { usageMoney, normalizeEnterpriseUsageTrend, useEnterpriseUsageTheme } from '../useEnterpriseUsage'
+const props = defineProps<{ items: EnterpriseUsageTrend[]; loading: boolean; granularity?: 'day' | 'hour' }>()
+const emit = defineEmits<{ 'update:granularity': [value: 'day' | 'hour'] }>()
 const { t } = useI18n()
 const theme = useEnterpriseUsageTheme()
-const columns = computed(() => [{ key: 'date', label: t('usage.time') }, { key: 'requests', label: t('enterprise.requests') }, { key: 'total_tokens', label: t('enterprise.tokens') }, { key: 'actual_cost', label: t('enterprise.cost') }])
-const chartData = computed<ChartData<'line'>>(() => ({
-  labels: props.items.map(item => item.date),
-  datasets: [
-    { label: t('enterprise.cost'), data: props.items.map(item => item.actual_cost), yAxisID: 'y', borderColor: '#14b8a6', backgroundColor: '#14b8a6', borderWidth: 2, pointRadius: props.items.length === 1 ? 5 : 3, pointHoverRadius: 7, pointHitRadius: 12, tension: 0.25 },
-    { label: t('enterprise.requests'), data: props.items.map(item => item.requests), yAxisID: 'requests', borderColor: '#3b82f6', backgroundColor: '#3b82f6', borderDash: [4, 4], borderWidth: 2, pointRadius: props.items.length === 1 ? 5 : 3, tension: 0.25 }
-  ]
-}))
-const chartOptions = computed<ChartOptions<'line'>>(() => ({
-  responsive: true, maintainAspectRatio: false,
-  interaction: { intersect: false, mode: 'index' },
-  plugins: {
-    legend: { labels: { color: theme.value.text, usePointStyle: true } },
-    tooltip: { callbacks: {
-      label: context => `${context.dataset.label}: ${context.dataset.yAxisID === 'requests' ? (context.parsed.y ?? 0).toLocaleString() : usageMoney(context.parsed.y)}`,
-      afterBody: items => {
-        const point = props.items[items[0]?.dataIndex ?? -1]
-        return point ? [`${t('enterprise.requests')}: ${point.requests.toLocaleString()}`, `${t('enterprise.tokens')}: ${point.total_tokens.toLocaleString()}`] : []
-      }
-    } }
-  },
-  scales: {
-    x: { offset: true, ticks: { color: theme.value.text }, grid: { color: theme.value.grid } },
-    y: { beginAtZero: true, grace: '10%', title: { display: true, text: t('enterprise.cost'), color: theme.value.text }, ticks: { color: theme.value.text }, grid: { color: theme.value.grid } },
-    requests: { position: 'right', beginAtZero: true, grace: '10%', title: { display: true, text: t('enterprise.requests'), color: theme.value.text }, ticks: { color: theme.value.text, precision: 0 }, grid: { drawOnChartArea: false } }
-  }
-}))
+const data = computed(() => props.items.map(normalizeEnterpriseUsageTrend))
 </script>
+
+<template>
+  <Card class="usage-chart-card min-w-0" :aria-busy="loading">
+    <CardHeader class="flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
+      <CardTitle class="text-base">{{ t('admin.dashboard.tokenUsageTrend') }}</CardTitle>
+      <Select :model-value="granularity ?? 'day'" @update:model-value="value => emit('update:granularity', value as 'day' | 'hour')">
+        <SelectTrigger class="h-8 w-28" data-test="usage-granularity" :aria-label="t('admin.dashboard.granularity')"><SelectValue /></SelectTrigger>
+        <SelectContent><SelectItem value="day">{{ t('admin.dashboard.day') }}</SelectItem><SelectItem value="hour">{{ t('admin.dashboard.hour') }}</SelectItem></SelectContent>
+      </Select>
+    </CardHeader>
+    <CardContent class="min-w-0 pt-0">
+      <Skeleton v-if="loading" class="h-64 w-full" />
+      <TokenUsageTrend v-else :key="theme.text" class="usage-shared-chart" :trend-data="data" :loading="false" />
+      <Collapsible v-if="items.length && !loading" class="mt-3">
+        <CollapsibleTrigger as-child><Button type="button" size="sm" variant="ghost">{{ t('enterprise.usageAnalysis.viewTable') }}</Button></CollapsibleTrigger>
+        <CollapsibleContent>
+          <Table><TableHeader><TableRow><TableHead>{{ t('usage.time') }}</TableHead><TableHead>{{ t('enterprise.requests') }}</TableHead><TableHead>{{ t('enterprise.tokens') }}</TableHead><TableHead>{{ t('enterprise.cost') }}</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in items" :key="item.date"><TableCell>{{ item.date }}</TableCell><TableCell>{{ item.requests.toLocaleString() }}</TableCell><TableCell>{{ item.total_tokens.toLocaleString() }}</TableCell><TableCell>{{ usageMoney(item.actual_cost) }}</TableCell></TableRow></TableBody></Table>
+        </CollapsibleContent>
+      </Collapsible>
+    </CardContent>
+  </Card>
+</template>
+
+<style scoped>
+.usage-shared-chart { border: 0; background: transparent; box-shadow: none; padding: 0; }
+.usage-shared-chart :deep(h3) { display: none; }
+.usage-shared-chart :deep(.h-48) { height: 16rem; }
+</style>

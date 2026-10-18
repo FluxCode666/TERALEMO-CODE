@@ -47,6 +47,7 @@ describe('Enterprise settings refresh', () => {
 
   it('preserves edited fields, merges other server changes, and saves the merged snapshot', async () => {
     const wrapper = mountSettings()
+    expect(checkbox(wrapper, 'balance_visible_to_member').attributes('role')).toBe('switch')
     await checkbox(wrapper, 'balance_visible_to_member').trigger('click')
     await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, manager_can_manage_members: true } })
 

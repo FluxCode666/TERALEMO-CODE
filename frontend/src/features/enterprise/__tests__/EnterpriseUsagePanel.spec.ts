@@ -5,6 +5,7 @@ import { Line } from 'vue-chartjs'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseUsageTrend } from '@/types/enterprise'
 import { formatDateTime } from '@/utils/format'
+import EnterpriseUsageTrendView from '../components/EnterpriseUsageTrend.vue'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
@@ -19,7 +20,7 @@ vi.mock('vue-chartjs', async importOriginal => ({
 
 const wrappers: VueWrapper[] = []
 const charts: ChartJS[] = []
-const singleDay: EnterpriseUsageTrend = { date: '2026-10-18', requests: 4, total_tokens: 6000, actual_cost: 0.08 }
+const singleDay: EnterpriseUsageTrend = { date: '2026-10-18', requests: 4, total_tokens: 6000, actual_cost: 0.08, input_tokens: 1000, output_tokens: 2000, cache_creation_tokens: 1000, cache_read_tokens: 2000, cost: 0.1 }
 const createdAt = '2026-10-18T00:15:27.98669+08:00'
 
 async function mountUsage(trend: EnterpriseUsageTrend[]) {
@@ -74,35 +75,32 @@ afterEach(() => {
 })
 
 describe('enterprise usage display', () => {
-  it('renders the backend single-day cost as a visible point inside the plot', async () => {
+  it('maps the backend single-day token breakdown into the personal trend chart', async () => {
     const { wrapper, api } = await mountUsage([singleDay])
     expect(api.usageTrend).toHaveBeenCalledWith({ granularity: 'day' }, expect.objectContaining({ signal: expect.any(AbortSignal) }))
     const line = wrapper.getComponent(Line)
-    expect(line.props('data')).toMatchObject({ labels: ['2026-10-18'], datasets: [{ data: [0.08], yAxisID: 'y' }, { data: [4], yAxisID: 'requests' }] })
-    expect(line.props('height')).toBe(256)
-    expect(line.element.parentElement?.classList.contains('h-64')).toBe(true)
-    expect(line.element.parentElement?.classList.contains('relative')).toBe(true)
+    expect(line.props('data')).toMatchObject({ labels: ['2026-10-18'], datasets: [{ data: [1000] }, { data: [2000] }, { data: [1000] }, { data: [2000] }, { data: [50], yAxisID: 'yPercent' }] })
+    expect(line.element.parentElement?.classList.contains('h-48')).toBe(true)
+    expect(wrapper.get('[data-test="usage-charts-row"]').classes()).toEqual(expect.arrayContaining(['grid-cols-1', 'lg:grid-cols-2', 'items-stretch']))
 
     const chart = renderChart(wrapper)
     const point = chart.getDatasetMeta(0).data[0]
-    expect(point).toMatchObject({ skip: false, options: { radius: 5 } })
-    expect(point.x).toBeGreaterThan(chart.chartArea.left + 5)
-    expect(point.x).toBeLessThan(chart.chartArea.right - 5)
-    expect(point.y).toBeGreaterThan(chart.chartArea.top + 5)
-    expect(point.y).toBeLessThan(chart.chartArea.bottom - 5)
-
+    expect(point).toMatchObject({ skip: false, options: { radius: 3 } })
+    expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true)
+    expect(point.x).toBeGreaterThanOrEqual(chart.chartArea.left)
+    expect(point.x).toBeLessThanOrEqual(chart.chartArea.right)
     const callbacks = (line.props('options') as ChartOptions<'line'>).plugins!.tooltip!.callbacks!
-    const item = { dataIndex: 0, dataset: { label: 'enterprise.cost' }, parsed: { x: 0, y: 0.08 } } as TooltipItem<'line'>
-    expect(callbacks.label!.call({} as never, item)).toBe('enterprise.cost: $0.0800')
-    expect(callbacks.afterBody!.call({} as never, [item])).toEqual(['enterprise.requests: 4', `enterprise.tokens: ${(6000).toLocaleString()}`])
+    const item = { dataIndex: 0, dataset: { label: 'Input' }, raw: 1000, parsed: { x: 0, y: 1000 } } as TooltipItem<'line'>
+    expect(callbacks.label!.call({} as never, item)).toContain('1.00K')
+
   })
 
-  it('renders multiple daily cost points with the original date order and connected line', async () => {
-    const trend = [singleDay, { ...singleDay, date: '2026-10-19', actual_cost: 0.03 }, { ...singleDay, date: '2026-10-20', actual_cost: 0.12 }]
+  it('renders multiple token buckets with the original date order and connected line', async () => {
+    const trend = [singleDay, { ...singleDay, date: '2026-10-19', input_tokens: 3000 }, { ...singleDay, date: '2026-10-20', input_tokens: 5000 }]
     const { wrapper } = await mountUsage(trend)
     const chart = renderChart(wrapper)
     expect(chart.data.labels).toEqual(trend.map(point => point.date))
-    expect(chart.data.datasets[0].data).toEqual([0.08, 0.03, 0.12])
+    expect(chart.data.datasets[0].data).toEqual([1000, 3000, 5000])
     const meta = chart.getDatasetMeta(0)
     expect(meta.data).toHaveLength(3)
     meta.data.forEach((point, index) => {
@@ -116,16 +114,25 @@ describe('enterprise usage display', () => {
   it('keeps the empty state when there are no trend buckets', async () => {
     const { wrapper } = await mountUsage([])
     expect(wrapper.findComponent(Line).exists()).toBe(false)
-    expect(wrapper.text()).toContain('enterprise.empty')
+    expect(wrapper.text()).toContain('admin.dashboard.noDataAvailable')
+  })
+
+  it('switches day/hour while keeping the submitted filter snapshot', async () => {
+    const { wrapper, api } = await mountUsage([singleDay])
+    wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'submitted')
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+    wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'draft')
+    wrapper.getComponent(EnterpriseUsageTrendView).vm.$emit('update:granularity', 'hour'); await flushPromises()
+    expect(api.usageTrend).toHaveBeenLastCalledWith(expect.objectContaining({ granularity: 'hour', model: 'submitted' }), expect.anything())
+    expect(api.usageStats).toHaveBeenCalledTimes(2)
   })
 
   it('formats usage creation times with the shared formatter and renders stat icons', async () => {
     const { wrapper } = await mountUsage([])
     expect(wrapper.text()).toContain(formatDateTime(createdAt))
     expect(wrapper.text()).not.toContain(createdAt)
-    expect(wrapper.findAll('.stat-icon svg')).toHaveLength(4)
+    expect(wrapper.findAll('[data-usage-card] svg')).toHaveLength(4)
     expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0200')
-    expect(wrapper.find('.stat-icon-warning svg').exists()).toBe(true)
-    expect(wrapper.find('.stat-icon-success svg').exists()).toBe(true)
+    expect(wrapper.findAll('[data-usage-value]')).toHaveLength(4)
   })
 })

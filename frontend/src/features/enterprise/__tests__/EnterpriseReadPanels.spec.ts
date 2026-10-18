@@ -6,7 +6,7 @@ import EnterpriseOrganizationPanel from '../components/EnterpriseOrganizationPan
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 import EnterpriseLogsPanel from '../components/EnterpriseLogsPanel.vue'
 import EnterpriseGroupsPanel from '../components/EnterpriseGroupsPanel.vue'
-import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import DateRangePicker from '../components/EnterpriseDateRangePicker.vue'
 import { loadMemberOptions } from '../memberOptions'
 
 const { showError } = vi.hoisted(() => ({ showError: vi.fn() }))
@@ -23,6 +23,7 @@ const stubs = {
   ConfirmDialog: true,
   StatCard: { props: ['value'], template: '<div data-test="stat">{{ value }}</div>' }
 }
+Object.assign(stubs, { EnterpriseTable: stubs.DataTable, EnterprisePagination: stubs.Pagination, EnterpriseDialog: stubs.BaseDialog, EnterpriseConfirm: stubs.ConfirmDialog })
 const wrappers: VueWrapper[] = []
 function track<T extends VueWrapper>(wrapper: T) { wrappers.push(wrapper); return wrapper }
 function page(items: unknown[], current = 1) { return { items, total: 100, page: current, page_size: 20, pages: 5 } }
@@ -43,7 +44,7 @@ function deferred<T>() {
   return { promise, resolve }
 }
 async function changePage(wrapper: VueWrapper, value: number) {
-  wrapper.findComponent({ name: 'Pagination' }).vm.$emit('update:page', value)
+  (wrapper.findComponent({ name: 'EnterprisePagination' }).exists() ? wrapper.findComponent({ name: 'EnterprisePagination' }) : wrapper.findComponent({ name: 'Pagination' })).vm.$emit('update:page', value)
   await flushPromises()
 }
 
@@ -66,7 +67,7 @@ describe('enterprise paginated reads', () => {
     await flushPromises()
     expect(wrapper.get('[data-test="rows"]').text()).toContain('page-three')
     expect(wrapper.get('[data-test="rows"]').text()).not.toContain('page-two')
-    expect(wrapper.findComponent({ name: 'Pagination' }).props('page')).toBe(3)
+    expect((wrapper.findComponent({ name: 'EnterprisePagination' }).exists() ? wrapper.findComponent({ name: 'EnterprisePagination' }) : wrapper.findComponent({ name: 'Pagination' })).props('page')).toBe(3)
   })
 
   it.each(['audit', 'balanceLogs'] as const)('keeps the latest %s page and reloads it on refresh', async kind => {
@@ -124,14 +125,14 @@ describe('usage applied filters and latest page', () => {
     const requests = api(), wrapper = mountUsage(requests)
     await flushPromises()
     const dates = wrapper.getComponent(DateRangePicker)
-    const model = wrapper.get('input:not([type])')
-    await model.setValue('submitted-model')
+    const model = wrapper.getComponent('[data-test="usage-model"]')
+    model.vm.$emit('update:modelValue', 'submitted-model')
     dates.vm.$emit('update:startDate', '2024-01-01')
     dates.vm.$emit('update:endDate', '2024-12-31')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'submitted-model', start_date: '2024-01-01', end_date: '2024-12-31' }), expect.anything())
-    await model.setValue('unsaved-model')
+    model.vm.$emit('update:modelValue', 'unsaved-model')
     dates.vm.$emit('update:endDate', '2025-01-01')
     const count = requests.usageStats.mock.calls.length
     await changePage(wrapper, 2)
@@ -141,7 +142,7 @@ describe('usage applied filters and latest page', () => {
     await wrapper.setProps({ refreshKey: 1 })
     await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'submitted-model', end_date: '2024-12-31' }), expect.anything())
-    expect(wrapper.findAll('[data-test="stat"]')[0].text()).toBe('12')
+    expect(wrapper.findAll('[data-usage-value]')[0].text()).toBe('12')
   })
 
   it('rejects 367 inclusive days, allows 366 and same-day ranges, and leaves the applied page unchanged on invalid search', async () => {
@@ -156,7 +157,7 @@ describe('usage applied filters and latest page', () => {
     await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('enterprise.validationDateRange')
     expect(requests.usage).toHaveBeenCalledTimes(count)
-    expect(wrapper.findComponent({ name: 'Pagination' }).props('page')).toBe(2)
+    expect((wrapper.findComponent({ name: 'EnterprisePagination' }).exists() ? wrapper.findComponent({ name: 'EnterprisePagination' }) : wrapper.findComponent({ name: 'Pagination' })).props('page')).toBe(2)
     for (const end of ['2024-12-31', '2024-01-01']) {
       dates.vm.$emit('update:endDate', end)
       await wrapper.get('form').trigger('submit')

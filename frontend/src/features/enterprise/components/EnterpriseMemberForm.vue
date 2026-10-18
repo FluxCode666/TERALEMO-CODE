@@ -1,39 +1,41 @@
 <template>
-  <form id="enterprise-member-form" class="space-y-4" @submit.prevent="submit">
-    <div v-if="admin && !member" class="flex gap-4">
-      <label class="flex items-center gap-2"><input v-model="mode" type="radio" value="existing" />{{ t('enterprise.existingUser') }}</label>
-      <label class="flex items-center gap-2"><input v-model="mode" type="radio" value="new" />{{ t('enterprise.newAccount') }}</label>
-    </div>
+  <form id="enterprise-member-form" class="shadcn-scope space-y-4" @submit.prevent="submit">
+    <RadioGroup v-if="admin && !member" v-model="mode" class="flex flex-wrap gap-4"><Label class="flex items-center gap-2"><RadioGroupItem value="existing" />{{ t('enterprise.existingUser') }}</Label><Label class="flex items-center gap-2"><RadioGroupItem value="new" />{{ t('enterprise.newAccount') }}</Label></RadioGroup>
     <div v-if="!member && mode === 'existing'" class="space-y-3">
-      <label class="input-label" for="enterprise-user-search">{{ t('enterprise.searchUsers') }}</label>
+      <Label class="mb-2 block text-sm font-medium text-foreground" for="enterprise-user-search">{{ t('enterprise.searchUsers') }}</Label>
       <div class="flex gap-2">
-        <input id="enterprise-user-search" v-model.trim="search" class="input" @keydown.enter.prevent="searchUsers" />
-        <button type="button" class="btn btn-secondary" :disabled="searching" @click="searchUsers">{{ t('enterprise.search') }}</button>
+        <Input id="enterprise-user-search" v-model.trim="search"  @keydown.enter.prevent="searchUsers" />
+        <Button variant="outline" type="button"  :disabled="searching" data-test="member-search" @click="searchUsers">{{ t('enterprise.search') }}</Button>
       </div>
-      <Select v-model="userId" :options="userOptions" :aria-label="t('enterprise.selectUser')" data-test="member-user" />
+      <EnterpriseSelect v-model="userId" :options="userOptions" :aria-label="t('enterprise.selectUser')" data-test="member-user" />
     </div>
     <template v-if="!member && mode === 'new'">
-      <label class="block"><span class="input-label">{{ t('enterprise.email') }}</span><input v-model.trim="form.email" class="input" type="email" autocomplete="off" data-test="member-email" /></label>
-      <label class="block"><span class="input-label">{{ t('enterprise.username') }}</span><input v-model.trim="form.username" class="input" autocomplete="off" /></label>
-      <label class="block"><span class="input-label">{{ t('enterprise.password') }}</span><input v-model="form.password" class="input" type="password" autocomplete="new-password" data-test="member-password" /></label>
+      <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.email') }}</span><Input v-model.trim="form.email"  type="email" autocomplete="off" data-test="member-email" /></Label>
+      <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.username') }}</span><Input v-model.trim="form.username"  autocomplete="off" /></Label>
+      <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.password') }}</span><Input v-model="form.password"  type="password" autocomplete="new-password" data-test="member-password" /></Label>
     </template>
-    <label v-if="!limitedManager" class="block"><span class="input-label">{{ t('enterprise.department') }}</span>
-      <Select v-model="form.department_id" :options="departmentOptions" :aria-label="t('enterprise.department')" data-test="member-department" />
-    </label>
-    <label v-if="!limitedManager" class="block"><span class="input-label">{{ t('enterprise.role') }}</span>
-      <Select v-model="form.role" :options="roleOptions" :aria-label="t('enterprise.role')" data-test="member-role" />
-    </label>
-    <label class="block"><span class="input-label">{{ t('enterprise.titleField') }}</span><input v-model.trim="form.title" class="input" maxlength="100" /></label>
-    <label v-if="member" class="block"><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="member-status" /></label>
+    <Label v-if="!limitedManager" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.department') }}</span>
+      <EnterpriseSelect v-model="form.department_id" :options="departmentOptions" :aria-label="t('enterprise.department')" data-test="member-department" />
+    </Label>
+    <Label v-if="!limitedManager" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.role') }}</span>
+      <EnterpriseSelect v-model="form.role" :options="roleOptions" :aria-label="t('enterprise.role')" data-test="member-role" />
+    </Label>
+    <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.titleField') }}</span><Input v-model.trim="form.title"  maxlength="100" /></Label>
+    <Label v-if="member" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.status') }}</span><EnterpriseSelect v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="member-status" /></Label>
     <p v-if="validation" role="alert" class="text-sm text-red-600 dark:text-red-400" data-test="member-validation">{{ validation }}</p>
-    <button type="submit" class="btn btn-primary" :disabled="busy" data-test="member-submit">{{ t('enterprise.save') }}</button>
+    <Button variant="default" type="submit"  :disabled="busy" data-test="member-submit">{{ t('enterprise.save') }}</Button>
   </form>
 </template>
 
 <script setup lang="ts">
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from '@/components/common/Select.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
 import { adminAPI } from '@/api/admin'
 import { enterpriseErrorMessage } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember } from '@/types/enterprise'

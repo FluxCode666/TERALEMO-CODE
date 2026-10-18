@@ -1,19 +1,21 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
-import type { AdminUsageLog } from '@/types'
-import type { EnterpriseDepartment, EnterpriseUsageLog } from '@/types/enterprise'
+import type { AdminUsageLog, TrendDataPoint, ModelStat } from '@/types'
+import type { EnterpriseDepartment, EnterpriseUsageLog, EnterpriseUsageTrend, EnterpriseUsageModel } from '@/types/enterprise'
 import type { Column } from '@/components/common/types'
 
 export const usageNumber = (value: unknown): number => typeof value === 'number' && Number.isFinite(value) ? value : 0
 export const usageMoney = (value: unknown) => `$${usageNumber(value).toFixed(4)}`
 export const usageColors = ['#14b8a6', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16']
-export type UsagePeriod = 'today' | 'last7' | 'last30' | 'month'
+export type UsagePeriod = 'today' | 'last7' | 'last30' | 'month' | 'lastMonth'
 export function usageDateRange(period: UsagePeriod, now = new Date()) {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   if (period === 'month') start.setDate(1)
+  if (period === 'lastMonth') { start.setDate(1); start.setMonth(start.getMonth() - 1); end.setDate(0) }
   if (period === 'last7') start.setDate(start.getDate() - 6)
   if (period === 'last30') start.setDate(start.getDate() - 29)
   const date = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
-  return { start_date: date(start), end_date: date(now) }
+  return { start_date: date(start), end_date: date(end) }
 }
 
 // Adapt the enterprise's nested summaries to the shared personal UsageTable.
@@ -65,3 +67,15 @@ export function useEnterpriseUsageTheme() {
   onScopeDispose(() => observer.disconnect())
   return computed(() => ({ text: dark.value ? '#cbd5e1' : '#475569', grid: dark.value ? 'rgba(148,163,184,0.15)' : '#e5e7eb' }))
 }
+
+// Older payloads omit token breakdowns; current endpoints match the personal chart DTOs.
+function normalizeUsageMetrics(item: EnterpriseUsageTrend | EnterpriseUsageModel) {
+  return {
+    requests: usageNumber(item.requests), input_tokens: usageNumber(item.input_tokens),
+    output_tokens: usageNumber(item.output_tokens), cache_creation_tokens: usageNumber(item.cache_creation_tokens),
+    cache_read_tokens: usageNumber(item.cache_read_tokens), total_tokens: usageNumber(item.total_tokens),
+    cost: usageNumber(item.cost), actual_cost: usageNumber(item.actual_cost)
+  }
+}
+export const normalizeEnterpriseUsageTrend = (item: EnterpriseUsageTrend): TrendDataPoint => ({ date: item.date, ...normalizeUsageMetrics(item) })
+export const normalizeEnterpriseUsageModel = (item: EnterpriseUsageModel): ModelStat => ({ model: item.model, ...normalizeUsageMetrics(item) })

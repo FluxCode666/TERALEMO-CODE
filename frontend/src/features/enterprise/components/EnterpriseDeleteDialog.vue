@@ -1,15 +1,17 @@
 <template>
-  <ConfirmDialog :show="true" :title="t(dissolve ? 'admin.enterprises.dissolve' : 'admin.enterprises.delete')" :message="t(dissolve ? 'admin.enterprises.confirmDissolve' : 'admin.enterprises.confirmDelete')" danger @cancel="cancel" @confirm="remove">
+  <EnterpriseConfirm :busy="busy" :show="true" :title="t(dissolve ? 'admin.enterprises.dissolve' : 'admin.enterprises.delete')" :message="t(dissolve ? 'admin.enterprises.confirmDissolve' : 'admin.enterprises.confirmDelete')" danger @cancel="cancel" @confirm="remove">
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-  </ConfirmDialog>
+  </EnterpriseConfirm>
 </template>
 
 <script setup lang="ts">
+
+
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { useAppStore } from '@/stores/app'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import EnterpriseConfirm from '@/features/enterprise/components/EnterpriseConfirm.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 
 const props = defineProps<{ enterpriseId: number }>()

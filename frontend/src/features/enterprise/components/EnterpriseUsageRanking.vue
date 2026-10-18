@@ -1,13 +1,13 @@
 <template>
-  <div class="card min-w-0 p-4 sm:p-5" :aria-busy="loading">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="font-medium text-gray-900 dark:text-white">{{ title }}</h3><button v-if="items.length" type="button" class="btn btn-secondary px-3 py-1.5 text-xs" :aria-pressed="table" @click="table = !table">{{ t(table ? 'enterprise.usageAnalysis.viewChart' : 'enterprise.usageAnalysis.viewTable') }}</button></div>
-    <div v-if="loading" class="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-dark-800" />
+  <Card class="min-w-0 p-4 sm:p-5" :aria-busy="loading">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 class="font-medium text-gray-900 dark:text-white">{{ title }}</h3><Button v-if="items.length" type="button" variant="outline" size="sm" :aria-pressed="table" @click="table = !table">{{ t(table ? 'enterprise.usageAnalysis.viewChart' : 'enterprise.usageAnalysis.viewTable') }}</Button></div>
+    <Skeleton v-if="loading" class="h-64 w-full" />
     <template v-else-if="items.length">
-      <DataTable v-if="table" :columns="columns" :data="sorted"><template #cell-actual_cost="{ value }">{{ usageMoney(value) }}</template></DataTable>
+      <Table v-if="table" data-test="usage-ranking-table"><TableHeader><TableRow><TableHead>{{ title }}</TableHead><TableHead>{{ t('enterprise.requests') }}</TableHead><TableHead>{{ t('enterprise.tokens') }}</TableHead><TableHead>{{ t('enterprise.cost') }}</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in sorted" :key="item.id"><TableCell>{{ item.label }}</TableCell><TableCell>{{ item.requests.toLocaleString() }}</TableCell><TableCell>{{ item.total_tokens.toLocaleString() }}</TableCell><TableCell>{{ usageMoney(item.actual_cost) }}</TableCell></TableRow></TableBody></Table>
       <template v-else><p class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.topRanking', { count: Math.min(limit, items.length), total: items.length }) }}</p><div class="relative w-full" :style="{ height: `${Math.max(180, displayed.length * 36)}px` }"><Bar :data="chartData" :options="options" :aria-label="title" role="img" /></div></template>
     </template>
     <p v-else class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.empty') }}</p>
-  </div>
+  </Card>
 </template>
 
 <script setup lang="ts">
@@ -15,7 +15,10 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend, type ChartOptions } from 'chart.js'
 import { Bar } from 'vue-chartjs'
-import DataTable from '@/components/common/DataTable.vue'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { usageMoney, usageNumber, useEnterpriseUsageTheme } from '../useEnterpriseUsage'
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 export interface UsageRankingItem { id: string | number; label: string; requests: number; total_tokens: number; actual_cost: number }
@@ -34,5 +37,4 @@ const options = computed<ChartOptions<'bar'>>(() => ({
   } } } },
   scales: { x: { beginAtZero: true, ticks: { color: theme.value.text }, grid: { color: theme.value.grid } }, y: { ticks: { color: theme.value.text, callback: function(value) { const label = this.getLabelForValue(Number(value)); return label.length > 24 ? `${label.slice(0, 22)}…` : label } }, grid: { display: false } } }
 }))
-const columns = computed(() => [{ key: 'label', label: props.title }, { key: 'requests', label: t('enterprise.requests') }, { key: 'total_tokens', label: t('enterprise.tokens') }, { key: 'actual_cost', label: t('enterprise.cost') }])
 </script>

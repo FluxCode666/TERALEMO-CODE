@@ -154,8 +154,9 @@ export interface EnterpriseUsageStats {
   total_requests: number; total_tokens: number; total_actual_cost: number
   total_cost?: number; total_input_tokens?: number; total_output_tokens?: number
 }
-export interface EnterpriseUsageTrend { date: string; requests: number; actual_cost: number; total_tokens: number }
-export interface EnterpriseUsageModel { model: string; requests: number; total_tokens: number; actual_cost: number }
+export interface EnterpriseUsageTokens { input_tokens?: number; output_tokens?: number; cache_creation_tokens?: number; cache_read_tokens?: number; cost?: number }
+export interface EnterpriseUsageTrend extends EnterpriseUsageTokens { date: string; requests: number; actual_cost: number; total_tokens: number }
+export interface EnterpriseUsageModel extends EnterpriseUsageTokens { model: string; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseMemberUsage { user_id: number; username: string; email: string; department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseDepartmentUsage { department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseQuery { member_id?: number; page?: number; page_size?: number; search?: string; status?: string; role?: EnterpriseRole; department_id?: number; user_id?: number; api_key_id?: number; model?: string; start_date?: string; end_date?: string; granularity?: 'day' | 'hour'; action?: string; scope_type?: EnterpriseScope; sort_by?: 'created_at' | 'model'; sort_order?: 'asc' | 'desc' }

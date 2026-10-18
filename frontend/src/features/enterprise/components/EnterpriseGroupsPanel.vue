@@ -1,33 +1,38 @@
 <template>
-  <section class="space-y-6" :aria-busy="busy">
-    <p v-if="error" role="alert" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{{ error }} <button class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
-    <div class="card space-y-4 p-4 sm:p-6">
-      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('enterprise.groupAccess.availableTitle') }}</h2><button v-if="admin && !readonly" class="btn btn-secondary" @click="poolOpen = true">{{ t('enterprise.groupAccess.editAvailable') }}</button></div>
-      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.groupAccess.availableHint') }}</p>
-      <div v-if="busy && !loaded" class="h-24 animate-pulse rounded-xl bg-gray-100 dark:bg-dark-700" />
-      <template v-else><EnterpriseGroupCards v-if="poolConfigured !== false && availableGroups.length" :groups="availableGroups" /><p v-if="poolConfigured === false" class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-dark-900 dark:text-gray-300">{{ t('enterprise.groupAccess.personalRules') }}</p><p v-else-if="!availableGroups.length" class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.groupAccess.noAvailable') }}</p></template>
-    </div>
+  <section class="shadcn-scope space-y-6" :aria-busy="busy">
+    <p v-if="error" role="alert" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
+    <Card class="rounded-ui-lg border bg-card text-card-foreground shadow-sm space-y-4 p-4 sm:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.groupAccess.availableTitle') }}</h2><Button variant="outline" v-if="admin && !readonly"  @click="poolOpen = true">{{ t('enterprise.groupAccess.editAvailable') }}</Button></div>
+      <p class="text-sm text-muted-foreground">{{ t('enterprise.groupAccess.availableHint') }}</p>
+      <Skeleton v-if="busy && !loaded" class="h-24" />
+      <template v-else><EnterpriseGroupCards v-if="poolConfigured !== false && availableGroups.length" :groups="availableGroups" /><p v-if="poolConfigured === false" class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-dark-900 dark:text-gray-300">{{ t('enterprise.groupAccess.personalRules') }}</p><p v-else-if="!availableGroups.length" class="text-sm text-muted-foreground">{{ t('enterprise.groupAccess.noAvailable') }}</p></template>
+    </Card>
     <template v-if="showWhitelists">
       <section v-for="kind in scopeKinds" :key="kind" class="space-y-3" :data-test="`group-section-${kind}`">
-        <div><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t(`enterprise.groupAccess.sections.${kind}`) }}</h2><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.groupAccess.configureHint') }}</p></div>
-        <Select v-if="kind !== 'enterprise' && scopeOptions(kind).length" v-model="selectedTargets[kind]" :options="scopeOptions(kind)" :aria-label="t(`enterprise.groupAccess.sections.${kind}`)" :data-test="`group-target-${kind}`" class="sm:max-w-md" />
+        <div><h2 class="text-lg font-semibold text-foreground">{{ t(`enterprise.groupAccess.sections.${kind}`) }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t('enterprise.groupAccess.configureHint') }}</p></div>
+        <EnterpriseSelect v-if="kind !== 'enterprise' && scopeOptions(kind).length" v-model="selectedTargets[kind]" :options="scopeOptions(kind)" :aria-label="t(`enterprise.groupAccess.sections.${kind}`)" :data-test="`group-target-${kind}`" class="sm:max-w-md" />
         <EnterpriseGroupEditor v-if="currentScope(kind)" :key="currentScope(kind)!.key" :title="currentScope(kind)!.label" :group-ids="whitelistIds(kind, currentScope(kind)!.id)" :groups="candidates(currentScope(kind)!)" :editable="canEdit(currentScope(kind)!)" :busy="busy" @save="saveWhitelist(currentScope(kind)!, $event)" />
-        <div v-else class="card"><EmptyState :title="t('enterprise.empty')" /></div>
+        <Card v-else class="rounded-ui-lg border bg-card text-card-foreground shadow-sm"><EnterpriseEmpty :title="t('enterprise.empty')" /></Card>
       </section>
     </template>
-    <BaseDialog :show="poolOpen" :title="t('enterprise.groupAccess.editAvailable')" width="wide" @close="poolOpen = false"><div class="space-y-4"><p class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.groupAccess.adminHint') }}</p><p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p><EnterpriseGroupCards v-model="poolSelection" :groups="allGroups.filter(group => group.status === 'active')" selectable :disabled="busy" /><button class="btn btn-primary" :disabled="busy" @click="savePool">{{ t('enterprise.save') }}</button></div></BaseDialog>
+    <EnterpriseDialog :show="poolOpen" :title="t('enterprise.groupAccess.editAvailable')" width="wide" @close="poolOpen = false"><div class="space-y-4"><p class="text-sm text-muted-foreground">{{ t('enterprise.groupAccess.adminHint') }}</p><p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p><EnterpriseGroupCards v-model="poolSelection" :groups="allGroups.filter(group => group.status === 'active')" selectable :disabled="busy" /><Button variant="default"  :disabled="busy" @click="savePool">{{ t('enterprise.save') }}</Button></div></EnterpriseDialog>
   </section>
 </template>
 
 <script setup lang="ts">
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card } from '@/components/ui/card'
+
+import { Button } from '@/components/ui/button'
+
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseDepartment, EnterpriseMember, EnterpriseScope, EnterpriseOverview } from '@/types/enterprise'
-import Select from '@/components/common/Select.vue'
-import BaseDialog from '@/components/common/BaseDialog.vue'
-import EmptyState from '@/components/common/EmptyState.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
+import EnterpriseDialog from '@/features/enterprise/components/EnterpriseDialog.vue'
+import EnterpriseEmpty from '@/features/enterprise/components/EnterpriseEmpty.vue'
 import EnterpriseGroupCards from './EnterpriseGroupCards.vue'
 import EnterpriseGroupEditor from './EnterpriseGroupEditor.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'

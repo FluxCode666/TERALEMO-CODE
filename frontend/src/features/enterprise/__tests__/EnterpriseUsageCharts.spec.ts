@@ -5,7 +5,8 @@ import type { ChartOptions, TooltipItem } from 'chart.js'
 import type { EnterpriseUsageLog } from '@/types/enterprise'
 import EnterpriseUsageDistribution from '../components/EnterpriseUsageDistribution.vue'
 import EnterpriseUsageRanking from '../components/EnterpriseUsageRanking.vue'
-import { selectOption } from './selectOption'
+import { Select } from '@/components/ui/select'
+import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import { normalizeEnterpriseUsage } from '../useEnterpriseUsage'
 
 vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
@@ -23,28 +24,32 @@ function ranking(items = rankingRows) {
 }
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); document.documentElement.classList.remove('dark') })
 
-describe('enterprise model doughnut', () => {
-  it('maps costs, requests and tokens into slices and legends and shows every metric with its own percentage', async () => {
+describe('enterprise personal model distribution', () => {
+  it('maps token and cost slices, preserves requests in the legend and disables unrelated sources and admin breakdowns', async () => {
     const wrapper = distribution()
+    const shared = wrapper.getComponent(ModelDistributionChart)
+    expect(shared.props()).toMatchObject({ showSourceToggle: false, enableBreakdown: false, showAccountCost: false, upstreamModelStats: [], mappingModelStats: [] })
     const chart = wrapper.getComponent(Doughnut)
-    expect(chart.props('data')).toMatchObject({ labels: ['large', 'small'], datasets: [{ data: [3, 1] }] })
-    expect(wrapper.get('ul').text()).toContain('75.0%')
-    const callback = (chart.props('options') as ChartOptions<'doughnut'>).plugins!.tooltip!.callbacks!.label!
-    expect(callback.call({} as never, { dataIndex: 0 } as TooltipItem<'doughnut'>)).toEqual(['enterprise.requests: 3 (75.0%)', 'enterprise.tokens: 800 (80.0%)', 'enterprise.cost: $3.0000 (75.0%)'])
-    expect(wrapper.find('select').exists()).toBe(false)
-    await selectOption(wrapper, '[data-test="usage-distribution-metric"]', 'enterprise.tokens')
-    expect(chart.props('data').datasets[0].data).toEqual([800, 200])
-    await selectOption(wrapper, '[data-test="usage-distribution-metric"]', 'enterprise.requests')
+    expect(chart.props('data')).toMatchObject({ labels: ['large', 'small'], datasets: [{ data: [800, 200] }] })
+    expect(shared.props('modelStats')[0]).toMatchObject({ requests: 1, input_tokens: 0, output_tokens: 0, cost: 0 })
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
+    expect(wrapper.findAll('tbody tr')[0].text()).toContain('3')
+    let callback = (chart.props('options') as ChartOptions<'doughnut'>).plugins!.tooltip!.callbacks!.label!
+    expect(callback.call({} as never, { raw: 800, label: 'large', dataset: { data: [800, 200] } } as TooltipItem<'doughnut'>)).toContain('80.0%')
+    wrapper.getComponent(Select).vm.$emit('update:modelValue', 'actual_cost'); await flushPromises()
     expect(chart.props('data').datasets[0].data).toEqual([3, 1])
+    callback = (chart.props('options') as ChartOptions<'doughnut'>).plugins!.tooltip!.callbacks!.label!
+    expect(callback.call({} as never, { raw: 3, label: 'large', dataset: { data: [3, 1] } } as TooltipItem<'doughnut'>)).toContain('75.0%')
   })
   it('handles empty, single and zero-total data without invalid percentages', () => {
     expect(distribution([]).findComponent(Doughnut).exists()).toBe(false)
     const single = distribution([{ model: 'one', requests: 1, total_tokens: 5, actual_cost: 0.1 }])
-    expect(single.getComponent(Doughnut).props('data').datasets[0].data).toEqual([0.1])
-    expect(single.get('ul').text()).toContain('100.0%')
+    expect(single.getComponent(Doughnut).props('data').datasets[0].data).toEqual([5])
     const zero = distribution([{ model: 'free', requests: 0, total_tokens: 0, actual_cost: 0 }])
     expect(zero.text()).not.toMatch(/NaN|Infinity/)
-    expect(zero.get('ul').text()).toContain('0.0%')
+    const chart = zero.getComponent(Doughnut)
+    const callback = (chart.props('options') as ChartOptions<'doughnut'>).plugins!.tooltip!.callbacks!.label!
+    expect(callback.call({} as never, { raw: 0, label: 'free', dataset: { data: [0] } } as TooltipItem<'doughnut'>)).toContain('0.0%')
   })
 })
 
@@ -59,7 +64,7 @@ describe('enterprise horizontal rankings', () => {
     expect(options.plugins!.tooltip!.callbacks!.label!.call({} as never, { dataIndex: 0 } as TooltipItem<'bar'>)).toEqual(['enterprise.requests: 12', `enterprise.tokens: ${(1100).toLocaleString()}`, 'enterprise.cost: $1.1000'])
     await wrapper.get('button').trigger('click')
     expect(wrapper.findComponent(Bar).exists()).toBe(false)
-    expect(JSON.parse(wrapper.get('[data-test="table"]').text())).toHaveLength(12)
+    expect(wrapper.get('[data-test="usage-ranking-table"]').findAll('tbody tr')).toHaveLength(12)
   })
   it('renders empty and single rankings and updates axes for dark mode', async () => {
     expect(ranking([]).findComponent(Bar).exists()).toBe(false)

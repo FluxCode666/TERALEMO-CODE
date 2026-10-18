@@ -1,75 +1,83 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
-      <template #actions><div class="flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('admin.enterprises.title') }}</h1><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.enterprises.description') }}</p></div><button class="btn btn-primary" data-test="enterprise-create-open" @click="openCreate">{{ t('admin.enterprises.create') }}</button></div></template>
-      <template #filters>
-        <form class="card flex flex-wrap gap-3 p-4" @submit.prevent="searchEnterprises">
-          <SearchInput v-model="search" class="sm:max-w-sm" :aria-label="t('enterprise.search')" :placeholder="t('admin.enterprises.searchPlaceholder')" />
-          <Select v-model="status" :options="[{ value: '', label: t('enterprise.all') }, ...statusOptions]" class="w-full sm:w-40" :aria-label="t('enterprise.status')" data-test="enterprise-status-filter" />
-          <button class="btn btn-secondary">{{ t('enterprise.search') }}</button>
-          <p v-if="error" role="alert" class="w-full text-sm text-red-600 dark:text-red-400">{{ error }} <button type="button" class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
-        </form>
-      </template>
-      <template #table>
-        <DataTable :columns="columns" :data="items" :loading="busy">
-          <template #cell-name="{ row }"><RouterLink :to="`/admin/enterprises/${row.id}`" class="font-medium text-primary-600 dark:text-primary-400">{{ row.name }}</RouterLink><p class="text-xs text-gray-500">#{{ row.id }}</p><EnterpriseOwnerWarning class="mt-2" :active-owner-count="row.active_owner_count" /></template>
-          <template #cell-status="{ value }"><span class="badge" :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
-          <template #cell-balance="{ value }">${{ value.toFixed(4) }}</template>
-          <template #cell-frozen_balance="{ value }"><span :title="t('enterprise.frozenBalanceHint')" :class="value > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">${{ value.toFixed(4) }}</span></template>
-          <template #cell-created_at="{ value }">{{ formatDateTime(value) }}</template>
-          <template #cell-actions="{ row }"><div class="flex flex-wrap gap-3"><RouterLink :to="`/admin/enterprises/${row.id}`" class="text-primary-600 dark:text-primary-400">{{ t('admin.enterprises.open') }}</RouterLink><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-edit-${row.id}`" @click="editing = row">{{ t('enterprise.edit') }}</button><button class="text-primary-600 dark:text-primary-400" :data-test="`enterprise-balance-${row.id}`" @click="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</button><button class="text-amber-700 dark:text-amber-400" :data-test="`enterprise-status-${row.id}`" @click="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</button><button class="text-red-600 dark:text-red-400" :data-test="`enterprise-delete-${row.id}`" @click="deleting = row">{{ t('admin.enterprises.delete') }}</button></div></template>
-          <template #empty><EmptyState :title="t('enterprise.empty')" :description="t('admin.enterprises.description')" /></template>
-        </DataTable>
-      </template>
-      <template #pagination><Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" /></template>
-    </TablePageLayout>
-    <BaseDialog :show="createOpen" :title="t('admin.enterprises.createTitle')" width="wide" @close="createOpen = false">
+    <div class="shadcn-scope min-w-0 space-y-5 text-foreground">
+      <header><div class="shadcn-scope flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-bold text-foreground">{{ t('admin.enterprises.title') }}</h1><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.enterprises.description') }}</p></div><Button variant="default"  data-test="enterprise-create-open" @click="openCreate">{{ t('admin.enterprises.create') }}</Button></div></header>
+      <section>
+        <Card><form class="flex flex-wrap gap-3 p-4" @submit.prevent="searchEnterprises">
+          <Input type="search" v-model="search" class="sm:max-w-sm" :aria-label="t('enterprise.search')" :placeholder="t('admin.enterprises.searchPlaceholder')" />
+          <EnterpriseSelect v-model="status" :options="[{ value: '', label: t('enterprise.all') }, ...statusOptions]" class="w-full sm:w-40" :aria-label="t('enterprise.status')" data-test="enterprise-status-filter" />
+          <Button variant="outline" data-test="enterprise-search">{{ t('enterprise.search') }}</Button>
+          <p v-if="error" role="alert" class="w-full text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" type="button" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
+        </form></Card>
+      </section>
+      <section class="min-w-0">
+        <EnterpriseTable :columns="columns" :data="items" :loading="busy">
+          <template #cell-name="{ row }"><RouterLink :to="`/admin/enterprises/${row.id}`" class="font-medium text-primary">{{ row.name }}</RouterLink><p class="text-xs text-gray-500">#{{ row.id }}</p><EnterpriseOwnerWarning class="mt-2" :active-owner-count="row.active_owner_count" /></template>
+          <template #cell-status="{ value }"><Badge data-test="enterprise-status-badge" class="whitespace-nowrap" :variant="value === 'active' ? 'secondary' : 'destructive'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</Badge></template>
+          <template #cell-balance="{ row }">${{ row.balance.toFixed(4) }}</template>
+          <template #cell-frozen_balance="{ row }"><span :title="t('enterprise.frozenBalanceHint')" :class="row.frozen_balance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'">${{ row.frozen_balance.toFixed(4) }}</span></template>
+          <template #cell-created_at="{ row }">{{ formatDateTime(row.created_at) }}</template>
+          <template #cell-actions="{ row }"><DropdownMenu><DropdownMenuTrigger as-child><Button variant="ghost" size="icon" :aria-label="`${row.name} · ${t('enterprise.actions')}`" :data-test="`enterprise-menu-${row.id}`"><MoreHorizontal class="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem as-child><RouterLink :to="`/admin/enterprises/${row.id}`">{{ t('admin.enterprises.open') }}</RouterLink></DropdownMenuItem><DropdownMenuItem :data-test="`enterprise-edit-${row.id}`" @select="editing = row">{{ t('enterprise.edit') }}</DropdownMenuItem><DropdownMenuItem :data-test="`enterprise-balance-${row.id}`" @select="balanceTarget = row">{{ t('enterprise.adjustBalance') }}</DropdownMenuItem><DropdownMenuItem :data-test="`enterprise-status-${row.id}`" @select="statusTarget = row">{{ t(row.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem class="text-destructive focus:text-destructive" :data-test="`enterprise-delete-${row.id}`" @select="deleting = row">{{ t('admin.enterprises.delete') }}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></template>
+          <template #empty><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('admin.enterprises.description')" /></template>
+        </EnterpriseTable>
+      </section>
+      <footer><EnterprisePagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" /></footer>
+    </div>
+    <EnterpriseDialog :show="createOpen" :title="t('admin.enterprises.createTitle')" width="wide" @close="createOpen = false">
       <form class="space-y-5" data-test="enterprise-create-form" @submit.prevent="create">
         <div class="grid gap-4 sm:grid-cols-2">
-          <label><span class="input-label">{{ t('enterprise.name') }}</span><input v-model.trim="form.name" class="input" maxlength="100" required data-test="enterprise-name" /></label>
-          <label><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></label>
-          <label><span class="input-label">{{ t('enterprise.contactName') }}</span><input v-model.trim="form.contact_name" class="input" maxlength="100" /></label>
-          <label><span class="input-label">{{ t('enterprise.contactEmail') }}</span><input v-model.trim="form.contact_email" class="input" type="email" maxlength="255" /></label>
-          <label><span class="input-label">{{ t('enterprise.contactPhone') }}</span><input v-model.trim="form.contact_phone" class="input" maxlength="50" /></label>
-          <label><span class="input-label">{{ t('enterprise.lowBalanceThreshold') }}</span><input v-model="form.threshold" class="input" type="number" min="0" step="any" :placeholder="t('enterprise.disabled')" /></label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.name') }}</span><Input v-model.trim="form.name"  maxlength="100" required data-test="enterprise-name" /></Label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.status') }}</span><EnterpriseSelect v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></Label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactName') }}</span><Input v-model.trim="form.contact_name"  maxlength="100" /></Label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactEmail') }}</span><Input v-model.trim="form.contact_email"  type="email" maxlength="255" /></Label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactPhone') }}</span><Input v-model.trim="form.contact_phone"  maxlength="50" /></Label>
+          <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.lowBalanceThreshold') }}</span><Input v-model="form.threshold"  type="number" min="0" step="any" :placeholder="t('enterprise.disabled')" /></Label>
         </div>
-        <label class="block"><span class="input-label">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="input" rows="2"></textarea></label>
+        <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="flex w-full rounded-ui-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" rows="2"></textarea></Label>
         <fieldset class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-dark-700">
-          <legend class="px-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.enterprises.initialOwner') }}</legend>
-          <div class="flex flex-wrap gap-4"><label v-for="mode in ownerModes" :key="mode.value" class="flex items-center gap-2 text-sm dark:text-gray-200"><input v-model="ownerMode" type="radio" :value="mode.value" />{{ mode.label }}</label></div>
+          <legend class="px-2 text-sm font-medium text-foreground">{{ t('admin.enterprises.initialOwner') }}</legend>
+          <RadioGroup v-model="ownerMode" class="flex flex-wrap gap-4"><Label v-for="mode in ownerModes" :key="mode.value" class="flex items-center gap-2"><RadioGroupItem :value="mode.value" />{{ mode.label }}</Label></RadioGroup>
           <div v-if="ownerMode === 'existing'" class="space-y-3">
-            <div class="flex gap-2"><input v-model.trim="ownerSearch" class="input" :aria-label="t('enterprise.searchUsers')" :placeholder="t('enterprise.searchUsers')" @keydown.enter.prevent="searchUsers" /><button type="button" class="btn btn-secondary" :disabled="searchingUsers" @click="searchUsers">{{ t('enterprise.search') }}</button></div>
-            <Select v-model="ownerUserId" :options="ownerOptions" :aria-label="t('enterprise.selectUser')" data-test="owner-user" />
+            <div class="flex gap-2"><Input v-model.trim="ownerSearch"  :aria-label="t('enterprise.searchUsers')" :placeholder="t('enterprise.searchUsers')" @keydown.enter.prevent="searchUsers" /><Button variant="outline" type="button"  :disabled="searchingUsers" @click="searchUsers">{{ t('enterprise.search') }}</Button></div>
+            <EnterpriseSelect v-model="ownerUserId" :options="ownerOptions" :aria-label="t('enterprise.selectUser')" data-test="owner-user" />
           </div>
-          <div v-else-if="ownerMode === 'new'" class="grid gap-4 sm:grid-cols-2"><label><span class="input-label">{{ t('enterprise.email') }}</span><input v-model.trim="owner.email" class="input" type="email" autocomplete="off" data-test="owner-email" /></label><label><span class="input-label">{{ t('enterprise.username') }}</span><input v-model.trim="owner.username" class="input" autocomplete="off" /></label><label class="sm:col-span-2"><span class="input-label">{{ t('enterprise.password') }}</span><input v-model="owner.password" class="input" type="password" autocomplete="new-password" data-test="owner-password" /></label></div>
+          <div v-else-if="ownerMode === 'new'" class="grid gap-4 sm:grid-cols-2"><Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.email') }}</span><Input v-model.trim="owner.email"  type="email" autocomplete="off" data-test="owner-email" /></Label><Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.username') }}</span><Input v-model.trim="owner.username"  autocomplete="off" /></Label><Label class="sm:col-span-2"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.password') }}</span><Input v-model="owner.password"  type="password" autocomplete="new-password" data-test="owner-password" /></Label></div>
         </fieldset>
         <p v-if="validation" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation }}</p>
-        <div class="flex justify-end gap-3"><button type="button" class="btn btn-secondary" @click="createOpen = false">{{ t('enterprise.cancel') }}</button><button class="btn btn-primary" :disabled="busy" data-test="enterprise-create">{{ t('admin.enterprises.create') }}</button></div>
+        <div class="flex justify-end gap-3"><Button variant="outline" type="button"  @click="createOpen = false">{{ t('enterprise.cancel') }}</Button><Button variant="default"  :disabled="busy" data-test="enterprise-create">{{ t('admin.enterprises.create') }}</Button></div>
       </form>
-    </BaseDialog>
+    </EnterpriseDialog>
     <EnterpriseDeleteDialog v-if="deleting" :key="deleting.id" :enterprise-id="deleting.id" @cancel="deleting = null" @deleted="removed" />
-    <BaseDialog :show="!!editing" :title="t('enterprise.edit')" width="wide" @close="editing = null"><EnterpriseBasicsForm v-if="editing" :key="editing.id" :enterprise="editing" @updated="editing = null; load()" /></BaseDialog>
-    <BaseDialog :show="!!balanceTarget" :title="t('enterprise.adjustBalance')" @close="balanceTarget = null"><EnterpriseBalanceForm v-if="balanceTarget" :key="balanceTarget.id" :enterprise-id="balanceTarget.id" @updated="balanceTarget = null; load()" /></BaseDialog>
-    <ConfirmDialog :show="!!statusTarget" :title="t(statusTarget?.status === 'active' ? 'enterprise.disabled' : 'enterprise.active')" :message="t('enterprise.confirmStatusChange')" :danger="statusTarget?.status === 'active'" @cancel="statusTarget = null" @confirm="changeStatus" />
+    <EnterpriseDialog :show="!!editing" :title="t('enterprise.edit')" width="wide" @close="editing = null"><EnterpriseBasicsForm v-if="editing" :key="editing.id" :enterprise="editing" @updated="editing = null; load()" /></EnterpriseDialog>
+    <EnterpriseDialog :show="!!balanceTarget" :title="t('enterprise.adjustBalance')" @close="balanceTarget = null"><EnterpriseBalanceForm v-if="balanceTarget" :key="balanceTarget.id" :enterprise-id="balanceTarget.id" @updated="balanceTarget = null; load()" /></EnterpriseDialog>
+    <EnterpriseConfirm :busy="busy" :show="!!statusTarget" :title="t(statusTarget?.status === 'active' ? 'enterprise.disabled' : 'enterprise.active')" :message="t('enterprise.confirmStatusChange')" :danger="statusTarget?.status === 'active'" @cancel="statusTarget = null" @confirm="changeStatus" />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
+import { Card } from '@/components/ui/card'
+
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { MoreHorizontal } from '@lucide/vue'
+import { Badge } from '@/components/ui/badge'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from '@/components/common/Select.vue'
-import SearchInput from '@/components/common/SearchInput.vue'
-import EmptyState from '@/components/common/EmptyState.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
+import { Input } from '@/components/ui/input'
+import EnterpriseEmpty from '@/features/enterprise/components/EnterpriseEmpty.vue'
 import { adminAPI } from '@/api/admin'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { enterpriseErrorMessage } from '@/api/enterprise'
 import type { Enterprise, EnterpriseQuery, CreateEnterpriseRequest } from '@/types/enterprise'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import DataTable from '@/components/common/DataTable.vue'
-import BaseDialog from '@/components/common/BaseDialog.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import Pagination from '@/components/common/Pagination.vue'
+import EnterpriseTable from '@/features/enterprise/components/EnterpriseTable.vue'
+import EnterpriseDialog from '@/features/enterprise/components/EnterpriseDialog.vue'
+import EnterpriseConfirm from '@/features/enterprise/components/EnterpriseConfirm.vue'
+import EnterprisePagination from '@/features/enterprise/components/EnterprisePagination.vue'
 import { useEnterpriseAction } from '@/features/enterprise/useEnterpriseAction'
 import EnterpriseBasicsForm from '@/features/enterprise/components/EnterpriseBasicsForm.vue'
 import EnterpriseBalanceForm from '@/features/enterprise/components/EnterpriseBalanceForm.vue'

@@ -1,5 +1,12 @@
 export default {
   "enterprise": {
+    paginationUi: { total: '共 {count} 条', pageSize: '每页条数' },
+    auditDetails: {
+      title: '审计详情', view: '查看详情', before: '修改前', after: '修改后', changedTo: '变更为',
+      copyJson: '复制 JSON', copied: '已复制', copyError: '复制失败，请手动选择复制',
+      fields: { name: '名称', status: '状态', role: '角色', department_id: '部门 ID', member_id: '成员 ID', user_id: '用户 ID', amount: '金额', operation: '操作', notes: '备注', title: '职位', email: '邮箱', group_ids: '分组 ID', sort_order: '排序', daily_limit_usd: '每日上限', weekly_limit_usd: '每周上限', monthly_limit_usd: '每月上限', total_limit_usd: '总额上限' }
+    },
+
     "title": "我的企业",
     "overview": "概览",
     "organization": "组织架构",
@@ -14,6 +21,15 @@ export default {
       "last7": "近 7 天",
       "last30": "近 30 天",
       "month": "本月",
+      "lastMonth": "上月",
+      "dateRange": "日期范围",
+      "clear": "清空",
+      "searchOptions": "搜索{label}…",
+      "optionRequests": "{count} 次请求",
+      "noOptions": "暂无匹配项",
+      "optionsError": "候选项加载失败，请重试",
+      "retryOptions": "重试",
+      "incompleteRange": "请选择结束日期",
       "collapse": "收起筛选",
       "expand": "展开筛选",
       "snapshotHint": "调整条件后点击搜索，统计与明细同步更新。",

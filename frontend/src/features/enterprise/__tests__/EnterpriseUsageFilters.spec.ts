@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
-import { selectOption } from './selectOption'
+import DateRangePicker from '../components/EnterpriseDateRangePicker.vue'
+import UsageCombobox from '../components/EnterpriseUsageCombobox.vue'
+import { Select } from '@/components/ui/select'
 
 vi.mock('vue-i18n', async original => {
   const { default: messages } = await import('@/i18n/locales/zh/enterprise')
@@ -110,45 +112,44 @@ describe('enterprise usage sticky filters', () => {
     expect(intersections.every(observer => observer.disconnect.mock.calls.length > 0)).toBe(true)
   })
 
-  it('summarizes applied conditions and keeps edits staged until search, including reset', async () => {
+  it('summarizes submitted dates, member, department, model and key names while edits stay staged', async () => {
     const { wrapper, api } = await setup()
-    await wrapper.get('[data-test="usage-period-last7"]').trigger('click')
-    await selectOption(wrapper, '[data-test="usage-department"]', '研发')
-    await wrapper.get('input:not([type])').setValue('gpt-5.4')
-    await wrapper.get('form').trigger('submit'); await flushPromises()
-    await intersect(false, 0)
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('近 7 天 · 研发 · gpt-5.4')
-    await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
-    await wrapper.get('input:not([type])').setValue('draft-model')
-    await wrapper.get('[data-test="usage-period-today"]').trigger('click')
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('近 7 天 · 研发 · gpt-5.4')
-    expect(api.usageStats).toHaveBeenCalledTimes(2)
-    await wrapper.get('form .btn-secondary').trigger('click'); await flushPromises()
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间')
-    expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
-    expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0000')
-  })
-
-  it('submits common Select and DateRangePicker values with the original API parameter types', async () => {
-    const { wrapper, api } = await setup()
-    expect(wrapper.find('select').exists()).toBe(false)
-    await selectOption(wrapper, '[data-test="usage-member"]', 'Alice')
-    await selectOption(wrapper, '[data-test="usage-department"]', '研发')
-    await wrapper.get('[data-test="usage-date-range"] button').trigger('click')
-    const dates = wrapper.findAll('input[type="date"]')
-    await dates[0].setValue('2026-10-01')
-    await dates[1].setValue('2026-10-10')
-    expect(wrapper.get('.date-picker-apply').attributes('type')).toBe('button')
-    expect(wrapper.get('.date-picker-preset').attributes('type')).toBe('button')
-    await wrapper.get('.date-picker-apply').trigger('click')
+    const picker = wrapper.getComponent(DateRangePicker)
+    picker.vm.$emit('update:startDate', '2026-10-01'); picker.vm.$emit('update:endDate', '2026-10-10')
+    const combos = wrapper.findAllComponents(UsageCombobox)
+    combos[0].vm.$emit('update:modelValue', '42')
+    combos[1].vm.$emit('update:modelValue', 'gpt-5.4')
+    combos[2].vm.$emit('update:modelValue', '8')
+    combos[2].vm.$emit('select', { value: '8', label: 'Production · Alice' })
+    wrapper.getComponent(Select).vm.$emit('update:modelValue', '3')
     expect(api.usageStats).toHaveBeenCalledOnce()
-    await wrapper.get('input:not([type])').setValue('gpt-5.4')
-    await wrapper.get('input[type="number"]').setValue('8')
     await wrapper.get('form').trigger('submit'); await flushPromises()
     for (const request of [api.usage, api.usageStats, api.usageTrend, api.usageModels, api.usageMembers, api.usageDepartments]) {
       expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: '2026-10-01', end_date: '2026-10-10', user_id: 42, department_id: 3, model: 'gpt-5.4', api_key_id: 8 }), expect.anything())
     }
     await intersect(false, 0)
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-01 – 2026-10-10 · Alice · 研发 · gpt-5.4 · API 密钥 #8')
+    const snapshot = '2026-10-01 – 2026-10-10 · Alice · 研发 · gpt-5.4 · Production · Alice'
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
+    await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
+    wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'draft-model')
+    wrapper.getComponent(DateRangePicker).vm.$emit('update:startDate', '2026-10-02')
+    await flushPromises()
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
+    expect(api.usageStats).toHaveBeenCalledTimes(2)
+    await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间')
+    expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
+    expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0000')
+  })
+
+  it('validates reversed or excessive ranges before issuing requests', async () => {
+    const { wrapper, api } = await setup()
+    const picker = wrapper.getComponent(DateRangePicker)
+    for (const [start, end] of [['2026-10-10', '2026-10-01'], ['2024-01-01', '2026-10-18']]) {
+      picker.vm.$emit('update:startDate', start); picker.vm.$emit('update:endDate', end)
+      await wrapper.get('form').trigger('submit'); await flushPromises()
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+      expect(api.usageStats).toHaveBeenCalledOnce()
+    }
   })
 })

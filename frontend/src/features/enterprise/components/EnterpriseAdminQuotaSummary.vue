@@ -1,22 +1,26 @@
 <template>
-  <section class="space-y-3">
-    <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold text-gray-900 dark:text-white">{{ t('enterprise.quotas') }}</h2><button class="text-sm text-primary-600 dark:text-primary-400" @click="$emit('manage')">{{ t('enterprise.view') }}</button></div>
-    <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <button class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
+  <section class="shadcn-scope space-y-3">
+    <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold text-foreground">{{ t('enterprise.quotas') }}</h2><Button variant="ghost" class="text-sm text-primary" @click="$emit('manage')">{{ t('enterprise.view') }}</Button></div>
+    <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
     <div class="grid gap-4 xl:grid-cols-3" :aria-busy="busy">
       <div v-for="kind in kinds" :key="kind" class="min-w-0 space-y-3">
-        <Select v-if="kind !== 'enterprise' && options(kind).length" v-model="selected[kind]" :options="options(kind)" :aria-label="t(`enterprise.quotaSections.${kind}.title`)" />
+        <EnterpriseSelect v-if="kind !== 'enterprise' && options(kind).length" v-model="selected[kind]" :options="options(kind)" :aria-label="t(`enterprise.quotaSections.${kind}.title`)" />
         <EnterpriseQuotaDisplay v-if="current(kind)" :quota="current(kind)!" :title="t(`enterprise.quotaSections.${kind}.title`)" compact :data-test="`${kind}-quota`" />
-        <div v-else class="card p-5"><h3 class="font-medium text-gray-900 dark:text-white">{{ t(`enterprise.quotaSections.${kind}.title`) }}</h3><p class="mt-4 text-sm text-gray-500 dark:text-gray-400">{{ t(busy ? 'common.loading' : 'enterprise.empty') }}</p></div>
+        <Card v-else class="rounded-ui-lg border bg-card text-card-foreground shadow-sm p-5"><h3 class="font-medium text-foreground">{{ t(`enterprise.quotaSections.${kind}.title`) }}</h3><p class="mt-4 text-sm text-muted-foreground">{{ t(busy ? 'common.loading' : 'enterprise.empty') }}</p></Card>
       </div>
     </div>
   </section>
 </template>
 <script setup lang="ts">
+import { Card } from '@/components/ui/card'
+
+import { Button } from '@/components/ui/button'
+
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseQuota, EnterpriseScope } from '@/types/enterprise'
-import Select from '@/components/common/Select.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
 import EnterpriseQuotaDisplay from './EnterpriseQuotaDisplay.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 import { loadMemberOptions } from '../memberOptions'

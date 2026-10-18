@@ -1,17 +1,21 @@
 <template>
-  <form class="space-y-4" @submit.prevent="save">
-    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.balanceAdjustmentHint') }}</p>
-    <label class="block"><span class="input-label">{{ t('enterprise.operation') }}</span><Select v-model="form.operation" :options="operationOptions" :aria-label="t('enterprise.operation')" data-test="balance-operation" /></label>
-    <label class="block"><span class="input-label">{{ t('enterprise.amount') }}</span><input v-model="form.amount" class="input" type="number" min="0" step="any" data-test="enterprise-balance-amount" /></label>
-    <label class="block"><span class="input-label">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="input" rows="3"></textarea></label>
+  <form class="shadcn-scope space-y-4" @submit.prevent="save">
+    <p class="text-sm text-muted-foreground">{{ t('enterprise.balanceAdjustmentHint') }}</p>
+    <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.operation') }}</span><EnterpriseSelect v-model="form.operation" :options="operationOptions" :aria-label="t('enterprise.operation')" data-test="balance-operation" /></Label>
+    <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.amount') }}</span><Input v-model="form.amount"  type="number" min="0" step="any" data-test="enterprise-balance-amount" /></Label>
+    <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="flex w-full rounded-ui-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" rows="3"></textarea></Label>
     <p v-if="validation || error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation || error }}</p>
-    <button class="btn btn-primary" :disabled="busy">{{ t('enterprise.save') }}</button>
+    <Button variant="default"  :disabled="busy">{{ t('enterprise.save') }}</Button>
   </form>
 </template>
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from '@/components/common/Select.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 const props = defineProps<{ enterpriseId: number }>()

@@ -1,23 +1,27 @@
 <template>
-  <AppLayout>
-    <div v-if="loading && !overview" class="flex justify-center py-12" :aria-label="t('common.loading')" aria-busy="true">
-      <LoadingSpinner />
+  <AppLayout><div class="shadcn-scope min-w-0 space-y-6">
+    <div v-if="loading && !overview" class="shadcn-scope flex justify-center py-12" :aria-label="t('common.loading')" aria-busy="true">
+      <Skeleton v-for="n in 3" :key="n" class="h-32 flex-1" />
     </div>
-    <div v-if="errorMessage" role="alert" class="card space-y-4 p-6">
+    <Card v-if="errorMessage" role="alert" class="rounded-ui-lg border bg-card text-card-foreground shadow-sm space-y-4 p-6">
       <p class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
-      <button type="button" class="btn btn-secondary" @click="loadOverview">{{ t('enterprise.retry') }}</button>
-    </div>
+      <Button variant="outline" type="button"  @click="loadOverview">{{ t('enterprise.retry') }}</Button>
+    </Card>
     <EnterpriseWorkspace v-if="overview" :overview="overview" @updated="handleUpdated" />
-  </AppLayout>
+  </div></AppLayout>
 </template>
 
 <script setup lang="ts">
+import { Card } from '@/components/ui/card'
+
+import { Button } from '@/components/ui/button'
+
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { enterpriseAPI, enterpriseErrorMessage } from '@/api/enterprise'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import EnterpriseWorkspace from '@/features/enterprise/EnterpriseWorkspace.vue'
 import type { EnterpriseOverview } from '@/types/enterprise'
 

@@ -1,76 +1,85 @@
 <template>
-  <section class="space-y-4" :aria-busy="busy">
-    <p v-if="error" role="alert" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{{ error }} <button class="underline" @click="load">{{ t('enterprise.retry') }}</button></p>
+  <section class="shadcn-scope space-y-4" :aria-busy="busy">
+    <p v-if="error" role="alert" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
     <div class="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside class="card min-w-0 p-3">
-        <div class="flex items-center justify-between gap-2 px-2 py-2">
-          <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('enterprise.organization') }}</h2>
-          <button class="btn btn-secondary px-2 py-1 lg:hidden" :aria-expanded="treeOpen" @click="treeOpen = !treeOpen">{{ t(treeOpen ? 'enterprise.organizationUi.collapse' : 'enterprise.organizationUi.expand') }}</button>
-        </div>
-        <div :class="treeOpen ? 'block' : 'hidden lg:block'">
-          <nav class="space-y-1" :aria-label="t('enterprise.departments')">
-            <button v-for="node in nodes" :key="node.key" :data-test="`org-node-${node.key}`" class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary-500" :class="selected === node.key ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-dark-700'" :aria-current="selected === node.key ? 'true' : undefined" @click="selectNode(node.key)">
-              <span class="min-w-0 break-words" :class="node.key !== 'all' && !limitedManager ? 'pl-3' : ''">{{ node.name }}</span><span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs tabular-nums text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ node.count ?? '—' }}</span>
-            </button>
-          </nav>
-          <button v-if="canManageDepartments" class="btn btn-secondary mt-3 w-full" data-test="department-create" @click="openDepartment()">+ {{ t('enterprise.addDepartment') }}</button>
-        </div>
-      </aside>
+      <Card class="rounded-ui-lg border bg-card p-3">
+        <Collapsible v-model:open="treeOpen">
+          <div class="flex items-center justify-between gap-2 px-2 py-2"><h2 class="font-semibold">{{ t('enterprise.organization') }}</h2><CollapsibleTrigger as-child><Button variant="ghost" size="icon" :aria-label="t(treeOpen ? 'enterprise.organizationUi.collapse' : 'enterprise.organizationUi.expand')"><ChevronDown class="size-4 transition-transform" :class="treeOpen ? '' : '-rotate-90'" /></Button></CollapsibleTrigger></div>
+          <CollapsibleContent class="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none">
+            <nav class="space-y-1" :aria-label="t('enterprise.departments')">
+              <div v-for="node in nodes" :key="node.key" class="flex min-w-0 items-center gap-1">
+                <Button variant="ghost" :data-test="`org-node-${node.key}`" class="h-auto min-w-0 flex-1 justify-between gap-2 px-3 py-3 text-left" :class="selected === node.key ? 'bg-primary/10 text-primary' : ''" :aria-current="selected === node.key ? 'true' : undefined" @click="selectNode(node.key)"><span class="flex min-w-0 items-center gap-2" :class="node.key !== 'all' && !limitedManager ? 'pl-3' : ''"><Building2 class="size-4 shrink-0 text-muted-foreground" /><span class="break-words whitespace-normal">{{ node.name }}</span></span><Badge variant="secondary" class="shrink-0 tabular-nums">{{ node.count ?? '—' }}</Badge></Button>
+                <DropdownMenu v-if="canManageDepartments && node.key !== 'all' && node.key !== '0'"><DropdownMenuTrigger as-child><Button variant="ghost" size="icon" class="size-8 shrink-0" :aria-label="`${node.name} · ${t('enterprise.actions')}`" :data-test="`org-menu-${node.key}`"><MoreHorizontal class="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem :data-test="`org-edit-${node.key}`" @select="openDepartment(departments.find(row => String(row.id) === node.key))">{{ t('enterprise.editDepartment') }}</DropdownMenuItem><DropdownMenuItem class="text-destructive focus:text-destructive" :data-test="`org-delete-${node.key}`" @select="deleteDepartment(node.key)">{{ t('enterprise.deleteDepartment') }}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+              </div>
+            </nav>
+            <Button v-if="canManageDepartments" variant="outline" class="mt-3 w-full" data-test="department-create" @click="openDepartment()">+ {{ t('enterprise.addDepartment') }}</Button>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
       <div class="min-w-0 space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div><h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ selectedName }}</h2><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t(canViewMembers ? 'enterprise.organizationUi.membersHint' : 'enterprise.organizationUi.directoryHint') }}</p></div>
+          <div><h2 class="text-lg font-semibold text-foreground">{{ selectedName }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t(canViewMembers ? 'enterprise.organizationUi.membersHint' : 'enterprise.organizationUi.directoryHint') }}</p></div>
           <div class="flex flex-wrap gap-2">
-            <template v-if="selectedDepartment && canManageDepartments"><button class="btn btn-secondary" data-test="department-edit" @click="openDepartment(selectedDepartment)">{{ t('enterprise.editDepartment') }}</button><button class="btn btn-secondary text-red-600 dark:text-red-400" data-test="department-delete" @click="deleting = { kind: 'department', row: selectedDepartment }">{{ t('enterprise.deleteDepartment') }}</button></template>
-            <button v-if="canCreateMembers" class="btn btn-primary" data-test="organization-create" @click="openMember()">{{ t('enterprise.addMember') }}</button>
+            <Button variant="default" v-if="canCreateMembers"  data-test="organization-create" @click="openMember()">{{ t('enterprise.addMember') }}</Button>
           </div>
         </div>
         <template v-if="canViewMembers">
-          <form class="card grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(10rem,1fr)_9rem_8rem_auto]" @submit.prevent="searchMembers">
-            <SearchInput v-model="search" :placeholder="t('enterprise.organizationUi.searchMembers')" :aria-label="t('enterprise.search')" />
-            <Select v-model="roleFilter" :options="roleOptions" :aria-label="t('enterprise.role')" />
-            <Select v-model="statusFilter" :options="statusOptions" :aria-label="t('enterprise.status')" />
-            <button class="btn btn-secondary" :disabled="busy">{{ t('enterprise.search') }}</button>
-          </form>
-          <DataTable :columns="columns" :data="visibleMembers" :loading="busy">
-            <template #cell-username="{ row }"><span class="break-words font-medium">{{ row.username || row.email }}</span><p class="break-all text-xs text-gray-500 dark:text-gray-400">{{ row.email }}</p></template>
+          <Card><form class="rounded-ui-lg border bg-card text-card-foreground shadow-sm grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(10rem,1fr)_9rem_8rem_auto]" @submit.prevent="searchMembers">
+            <Input type="search" v-model="search" :placeholder="t('enterprise.organizationUi.searchMembers')" :aria-label="t('enterprise.search')" />
+            <EnterpriseSelect v-model="roleFilter" :options="roleOptions" :aria-label="t('enterprise.role')" />
+            <EnterpriseSelect v-model="statusFilter" :options="statusOptions" :aria-label="t('enterprise.status')" />
+            <Button variant="outline"  :disabled="busy">{{ t('enterprise.search') }}</Button>
+          </form></Card>
+          <EnterpriseTable :columns="columns" :data="visibleMembers" :loading="busy">
+            <template #cell-username="{ row }"><span class="break-words font-medium">{{ row.username || row.email }}</span><p class="break-all text-xs text-muted-foreground">{{ row.email }}</p></template>
             <template #cell-role="{ value }">{{ t(`enterprise.roles.${value}`) }}</template>
-            <template #cell-status="{ value }"><span class="badge" :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
+            <template #cell-status="{ value }"><Badge data-test="enterprise-status-badge" class="whitespace-nowrap" :variant="value === 'active' ? 'secondary' : 'destructive'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</Badge></template>
             <template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template>
-            <template #cell-joined_at="{ value }">{{ formatDateTime(value) }}</template>
-            <template #cell-actions="{ row }"><div v-if="canManageMembers && canManageMember(row)" class="flex gap-3"><button class="text-primary-600 dark:text-primary-400" @click="openMember(row)">{{ t('enterprise.edit') }}</button><button class="text-red-600 dark:text-red-400" @click="deleting = { kind: 'member', row }">{{ t('enterprise.removeMember') }}</button></div></template>
-            <template #empty><EmptyState :title="t('enterprise.empty')" :description="t('enterprise.organizationUi.emptyMembers')" /></template>
-          </DataTable>
-          <Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" />
+            <template #cell-joined_at="{ row }">{{ formatDateTime(row.joined_at) }}</template>
+            <template #cell-actions="{ row }"><div v-if="canManageMembers && canManageMember(row)" class="flex gap-3"><Button variant="ghost" class="text-primary" @click="openMember(row)">{{ t('enterprise.edit') }}</Button><Button variant="ghost" class="text-red-600 dark:text-red-400" @click="deleting = { kind: 'member', row }">{{ t('enterprise.removeMember') }}</Button></div></template>
+            <template #empty><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('enterprise.organizationUi.emptyMembers')" /></template>
+          </EnterpriseTable>
+          <EnterprisePagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" />
         </template>
-        <template v-else><div v-if="busy" class="h-32 animate-pulse rounded-xl bg-gray-100 dark:bg-dark-800" /><div v-else class="card p-5"><p class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.memberCount') }}</p><p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ nodes.find(node => node.key === selected)?.count ?? '—' }}</p></div></template>
+        <template v-else><Skeleton v-if="busy" class="h-32" /><Card v-else class="rounded-ui-lg border bg-card text-card-foreground shadow-sm p-5"><p class="text-sm text-muted-foreground">{{ t('enterprise.memberCount') }}</p><p class="mt-2 text-2xl font-semibold text-foreground">{{ nodes.find(node => node.key === selected)?.count ?? '—' }}</p></Card></template>
       </div>
     </div>
-    <BaseDialog :show="formOpen" :title="t(formKind === 'member' ? (editingMember ? 'enterprise.editMember' : 'enterprise.addMember') : (editingDepartment ? 'enterprise.editDepartment' : 'enterprise.addDepartment'))" @close="formOpen = false">
+    <EnterpriseDialog :show="formOpen" :title="t(formKind === 'member' ? (editingMember ? 'enterprise.editMember' : 'enterprise.addMember') : (editingDepartment ? 'enterprise.editDepartment' : 'enterprise.addDepartment'))" @close="formOpen = false">
       <p v-if="error" role="alert" class="mb-4 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
       <EnterpriseMemberForm v-if="formOpen && formKind === 'member'" :admin="admin" :member="editingMember" :departments="departments" :limited-manager="limitedManager" :department-id="limitedManager ? overview?.me.department_id : selectedDepartment?.id" :default-department-id="selectedDepartment?.id" :busy="busy" @submit="saveMember" />
       <form v-else-if="formOpen" class="space-y-4" @submit.prevent="saveDepartment">
-        <label class="block"><span class="input-label">{{ t('enterprise.name') }}</span><input v-model.trim="departmentForm.name" class="input" maxlength="100" required data-test="department-name" /></label>
-        <label class="block"><span class="input-label">{{ t('enterprise.sortOrder') }}</span><input v-model.number="departmentForm.sort_order" class="input" type="number" step="1" required data-test="department-sort" /><span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.organizationUi.sortHint') }}</span></label>
-        <button class="btn btn-primary" :disabled="busy || !departmentForm.name">{{ t('enterprise.save') }}</button>
+        <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.name') }}</span><Input v-model.trim="departmentForm.name"  maxlength="100" required data-test="department-name" /></Label>
+        <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.sortOrder') }}</span><Input v-model.number="departmentForm.sort_order"  type="number" step="1" required data-test="department-sort" /><span class="mt-1 block text-xs text-muted-foreground">{{ t('enterprise.organizationUi.sortHint') }}</span></Label>
+        <Button variant="default"  :disabled="busy || !departmentForm.name">{{ t('enterprise.save') }}</Button>
       </form>
-    </BaseDialog>
-    <ConfirmDialog :show="!!deleting" :title="t(deleting?.kind === 'member' ? 'enterprise.removeMember' : 'enterprise.deleteDepartment')" :message="t('enterprise.confirmRemove')" danger @cancel="deleting = null" @confirm="remove"><p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p></ConfirmDialog>
+    </EnterpriseDialog>
+    <EnterpriseConfirm :show="!!deleting" :busy="busy" :title="t(deleting?.kind === 'member' ? 'enterprise.removeMember' : 'enterprise.deleteDepartment')" :message="t('enterprise.confirmRemove')" danger @cancel="deleting = null" @confirm="remove"><p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p></EnterpriseConfirm>
   </section>
 </template>
 
 <script setup lang="ts">
+import { Card } from '@/components/ui/card'
+
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+
+import { Badge } from '@/components/ui/badge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { MoreHorizontal, ChevronDown, Building2 } from '@lucide/vue'
+import { Skeleton } from '@/components/ui/skeleton'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseQuery, CreateEnterpriseAccountMemberRequest, CreateEnterpriseMemberRequest, UpdateEnterpriseMemberRequest } from '@/types/enterprise'
 import { formatDateTime } from '@/utils/format'
-import BaseDialog from '@/components/common/BaseDialog.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import DataTable from '@/components/common/DataTable.vue'
-import Pagination from '@/components/common/Pagination.vue'
-import Select from '@/components/common/Select.vue'
-import SearchInput from '@/components/common/SearchInput.vue'
-import EmptyState from '@/components/common/EmptyState.vue'
+import EnterpriseDialog from '@/features/enterprise/components/EnterpriseDialog.vue'
+import EnterpriseConfirm from '@/features/enterprise/components/EnterpriseConfirm.vue'
+import EnterpriseTable from '@/features/enterprise/components/EnterpriseTable.vue'
+import EnterprisePagination from '@/features/enterprise/components/EnterprisePagination.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
+import { Input } from '@/components/ui/input'
+import EnterpriseEmpty from '@/features/enterprise/components/EnterpriseEmpty.vue'
 import EnterpriseMemberForm from './EnterpriseMemberForm.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 const props = defineProps<{ api: EnterpriseResourceAPI; mode?: 'members' | 'departments'; enterpriseName?: string; memberCount?: number; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
@@ -86,7 +95,7 @@ const canViewMembers = computed(() => props.mode !== 'departments' && (props.adm
 const canManageDepartments = computed(() => !props.readonly && (props.admin || props.overview?.permissions.manage_departments))
 const canManageMembers = computed(() => !props.readonly && (props.admin || props.overview?.permissions.manage_members))
 const canCreateMembers = computed(() => canViewMembers.value && !props.readonly && (props.admin || props.overview?.permissions.create_members))
-const selected = ref(limitedManager.value ? String(props.overview?.me.department_id ?? 0) : 'all'), treeOpen = ref(false)
+const selected = ref(limitedManager.value ? String(props.overview?.me.department_id ?? 0) : 'all'), treeOpen = ref(true)
 const visibleDepartments = computed(() => departments.value.filter(item => !limitedManager.value || item.id === props.overview?.me.department_id).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id))
 const nodes = computed(() => {
   const rows = visibleDepartments.value.map(item => ({ key: String(item.id), name: item.name, count: item.member_count }))
@@ -112,6 +121,7 @@ async function load() {
     if (memberPage) { members.value = memberPage.items; total.value = memberPage.total; if (selected.value === 'all' && !appliedQuery.search && !appliedQuery.role && !appliedQuery.status) allCount.value = memberPage.total }
   })
 }
+function deleteDepartment(key: string) { const row = departments.value.find(item => String(item.id) === key); if (row) deleting.value = { kind: 'department', row } }
 function selectNode(key: string) { selected.value = key; page.value = 1; void load() }
 function searchMembers() { appliedQuery = { search: search.value.trim() || undefined, role: (roleFilter.value || undefined) as EnterpriseQuery['role'], status: statusFilter.value || undefined }; page.value = 1; void load() }
 function openMember(row?: EnterpriseMember) { editingMember.value = row; formKind.value = 'member'; error.value = ''; formOpen.value = true }

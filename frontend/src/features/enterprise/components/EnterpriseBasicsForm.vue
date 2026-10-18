@@ -1,23 +1,29 @@
 <template>
-  <form class="card space-y-4 p-4 sm:p-6" @submit.prevent="save">
-    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('enterprise.basicInfo') }}</h2>
+  <Card><form class="shadcn-scope space-y-4 p-4 sm:p-6" @submit.prevent="save">
+    <h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.basicInfo') }}</h2>
     <div class="grid gap-4 sm:grid-cols-2">
-      <label><span class="input-label">{{ t('enterprise.name') }}</span><input v-model.trim="form.name" class="input" maxlength="100" required data-test="enterprise-basic-name" /></label>
-      <label><span class="input-label">{{ t('enterprise.status') }}</span><Select v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></label>
-      <label><span class="input-label">{{ t('enterprise.contactName') }}</span><input v-model.trim="form.contact_name" class="input" maxlength="100" /></label>
-      <label><span class="input-label">{{ t('enterprise.contactEmail') }}</span><input v-model.trim="form.contact_email" class="input" type="email" maxlength="255" /></label>
-      <label><span class="input-label">{{ t('enterprise.contactPhone') }}</span><input v-model.trim="form.contact_phone" class="input" maxlength="50" /></label>
-      <label><span class="input-label">{{ t('enterprise.lowBalanceThreshold') }}</span><input v-model="threshold" class="input" type="number" min="0" step="any" :placeholder="t('enterprise.disabled')" data-test="enterprise-basic-threshold" /></label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.name') }}</span><Input v-model.trim="form.name"  maxlength="100" required data-test="enterprise-basic-name" /></Label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.status') }}</span><EnterpriseSelect v-model="form.status" :options="statusOptions" :aria-label="t('enterprise.status')" data-test="enterprise-status-select" /></Label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactName') }}</span><Input v-model.trim="form.contact_name"  maxlength="100" /></Label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactEmail') }}</span><Input v-model.trim="form.contact_email"  type="email" maxlength="255" /></Label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.contactPhone') }}</span><Input v-model.trim="form.contact_phone"  maxlength="50" /></Label>
+      <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.lowBalanceThreshold') }}</span><Input v-model="threshold"  type="number" min="0" step="any" :placeholder="t('enterprise.disabled')" data-test="enterprise-basic-threshold" /></Label>
     </div>
-    <label class="block"><span class="input-label">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="input" rows="3"></textarea></label>
+    <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="flex w-full rounded-ui-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" rows="3"></textarea></Label>
     <p v-if="validation || error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ validation || error }}</p>
-    <button class="btn btn-primary" :disabled="busy">{{ t('enterprise.save') }}</button>
-  </form>
+    <Button variant="default"  :disabled="busy">{{ t('enterprise.save') }}</Button>
+  </form></Card>
 </template>
 <script setup lang="ts">
+import { Card } from '@/components/ui/card'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from '@/components/common/Select.vue'
+import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
 import { enterprisesAPI } from '@/api/admin/enterprises'
 import type { Enterprise } from '@/types/enterprise'
 import { useEnterpriseAction } from '../useEnterpriseAction'

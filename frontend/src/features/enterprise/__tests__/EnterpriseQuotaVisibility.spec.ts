@@ -20,12 +20,12 @@ function quotaWithoutUsage(): EnterpriseQuota {
 }
 
 const stubs = {
-  DataTable: {
+  EnterpriseTable: {
     props: ['data', 'columns'],
     template: '<div><div v-for="row in data" :key="`${row.scope_type}-${row.scope_id}`"><div v-for="column in columns" :key="column.key"><slot :name="`cell-${column.key}`" :row="row" /></div></div></div>'
   },
-  BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
-  ConfirmDialog: true
+  EnterpriseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
+  EnterpriseConfirm: true
 }
 
 describe('enterprise quota limits and editing permissions', () => {

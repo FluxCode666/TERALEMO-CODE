@@ -22,18 +22,21 @@ describe('enterprise quota sections', () => {
   it('groups employees under departments, collapses larger groups, and finds employees by email', async () => {
     const members = Array.from({ length: 7 }, (_, index) => ({ id: index + 10, username: `Employee ${index}`, email: `employee${index}@example.com`, department_id: 3, department_name: '研发部', role: 'member' }))
     const api = { quotas: vi.fn().mockResolvedValue([quota('enterprise', 1), quota('department', 3), ...members.map(member => quota('member', member.id))]), departments: vi.fn().mockResolvedValue([{ id: 3, name: '研发部' }]), members: vi.fn().mockResolvedValue({ items: members, total: 7 }) } as unknown as EnterpriseResourceAPI
-    const wrapper = mount(EnterpriseQuotaPanel, { props: { api, admin: true, enterpriseName: 'Acme' }, global: { stubs: { BaseDialog: true, ConfirmDialog: true } } }); wrappers.push(wrapper)
+    const wrapper = mount(EnterpriseQuotaPanel, { props: { api, admin: true, enterpriseName: 'Acme' }, global: { stubs: { EnterpriseDialog: true, EnterpriseConfirm: true } } }); wrappers.push(wrapper)
     await flushPromises()
     expect(wrapper.get('[data-test="quota-section-enterprise"]').getComponent(EnterpriseQuotaDisplay).props('title')).toBe('Acme')
     expect(wrapper.text()).not.toContain('enterprise.enterpriseScope #1')
+    expect(wrapper.get('[data-test="quota-section-member"] [data-test="quota-member-toggle"]').attributes('aria-expanded')).toBe('false')
+    await wrapper.get('[data-test="quota-section-member"] [data-test="quota-member-toggle"]').trigger('click')
     for (const kind of ['enterprise', 'department', 'member']) {
       const section = wrapper.get(`[data-test="quota-section-${kind}"]`)
       expect(section.findAll('dd').slice(0, 4).map(item => item.text())).toEqual(['enterprise.quotaSections.disabled', 'enterprise.unlimited', '$20', '$30'])
       expect(section.find('[role="progressbar"]').exists()).toBe(false)
     }
-    expect(wrapper.get('details').attributes('open')).toBeUndefined()
-    await wrapper.get('input[type="text"]').setValue('employee5@example.com')
-    expect(wrapper.get('details').attributes('open')).toBeDefined()
+    await wrapper.get('[data-test="quota-section-member"] [data-test="quota-member-toggle"]').trigger('click')
+    expect(wrapper.get('[data-test="quota-section-member"] [data-test="quota-member-toggle"]').attributes('aria-expanded')).toBe('false')
+    await wrapper.get('input[type="search"]').setValue('employee5@example.com')
+    expect(wrapper.get('[data-test="quota-section-member"] [data-test="quota-member-toggle"]').attributes('aria-expanded')).toBe('true')
     expect(wrapper.get('[data-test="quota-section-member"]').text()).toContain('Employee 5')
     expect(wrapper.get('[data-test="quota-section-member"]').text()).not.toContain('Employee 4')
   })

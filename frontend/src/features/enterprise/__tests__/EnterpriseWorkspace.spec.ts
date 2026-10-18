@@ -35,7 +35,7 @@ vi.mock('@/api/admin', () => ({
 }))
 
 vi.mock('@/api/client', () => ({ apiClient: {} }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '1' } }), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-router', async original => ({ ...await original<typeof import('vue-router')>(), useRoute: () => ({ params: { id: '1' }, query: {} }), useRouter: () => ({ push: vi.fn() }) }))
 
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({ showSuccess: vi.fn(), showError })
@@ -99,7 +99,7 @@ function mountWorkspace(value: EnterpriseOverview) {
       stubs: {
         AppLayout: { template: '<div><slot /></div>' },
         TablePageLayout: { template: '<div><slot name="header" /><slot name="filters" /><slot /><slot name="pagination" /></div>' },
-        Pagination: true,
+        EnterprisePagination: true,
         Line: true,
         Icon: true
       }
@@ -139,6 +139,19 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const wrapper = mountWorkspace(overview(role))
     await flushPromises()
     expect(tabNames(wrapper).sort()).toEqual([...expected].sort())
+  })
+
+  it('switches shadcn Tabs with selected state and lazy content', async () => {
+    const wrapper = mountWorkspace(overview('owner'))
+    await flushPromises()
+    expect(wrapper.get('[role="tablist"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="tab-overview"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).exists()).toBe(false)
+    await openTab(wrapper, 'organization')
+    expect(wrapper.get('[data-test="tab-organization"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-test="tab-overview"]').attributes('aria-selected')).toBe('false')
+    expect(wrapper.get('[role="tabpanel"]').exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'EnterpriseOrganizationPanel' }).exists()).toBe(true)
   })
 
   it('hides forbidden tabs and all invisible null overview cards instead of showing zero', async () => {
@@ -221,7 +234,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const instance = panel.vm
     const refreshKey = panel.props('refreshKey')
 
-    await wrapper.get('button.btn-secondary').trigger('click')
+    await wrapper.get('[data-test="enterprise-refresh"]').trigger('click')
     expect(wrapper.emitted('updated')).toHaveLength(1)
     expect(panel.props('refreshKey')).toBe(refreshKey)
 
@@ -251,7 +264,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const refreshKey = panel.props('refreshKey')
 
     getEnterprise.mockResolvedValue({ ...enterprise, balance: 200 })
-    await wrapper.get('button.btn-secondary').trigger('click')
+    await wrapper.get('[data-test="enterprise-refresh"]').trigger('click')
     await flushPromises()
 
     expect(getEnterprise).toHaveBeenCalledTimes(2)
@@ -321,9 +334,9 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     await flushPromises()
 
     const actions = wrapper.get('[data-test="enterprise-header-actions"]')
-    expect(actions.get('button.btn-secondary').text()).toBe('enterprise.refresh')
+    expect(actions.get('[data-test="enterprise-refresh"]').text()).toBe('enterprise.refresh')
     const deleteButton = actions.get('[data-test="enterprise-delete-detail"]')
-    expect(deleteButton.classes()).toContain('btn-danger')
+    expect(deleteButton.classes()).toContain('bg-destructive')
     await deleteButton.trigger('click')
     expect(wrapper.findComponent({ name: 'EnterpriseDeleteDialog' }).props('enterpriseId')).toBe(1)
   })

@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import EnterpriseOrganizationPanel from '../components/EnterpriseOrganizationPanel.vue'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview } from '@/types/enterprise'
+import { clickMenuItem } from './selectOption'
 import { selectOption } from './selectOption'
 vi.mock('@/api/client', () => ({ apiClient: {} }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
@@ -19,9 +20,9 @@ const members = [
 ] as EnterpriseMember[]
 const wrappers: VueWrapper[] = []
 const stubs = {
-  BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
-  ConfirmDialog: { props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-remove" @click="$emit(\'confirm\')">Confirm</button></div>' },
-  Pagination: true
+  EnterpriseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
+  EnterpriseConfirm: { props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-remove" @click="$emit(\'confirm\')">Confirm</button></div>' },
+  EnterprisePagination: true
 }
 function api() {
   return {
@@ -43,24 +44,24 @@ describe('enterprise organization tree', () => {
     expect(wrapper.get('[data-test="org-node-all"]').text()).toBe('Acme3')
     expect(wrapper.get('[aria-label="enterprise.role"]').text()).toContain('enterprise.organizationUi.allRoles')
     expect(wrapper.get('[aria-label="enterprise.status"]').text()).toContain('enterprise.organizationUi.allStatuses')
-    expect(wrapper.get('.badge-success').classes()).toContain('badge')
+    expect(wrapper.get('[data-test="enterprise-status-badge"]').text()).toBe('enterprise.active')
     expect(wrapper.get('[data-test="org-node-0"]').text()).toContain('1')
-    expect(wrapper.findAll('nav button').map(node => node.attributes('data-test'))).toEqual(['org-node-all', 'org-node-0', 'org-node-4', 'org-node-3'])
+    expect(wrapper.findAll('nav [data-test^="org-node-"]').map(node => node.attributes('data-test'))).toEqual(['org-node-all', 'org-node-0', 'org-node-4', 'org-node-3'])
     await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
     expect(requests.members).toHaveBeenLastCalledWith(expect.objectContaining({ department_id: 3, page: 1 }), expect.anything())
-    expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toEqual([members[0]])
+    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[0]])
     await wrapper.get('[data-test="org-node-0"]').trigger('click'); await flushPromises()
     expect(requests.members).toHaveBeenLastCalledWith(expect.objectContaining({ department_id: 0 }), expect.anything())
-    expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toEqual([members[2]])
+    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[2]])
     await wrapper.get('[data-test="org-node-all"]').trigger('click'); await flushPromises()
-    expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toHaveLength(3)
+    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toHaveLength(3)
   })
   it('only shows a manager’s department and its members even if a response contains other departments', async () => {
     const requests = api(); requests.members.mockResolvedValue({ items: members, total: 1 })
     const overview = { enterprise: { name: 'Acme' }, me: { role: 'manager', department_id: 3 }, permissions: { view_members: true, manage_members: true, create_members: true, manage_departments: false } } as EnterpriseOverview
     const wrapper = render(requests, overview); await flushPromises()
-    expect(wrapper.findAll('nav button').map(node => node.text())).toEqual(['研发部1'])
-    expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toEqual([members[0]])
+    expect(wrapper.findAll('nav [data-test^="org-node-"]').map(node => node.text())).toEqual(['研发部1'])
+    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[0]])
     expect(wrapper.find('[data-test="department-create"]').exists()).toBe(false)
     expect(requests.members).toHaveBeenCalledWith(expect.objectContaining({ department_id: 3 }), expect.anything())
   })
@@ -74,7 +75,7 @@ describe('enterprise organization tree', () => {
     const requests = api(); requests.deleteDepartment.mockRejectedValue({ reason: 'ENTERPRISE_DEPARTMENT_NOT_EMPTY', code: 'CONFLICT' })
     const wrapper = render(requests); await flushPromises()
     await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
-    await wrapper.get('[data-test="department-delete"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="org-menu-3"]', '[data-test="org-delete-3"]')
     await wrapper.get('[data-test="confirm-remove"]').trigger('click'); await flushPromises()
     expect(requests.deleteDepartment).toHaveBeenCalledWith(3)
     expect(wrapper.text()).toContain('enterprise.errors.ENTERPRISE_DEPARTMENT_NOT_EMPTY')
@@ -83,7 +84,7 @@ describe('enterprise organization tree', () => {
   it('submits department name and sort order, and defaults a new member to the selected department', async () => {
     const requests = api(), wrapper = render(requests); await flushPromises()
     await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
-    await wrapper.get('[data-test="department-edit"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="org-menu-3"]', '[data-test="org-edit-3"]')
     await wrapper.get('[data-test="department-name"]').setValue('工程部'); await wrapper.get('[data-test="department-sort"]').setValue('5')
     await wrapper.get('form.space-y-4').trigger('submit'); await flushPromises()
     expect(requests.updateDepartment).toHaveBeenCalledWith(3, { name: '工程部', sort_order: 5 })
@@ -91,7 +92,7 @@ describe('enterprise organization tree', () => {
     expect(wrapper.get('[data-test="member-department"]').text()).toContain('研发部')
     expect(wrapper.find('select').exists()).toBe(false)
     await selectOption(wrapper, '[data-test="member-role"]', 'enterprise.roles.manager')
-    await wrapper.get('input[value="new"]').setValue()
+    await wrapper.get('button[role="radio"][value="new"]').trigger('click')
     await wrapper.get('[data-test="member-email"]').setValue('new@example.com')
     await wrapper.get('[data-test="member-password"]').setValue('password123')
     await wrapper.get('#enterprise-member-form').trigger('submit'); await flushPromises()

@@ -1,3 +1,4 @@
+import { clickMenuItem } from './selectOption'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import EnterpriseDeleteDialog from '../components/EnterpriseDeleteDialog.vue'
@@ -16,9 +17,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({ ...await importOriginal<typeof 
 const stubs = {
   AppLayout: { template: '<div><slot /></div>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
-  DataTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></div></div>' },
-  ConfirmDialog: { props: ['show', 'message'], emits: ['confirm', 'cancel'], template: '<div v-if="show" data-test="delete-confirm"><p>{{ message }}</p><slot /><button data-test="confirm-delete" @click="$emit(\'confirm\')">Confirm</button><button data-test="cancel-delete" @click="$emit(\'cancel\')">Cancel</button></div>' },
-  EnterpriseWorkspace: { template: '<div><slot name="header-actions" /></div>' }, Pagination: true, BaseDialog: true, RouterLink: true
+  EnterpriseTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></div></div>' },
+  EnterpriseConfirm: { props: ['show', 'message'], emits: ['confirm', 'cancel'], template: '<div v-if="show" data-test="delete-confirm"><p>{{ message }}</p><slot /><button data-test="confirm-delete" @click="$emit(\'confirm\')">Confirm</button><button data-test="cancel-delete" @click="$emit(\'cancel\')">Cancel</button></div>' },
+  EnterpriseWorkspace: { template: '<div><slot name="header-actions" /></div>' }, EnterprisePagination: true, EnterpriseDialog: true, RouterLink: true
 }
 
 describe('Enterprise deletion confirmation', () => {
@@ -84,7 +85,7 @@ describe('Enterprise deletion confirmation', () => {
     removeEnterprise.mockRejectedValueOnce({ code: 'ENTERPRISE_NOT_EMPTY' })
     const wrapper = mount(EnterprisesView, { global: { stubs } })
     await flushPromises()
-    await wrapper.get('[data-test="enterprise-delete-7"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="enterprise-menu-7"]', '[data-test="enterprise-delete-7"]')
     await wrapper.get('[data-test="confirm-delete"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('admin.enterprises.confirmDissolve')

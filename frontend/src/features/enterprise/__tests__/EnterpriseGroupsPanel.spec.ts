@@ -15,7 +15,7 @@ function api() {
 const wrappers: VueWrapper[] = []
 function render(requests: ReturnType<typeof api>, role: EnterpriseRole = 'owner', editable = true) {
   const overview = { enterprise: { id: 1, name: 'Acme' }, me: { role, member_id: 7, department_id: 3 }, permissions: { view_members: role !== 'member', edit_member_groups: editable } } as EnterpriseOverview
-  const wrapper = mount(EnterpriseGroupsPanel, { props: { api: requests as unknown as EnterpriseResourceAPI, enterpriseId: 1, overview }, global: { stubs: { BaseDialog: true } } }); wrappers.push(wrapper); return wrapper
+  const wrapper = mount(EnterpriseGroupsPanel, { props: { api: requests as unknown as EnterpriseResourceAPI, enterpriseId: 1, overview }, global: { stubs: { EnterpriseDialog: true } } }); wrappers.push(wrapper); return wrapper
 }
 beforeEach(() => vi.clearAllMocks())
 afterEach(() => wrappers.splice(0).forEach(wrapper => wrapper.unmount()))
@@ -25,17 +25,17 @@ describe('enterprise callable groups', () => {
     const enterprise = wrapper.get('[data-test="group-section-enterprise"]')
     expect(enterprise.text()).not.toContain('enterprise.quotaScope')
     expect(enterprise.find('input[type="checkbox"]').exists()).toBe(false)
-    await enterprise.get('[data-test="group-mode-selected"]').trigger('click')
-    expect(enterprise.get('.badge-primary').classes()).toContain('badge')
-    expect(enterprise.get('.badge-success').classes()).toContain('badge')
-    expect(enterprise.get('.badge-gray').classes()).toContain('badge')
+    await enterprise.get('[data-test="group-radio-selected"]').trigger('click')
+    expect(enterprise.get('[data-test="group-card-2"]').text()).toContain('enterprise.groupAccess.exclusive')
+    expect(enterprise.get('[data-test="group-card-2"]').text()).toContain('enterprise.groupAccess.subscription')
+    expect(enterprise.get('[data-test="group-card-1"]').text()).toContain('OpenAI')
     await enterprise.get('form').trigger('submit')
     expect(requests.updateGroupWhitelist).not.toHaveBeenCalled()
     expect(enterprise.text()).toContain('enterprise.groupAccess.selectRequired')
     await enterprise.get('[data-test="group-card-2"]').trigger('click')
     await enterprise.get('form').trigger('submit'); await flushPromises()
     expect(requests.updateGroupWhitelist).toHaveBeenLastCalledWith('enterprise', 1, [2])
-    await enterprise.get('[data-test="group-mode-inherit"]').trigger('click')
+    await enterprise.get('[data-test="group-radio-inherit"]').trigger('click')
     await enterprise.get('form').trigger('submit'); await flushPromises()
     expect(requests.updateGroupWhitelist).toHaveBeenLastCalledWith('enterprise', 1, [])
   })
@@ -55,7 +55,7 @@ describe('enterprise callable groups', () => {
     ])
     const wrapper = render(requests); await flushPromises()
     const member = wrapper.get('[data-test="group-section-member"]')
-    await member.get('[data-test="group-mode-selected"]').trigger('click')
+    await member.get('[data-test="group-radio-selected"]').trigger('click')
     expect(member.find('[data-test="group-card-1"]').exists()).toBe(false)
     await member.get('[data-test="group-card-2"]').trigger('click')
     await member.get('form').trigger('submit'); await flushPromises()
@@ -69,7 +69,7 @@ describe('enterprise callable groups', () => {
     expect(wrapper.text()).not.toContain('Bob')
     expect(wrapper.find('[data-test="group-save"]').exists()).toBe(editable)
     if (editable) {
-      await wrapper.get('[data-test="group-mode-selected"]').trigger('click')
+      await wrapper.get('[data-test="group-radio-selected"]').trigger('click')
       await wrapper.get('[data-test="group-card-1"][aria-pressed]').trigger('click')
       await wrapper.get('form').trigger('submit'); await flushPromises()
       expect(requests.updateGroupWhitelist).toHaveBeenCalledWith('member', 7, [1])

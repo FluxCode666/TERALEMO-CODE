@@ -1,11 +1,24 @@
-import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, type VueWrapper } from '@vue/test-utils'
 
-/** Exercise the actual common Select, including its teleported options. */
+/** Exercise actual selects, including their portal content. */
 export async function selectOption(wrapper: VueWrapper, selector: string, label: string) {
-  await wrapper.get(`${selector} button`).trigger('click')
+  const trigger = wrapper.get(`${selector} button`)
+  if (trigger.attributes('role') === 'combobox') await trigger.trigger('keydown', { key: 'Enter' })
+  else await trigger.trigger('click')
   await flushPromises()
-  const option = [...document.querySelectorAll<HTMLElement>('.select-dropdown-portal:not(.select-dropdown-leave-active) [role="option"]')].filter(item => item.textContent?.trim() === label).at(-1)
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].filter(item => item.textContent?.trim() === label).at(-1)
   if (!option) throw new Error(`Select option not found: ${label}`)
-  option.click()
+  await new DOMWrapper(option).trigger('keydown', { key: 'Enter' })
+  // Common Select uses click, shadcn Select handles Enter.
+  if (document.body.contains(option)) option.click()
+  await flushPromises()
+}
+
+export async function clickMenuItem(wrapper: VueWrapper, trigger: string, item: string) {
+  await wrapper.get(trigger).trigger('keydown', { key: 'Enter' })
+  await flushPromises()
+  const element = document.querySelector<HTMLElement>(item)
+  if (!element) throw new Error(`Menu item not found: ${item}`)
+  element.click()
   await flushPromises()
 }

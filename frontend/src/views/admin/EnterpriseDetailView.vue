@@ -1,12 +1,14 @@
 <template>
-  <AppLayout>
+  <AppLayout><div class="shadcn-scope min-w-0">
     <EnterpriseWorkspace :key="enterpriseId" admin :enterprise-id="enterpriseId">
-      <template #header-actions><button class="btn btn-danger" data-test="enterprise-delete-detail" @click="deleting = true">{{ t('admin.enterprises.delete') }}</button></template>
+      <template #header-actions><Button variant="destructive"  data-test="enterprise-delete-detail" @click="deleting = true">{{ t('admin.enterprises.delete') }}</Button></template>
     </EnterpriseWorkspace>
     <EnterpriseDeleteDialog v-if="deleting" :key="enterpriseId" :enterprise-id="enterpriseId" @cancel="deleting = false" @deleted="removed" />
-  </AppLayout>
+  </div></AppLayout>
 </template>
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
+
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'

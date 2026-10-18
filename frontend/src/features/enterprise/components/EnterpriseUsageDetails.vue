@@ -1,13 +1,13 @@
 <template>
-  <div class="card min-w-0" data-test="usage-details">
+  <Card class="min-w-0 overflow-hidden" data-test="usage-details">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-4 dark:border-dark-700">
       <div><h3 class="font-semibold text-gray-900 dark:text-white">{{ t('enterprise.usageAnalysis.details') }}</h3><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.recordCount', { count: total.toLocaleString() }) }}</p></div>
-      <div ref="dropdown" class="relative" @keydown.esc="showColumns = false">
-        <button type="button" data-test="usage-column-settings" class="btn btn-secondary" :aria-expanded="showColumns" @click="showColumns = !showColumns"><Icon name="grid" size="sm" />{{ t('admin.users.columnSettings') }}</button>
-        <div v-if="showColumns" class="absolute right-0 top-full z-50 mt-1 max-h-80 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-dark-600 dark:bg-dark-800">
-          <button v-for="column in columns" :key="column.key" type="button" role="checkbox" :data-test="`usage-column-toggle-${column.key}`" :aria-checked="column.key === 'created_at' || !hidden.includes(column.key)" :disabled="column.key === 'created_at'" class="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-default dark:text-gray-300 dark:hover:bg-dark-700" @click="toggle(column.key)"><span>{{ column.label }}</span><Icon v-if="column.key === 'created_at' || !hidden.includes(column.key)" name="check" size="sm" class="text-primary-600 dark:text-primary-400" /></button>
-        </div>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child><Button type="button" variant="outline" size="sm" data-test="usage-column-settings"><Columns3 class="mr-2 size-4" />{{ t('admin.users.columnSettings') }}</Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="max-h-80 w-60 overflow-y-auto">
+          <DropdownMenuCheckboxItem v-for="column in columns" :key="column.key" :model-value="column.key === 'created_at' || !hidden.includes(column.key)" :disabled="column.key === 'created_at'" :data-test="`usage-column-toggle-${column.key}`" @select.prevent @update:model-value="toggle(column.key)">{{ column.label }}</DropdownMenuCheckboxItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
     <UsageTable :data="normalized" :columns="visible" :loading="loading" mobile-layout="table" :sticky-first-column="false" :server-side-sort="true" :show-account-billing="false" :show-upstream-endpoint="false" default-sort-key="created_at" default-sort-order="desc" flat @sort="(key, order) => emit('sort', key, order)">
       <template #cell-member="{ row }">
@@ -17,25 +17,24 @@
         </div>
       </template>
     </UsageTable>
-  </div>
+  </Card>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { onClickOutside } from '@vueuse/core'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Column } from '@/components/common/types'
 import type { EnterpriseDepartment, EnterpriseUsageLog } from '@/types/enterprise'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'
-import Icon from '@/components/icons/Icon.vue'
+import { Columns3 } from '@lucide/vue'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { normalizeEnterpriseUsage, useEnterpriseUsageColumns } from '../useEnterpriseUsage'
 const props = defineProps<{ rows: EnterpriseUsageLog[]; departments: EnterpriseDepartment[]; total: number; loading: boolean; admin?: boolean }>()
 const emit = defineEmits<{ sort: [key: string, order: 'asc' | 'desc'] }>()
 const { t } = useI18n()
-const dropdown = ref<HTMLElement>()
-const showColumns = ref(false)
-onClickOutside(dropdown, () => { showColumns.value = false })
 const columns = computed<Column[]>(() => [
   { key: 'member', label: t('enterprise.members') },
   { key: 'department_name', label: t('enterprise.department') },

@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseOverview } from '@/types/enterprise'
-import DateRangePicker from '@/components/common/DateRangePicker.vue'
-import Select from '@/components/common/Select.vue'
+import DateRangePicker from '../components/EnterpriseDateRangePicker.vue'
+import UsageCombobox from '../components/EnterpriseUsageCombobox.vue'
+import { DropdownMenuContent } from '@/components/ui/dropdown-menu'
+import { Select } from '@/components/ui/select'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 import { usageDateRange } from '../useEnterpriseUsage'
@@ -12,6 +14,7 @@ vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showS
 vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key, locale: { value: 'zh' } }) }))
 vi.mock('vue-chartjs', () => ({ Line: { template: '<canvas />' }, Doughnut: { template: '<canvas />' }, Bar: { template: '<canvas />' } }))
 const stubs = {
+  Teleport: { template: '<div><slot /></div>' },
   Pagination: { name: 'Pagination', props: ['page', 'pageSize'], emits: ['update:page', 'update:pageSize'], template: '<div />' },
   DataTable: {
     props: ['columns', 'data'], emits: ['sort'],
@@ -30,10 +33,15 @@ function api() {
 }
 async function setup(admin = true, overview?: EnterpriseOverview) {
   const requests = api()
-  const wrapper = mount(EnterpriseUsagePanel, { props: { api: requests as unknown as EnterpriseResourceAPI, admin, overview }, global: { stubs } })
+  const wrapper = mount(EnterpriseUsagePanel, { props: { api: requests as unknown as EnterpriseResourceAPI, admin, overview }, global: { stubs }, attachTo: document.body })
   wrappers.push(wrapper)
   await flushPromises()
   return { wrapper, requests }
+}
+async function model(wrapper: VueWrapper, value: string) { wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', value); await flushPromises() }
+async function dates(wrapper: VueWrapper, start: string, end: string) {
+  const picker = wrapper.getComponent(DateRangePicker)
+  picker.vm.$emit('update:startDate', start); picker.vm.$emit('update:endDate', end); await flushPromises()
 }
 async function submit(wrapper: VueWrapper) { await wrapper.get('form').trigger('submit'); await flushPromises() }
 beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 18, 12)) })
@@ -42,21 +50,22 @@ afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); vi.u
 describe('enterprise usage analysis queries', () => {
   it('stages quick dates until search, then shares the snapshot across every endpoint', async () => {
     const { wrapper, requests } = await setup()
-    expect(wrapper.get('form').classes()).toEqual(expect.arrayContaining(['sticky', 'z-20', 'dark:bg-dark-900']))
+    expect(wrapper.get('form').classes()).toEqual(expect.arrayContaining(['sticky', 'z-20', 'bg-card']))
     expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(true)
     expect(wrapper.find('select').exists()).toBe(false)
     for (const [period, start] of [['today', '2026-10-18'], ['last7', '2026-10-12'], ['last30', '2026-09-19'], ['month', '2026-10-01']]) {
-      await wrapper.get(`[data-test="usage-period-${period}"]`).trigger('click')
+      const range = usageDateRange(period as 'today' | 'last7' | 'last30' | 'month')
+      await dates(wrapper, range.start_date, range.end_date)
       expect(wrapper.getComponent(DateRangePicker).props('startDate')).toBe(start)
       expect(requests.usageStats).toHaveBeenCalledTimes(1)
     }
-    await wrapper.get('input:not([type])').setValue('submitted-model')
-    await wrapper.get('input[type="number"]').setValue(8)
+    await model(wrapper, 'submitted-model')
+    wrapper.getComponent('[data-test="usage-api-key"]').vm.$emit('update:modelValue', '8')
     await submit(wrapper)
     const snapshot = { start_date: '2026-10-01', end_date: '2026-10-18', model: 'submitted-model', api_key_id: 8 }
     for (const request of [requests.usage, requests.usageStats, requests.usageTrend, requests.usageModels, requests.usageMembers, requests.usageDepartments]) expect(request).toHaveBeenLastCalledWith(expect.objectContaining(snapshot), expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    await wrapper.get('input:not([type])').setValue('draft-model')
-    await wrapper.get('[data-test="usage-period-today"]').trigger('click')
+    await model(wrapper, 'draft-model')
+    await dates(wrapper, '2026-10-18', '2026-10-18')
     wrapper.getComponent({ name: 'Pagination' }).vm.$emit('update:page', 2)
     await flushPromises()
     expect(requests.usage).toHaveBeenLastCalledWith(expect.objectContaining({ ...snapshot, page: 2 }), expect.anything())
@@ -68,7 +77,7 @@ describe('enterprise usage analysis queries', () => {
     expect(requests.usage).toHaveBeenLastCalledWith(expect.objectContaining({ ...snapshot, sort_by: 'created_at', sort_order: 'asc' }), expect.anything())
     await wrapper.setProps({ refreshKey: 1 }); await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining(snapshot), expect.anything())
-    await wrapper.get('form button.btn-secondary').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: undefined, end_date: undefined, model: undefined, api_key_id: undefined }), expect.anything())
   })
 
@@ -84,7 +93,8 @@ describe('enterprise usage analysis queries', () => {
     expect(requests.usageDepartments).not.toHaveBeenCalled()
     expect(requests.departments).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="usage-department-ranking"]').exists()).toBe(false)
-    expect(wrapper.get('form').findAllComponents(Select)).toHaveLength(1)
+    expect(wrapper.get('form').findAllComponents(Select)).toHaveLength(0)
+    expect(wrapper.get('form').findAllComponents(UsageCombobox)).toHaveLength(3)
     await wrapper.setProps({ admin: true, refreshKey: 1 }); await flushPromises()
     expect(requests.usageDepartments).toHaveBeenCalledOnce()
     expect(requests.departments).toHaveBeenCalledOnce()
@@ -95,10 +105,10 @@ describe('enterprise usage analysis queries', () => {
     const { wrapper, requests } = await setup()
     let resolveOld!: (value: unknown) => void
     requests.usageStats.mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve }))
-    await wrapper.get('input:not([type])').setValue('old')
+    await model(wrapper, 'old')
     await submit(wrapper)
     const signal = requests.usageStats.mock.calls.at(-1)![1].signal
-    await wrapper.get('input:not([type])').setValue('new')
+    await model(wrapper, 'new')
     requests.usageStats.mockResolvedValue({ total_requests: 99, total_tokens: 888, total_actual_cost: 1 })
     await submit(wrapper)
     expect(signal.aborted).toBe(true)
@@ -112,11 +122,11 @@ describe('enterprise usage analysis queries', () => {
   it('shows errors without mixing previous summaries into a new query, and retries the submitted snapshot', async () => {
     const { wrapper, requests } = await setup()
     requests.usageStats.mockRejectedValueOnce(new Error('offline'))
-    await wrapper.get('input:not([type])').setValue('failed-query')
+    await model(wrapper, 'failed-query')
     await submit(wrapper)
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
-    expect(wrapper.find('.stat-card').exists()).toBe(false)
-    await wrapper.get('input:not([type])').setValue('unsaved-query')
+    expect(wrapper.find('[data-usage-card]').exists()).toBe(false)
+    await model(wrapper, 'unsaved-query')
     await wrapper.get('[role="alert"] button').trigger('click'); await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'failed-query' }), expect.anything())
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
@@ -146,17 +156,18 @@ describe('enterprise usage details', () => {
     const { wrapper } = await setup(false)
     const keys = () => wrapper.getComponent(UsageTable).props('columns').map((column: { key: string }) => column.key)
     expect(keys()).not.toContain('user_agent')
-    await wrapper.get('[data-test="usage-column-settings"]').trigger('click')
-    expect(wrapper.get('[data-test="usage-column-toggle-created_at"]').attributes('disabled')).toBeDefined()
-    await wrapper.get('[data-test="usage-column-toggle-user_agent"]').trigger('click')
-    await wrapper.get('[data-test="usage-column-toggle-model"]').trigger('click')
+    await wrapper.get('[data-test="usage-column-settings"]').trigger('click', { button: 0, ctrlKey: false }); await flushPromises()
+    const menu = wrapper.getComponent(DropdownMenuContent)
+    expect(menu.get('[data-test="usage-column-toggle-created_at"]').attributes('data-disabled')).toBeDefined()
+    await menu.get('[data-test="usage-column-toggle-user_agent"]').trigger('click')
+    await menu.get('[data-test="usage-column-toggle-model"]').trigger('click')
     expect(keys()).toContain('user_agent')
     expect(keys()).not.toContain('model')
     expect(JSON.parse(localStorage.getItem('enterprise-usage-hidden-columns')!)).toContain('model')
     await wrapper.setProps({ admin: true }); await flushPromises()
     expect(keys()).toContain('model')
     expect(keys()).not.toContain('user_agent')
-    await wrapper.get('[data-test="usage-column-toggle-request_id"]').trigger('click')
+    await menu.get('[data-test="usage-column-toggle-request_id"]').trigger('click')
     expect(localStorage.getItem('admin-enterprise-usage-hidden-columns')).not.toBeNull()
     const second = await setup(false)
     expect(second.wrapper.getComponent(UsageTable).props('columns').map((column: { key: string }) => column.key)).toContain('user_agent')

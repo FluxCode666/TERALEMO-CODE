@@ -1,3 +1,4 @@
+import { clickMenuItem } from './selectOption'
 import { selectOption } from './selectOption'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -18,10 +19,10 @@ const dialog = { props: ['show'], template: '<div v-if="show"><slot /></div>' }
 const stubs = {
   AppLayout: { template: '<div><slot /></div>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
-  BaseDialog: dialog,
-  ConfirmDialog: { name: 'ConfirmDialog', props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-reset" @click="$emit(\'confirm\')">Confirm</button></div>' },
-  DataTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.scope_id"><slot name="cell-actions" :row="row" /></div></div>' },
-  Pagination: true,
+  EnterpriseDialog: dialog,
+  EnterpriseConfirm: { name: 'EnterpriseConfirm', props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-reset" @click="$emit(\'confirm\')">Confirm</button></div>' },
+  EnterpriseTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.scope_id"><slot name="cell-actions" :row="row" /></div></div>' },
+  EnterprisePagination: true,
   RouterLink: true
 }
 
@@ -51,7 +52,7 @@ describe('Enterprise administrator creation', () => {
     await flushPromises()
     await wrapper.get('[data-test="enterprise-create-open"]').trigger('click')
     await wrapper.get('[data-test="enterprise-name"]').setValue('Acme')
-    await wrapper.get('input[value="existing"]').setValue()
+    await wrapper.get('button[role="radio"][value="existing"]').trigger('click')
     await wrapper.get('[data-test="enterprise-create-form"]').trigger('submit')
     expect(createEnterprise).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('enterprise.validationUser')
@@ -72,7 +73,7 @@ describe('Enterprise administrator creation', () => {
     await flushPromises()
     await wrapper.get('[data-test="enterprise-create-open"]').trigger('click')
     await wrapper.get('[data-test="enterprise-name"]').setValue('Acme')
-    await wrapper.get('input[value="new"]').setValue()
+    await wrapper.get('button[role="radio"][value="new"]').trigger('click')
     await wrapper.get('[data-test="owner-email"]').setValue('alice@example.com')
     await wrapper.get('[data-test="owner-password"]').setValue('short')
     await wrapper.get('[data-test="enterprise-create-form"]').trigger('submit')
@@ -92,17 +93,17 @@ describe('Enterprise administrator creation', () => {
     adjustBalance.mockResolvedValue(enterprise)
     const wrapper = mount(EnterprisesView, { global: { stubs } })
     await flushPromises()
-    await wrapper.get('[data-test="enterprise-edit-1"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="enterprise-menu-1"]', '[data-test="enterprise-edit-1"]')
     await wrapper.get('[data-test="enterprise-basic-name"]').setValue('Acme II')
     await wrapper.get('[data-test="enterprise-basic-threshold"]').setValue('25')
     await wrapper.findComponent({ name: 'EnterpriseBasicsForm' }).get('form').trigger('submit')
     await flushPromises()
     expect(updateEnterprise).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Acme II', low_balance_threshold: 25 }))
-    await wrapper.get('[data-test="enterprise-status-1"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="enterprise-menu-1"]', '[data-test="enterprise-status-1"]')
     await wrapper.get('[data-test="confirm-reset"]').trigger('click')
     await flushPromises()
     expect(updateEnterprise).toHaveBeenCalledWith(1, { status: 'disabled' })
-    await wrapper.get('[data-test="enterprise-balance-1"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="enterprise-menu-1"]', '[data-test="enterprise-balance-1"]')
     const balanceForm = wrapper.findComponent({ name: 'EnterpriseBalanceForm' })
     expect(balanceForm.text()).toContain('enterprise.balanceAdjustmentHint')
     await balanceForm.get('[data-test="enterprise-balance-amount"]').setValue('0')
@@ -149,7 +150,7 @@ describe('Enterprise quota forms', () => {
     expect(wrapper.text()).toContain('enterprise.validationQuota')
     await wrapper.get('[data-test="quota-reset-member-7"]').trigger('click')
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
-    const dialog = wrapper.getComponent({ name: 'ConfirmDialog' })
+    const dialog = wrapper.getComponent({ name: 'EnterpriseConfirm' })
     expect(dialog.attributes('title')).toBe('enterprise.resetUsage')
     expect(dialog.attributes('message')).toBe('enterprise.resetConfirm')
     await wrapper.get('[data-test="quota-reset-window-total"]').trigger('click')

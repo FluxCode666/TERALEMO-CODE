@@ -1,3 +1,4 @@
+import { clickMenuItem } from '../../../features/enterprise/__tests__/selectOption'
 import { selectOption } from '@/features/enterprise/__tests__/selectOption'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -18,16 +19,16 @@ vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof im
 const stubs = {
   AppLayout: { template: '<main><slot /></main>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
-  DataTable: {
-    name: 'DataTable', props: ['data', 'loading'],
+  EnterpriseTable: {
+    name: 'EnterpriseTable', props: ['data', 'loading'],
     template: '<div data-test="rows"><div v-for="row in data" :key="row.id"><span>{{ row.name }}</span><slot name="cell-status" :value="row.status" /><slot name="cell-actions" :row="row" /></div></div>'
   },
-  Pagination: { name: 'Pagination', props: ['page', 'pageSize', 'total'], emits: ['update:page', 'update:pageSize'], template: '<div />' },
-  ConfirmDialog: {
+  EnterprisePagination: { name: 'EnterprisePagination', props: ['page', 'pageSize', 'total'], emits: ['update:page', 'update:pageSize'], template: '<div />' },
+  EnterpriseConfirm: {
     props: ['show', 'message'], emits: ['confirm', 'cancel'],
     template: '<div v-if="show" data-test="delete-confirm"><p>{{ message }}</p><slot /><button data-test="confirm-delete" @click="$emit(\'confirm\')">Confirm</button><button data-test="cancel-delete" @click="$emit(\'cancel\')">Cancel</button></div>'
   },
-  BaseDialog: true,
+  EnterpriseDialog: true,
   RouterLink: true
 }
 
@@ -54,15 +55,15 @@ function mountList() {
   return wrapper
 }
 async function changePage(wrapper: VueWrapper, value: number) {
-  wrapper.findComponent({ name: 'Pagination' }).vm.$emit('update:page', value)
+  wrapper.findComponent({ name: 'EnterprisePagination' }).vm.$emit('update:page', value)
   await flushPromises()
 }
 function expectPage(wrapper: VueWrapper, current: number, id: number, total: number) {
-  expect(wrapper.get('.badge-success').classes()).toContain('badge')
-  const pagination = wrapper.findComponent({ name: 'Pagination' })
+  expect(wrapper.get('[data-test="enterprise-status-badge"]').text()).toBe('enterprise.active')
+  const pagination = wrapper.findComponent({ name: 'EnterprisePagination' })
   expect(pagination.props('page')).toBe(current)
   expect(pagination.props('total')).toBe(total)
-  expect(wrapper.findComponent({ name: 'DataTable' }).props('data')).toEqual([enterprise(id)])
+  expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([enterprise(id)])
 }
 
 beforeEach(() => {
@@ -100,7 +101,7 @@ describe('administrator enterprise latest reads', () => {
     const signal = listEnterprises.mock.calls[0][1].signal as AbortSignal
     await wrapper.get('input[aria-label="enterprise.search"]').setValue('Acme')
     await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.disabled')
-    expect(wrapper.get('form button.btn-secondary').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('form [data-test="enterprise-search"]').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(signal.aborted).toBe(true)
@@ -123,7 +124,7 @@ describe('administrator enterprise latest reads', () => {
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 1, page_size: 20, search: 'old', status: 'active' }, expect.anything())
     await search.setValue('latest')
     await selectOption(wrapper, '[data-test="enterprise-status-filter"]', 'enterprise.disabled')
-    expect(wrapper.get('form button.btn-secondary').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('form [data-test="enterprise-search"]').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 1, page_size: 20, search: 'latest', status: 'disabled' }, expect.anything())
     latest.resolve(page(9, 25))
@@ -152,14 +153,14 @@ describe('administrator enterprise latest reads', () => {
     listEnterprises.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(page(50))
     await changePage(wrapper, 3)
     const signal = listEnterprises.mock.calls.at(-1)![1].signal as AbortSignal
-    wrapper.findComponent({ name: 'Pagination' }).vm.$emit('update:pageSize', 50)
+    wrapper.findComponent({ name: 'EnterprisePagination' }).vm.$emit('update:pageSize', 50)
     await flushPromises()
     expect(signal.aborted).toBe(true)
     expect(listEnterprises).toHaveBeenLastCalledWith({ page: 1, page_size: 50, search: 'applied', status: 'active' }, expect.anything())
     pending.resolve(page(3))
     await flushPromises()
     expectPage(wrapper, 1, 50, 100)
-    expect(wrapper.findComponent({ name: 'Pagination' }).props('pageSize')).toBe(50)
+    expect(wrapper.findComponent({ name: 'EnterprisePagination' }).props('pageSize')).toBe(50)
 
     listEnterprises.mockRejectedValueOnce(new Error('offline'))
     await changePage(wrapper, 2)
@@ -194,7 +195,7 @@ describe('administrator enterprise latest reads', () => {
     await changePage(wrapper, 2)
     await search.setValue('draft')
     removeEnterprise.mockRejectedValueOnce({ code: 'ENTERPRISE_NOT_EMPTY' })
-    await wrapper.get('[data-test="enterprise-delete-7"]').trigger('click')
+    await clickMenuItem(wrapper, '[data-test="enterprise-menu-7"]', '[data-test="enterprise-delete-7"]')
     await wrapper.get('[data-test="confirm-delete"]').trigger('click')
     await flushPromises()
     expect(removeEnterprise).toHaveBeenCalledTimes(1)
@@ -221,7 +222,7 @@ describe('administrator enterprise display', () => {
         enterprise(3)
       ], total: 3, page: 1, page_size: 20, pages: 1
     })
-    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, EnterpriseTable: false } } })
     wrappers.push(wrapper)
     await flushPromises()
 
@@ -238,7 +239,7 @@ describe('administrator enterprise display', () => {
     listEnterprises.mockResolvedValue({ ...page(1), items: [
       { ...enterprise(1), balance: 100, frozen_balance: 9.25 }, enterprise(2)
     ] })
-    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, EnterpriseTable: false } } })
     wrappers.push(wrapper)
     await flushPromises()
     expect(wrapper.get('thead').text()).toContain('enterprise.frozenBalance')
@@ -251,7 +252,7 @@ describe('administrator enterprise display', () => {
   it('formats enterprise creation timestamps with the shared date formatter', async () => {
     const timestamp = '2026-10-18T00:15:27.98669+08:00'
     listEnterprises.mockResolvedValue({ ...page(1), items: [{ ...enterprise(1), created_at: timestamp }] })
-    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, EnterpriseTable: false } } })
     wrappers.push(wrapper)
     await flushPromises()
 

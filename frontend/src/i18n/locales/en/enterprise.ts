@@ -1,5 +1,12 @@
 export default {
   "enterprise": {
+    paginationUi: { total: '{count} records', pageSize: 'Rows per page' },
+    auditDetails: {
+      title: 'Audit details', view: 'View details', before: 'Before', after: 'After', changedTo: 'Changed to',
+      copyJson: 'Copy JSON', copied: 'Copied', copyError: 'Copy failed. Select the text to copy manually.',
+      fields: { name: 'Name', status: 'Status', role: 'Role', department_id: 'Department ID', member_id: 'Member ID', user_id: 'User ID', amount: 'Amount', operation: 'Operation', notes: 'Notes', title: 'Job title', email: 'Email', group_ids: 'Group IDs', sort_order: 'Sort order', daily_limit_usd: 'Daily limit', weekly_limit_usd: 'Weekly limit', monthly_limit_usd: 'Monthly limit', total_limit_usd: 'Total limit' }
+    },
+
     "title": "My enterprise",
     "overview": "Overview",
     "organization": "Organization",
@@ -14,6 +21,15 @@ export default {
       "last7": "Last 7 days",
       "last30": "Last 30 days",
       "month": "This month",
+      "lastMonth": "Last month",
+      "dateRange": "Date range",
+      "clear": "Clear",
+      "searchOptions": "Search {label}…",
+      "optionRequests": "{count} requests",
+      "noOptions": "No matches",
+      "optionsError": "Could not load options. Please retry.",
+      "retryOptions": "Retry",
+      "incompleteRange": "Choose an end date",
       "collapse": "Collapse filters",
       "expand": "Expand filters",
       "snapshotHint": "Click Search to update statistics and details together.",
