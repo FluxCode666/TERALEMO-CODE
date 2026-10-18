@@ -22,7 +22,7 @@
       <div v-if="effectiveBusy" class="flex items-center gap-3 py-4 text-sm text-gray-500 dark:text-gray-400"><LoadingSpinner size="sm" />{{ t('common.loading') }}</div>
       <template v-else-if="effective">
         <p v-if="!effective.restricted" class="text-sm text-gray-600 dark:text-gray-300" data-test="effective-unrestricted">{{ t('enterprise.groupAccess.personalRules') }}</p>
-        <div v-else class="flex flex-wrap gap-2" data-test="effective-restrictions"><span v-for="level in restrictionLevels" :key="level" class="badge-primary">{{ t(`enterprise.groupAccess.restrictions.${level}`) }}</span></div>
+        <div v-else class="flex flex-wrap gap-2" data-test="effective-restrictions"><span v-for="level in restrictionLevels" :key="level" class="badge badge-primary">{{ t(`enterprise.groupAccess.restrictions.${level}`) }}</span></div>
         <EnterpriseGroupCards :groups="effective.groups" />
         <EmptyState v-if="effective.restricted && !effective.groups.length" :title="t('enterprise.groupAccess.noEffective')" />
       </template>

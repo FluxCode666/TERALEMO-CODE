@@ -10,7 +10,7 @@ import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock('vue-i18n', async importOriginal => ({
   ...await importOriginal<typeof import('vue-i18n')>(),
-  useI18n: () => ({ t: (key: string) => key })
+  useI18n: () => ({ t: (key: string) => key, locale: { value: 'zh' } })
 }))
 vi.mock('vue-chartjs', async importOriginal => ({
   ...await importOriginal<typeof import('vue-chartjs')>(),
@@ -123,7 +123,8 @@ describe('enterprise usage display', () => {
     const { wrapper } = await mountUsage([])
     expect(wrapper.text()).toContain(formatDateTime(createdAt))
     expect(wrapper.text()).not.toContain(createdAt)
-    expect(wrapper.findAll('.stat-icon svg')).toHaveLength(3)
+    expect(wrapper.findAll('.stat-icon svg')).toHaveLength(4)
+    expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0200')
     expect(wrapper.find('.stat-icon-warning svg').exists()).toBe(true)
     expect(wrapper.find('.stat-icon-success svg').exists()).toBe(true)
   })

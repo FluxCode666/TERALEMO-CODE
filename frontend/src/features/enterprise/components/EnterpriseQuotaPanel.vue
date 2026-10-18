@@ -29,7 +29,7 @@
       </form>
     </BaseDialog>
     <ConfirmDialog :show="!!resetTarget" :title="t('enterprise.resetUsage')" :message="t('enterprise.resetConfirm')" danger @cancel="resetTarget = null" @confirm="reset">
-      <div class="flex flex-wrap gap-4"><label v-for="window in windows" :key="window" class="flex items-center gap-2"><input v-model="resetWindows" type="checkbox" :value="window" />{{ t(`enterprise.${window}`) }}</label></div>
+      <div class="flex flex-wrap gap-4"><div v-for="window in windows" :key="window" class="flex items-center gap-2"><Toggle :model-value="resetWindows.includes(window)" :aria-label="t(`enterprise.${window}`)" :data-test="`quota-reset-window-${window}`" @update:model-value="selected => setResetWindow(window, selected)" /><span>{{ t(`enterprise.${window}`) }}</span></div></div>
     </ConfirmDialog>
   </section>
 </template>
@@ -43,10 +43,11 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EnterpriseQuotaDisplay from './EnterpriseQuotaDisplay.vue'
 import SearchInput from '@/components/common/SearchInput.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 import { loadMemberOptions } from '../memberOptions'
-const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
+const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseName?: string; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
 const { busy, error, run, read } = useEnterpriseAction()
@@ -70,7 +71,11 @@ const memberSections = computed(() => {
   }
   return [...sections.values()]
 })
+function setResetWindow(window: QuotaWindow, selected: boolean) {
+  resetWindows.value = selected ? [...new Set([...resetWindows.value, window])] : resetWindows.value.filter(item => item !== window)
+}
 function scopeLabel(quota: EnterpriseQuota) {
+  if (quota.scope_type === 'enterprise') return props.enterpriseName || props.overview?.enterprise?.name || t('enterprise.enterpriseScope')
   const name = quota.scope_type === 'department' ? departments.value.find(item => item.id === quota.scope_id)?.name : quota.scope_type === 'member' ? (members.value.find(item => item.id === quota.scope_id)?.username || members.value.find(item => item.id === quota.scope_id)?.email) : ''
   return `${t(`enterprise.${quota.scope_type}Scope`)}${name ? ` · ${name}` : ` #${quota.scope_id}`}`
 }

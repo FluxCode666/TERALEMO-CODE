@@ -20,7 +20,7 @@ const stubs = {
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
   DataTable: {
     name: 'DataTable', props: ['data', 'loading'],
-    template: '<div data-test="rows"><div v-for="row in data" :key="row.id"><span>{{ row.name }}</span><slot name="cell-actions" :row="row" /></div></div>'
+    template: '<div data-test="rows"><div v-for="row in data" :key="row.id"><span>{{ row.name }}</span><slot name="cell-status" :value="row.status" /><slot name="cell-actions" :row="row" /></div></div>'
   },
   Pagination: { name: 'Pagination', props: ['page', 'pageSize', 'total'], emits: ['update:page', 'update:pageSize'], template: '<div />' },
   ConfirmDialog: {
@@ -58,6 +58,7 @@ async function changePage(wrapper: VueWrapper, value: number) {
   await flushPromises()
 }
 function expectPage(wrapper: VueWrapper, current: number, id: number, total: number) {
+  expect(wrapper.get('.badge-success').classes()).toContain('badge')
   const pagination = wrapper.findComponent({ name: 'Pagination' })
   expect(pagination.props('page')).toBe(current)
   expect(pagination.props('total')).toBe(total)

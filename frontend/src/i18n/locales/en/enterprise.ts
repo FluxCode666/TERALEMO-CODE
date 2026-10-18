@@ -8,6 +8,7 @@ export default {
     "quotas": "Quotas",
     "groups": "Allowed groups",
     "usageAnalysis": {
+      "allTime": "All time",
       "filters": "Filters",
       "today": "Today",
       "last7": "Last 7 days",
@@ -74,6 +75,7 @@ export default {
     "search": "Search",
     "all": "All",
     "actions": "Actions",
+    "myQuota": "My quota",
     "quotaScope": "Quota scope",
     "enterpriseScope": "Enterprise",
     "departmentScope": "Department",
@@ -135,6 +137,8 @@ export default {
     "view": "View",
     "personalWalletDisabled": "Your enterprise pays for your usage.",
     "organizationUi": {
+      "allRoles": "All roles",
+      "allStatuses": "All statuses",
       "directMembers": "Direct members (no department)",
       "collapse": "Collapse departments",
       "expand": "Expand departments",

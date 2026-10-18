@@ -2,7 +2,7 @@
   <div class="card min-w-0 p-4 sm:p-5" :aria-busy="loading">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h3 class="font-medium text-gray-900 dark:text-white">{{ t('enterprise.modelDistribution') }}</h3>
-      <label class="text-sm text-gray-600 dark:text-gray-300"><span class="sr-only">{{ t('enterprise.usageAnalysis.distributionMetric') }}</span><select v-model="metric" class="input py-1.5 text-sm" data-test="usage-distribution-metric"><option value="actual_cost">{{ t('enterprise.cost') }}</option><option value="total_tokens">{{ t('enterprise.tokens') }}</option><option value="requests">{{ t('enterprise.requests') }}</option></select></label>
+      <Select v-model="metric" class="w-40" :options="metricOptions" :aria-label="t('enterprise.usageAnalysis.distributionMetric')" data-test="usage-distribution-metric" />
     </div>
     <div v-if="loading" class="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-dark-800" />
     <div v-else-if="items.length" class="flex flex-col items-center gap-5 sm:flex-row">
@@ -22,12 +22,14 @@ import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, type ChartOptions } from 'chart.js'
 import { Doughnut } from 'vue-chartjs'
 import DataTable from '@/components/common/DataTable.vue'
+import Select from '@/components/common/Select.vue'
 import type { EnterpriseUsageModel } from '@/types/enterprise'
 import { usageColors, usageMoney, usageNumber } from '../useEnterpriseUsage'
 ChartJS.register(ArcElement, Tooltip, Legend)
 const props = defineProps<{ items: EnterpriseUsageModel[]; loading: boolean }>()
 const { t } = useI18n()
 const metric = ref<'actual_cost' | 'total_tokens' | 'requests'>('actual_cost')
+const metricOptions = computed(() => [{ value: 'actual_cost', label: t('enterprise.cost') }, { value: 'total_tokens', label: t('enterprise.tokens') }, { value: 'requests', label: t('enterprise.requests') }])
 const sorted = computed(() => [...props.items].sort((a, b) => usageNumber(b[metric.value]) - usageNumber(a[metric.value])))
 const totals = computed(() => props.items.reduce((sum, item) => ({ requests: sum.requests + usageNumber(item.requests), total_tokens: sum.total_tokens + usageNumber(item.total_tokens), actual_cost: sum.actual_cost + usageNumber(item.actual_cost) }), { requests: 0, total_tokens: 0, actual_cost: 0 }))
 const percentage = (value: number, total: number) => total > 0 ? (usageNumber(value) / total * 100).toFixed(1) : '0.0'

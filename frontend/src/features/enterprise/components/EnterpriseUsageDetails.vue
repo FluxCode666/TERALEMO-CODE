@@ -5,11 +5,18 @@
       <div ref="dropdown" class="relative" @keydown.esc="showColumns = false">
         <button type="button" data-test="usage-column-settings" class="btn btn-secondary" :aria-expanded="showColumns" @click="showColumns = !showColumns"><Icon name="grid" size="sm" />{{ t('admin.users.columnSettings') }}</button>
         <div v-if="showColumns" class="absolute right-0 top-full z-50 mt-1 max-h-80 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-dark-600 dark:bg-dark-800">
-          <label v-for="column in columns" :key="column.key" class="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-dark-700"><input type="checkbox" :data-test="`usage-column-toggle-${column.key}`" :checked="column.key === 'created_at' || !hidden.includes(column.key)" :disabled="column.key === 'created_at'" @change="toggle(column.key)" /><span>{{ column.label }}</span></label>
+          <button v-for="column in columns" :key="column.key" type="button" role="checkbox" :data-test="`usage-column-toggle-${column.key}`" :aria-checked="column.key === 'created_at' || !hidden.includes(column.key)" :disabled="column.key === 'created_at'" class="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-default dark:text-gray-300 dark:hover:bg-dark-700" @click="toggle(column.key)"><span>{{ column.label }}</span><Icon v-if="column.key === 'created_at' || !hidden.includes(column.key)" name="check" size="sm" class="text-primary-600 dark:text-primary-400" /></button>
         </div>
       </div>
     </div>
-    <UsageTable :data="normalized" :columns="visible" :loading="loading" mobile-layout="table" :sticky-first-column="false" :server-side-sort="true" :show-account-billing="false" :show-upstream-endpoint="false" default-sort-key="created_at" default-sort-order="desc" flat @sort="(key, order) => emit('sort', key, order)" />
+    <UsageTable :data="normalized" :columns="visible" :loading="loading" mobile-layout="table" :sticky-first-column="false" :server-side-sort="true" :show-account-billing="false" :show-upstream-endpoint="false" default-sort-key="created_at" default-sort-order="desc" flat @sort="(key, order) => emit('sort', key, order)">
+      <template #cell-member="{ row }">
+        <div class="max-w-40 leading-tight" data-test="usage-row-member">
+          <p class="truncate font-medium" :title="row.user?.username || row.user?.email || row.member">{{ row.user?.username || row.user?.email || row.member }}</p>
+          <p v-if="row.user?.username && row.user?.email" class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400" :title="row.user.email">{{ row.user.email }}</p>
+        </div>
+      </template>
+    </UsageTable>
   </div>
 </template>
 
@@ -53,3 +60,15 @@ const columns = computed<Column[]>(() => [
 const { hidden, toggle, visible } = useEnterpriseUsageColumns(computed(() => !!props.admin), columns)
 const normalized = computed(() => props.rows.map(row => normalizeEnterpriseUsage(row, props.departments, t('enterprise.noDepartment'))))
 </script>
+
+<style scoped>
+:deep(tbody td) {
+  @apply px-3 py-2;
+}
+:deep(tbody td .space-y-0\.5) {
+  @apply space-y-0 leading-tight;
+}
+:deep(tbody td .grid.text-xs) {
+  @apply gap-y-0 leading-tight;
+}
+</style>

@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseOverview } from '@/types/enterprise'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import Select from '@/components/common/Select.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 import { usageDateRange } from '../useEnterpriseUsage'
 
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
-vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key, locale: { value: 'zh' } }) }))
 vi.mock('vue-chartjs', () => ({ Line: { template: '<canvas />' }, Doughnut: { template: '<canvas />' }, Bar: { template: '<canvas />' } }))
 const stubs = {
   Pagination: { name: 'Pagination', props: ['page', 'pageSize'], emits: ['update:page', 'update:pageSize'], template: '<div />' },
@@ -38,16 +40,14 @@ beforeEach(() => { localStorage.clear(); vi.useFakeTimers({ toFake: ['Date'] });
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('enterprise usage analysis queries', () => {
-  it('keeps sticky filters collapsible and stages quick dates until search, then shares the snapshot across every endpoint', async () => {
+  it('stages quick dates until search, then shares the snapshot across every endpoint', async () => {
     const { wrapper, requests } = await setup()
-    expect(wrapper.get('form').classes()).toEqual(expect.arrayContaining(['sticky', 'top-0', 'z-40', 'dark:bg-dark-900']))
-    const collapse = wrapper.get('[aria-controls="enterprise-usage-filters"]')
-    expect(collapse.attributes('aria-expanded')).toBe('false')
-    await collapse.trigger('click')
-    expect(collapse.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('form').classes()).toEqual(expect.arrayContaining(['sticky', 'z-20', 'dark:bg-dark-900']))
+    expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(true)
+    expect(wrapper.find('select').exists()).toBe(false)
     for (const [period, start] of [['today', '2026-10-18'], ['last7', '2026-10-12'], ['last30', '2026-09-19'], ['month', '2026-10-01']]) {
       await wrapper.get(`[data-test="usage-period-${period}"]`).trigger('click')
-      expect((wrapper.findAll('input[type="date"]')[0].element as HTMLInputElement).value).toBe(start)
+      expect(wrapper.getComponent(DateRangePicker).props('startDate')).toBe(start)
       expect(requests.usageStats).toHaveBeenCalledTimes(1)
     }
     await wrapper.get('input:not([type])').setValue('submitted-model')
@@ -84,7 +84,7 @@ describe('enterprise usage analysis queries', () => {
     expect(requests.usageDepartments).not.toHaveBeenCalled()
     expect(requests.departments).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="usage-department-ranking"]').exists()).toBe(false)
-    expect(wrapper.get('form').findAll('select')).toHaveLength(1)
+    expect(wrapper.get('form').findAllComponents(Select)).toHaveLength(1)
     await wrapper.setProps({ admin: true, refreshKey: 1 }); await flushPromises()
     expect(requests.usageDepartments).toHaveBeenCalledOnce()
     expect(requests.departments).toHaveBeenCalledOnce()
@@ -148,15 +148,15 @@ describe('enterprise usage details', () => {
     expect(keys()).not.toContain('user_agent')
     await wrapper.get('[data-test="usage-column-settings"]').trigger('click')
     expect(wrapper.get('[data-test="usage-column-toggle-created_at"]').attributes('disabled')).toBeDefined()
-    await wrapper.get('[data-test="usage-column-toggle-user_agent"]').setValue(true)
-    await wrapper.get('[data-test="usage-column-toggle-model"]').setValue(false)
+    await wrapper.get('[data-test="usage-column-toggle-user_agent"]').trigger('click')
+    await wrapper.get('[data-test="usage-column-toggle-model"]').trigger('click')
     expect(keys()).toContain('user_agent')
     expect(keys()).not.toContain('model')
     expect(JSON.parse(localStorage.getItem('enterprise-usage-hidden-columns')!)).toContain('model')
     await wrapper.setProps({ admin: true }); await flushPromises()
     expect(keys()).toContain('model')
     expect(keys()).not.toContain('user_agent')
-    await wrapper.get('[data-test="usage-column-toggle-request_id"]').setValue(true)
+    await wrapper.get('[data-test="usage-column-toggle-request_id"]').trigger('click')
     expect(localStorage.getItem('admin-enterprise-usage-hidden-columns')).not.toBeNull()
     const second = await setup(false)
     expect(second.wrapper.getComponent(UsageTable).props('columns').map((column: { key: string }) => column.key)).toContain('user_agent')

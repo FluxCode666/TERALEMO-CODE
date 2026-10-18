@@ -309,6 +309,9 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
+        <template v-for="(_, name) in $slots" #[name]="cell">
+          <slot :name="name" v-bind="cell" />
+        </template>
         <template #empty><EmptyState :message="t('usage.noRecords')" /></template>
       </DataTable>
     </div>

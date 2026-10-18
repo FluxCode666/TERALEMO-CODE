@@ -21,8 +21,10 @@ describe('enterprise quota sections', () => {
   it('groups employees under departments, collapses larger groups, and finds employees by email', async () => {
     const members = Array.from({ length: 7 }, (_, index) => ({ id: index + 10, username: `Employee ${index}`, email: `employee${index}@example.com`, department_id: 3, department_name: '研发部', role: 'member' }))
     const api = { quotas: vi.fn().mockResolvedValue([quota('enterprise', 1), quota('department', 3), ...members.map(member => quota('member', member.id))]), departments: vi.fn().mockResolvedValue([{ id: 3, name: '研发部' }]), members: vi.fn().mockResolvedValue({ items: members, total: 7 }) } as unknown as EnterpriseResourceAPI
-    const wrapper = mount(EnterpriseQuotaPanel, { props: { api, admin: true }, global: { stubs: { BaseDialog: true, ConfirmDialog: true } } }); wrappers.push(wrapper)
+    const wrapper = mount(EnterpriseQuotaPanel, { props: { api, admin: true, enterpriseName: 'Acme' }, global: { stubs: { BaseDialog: true, ConfirmDialog: true } } }); wrappers.push(wrapper)
     await flushPromises()
+    expect(wrapper.get('[data-test="quota-section-enterprise"]').getComponent(EnterpriseQuotaDisplay).props('title')).toBe('Acme')
+    expect(wrapper.text()).not.toContain('enterprise.enterpriseScope #1')
     for (const kind of ['enterprise', 'department', 'member']) expect(wrapper.find(`[data-test="quota-section-${kind}"]`).exists()).toBe(true)
     expect(wrapper.get('details').attributes('open')).toBeUndefined()
     await wrapper.get('input[type="text"]').setValue('employee5@example.com')

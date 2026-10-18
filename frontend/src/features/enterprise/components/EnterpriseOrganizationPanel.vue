@@ -34,7 +34,7 @@
           <DataTable :columns="columns" :data="visibleMembers" :loading="busy">
             <template #cell-username="{ row }"><span class="break-words font-medium">{{ row.username || row.email }}</span><p class="break-all text-xs text-gray-500 dark:text-gray-400">{{ row.email }}</p></template>
             <template #cell-role="{ value }">{{ t(`enterprise.roles.${value}`) }}</template>
-            <template #cell-status="{ value }"><span :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
+            <template #cell-status="{ value }"><span class="badge" :class="value === 'active' ? 'badge-success' : 'badge-danger'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</span></template>
             <template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template>
             <template #cell-joined_at="{ value }">{{ formatDateTime(value) }}</template>
             <template #cell-actions="{ row }"><div v-if="canManageMembers && canManageMember(row)" class="flex gap-3"><button class="text-primary-600 dark:text-primary-400" @click="openMember(row)">{{ t('enterprise.edit') }}</button><button class="text-red-600 dark:text-red-400" @click="deleting = { kind: 'member', row }">{{ t('enterprise.removeMember') }}</button></div></template>
@@ -97,8 +97,8 @@ const nodes = computed(() => {
 const selectedDepartment = computed(() => visibleDepartments.value.find(item => String(item.id) === selected.value))
 const selectedName = computed(() => nodes.value.find(item => item.key === selected.value)?.name || t('enterprise.departments'))
 const visibleMembers = computed(() => members.value.filter(item => (!limitedManager.value || item.department_id === props.overview?.me.department_id) && (selected.value === 'all' || (item.department_id ?? 0) === Number(selected.value))))
-const roleOptions = computed(() => [{ value: '', label: t('enterprise.all') }, ...['owner', 'manager', 'member'].map(value => ({ value, label: t(`enterprise.roles.${value}`) }))])
-const statusOptions = computed(() => [{ value: '', label: t('enterprise.all') }, ...['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) }))])
+const roleOptions = computed(() => [{ value: '', label: t('enterprise.organizationUi.allRoles') }, ...['owner', 'manager', 'member'].map(value => ({ value, label: t(`enterprise.roles.${value}`) }))])
+const statusOptions = computed(() => [{ value: '', label: t('enterprise.organizationUi.allStatuses') }, ...['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) }))])
 const columns = computed(() => [{ key: 'username', label: t('enterprise.username') }, { key: 'department_name', label: t('enterprise.department') }, { key: 'role', label: t('enterprise.role') }, { key: 'status', label: t('enterprise.status') }, { key: 'title', label: t('enterprise.titleField') }, { key: 'joined_at', label: t('enterprise.joinedAt') }, { key: 'actions', label: t('enterprise.actions') }])
 const formOpen = ref(false), formKind = ref<'member' | 'department'>('member')
 const editingMember = ref<EnterpriseMember>(), editingDepartment = ref<EnterpriseDepartment>()

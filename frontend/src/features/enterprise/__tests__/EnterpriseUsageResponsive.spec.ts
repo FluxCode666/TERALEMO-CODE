@@ -14,9 +14,12 @@ describe('enterprise usage table on narrow screens', () => {
   }
   it('keeps a scrollable table and working sort headers on narrow screens', async () => {
     mobileViewport()
-    const wrapper = mount(EnterpriseUsageDetails, { props: { rows: [{ id: 1, model: 'gpt-5', created_at: '2026-10-18T00:00:00Z' }], total: 1, departments: [], loading: false }, global: { stubs: { IpGeoCell: true } } })
+    const wrapper = mount(EnterpriseUsageDetails, { props: { rows: [{ id: 1, model: 'gpt-5', user: { id: 42, username: 'Alice', email: 'alice@example.com' }, created_at: '2026-10-18T00:00:00Z' }], total: 1, departments: [], loading: false }, global: { stubs: { IpGeoCell: true } } })
     wrappers.push(wrapper); await flushPromises()
     expect(wrapper.get('.table-wrapper').find('table').exists()).toBe(true)
+    const member = wrapper.get('[data-test="usage-row-member"]')
+    expect(member.findAll('p').map(line => line.text())).toEqual(['Alice', 'alice@example.com'])
+    expect(member.get('p.text-xs').classes()).toEqual(expect.arrayContaining(['truncate', 'text-gray-500', 'dark:text-gray-400']))
     expect(wrapper.find('.sticky-col').exists()).toBe(false)
     expect(wrapper.find('[data-field="model"]').exists()).toBe(false)
     const modelHeader = wrapper.findAll('th').find(header => header.text() === 'usage.model')!

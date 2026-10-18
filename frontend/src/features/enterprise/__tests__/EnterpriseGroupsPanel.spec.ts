@@ -8,7 +8,7 @@ vi.mock('@/api/client', () => ({ apiClient: {} }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock('@/api/admin', () => ({ adminAPI: { groups: { getAll: vi.fn() } } }))
 vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
-const groups = [1, 2].map(id => ({ id, name: `Group ${id}`, platform: 'openai', rate_multiplier: 1.5, is_exclusive: id === 2, subscription_type: 'standard', status: 'active' }))
+const groups = [1, 2].map(id => ({ id, name: `Group ${id}`, platform: 'openai', rate_multiplier: 1.5, is_exclusive: id === 2, subscription_type: id === 2 ? 'subscription' : 'standard', status: 'active' }))
 function result(restricted = true): EnterpriseEffectiveGroups {
   return { member_id: 7, user_id: 42, department_id: 3, pool: { configured: restricted, group_ids: restricted ? [1, 2] : [] }, levels: { enterprise: { configured: restricted, group_ids: [1] }, department: { configured: false, group_ids: [] }, member: { configured: false, group_ids: [] } }, restricted, effective_group_ids: restricted ? [1] : null, groups: restricted ? [groups[0]] : groups }
 }
@@ -30,6 +30,9 @@ describe('enterprise callable groups', () => {
     expect(enterprise.text()).not.toContain('enterprise.quotaScope')
     expect(enterprise.find('input[type="checkbox"]').exists()).toBe(false)
     await enterprise.get('[data-test="group-mode-selected"]').trigger('click')
+    expect(enterprise.get('.badge-primary').classes()).toContain('badge')
+    expect(enterprise.get('.badge-success').classes()).toContain('badge')
+    expect(enterprise.get('.badge-gray').classes()).toContain('badge')
     await enterprise.get('form').trigger('submit')
     expect(requests.updateGroupWhitelist).not.toHaveBeenCalled()
     expect(enterprise.text()).toContain('enterprise.groupAccess.selectRequired')
@@ -46,6 +49,8 @@ describe('enterprise callable groups', () => {
     const final = wrapper.get('[data-test="effective-groups"]')
     expect(final.text()).toContain('Group 1'); expect(final.text()).not.toContain('Group 2')
     expect(final.text()).toContain('enterprise.groupAccess.restrictions.enterprise')
+    expect(final.findAll('[data-test="effective-restrictions"] .badge-primary')).toHaveLength(2)
+    expect(final.findAll('[data-test="effective-restrictions"] .badge-primary').every(badge => badge.classes().includes('badge'))).toBe(true)
     requests.effectiveGroups.mockResolvedValue(result(false))
     await selectOption(wrapper, '[data-test="effective-member"]', 'Bob · enterprise.noDepartment')
     expect(requests.effectiveGroups).toHaveBeenLastCalledWith(8, expect.anything())

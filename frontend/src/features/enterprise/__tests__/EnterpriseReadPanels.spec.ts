@@ -6,13 +6,14 @@ import EnterpriseOrganizationPanel from '../components/EnterpriseOrganizationPan
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 import EnterpriseLogsPanel from '../components/EnterpriseLogsPanel.vue'
 import EnterpriseGroupsPanel from '../components/EnterpriseGroupsPanel.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import { loadMemberOptions } from '../memberOptions'
 
 const { showError } = vi.hoisted(() => ({ showError: vi.fn() }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError, showSuccess: vi.fn() }) }))
 vi.mock('@/api/admin', () => ({ adminAPI: { users: { list: vi.fn() }, groups: { getAll: vi.fn().mockResolvedValue([]) } } }))
 vi.mock('@/api/client', () => ({ apiClient: {} }))
-vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key, locale: { value: 'zh' } }) }))
 vi.mock('vue-chartjs', () => ({ Line: { template: '<div />' } }))
 
 const stubs = {
@@ -122,16 +123,16 @@ describe('usage applied filters and latest page', () => {
   it('uses the last searched query for pagination and refresh while draft filters are edited', async () => {
     const requests = api(), wrapper = mountUsage(requests)
     await flushPromises()
-    const dates = wrapper.findAll('input[type="date"]')
+    const dates = wrapper.getComponent(DateRangePicker)
     const model = wrapper.get('input:not([type])')
     await model.setValue('submitted-model')
-    await dates[0].setValue('2024-01-01')
-    await dates[1].setValue('2024-12-31')
+    dates.vm.$emit('update:startDate', '2024-01-01')
+    dates.vm.$emit('update:endDate', '2024-12-31')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(requests.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'submitted-model', start_date: '2024-01-01', end_date: '2024-12-31' }), expect.anything())
     await model.setValue('unsaved-model')
-    await dates[1].setValue('2025-01-01')
+    dates.vm.$emit('update:endDate', '2025-01-01')
     const count = requests.usageStats.mock.calls.length
     await changePage(wrapper, 2)
     expect(requests.usage).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, model: 'submitted-model', end_date: '2024-12-31' }), expect.anything())
@@ -147,9 +148,9 @@ describe('usage applied filters and latest page', () => {
     const requests = api(), wrapper = mountUsage(requests)
     await flushPromises()
     await changePage(wrapper, 2)
-    const dates = wrapper.findAll('input[type="date"]')
-    await dates[0].setValue('2024-01-01')
-    await dates[1].setValue('2025-01-01')
+    const dates = wrapper.getComponent(DateRangePicker)
+    dates.vm.$emit('update:startDate', '2024-01-01')
+    dates.vm.$emit('update:endDate', '2025-01-01')
     const count = requests.usage.mock.calls.length
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -157,7 +158,7 @@ describe('usage applied filters and latest page', () => {
     expect(requests.usage).toHaveBeenCalledTimes(count)
     expect(wrapper.findComponent({ name: 'Pagination' }).props('page')).toBe(2)
     for (const end of ['2024-12-31', '2024-01-01']) {
-      await dates[1].setValue(end)
+      dates.vm.$emit('update:endDate', end)
       await wrapper.get('form').trigger('submit')
       await flushPromises()
       expect(wrapper.find('[role="alert"]').exists()).toBe(false)

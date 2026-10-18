@@ -383,6 +383,14 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
   })
 })
 
+it.each(['owner', 'manager', 'member'] as const)('labels the %s current-user quota as my quota and forwards the enterprise name', async role => {
+  const wrapper = mountWorkspace(overview(role))
+  await flushPromises()
+  expect(wrapper.getComponent('[data-test="member-quota"]').props('title')).toBe('enterprise.myQuota')
+  await openTab(wrapper, 'quotas')
+  expect(wrapper.getComponent({ name: 'EnterpriseQuotaPanel' }).props('enterpriseName')).toBe('Acme')
+})
+
 describe('EnterpriseQuotaDisplay four quota windows', () => {
   it('shows null limits as unlimited for daily, weekly, monthly, and total windows', () => {
     const wrapper = mount(EnterpriseQuotaDisplay, { props: { title: 'Quota', quota: quota('member', 7) } })

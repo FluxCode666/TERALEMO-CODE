@@ -5,6 +5,7 @@ import type { ChartOptions, TooltipItem } from 'chart.js'
 import type { EnterpriseUsageLog } from '@/types/enterprise'
 import EnterpriseUsageDistribution from '../components/EnterpriseUsageDistribution.vue'
 import EnterpriseUsageRanking from '../components/EnterpriseUsageRanking.vue'
+import { selectOption } from './selectOption'
 import { normalizeEnterpriseUsage } from '../useEnterpriseUsage'
 
 vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
@@ -30,9 +31,10 @@ describe('enterprise model doughnut', () => {
     expect(wrapper.get('ul').text()).toContain('75.0%')
     const callback = (chart.props('options') as ChartOptions<'doughnut'>).plugins!.tooltip!.callbacks!.label!
     expect(callback.call({} as never, { dataIndex: 0 } as TooltipItem<'doughnut'>)).toEqual(['enterprise.requests: 3 (75.0%)', 'enterprise.tokens: 800 (80.0%)', 'enterprise.cost: $3.0000 (75.0%)'])
-    await wrapper.get('select').setValue('total_tokens')
+    expect(wrapper.find('select').exists()).toBe(false)
+    await selectOption(wrapper, '[data-test="usage-distribution-metric"]', 'enterprise.tokens')
     expect(chart.props('data').datasets[0].data).toEqual([800, 200])
-    await wrapper.get('select').setValue('requests')
+    await selectOption(wrapper, '[data-test="usage-distribution-metric"]', 'enterprise.requests')
     expect(chart.props('data').datasets[0].data).toEqual([3, 1])
   })
   it('handles empty, single and zero-total data without invalid percentages', () => {

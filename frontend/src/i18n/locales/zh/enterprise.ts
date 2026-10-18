@@ -8,6 +8,7 @@ export default {
     "quotas": "限额",
     "groups": "可调用分组",
     "usageAnalysis": {
+      "allTime": "全部时间",
       "filters": "筛选条件",
       "today": "今天",
       "last7": "近 7 天",
@@ -74,6 +75,7 @@ export default {
     "search": "搜索",
     "all": "全部",
     "actions": "操作",
+    "myQuota": "我的限额",
     "quotaScope": "限额范围",
     "enterpriseScope": "企业",
     "departmentScope": "部门",
@@ -135,6 +137,8 @@ export default {
     "view": "查看",
     "personalWalletDisabled": "企业成员由企业统一付费。",
     "organizationUi": {
+      "allRoles": "全部角色",
+      "allStatuses": "全部状态",
       "directMembers": "直属企业（无部门）",
       "collapse": "收起部门",
       "expand": "展开部门",
