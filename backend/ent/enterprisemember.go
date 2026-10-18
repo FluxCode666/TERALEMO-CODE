@@ -38,6 +38,8 @@ type EnterpriseMember struct {
 	Status string `json:"status,omitempty"`
 	// Title holds the value of the "title" field.
 	Title string `json:"title,omitempty"`
+	// AccountCreatedByEnterprise holds the value of the "account_created_by_enterprise" field.
+	AccountCreatedByEnterprise bool `json:"account_created_by_enterprise,omitempty"`
 	// JoinedAt holds the value of the "joined_at" field.
 	JoinedAt time.Time `json:"joined_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -97,6 +99,8 @@ func (*EnterpriseMember) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case enterprisemember.FieldAccountCreatedByEnterprise:
+			values[i] = new(sql.NullBool)
 		case enterprisemember.FieldID, enterprisemember.FieldEnterpriseID, enterprisemember.FieldUserID, enterprisemember.FieldDepartmentID:
 			values[i] = new(sql.NullInt64)
 		case enterprisemember.FieldRole, enterprisemember.FieldStatus, enterprisemember.FieldTitle:
@@ -179,6 +183,12 @@ func (_m *EnterpriseMember) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field title", values[i])
 			} else if value.Valid {
 				_m.Title = value.String
+			}
+		case enterprisemember.FieldAccountCreatedByEnterprise:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field account_created_by_enterprise", values[i])
+			} else if value.Valid {
+				_m.AccountCreatedByEnterprise = value.Bool
 			}
 		case enterprisemember.FieldJoinedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -267,6 +277,9 @@ func (_m *EnterpriseMember) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("title=")
 	builder.WriteString(_m.Title)
+	builder.WriteString(", ")
+	builder.WriteString("account_created_by_enterprise=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AccountCreatedByEnterprise))
 	builder.WriteString(", ")
 	builder.WriteString("joined_at=")
 	builder.WriteString(_m.JoinedAt.Format(time.ANSIC))

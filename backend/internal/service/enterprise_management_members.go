@@ -186,7 +186,7 @@ func (s *EnterpriseService) createMember(ctx context.Context, a EnterpriseActor,
 		u, err = s.users.GetByID(ctx, in.UserID)
 	} else {
 		address, emailErr := mail.ParseAddress(strings.TrimSpace(in.Email))
-		if emailErr != nil || address.Address != strings.TrimSpace(in.Email) || len(in.Password) < 6 || len(in.Password) > 72 {
+		if emailErr != nil || address.Address != strings.TrimSpace(in.Email) || !enterprisePasswordValid(in.Password) {
 			return nil, false, ErrEnterpriseInvalidInput
 		}
 		u, err = s.createUser(ctx, a, in)
@@ -205,6 +205,7 @@ func (s *EnterpriseService) createMember(ctx context.Context, a EnterpriseActor,
 		return nil, false, ErrEnterpriseMemberExists
 	}
 	m.UserID = u.ID
+	m.AccountCreatedByEnterprise = created
 	if err = s.members.Create(ctx, m); err != nil {
 		return nil, false, err
 	}
@@ -237,84 +238,11 @@ func (s *EnterpriseService) CreateMember(ctx context.Context, a EnterpriseActor,
 func (s *EnterpriseService) UpdateMember(ctx context.Context, a EnterpriseActor, id, memberID int64, in UpdateEnterpriseMemberInput) (*EnterpriseMember, error) {
 	var uid int64
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {
-		m, err := s.members.GetByID(ctx, id, memberID)
-		if err != nil {
-			return err
+		m, err := s.updateMember(ctx, a, e, c, id, memberID, in)
+		if m != nil {
+			uid = m.UserID
 		}
-		before := *m
-		uid = m.UserID
-		if err = enterpriseCheck(a, c, e, EnterprisePermissionManageMember, EnterprisePermissionTarget{Member: m}); err != nil {
-			return err
-		}
-		// Managers may edit only the state/title of a department member. Even a
-		// redundant role/department field is rejected, so privilege changes cannot hide in patches.
-		if !a.IsAdmin && c.Role == EnterpriseRoleManager && (in.Role != nil || in.DepartmentID != nil) {
-			return ErrEnterprisePermissionDenied
-		}
-		if in.Role != nil {
-			if !enterpriseValidRole(*in.Role) {
-				return ErrEnterpriseInvalidInput
-			}
-			m.Role = *in.Role
-		}
-		if in.Status != nil {
-			if !enterpriseValidStatus(*in.Status) {
-				return ErrEnterpriseInvalidInput
-			}
-			m.Status = *in.Status
-		}
-		if in.Title != nil {
-			if !enterpriseManagementTextValid(*in.Title, 100) {
-				return ErrEnterpriseInvalidInput
-			}
-			m.Title = *in.Title
-		}
-		if in.DepartmentID != nil {
-			if *in.DepartmentID < 0 {
-				return ErrEnterpriseInvalidInput
-			}
-			m.DepartmentID = in.DepartmentID
-			if *in.DepartmentID == 0 {
-				m.DepartmentID = nil
-			}
-		}
-		if m.Role == EnterpriseRoleManager && m.DepartmentID == nil {
-			return ErrEnterpriseManagerRequiresDepartment
-		}
-		if m.DepartmentID != nil {
-			if _, err = s.departments.GetByID(ctx, id, *m.DepartmentID); err != nil {
-				return err
-			}
-		}
-		if enterpriseMemberIsAvailableOwner(&before) && (m.Role != EnterpriseRoleOwner || m.Status != EnterpriseMemberStatusActive) {
-			count, err := s.members.CountActiveOwners(ctx, id)
-			if err != nil {
-				return err
-			}
-			if count <= 1 {
-				return ErrEnterpriseLastOwner
-			}
-		}
-		if err = s.members.Update(ctx, m); err != nil {
-			return err
-		}
-		if in.DepartmentID != nil {
-			target, err := s.scopeTarget(ctx, id, EnterpriseScopeMember, m.ID)
-			if err != nil {
-				return err
-			}
-			q, err := s.quotas.GetByScope(ctx, id, EnterpriseScopeMember, m.ID)
-			if err != nil {
-				return err
-			}
-			if q == nil {
-				return ErrEnterpriseInvalidScope
-			}
-			if err := s.validateQuotaParents(ctx, id, target, q); err != nil {
-				return err
-			}
-		}
-		return s.audit(ctx, a, c, id, EnterpriseAuditActionMemberUpdate, EnterpriseScopeMember, memberID, &before, m)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -322,6 +250,89 @@ func (s *EnterpriseService) UpdateMember(ctx context.Context, a EnterpriseActor,
 	s.invalidate(ctx, id, uid)
 	return s.members.GetByID(ctx, id, memberID)
 }
+func (s *EnterpriseService) updateMember(ctx context.Context, a EnterpriseActor, e *Enterprise, c *EnterpriseMemberContext, id, memberID int64, in UpdateEnterpriseMemberInput) (*EnterpriseMember, error) {
+	m, err := s.members.GetByID(ctx, id, memberID)
+	if err != nil {
+		return nil, err
+	}
+	before := *m
+	if err = enterpriseCheck(a, c, e, EnterprisePermissionManageMember, EnterprisePermissionTarget{Member: m}); err != nil {
+		return nil, err
+	}
+	// Managers may edit only the state/title of a department member. Even a
+	// redundant role/department field is rejected, so privilege changes cannot hide in patches.
+	if !a.IsAdmin && c.Role == EnterpriseRoleManager && (in.Role != nil || in.DepartmentID != nil) {
+		return nil, ErrEnterprisePermissionDenied
+	}
+	if in.Role != nil {
+		if !enterpriseValidRole(*in.Role) {
+			return nil, ErrEnterpriseInvalidInput
+		}
+		m.Role = *in.Role
+	}
+	if in.Status != nil {
+		if !enterpriseValidStatus(*in.Status) {
+			return nil, ErrEnterpriseInvalidInput
+		}
+		m.Status = *in.Status
+	}
+	if in.Title != nil {
+		if !enterpriseManagementTextValid(*in.Title, 100) {
+			return nil, ErrEnterpriseInvalidInput
+		}
+		m.Title = *in.Title
+	}
+	if in.DepartmentID != nil {
+		if *in.DepartmentID < 0 {
+			return nil, ErrEnterpriseInvalidInput
+		}
+		m.DepartmentID = in.DepartmentID
+		if *in.DepartmentID == 0 {
+			m.DepartmentID = nil
+		}
+	}
+	if m.Role == EnterpriseRoleManager && m.DepartmentID == nil {
+		return nil, ErrEnterpriseManagerRequiresDepartment
+	}
+	if m.DepartmentID != nil {
+		if _, err = s.departments.GetByID(ctx, id, *m.DepartmentID); err != nil {
+			return nil, err
+		}
+	}
+	if enterpriseMemberIsAvailableOwner(&before) && (m.Role != EnterpriseRoleOwner || m.Status != EnterpriseMemberStatusActive) {
+		count, err := s.members.CountActiveOwners(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if count <= 1 {
+			return nil, ErrEnterpriseLastOwner
+		}
+	}
+	if err = s.members.Update(ctx, m); err != nil {
+		return nil, err
+	}
+	if in.DepartmentID != nil {
+		target, err := s.scopeTarget(ctx, id, EnterpriseScopeMember, m.ID)
+		if err != nil {
+			return nil, err
+		}
+		q, err := s.quotas.GetByScope(ctx, id, EnterpriseScopeMember, m.ID)
+		if err != nil {
+			return nil, err
+		}
+		if q == nil {
+			return nil, ErrEnterpriseInvalidScope
+		}
+		if err := s.validateQuotaParents(ctx, id, target, q); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.audit(ctx, a, c, id, EnterpriseAuditActionMemberUpdate, EnterpriseScopeMember, memberID, &before, m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (s *EnterpriseService) RemoveMember(ctx context.Context, a EnterpriseActor, id, memberID int64) error {
 	var uid int64
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {

@@ -100,6 +100,11 @@ func Title(v string) predicate.EnterpriseMember {
 	return predicate.EnterpriseMember(sql.FieldEQ(FieldTitle, v))
 }
 
+// AccountCreatedByEnterprise applies equality check predicate on the "account_created_by_enterprise" field. It's identical to AccountCreatedByEnterpriseEQ.
+func AccountCreatedByEnterprise(v bool) predicate.EnterpriseMember {
+	return predicate.EnterpriseMember(sql.FieldEQ(FieldAccountCreatedByEnterprise, v))
+}
+
 // JoinedAt applies equality check predicate on the "joined_at" field. It's identical to JoinedAtEQ.
 func JoinedAt(v time.Time) predicate.EnterpriseMember {
 	return predicate.EnterpriseMember(sql.FieldEQ(FieldJoinedAt, v))
@@ -498,6 +503,16 @@ func TitleEqualFold(v string) predicate.EnterpriseMember {
 // TitleContainsFold applies the ContainsFold predicate on the "title" field.
 func TitleContainsFold(v string) predicate.EnterpriseMember {
 	return predicate.EnterpriseMember(sql.FieldContainsFold(FieldTitle, v))
+}
+
+// AccountCreatedByEnterpriseEQ applies the EQ predicate on the "account_created_by_enterprise" field.
+func AccountCreatedByEnterpriseEQ(v bool) predicate.EnterpriseMember {
+	return predicate.EnterpriseMember(sql.FieldEQ(FieldAccountCreatedByEnterprise, v))
+}
+
+// AccountCreatedByEnterpriseNEQ applies the NEQ predicate on the "account_created_by_enterprise" field.
+func AccountCreatedByEnterpriseNEQ(v bool) predicate.EnterpriseMember {
+	return predicate.EnterpriseMember(sql.FieldNEQ(FieldAccountCreatedByEnterprise, v))
 }
 
 // JoinedAtEQ applies the EQ predicate on the "joined_at" field.

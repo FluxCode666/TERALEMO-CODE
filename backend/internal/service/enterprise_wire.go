@@ -46,3 +46,10 @@ func ProvideAffiliateService(repo AffiliateRepository, settings *SettingService,
 	svc.SetEnterpriseMembershipReader(enterprises)
 	return svc
 }
+
+// ProvideEnterpriseService connects password resets to the existing refresh-session revoker.
+func ProvideEnterpriseService(client *dbent.Client, enterprises EnterpriseRepository, departments EnterpriseDepartmentRepository, members EnterpriseMemberRepository, quotas EnterpriseQuotaRepository, balanceLogs EnterpriseBalanceLogRepository, auditLogs EnterpriseAuditLogRepository, enterpriseGroups EnterpriseGroupRepository, users UserRepository, groups GroupRepository, admin AdminService, authCache APIKeyAuthCacheInvalidator, billingCache EnterpriseBillingCache, auth *AuthService) *EnterpriseService {
+	s := NewEnterpriseService(client, enterprises, departments, members, quotas, balanceLogs, auditLogs, enterpriseGroups, users, groups, admin, authCache, billingCache)
+	s.sessions = auth
+	return s
+}

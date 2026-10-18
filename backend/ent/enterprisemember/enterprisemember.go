@@ -33,6 +33,8 @@ const (
 	FieldStatus = "status"
 	// FieldTitle holds the string denoting the title field in the database.
 	FieldTitle = "title"
+	// FieldAccountCreatedByEnterprise holds the string denoting the account_created_by_enterprise field in the database.
+	FieldAccountCreatedByEnterprise = "account_created_by_enterprise"
 	// FieldJoinedAt holds the string denoting the joined_at field in the database.
 	FieldJoinedAt = "joined_at"
 	// EdgeEnterprise holds the string denoting the enterprise edge name in mutations.
@@ -78,6 +80,7 @@ var Columns = []string{
 	FieldRole,
 	FieldStatus,
 	FieldTitle,
+	FieldAccountCreatedByEnterprise,
 	FieldJoinedAt,
 }
 
@@ -117,6 +120,8 @@ var (
 	DefaultTitle string
 	// TitleValidator is a validator for the "title" field. It is called by the builders before save.
 	TitleValidator func(string) error
+	// DefaultAccountCreatedByEnterprise holds the default value on creation for the "account_created_by_enterprise" field.
+	DefaultAccountCreatedByEnterprise bool
 	// DefaultJoinedAt holds the default value on creation for the "joined_at" field.
 	DefaultJoinedAt func() time.Time
 )
@@ -172,6 +177,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByTitle orders the results by the title field.
 func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTitle, opts...).ToFunc()
+}
+
+// ByAccountCreatedByEnterprise orders the results by the account_created_by_enterprise field.
+func ByAccountCreatedByEnterprise(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountCreatedByEnterprise, opts...).ToFunc()
 }
 
 // ByJoinedAt orders the results by the joined_at field.

@@ -57,6 +57,7 @@ func EnterpriseDepartmentFromService(d *service.EnterpriseDepartment) *Enterpris
 }
 
 type EnterpriseMember struct {
+	PasswordResettable  bool       `json:"password_resettable"`
 	DepartmentPathNames []string   `json:"department_path_names"`
 	LastLoginAt         *time.Time `json:"last_login_at"`
 	ID                  int64      `json:"id"`
@@ -82,7 +83,7 @@ func EnterpriseMemberFromService(m *service.EnterpriseMember) *EnterpriseMember 
 		n := m.DepartmentName
 		departmentName = &n
 	}
-	return &EnterpriseMember{DepartmentPathNames: append([]string{}, m.DepartmentPathNames...), LastLoginAt: m.LastLoginAt, ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
+	return &EnterpriseMember{PasswordResettable: m.AccountCreatedByEnterprise, DepartmentPathNames: append([]string{}, m.DepartmentPathNames...), LastLoginAt: m.LastLoginAt, ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
 }
 
 type EnterpriseQuota struct {

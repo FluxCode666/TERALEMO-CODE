@@ -114,6 +114,10 @@ func (s *EnterpriseService) validateQuotaParents(ctx context.Context, id int64, 
 	return nil
 }
 func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, id int64, scope string, scopeID int64, in EnterpriseQuotaLimitsInput) (*EnterpriseQuota, error) {
+	return s.updateQuotaFields(ctx, a, id, scope, scopeID, in, nil)
+}
+
+func (s *EnterpriseService) updateQuotaFields(ctx context.Context, a EnterpriseActor, id int64, scope string, scopeID int64, in EnterpriseQuotaLimitsInput, fields []string) (*EnterpriseQuota, error) {
 	for _, v := range []*float64{in.DailyLimitUSD, in.WeeklyLimitUSD, in.MonthlyLimitUSD, in.TotalLimitUSD} {
 		if !enterpriseValidNumber(v) {
 			return nil, ErrEnterpriseInvalidInput
@@ -138,10 +142,18 @@ func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, 
 			return ErrEnterpriseInvalidScope
 		}
 		before := *q
-		q.DailyLimitUSD = in.DailyLimitUSD
-		q.WeeklyLimitUSD = in.WeeklyLimitUSD
-		q.MonthlyLimitUSD = in.MonthlyLimitUSD
-		q.TotalLimitUSD = in.TotalLimitUSD
+		if fields == nil || slices.Contains(fields, "daily") {
+			q.DailyLimitUSD = in.DailyLimitUSD
+		}
+		if fields == nil || slices.Contains(fields, "weekly") {
+			q.WeeklyLimitUSD = in.WeeklyLimitUSD
+		}
+		if fields == nil || slices.Contains(fields, "monthly") {
+			q.MonthlyLimitUSD = in.MonthlyLimitUSD
+		}
+		if fields == nil || slices.Contains(fields, "total") {
+			q.TotalLimitUSD = in.TotalLimitUSD
+		}
 		if err = s.validateQuotaParents(ctx, id, target, q); err != nil {
 			return err
 		}

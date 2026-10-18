@@ -31,6 +31,7 @@ func (EnterpriseMember) Fields() []ent.Field {
 		field.String("role").MaxLen(20).Default("member"),
 		field.String("status").MaxLen(20).Default("active"),
 		field.String("title").MaxLen(100).Default(""),
+		field.Bool("account_created_by_enterprise").Default(false),
 		field.Time("joined_at").Default(time.Now).SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 	}
 }

@@ -421,13 +421,13 @@ func TestEnterpriseServiceQuotaChecksAllParentsAndKeepsUsage(t *testing.T) {
 		})
 	}
 }
-func TestEnterpriseServiceWhitelistIntersectsAllConfiguredParents(t *testing.T) {
+func TestEnterpriseServiceWhitelistUsesOnlyEnterprisePool(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		ids  []int64
 		want error
 	}{
-		{"inside", []int64{1}, nil}, {"outside department", []int64{2}, ErrEnterpriseGroupOutOfScope}, {"disabled", []int64{3}, ErrEnterpriseGroupOutOfScope}, {"missing", []int64{99}, ErrEnterpriseGroupOutOfScope}, {"empty removes restriction", nil, nil},
+		{"inside", []int64{1}, nil}, {"ignores department", []int64{2}, nil}, {"disabled", []int64{3}, ErrEnterpriseGroupOutOfScope}, {"missing", []int64{99}, ErrEnterpriseGroupOutOfScope}, {"empty removes restriction", nil, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newEnterpriseManagementTestFixture(t)
@@ -435,12 +435,12 @@ func TestEnterpriseServiceWhitelistIntersectsAllConfiguredParents(t *testing.T) 
 			f.e.e.GroupPoolConfigured = true
 			f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeEnterprise, 1}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1, 2}}
 			f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeDepartment, 3}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1}}
-			err := f.s.SetGroupWhitelist(context.Background(), EnterpriseActor{IsAdmin: true}, 1, EnterpriseScopeMember, 20, tc.ids)
+			err := f.s.SetGroupWhitelist(context.Background(), EnterpriseActor{IsAdmin: true}, 1, EnterpriseScopeEnterprise, 1, tc.ids)
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("got %v want %v", err, tc.want)
 			}
-			if tc.want == nil && len(f.auth.ids) != 1 {
-				t.Fatal("member cache not invalidated")
+			if tc.want == nil && len(f.auth.ids) != 3 {
+				t.Fatal("enterprise member caches not invalidated")
 			}
 			if tc.want != nil && f.g.writes != 0 {
 				t.Fatal("invalid whitelist was stored")

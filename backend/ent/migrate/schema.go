@@ -1122,6 +1122,7 @@ var (
 		{Name: "role", Type: field.TypeString, Size: 20, Default: "member"},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "title", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "account_created_by_enterprise", Type: field.TypeBool, Default: false},
 		{Name: "joined_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "enterprise_id", Type: field.TypeInt64},
 		{Name: "user_id", Type: field.TypeInt64},
@@ -1135,19 +1136,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "enterprise_members_enterprises_enterprise",
-				Columns:    []*schema.Column{EnterpriseMembersColumns[8]},
+				Columns:    []*schema.Column{EnterpriseMembersColumns[9]},
 				RefColumns: []*schema.Column{EnterprisesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "enterprise_members_users_user",
-				Columns:    []*schema.Column{EnterpriseMembersColumns[9]},
+				Columns:    []*schema.Column{EnterpriseMembersColumns[10]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "enterprise_members_enterprise_departments_department",
-				Columns:    []*schema.Column{EnterpriseMembersColumns[10]},
+				Columns:    []*schema.Column{EnterpriseMembersColumns[11]},
 				RefColumns: []*schema.Column{EnterpriseDepartmentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1156,7 +1157,7 @@ var (
 			{
 				Name:    "idx_enterprise_members_user_active",
 				Unique:  true,
-				Columns: []*schema.Column{EnterpriseMembersColumns[9]},
+				Columns: []*schema.Column{EnterpriseMembersColumns[10]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "deleted_at IS NULL",
 				},
@@ -1164,12 +1165,12 @@ var (
 			{
 				Name:    "idx_enterprise_members_enterprise",
 				Unique:  false,
-				Columns: []*schema.Column{EnterpriseMembersColumns[8]},
+				Columns: []*schema.Column{EnterpriseMembersColumns[9]},
 			},
 			{
 				Name:    "idx_enterprise_members_department",
 				Unique:  false,
-				Columns: []*schema.Column{EnterpriseMembersColumns[10]},
+				Columns: []*schema.Column{EnterpriseMembersColumns[11]},
 			},
 		},
 	}

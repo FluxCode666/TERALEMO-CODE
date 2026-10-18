@@ -16,6 +16,7 @@ import (
 )
 
 type enterpriseUsageAPI interface {
+	SeriesTrend(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters, string, string, int) ([]service.EnterpriseUsageSeriesPoint, error)
 	List(context.Context, service.EnterpriseUsageScope, pagination.PaginationParams, usagestats.UsageLogFilters) ([]service.EnterpriseUsageLog, *pagination.PaginationResult, error)
 	Stats(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters) (*service.EnterpriseUsageStats, error)
 	Trend(context.Context, service.EnterpriseUsageScope, usagestats.UsageLogFilters, string) ([]service.EnterpriseUsageTrend, error)
@@ -28,7 +29,7 @@ type enterpriseUsageAPI interface {
 }
 
 func (h *EnterpriseHandler) registerUsageRoutes(g *gin.RouterGroup, admin bool) {
-	for _, route := range []struct{ path, kind string }{{"/usage", "list"}, {"/usage/stats", "stats"}, {"/usage/trend", "trend"}, {"/usage/models", "models"}, {"/usage/api-key-options", "api-key-options"}, {"/usage/model-options", "model-options"}, {"/usage/members", "members"}, {"/usage/departments", "departments"}} {
+	for _, route := range []struct{ path, kind string }{{"/usage/models/trend", "models-trend"}, {"/usage/members/trend", "members-trend"}, {"/usage/departments/trend", "departments-trend"}, {"/usage", "list"}, {"/usage/stats", "stats"}, {"/usage/trend", "trend"}, {"/usage/models", "models"}, {"/usage/api-key-options", "api-key-options"}, {"/usage/model-options", "model-options"}, {"/usage/members", "members"}, {"/usage/departments", "departments"}} {
 		kind := route.kind
 		g.GET(route.path, h.bind(admin, func(c *gin.Context, a service.EnterpriseActor, id int64) { h.usageQuery(c, a, id, kind) }))
 	}
@@ -92,6 +93,21 @@ func (h *EnterpriseHandler) usageQuery(c *gin.Context, a service.EnterpriseActor
 	scope := enterpriseUsageScope(c, a, id)
 	ctx := c.Request.Context()
 	switch kind {
+	case "models-trend", "members-trend", "departments-trend":
+		top := 8
+		if raw, exists := c.GetQuery("top"); exists {
+			value, err := strconv.Atoi(raw)
+			if err != nil || value <= 0 {
+				response.BadRequest(c, "Invalid top")
+				return
+			}
+			top = value
+		}
+		items, err := h.usage.SeriesTrend(ctx, scope, filters, strings.TrimSuffix(kind, "-trend"), c.DefaultQuery("granularity", "day"), top)
+		if items == nil {
+			items = []service.EnterpriseUsageSeriesPoint{}
+		}
+		enterpriseSuccess(c, items, err)
 	case "api-key-options", "model-options":
 		limit := 20
 		if raw, exists := c.GetQuery("limit"); exists {

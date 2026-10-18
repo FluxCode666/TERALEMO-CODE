@@ -198,14 +198,14 @@ func TestEnterpriseTreeWhitelistContextAndParentWrites(t *testing.T) {
 	}
 	member, err := er.GetMemberContextByUserID(ctx, f.member.UserID)
 	require.NoError(t, err)
-	require.Equal(t, []int64{b}, member.GroupWhitelistIDs)
+	require.Equal(t, []int64{a, b, c}, member.GroupWhitelistIDs)
 	require.True(t, member.AllowsGroup(b))
-	require.False(t, member.AllowsGroup(a))
-	require.False(t, member.AllowsGroup(c))
+	require.True(t, member.AllowsGroup(a))
+	require.True(t, member.AllowsGroup(c))
 	svc := treeManagementService(client)
 	actor := service.EnterpriseActor{UserID: f.member.UserID, IsAdmin: true}
-	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, f.enterprise.ID, service.EnterpriseScopeDepartment, nodes[3].ID, []int64{c}), service.ErrEnterpriseGroupOutOfScope)
-	require.NoError(t, svc.SetGroupWhitelist(ctx, actor, f.enterprise.ID, service.EnterpriseScopeDepartment, nodes[3].ID, []int64{b}))
+	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, f.enterprise.ID, service.EnterpriseScopeDepartment, nodes[3].ID, []int64{c}), service.ErrEnterpriseGroupScopeDisabled)
+	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, f.enterprise.ID, service.EnterpriseScopeDepartment, nodes[3].ID, []int64{b}), service.ErrEnterpriseGroupScopeDisabled)
 	// PUT [] cancels a layer. To exercise a configured-empty restriction,
 	// remove its group rows while preserving the configuration marker.
 	_, err = integrationDB.ExecContext(ctx, `DELETE FROM enterprise_group_whitelists WHERE enterprise_id=$1 AND scope_type='department' AND scope_id=$2`, f.enterprise.ID, nodes[1].ID)
@@ -213,7 +213,7 @@ func TestEnterpriseTreeWhitelistContextAndParentWrites(t *testing.T) {
 	member, err = er.GetMemberContextByUserID(ctx, f.member.UserID)
 	require.NoError(t, err)
 	require.True(t, member.GroupWhitelistConfigured)
-	require.Empty(t, member.GroupWhitelistIDs)
+	require.Equal(t, []int64{a, b, c}, member.GroupWhitelistIDs)
 }
 
 func TestEnterpriseManagerSubtreeListsQuotasUsageRankingsAndOverrides(t *testing.T) {
@@ -280,8 +280,8 @@ func TestEnterpriseManagerSubtreeListsQuotasUsageRankingsAndOverrides(t *testing
 	require.NoError(t, err)
 	_, err = svc.UpdateQuota(ctx, actor, e.ID, service.EnterpriseScopeMember, outside.ID, service.EnterpriseQuotaLimitsInput{DailyLimitUSD: &quota})
 	require.ErrorIs(t, err, service.ErrEnterprisePermissionDenied)
-	require.NoError(t, svc.SetGroupWhitelist(ctx, actor, e.ID, service.EnterpriseScopeMember, f.member.ID, []int64{}))
-	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, e.ID, service.EnterpriseScopeMember, outside.ID, []int64{}), service.ErrEnterprisePermissionDenied)
+	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, e.ID, service.EnterpriseScopeMember, f.member.ID, []int64{}), service.ErrEnterpriseGroupScopeDisabled)
+	require.ErrorIs(t, svc.SetGroupWhitelist(ctx, actor, e.ID, service.EnterpriseScopeMember, outside.ID, []int64{}), service.ErrEnterpriseGroupScopeDisabled)
 	quotas, err := svc.ListQuotas(ctx, actor, e.ID, "")
 	require.NoError(t, err)
 	require.Len(t, quotas, 5)

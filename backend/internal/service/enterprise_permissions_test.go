@@ -53,6 +53,8 @@ func TestEnterprisePermissionsMatrix(t *testing.T) {
 									expected = ErrEnterpriseMemberDisabled
 								} else if enterpriseDisabled && write {
 									expected = ErrEnterpriseDisabled
+								} else if op == EnterprisePermissionEditWhitelist {
+									expected = ErrEnterpriseGroupScopeDisabled
 								} else if !allowed {
 									expected = ErrEnterprisePermissionDenied
 								}

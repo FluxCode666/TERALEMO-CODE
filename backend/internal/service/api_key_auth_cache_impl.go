@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 26 // v26: frozen ancestor chain and department subtree scope
+const apiKeyAuthSnapshotVersion = 27 // v27: only enterprise-level group whitelists apply
 
 func cloneEnterpriseMemberContext(src *EnterpriseMemberContext) *EnterpriseMemberContext {
 	if src == nil {

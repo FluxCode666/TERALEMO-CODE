@@ -55,7 +55,7 @@ func TestEnterpriseGroupDeleteWithTransactionClientWithoutTxContext(t *testing.T
 	snapshot, err := NewEnterpriseRepository(client).GetMemberContextByUserID(txCtx, active.UserID)
 	require.NoError(t, err)
 	require.True(t, snapshot.GroupPoolConfigured)
-	require.True(t, snapshot.GroupWhitelistConfigured)
+	require.False(t, snapshot.GroupWhitelistConfigured)
 	require.Empty(t, snapshot.GroupPoolIDs)
 	require.Empty(t, snapshot.GroupWhitelistIDs)
 	require.False(t, snapshot.AllowsGroup(groupID))

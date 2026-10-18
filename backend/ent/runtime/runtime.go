@@ -1191,8 +1191,12 @@ func init() {
 	enterprisemember.DefaultTitle = enterprisememberDescTitle.Default.(string)
 	// enterprisemember.TitleValidator is a validator for the "title" field. It is called by the builders before save.
 	enterprisemember.TitleValidator = enterprisememberDescTitle.Validators[0].(func(string) error)
+	// enterprisememberDescAccountCreatedByEnterprise is the schema descriptor for account_created_by_enterprise field.
+	enterprisememberDescAccountCreatedByEnterprise := enterprisememberFields[6].Descriptor()
+	// enterprisemember.DefaultAccountCreatedByEnterprise holds the default value on creation for the account_created_by_enterprise field.
+	enterprisemember.DefaultAccountCreatedByEnterprise = enterprisememberDescAccountCreatedByEnterprise.Default.(bool)
 	// enterprisememberDescJoinedAt is the schema descriptor for joined_at field.
-	enterprisememberDescJoinedAt := enterprisememberFields[6].Descriptor()
+	enterprisememberDescJoinedAt := enterprisememberFields[7].Descriptor()
 	// enterprisemember.DefaultJoinedAt holds the default value on creation for the joined_at field.
 	enterprisemember.DefaultJoinedAt = enterprisememberDescJoinedAt.Default.(func() time.Time)
 	enterprisequotaMixin := schema.EnterpriseQuota{}.Mixin()

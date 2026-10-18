@@ -135,6 +135,20 @@ func (_c *EnterpriseMemberCreate) SetNillableTitle(v *string) *EnterpriseMemberC
 	return _c
 }
 
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (_c *EnterpriseMemberCreate) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberCreate {
+	_c.mutation.SetAccountCreatedByEnterprise(v)
+	return _c
+}
+
+// SetNillableAccountCreatedByEnterprise sets the "account_created_by_enterprise" field if the given value is not nil.
+func (_c *EnterpriseMemberCreate) SetNillableAccountCreatedByEnterprise(v *bool) *EnterpriseMemberCreate {
+	if v != nil {
+		_c.SetAccountCreatedByEnterprise(*v)
+	}
+	return _c
+}
+
 // SetJoinedAt sets the "joined_at" field.
 func (_c *EnterpriseMemberCreate) SetJoinedAt(v time.Time) *EnterpriseMemberCreate {
 	_c.mutation.SetJoinedAt(v)
@@ -227,6 +241,10 @@ func (_c *EnterpriseMemberCreate) defaults() error {
 		v := enterprisemember.DefaultTitle
 		_c.mutation.SetTitle(v)
 	}
+	if _, ok := _c.mutation.AccountCreatedByEnterprise(); !ok {
+		v := enterprisemember.DefaultAccountCreatedByEnterprise
+		_c.mutation.SetAccountCreatedByEnterprise(v)
+	}
 	if _, ok := _c.mutation.JoinedAt(); !ok {
 		if enterprisemember.DefaultJoinedAt == nil {
 			return fmt.Errorf("ent: uninitialized enterprisemember.DefaultJoinedAt (forgotten import ent/runtime?)")
@@ -274,6 +292,9 @@ func (_c *EnterpriseMemberCreate) check() error {
 		if err := enterprisemember.TitleValidator(v); err != nil {
 			return &ValidationError{Name: "title", err: fmt.Errorf(`ent: validator failed for field "EnterpriseMember.title": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.AccountCreatedByEnterprise(); !ok {
+		return &ValidationError{Name: "account_created_by_enterprise", err: errors.New(`ent: missing required field "EnterpriseMember.account_created_by_enterprise"`)}
 	}
 	if _, ok := _c.mutation.JoinedAt(); !ok {
 		return &ValidationError{Name: "joined_at", err: errors.New(`ent: missing required field "EnterpriseMember.joined_at"`)}
@@ -334,6 +355,10 @@ func (_c *EnterpriseMemberCreate) createSpec() (*EnterpriseMember, *sqlgraph.Cre
 	if value, ok := _c.mutation.Title(); ok {
 		_spec.SetField(enterprisemember.FieldTitle, field.TypeString, value)
 		_node.Title = value
+	}
+	if value, ok := _c.mutation.AccountCreatedByEnterprise(); ok {
+		_spec.SetField(enterprisemember.FieldAccountCreatedByEnterprise, field.TypeBool, value)
+		_node.AccountCreatedByEnterprise = value
 	}
 	if value, ok := _c.mutation.JoinedAt(); ok {
 		_spec.SetField(enterprisemember.FieldJoinedAt, field.TypeTime, value)
@@ -550,6 +575,18 @@ func (u *EnterpriseMemberUpsert) UpdateTitle() *EnterpriseMemberUpsert {
 	return u
 }
 
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (u *EnterpriseMemberUpsert) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberUpsert {
+	u.Set(enterprisemember.FieldAccountCreatedByEnterprise, v)
+	return u
+}
+
+// UpdateAccountCreatedByEnterprise sets the "account_created_by_enterprise" field to the value that was provided on create.
+func (u *EnterpriseMemberUpsert) UpdateAccountCreatedByEnterprise() *EnterpriseMemberUpsert {
+	u.SetExcluded(enterprisemember.FieldAccountCreatedByEnterprise)
+	return u
+}
+
 // SetJoinedAt sets the "joined_at" field.
 func (u *EnterpriseMemberUpsert) SetJoinedAt(v time.Time) *EnterpriseMemberUpsert {
 	u.Set(enterprisemember.FieldJoinedAt, v)
@@ -730,6 +767,20 @@ func (u *EnterpriseMemberUpsertOne) SetTitle(v string) *EnterpriseMemberUpsertOn
 func (u *EnterpriseMemberUpsertOne) UpdateTitle() *EnterpriseMemberUpsertOne {
 	return u.Update(func(s *EnterpriseMemberUpsert) {
 		s.UpdateTitle()
+	})
+}
+
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (u *EnterpriseMemberUpsertOne) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberUpsertOne {
+	return u.Update(func(s *EnterpriseMemberUpsert) {
+		s.SetAccountCreatedByEnterprise(v)
+	})
+}
+
+// UpdateAccountCreatedByEnterprise sets the "account_created_by_enterprise" field to the value that was provided on create.
+func (u *EnterpriseMemberUpsertOne) UpdateAccountCreatedByEnterprise() *EnterpriseMemberUpsertOne {
+	return u.Update(func(s *EnterpriseMemberUpsert) {
+		s.UpdateAccountCreatedByEnterprise()
 	})
 }
 
@@ -1081,6 +1132,20 @@ func (u *EnterpriseMemberUpsertBulk) SetTitle(v string) *EnterpriseMemberUpsertB
 func (u *EnterpriseMemberUpsertBulk) UpdateTitle() *EnterpriseMemberUpsertBulk {
 	return u.Update(func(s *EnterpriseMemberUpsert) {
 		s.UpdateTitle()
+	})
+}
+
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (u *EnterpriseMemberUpsertBulk) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberUpsertBulk {
+	return u.Update(func(s *EnterpriseMemberUpsert) {
+		s.SetAccountCreatedByEnterprise(v)
+	})
+}
+
+// UpdateAccountCreatedByEnterprise sets the "account_created_by_enterprise" field to the value that was provided on create.
+func (u *EnterpriseMemberUpsertBulk) UpdateAccountCreatedByEnterprise() *EnterpriseMemberUpsertBulk {
+	return u.Update(func(s *EnterpriseMemberUpsert) {
+		s.UpdateAccountCreatedByEnterprise()
 	})
 }
 

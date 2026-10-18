@@ -26919,26 +26919,27 @@ func (m *EnterpriseGroupWhitelistScopeMutation) ResetEdge(name string) error {
 // EnterpriseMemberMutation represents an operation that mutates the EnterpriseMember nodes in the graph.
 type EnterpriseMemberMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int64
-	created_at        *time.Time
-	updated_at        *time.Time
-	deleted_at        *time.Time
-	role              *string
-	status            *string
-	title             *string
-	joined_at         *time.Time
-	clearedFields     map[string]struct{}
-	enterprise        *int64
-	clearedenterprise bool
-	user              *int64
-	cleareduser       bool
-	department        *int64
-	cleareddepartment bool
-	done              bool
-	oldValue          func(context.Context) (*EnterpriseMember, error)
-	predicates        []predicate.EnterpriseMember
+	op                            Op
+	typ                           string
+	id                            *int64
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	deleted_at                    *time.Time
+	role                          *string
+	status                        *string
+	title                         *string
+	account_created_by_enterprise *bool
+	joined_at                     *time.Time
+	clearedFields                 map[string]struct{}
+	enterprise                    *int64
+	clearedenterprise             bool
+	user                          *int64
+	cleareduser                   bool
+	department                    *int64
+	cleareddepartment             bool
+	done                          bool
+	oldValue                      func(context.Context) (*EnterpriseMember, error)
+	predicates                    []predicate.EnterpriseMember
 }
 
 var _ ent.Mutation = (*EnterpriseMemberMutation)(nil)
@@ -27389,6 +27390,42 @@ func (m *EnterpriseMemberMutation) ResetTitle() {
 	m.title = nil
 }
 
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (m *EnterpriseMemberMutation) SetAccountCreatedByEnterprise(b bool) {
+	m.account_created_by_enterprise = &b
+}
+
+// AccountCreatedByEnterprise returns the value of the "account_created_by_enterprise" field in the mutation.
+func (m *EnterpriseMemberMutation) AccountCreatedByEnterprise() (r bool, exists bool) {
+	v := m.account_created_by_enterprise
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountCreatedByEnterprise returns the old "account_created_by_enterprise" field's value of the EnterpriseMember entity.
+// If the EnterpriseMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseMemberMutation) OldAccountCreatedByEnterprise(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountCreatedByEnterprise is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountCreatedByEnterprise requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountCreatedByEnterprise: %w", err)
+	}
+	return oldValue.AccountCreatedByEnterprise, nil
+}
+
+// ResetAccountCreatedByEnterprise resets all changes to the "account_created_by_enterprise" field.
+func (m *EnterpriseMemberMutation) ResetAccountCreatedByEnterprise() {
+	m.account_created_by_enterprise = nil
+}
+
 // SetJoinedAt sets the "joined_at" field.
 func (m *EnterpriseMemberMutation) SetJoinedAt(t time.Time) {
 	m.joined_at = &t
@@ -27540,7 +27577,7 @@ func (m *EnterpriseMemberMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseMemberMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.created_at != nil {
 		fields = append(fields, enterprisemember.FieldCreatedAt)
 	}
@@ -27567,6 +27604,9 @@ func (m *EnterpriseMemberMutation) Fields() []string {
 	}
 	if m.title != nil {
 		fields = append(fields, enterprisemember.FieldTitle)
+	}
+	if m.account_created_by_enterprise != nil {
+		fields = append(fields, enterprisemember.FieldAccountCreatedByEnterprise)
 	}
 	if m.joined_at != nil {
 		fields = append(fields, enterprisemember.FieldJoinedAt)
@@ -27597,6 +27637,8 @@ func (m *EnterpriseMemberMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case enterprisemember.FieldTitle:
 		return m.Title()
+	case enterprisemember.FieldAccountCreatedByEnterprise:
+		return m.AccountCreatedByEnterprise()
 	case enterprisemember.FieldJoinedAt:
 		return m.JoinedAt()
 	}
@@ -27626,6 +27668,8 @@ func (m *EnterpriseMemberMutation) OldField(ctx context.Context, name string) (e
 		return m.OldStatus(ctx)
 	case enterprisemember.FieldTitle:
 		return m.OldTitle(ctx)
+	case enterprisemember.FieldAccountCreatedByEnterprise:
+		return m.OldAccountCreatedByEnterprise(ctx)
 	case enterprisemember.FieldJoinedAt:
 		return m.OldJoinedAt(ctx)
 	}
@@ -27699,6 +27743,13 @@ func (m *EnterpriseMemberMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTitle(v)
+		return nil
+	case enterprisemember.FieldAccountCreatedByEnterprise:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountCreatedByEnterprise(v)
 		return nil
 	case enterprisemember.FieldJoinedAt:
 		v, ok := value.(time.Time)
@@ -27800,6 +27851,9 @@ func (m *EnterpriseMemberMutation) ResetField(name string) error {
 		return nil
 	case enterprisemember.FieldTitle:
 		m.ResetTitle()
+		return nil
+	case enterprisemember.FieldAccountCreatedByEnterprise:
+		m.ResetAccountCreatedByEnterprise()
 		return nil
 	case enterprisemember.FieldJoinedAt:
 		m.ResetJoinedAt()

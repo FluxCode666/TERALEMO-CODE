@@ -8,4 +8,7 @@ var ErrEnterpriseFrozenBalancePending = infraerrors.Conflict("ENTERPRISE_FROZEN_
 var ErrEnterpriseDepartmentCycle = infraerrors.BadRequest("ENTERPRISE_DEPARTMENT_CYCLE", "部门不能移动到自身或子部门下")
 var ErrEnterpriseDepartmentDepthExceeded = infraerrors.BadRequest("ENTERPRISE_DEPARTMENT_DEPTH_EXCEEDED", "部门层级不能超过 8 级")
 
+var ErrEnterprisePasswordResetForbidden = infraerrors.Forbidden("ENTERPRISE_PASSWORD_RESET_FORBIDDEN", "仅可重置由企业创建的账号密码")
+var ErrEnterpriseGroupScopeDisabled = infraerrors.BadRequest("ENTERPRISE_GROUP_SCOPE_DISABLED", "仅支持企业级分组白名单")
+
 var ErrEnterpriseInvalidInput = infraerrors.BadRequest("INVALID_INPUT", "Invalid enterprise input")

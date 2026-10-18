@@ -64,7 +64,7 @@ func TestEnterpriseManagerSubtreePermissionsUsageAndRanking(t *testing.T) {
 		if id == 11 || id == 15 {
 			m.DepartmentPathIDs = []int64{3, 7, 11, id}
 		}
-		for _, op := range []EnterprisePermission{EnterprisePermissionManageMember, EnterprisePermissionEditQuota, EnterprisePermissionEditWhitelist, EnterprisePermissionViewQuota} {
+		for _, op := range []EnterprisePermission{EnterprisePermissionManageMember, EnterprisePermissionEditQuota, EnterprisePermissionViewQuota} {
 			err := CheckEnterprisePermission(c, settings, op, EnterprisePermissionTarget{ScopeType: EnterpriseScopeMember, ScopeID: 100, Member: m})
 			require.Equal(t, id == 7 || id == 11 || id == 15, err == nil, "id=%d op=%s", id, op)
 		}
@@ -82,7 +82,7 @@ func TestEnterpriseManagerSubtreePermissionsUsageAndRanking(t *testing.T) {
 }
 
 func TestEnterpriseTreeAuthSnapshotVersionAndClone(t *testing.T) {
-	require.Equal(t, 26, apiKeyAuthSnapshotVersion)
+	require.Equal(t, 27, apiKeyAuthSnapshotVersion)
 	c := &EnterpriseMemberContext{DepartmentID: enterpriseTestID(15), DepartmentPathIDs: []int64{3, 7, 11, 15}, DepartmentSubtreeIDs: []int64{15, 19}}
 	clone := cloneEnterpriseMemberContext(c)
 	clone.DepartmentPathIDs[0] = 99
@@ -152,7 +152,7 @@ func TestEnterpriseDepartmentMoveInvalidatesAuthWithDelayedSecondDelete(t *testi
 	}
 }
 
-func TestEnterpriseWhitelistWriteIntersectsEveryAncestor(t *testing.T) {
+func TestEnterpriseDepartmentWhitelistWritesRemainDisabledWithAncestors(t *testing.T) {
 	f := newEnterpriseManagementTestFixture(t)
 	d := &enterpriseManagementTestDepartments{items: map[int64]EnterpriseDepartment{3: {ID: 3, EnterpriseID: 1, PathIDs: []int64{3}}, 4: {ID: 4, EnterpriseID: 1, PathIDs: []int64{3, 4}}, 5: {ID: 5, EnterpriseID: 1, PathIDs: []int64{3, 4, 5}}}}
 	f.s.departments = d
@@ -162,8 +162,8 @@ func TestEnterpriseWhitelistWriteIntersectsEveryAncestor(t *testing.T) {
 	f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeDepartment, 3}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1}}
 	f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeDepartment, 4}] = EnterpriseGroupWhitelist{GroupIDs: []int64{1, 2}}
 	actor := EnterpriseActor{UserID: 10, IsAdmin: true}
-	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{2}), ErrEnterpriseGroupOutOfScope)
-	require.NoError(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{1}))
+	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{2}), ErrEnterpriseGroupScopeDisabled)
+	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{1}), ErrEnterpriseGroupScopeDisabled)
 	f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeDepartment, 3}] = EnterpriseGroupWhitelist{GroupIDs: []int64{}}
-	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{1}), ErrEnterpriseGroupOutOfScope)
+	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeDepartment, 5, []int64{1}), ErrEnterpriseGroupScopeDisabled)
 }

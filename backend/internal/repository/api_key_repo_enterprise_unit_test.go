@@ -53,8 +53,8 @@ func TestAPIKeyEnterpriseContextProjectionSQLite(t *testing.T) {
 			require.True(t, membership.GroupPoolConfigured)
 			require.Equal(t, []int64{group.ID}, membership.GroupPoolIDs)
 			require.True(t, membership.GroupWhitelistConfigured)
-			require.Empty(t, membership.GroupWhitelistIDs)
-			require.False(t, membership.AllowsGroup(group.ID), "disjoint configured whitelists deny everything")
+			require.Equal(t, []int64{group.ID}, membership.GroupWhitelistIDs)
+			require.True(t, membership.AllowsGroup(group.ID), "department whitelists are ignored")
 		})
 	}
 	_, err = client.EnterpriseMember.UpdateOneID(member.ID).SetDeletedAt(time.Now()).Save(ctx)

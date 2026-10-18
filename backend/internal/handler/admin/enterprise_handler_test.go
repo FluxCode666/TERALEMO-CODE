@@ -141,12 +141,12 @@ func TestEnterpriseHTTPWhitelistEmptyArray(t *testing.T) {
 		called = true
 		require.False(t, a.IsAdmin)
 		require.Equal(t, int64(8), id)
-		require.Equal(t, "member", scope)
-		require.Equal(t, int64(7), scopeID)
+		require.Equal(t, "enterprise", scope)
+		require.Equal(t, int64(8), scopeID)
 		require.Empty(t, groups)
 		return nil
 	}}
-	w := enterpriseTestRequest(enterpriseTestHandler(s, "owner"), http.MethodPut, "/api/v1/enterprise/group-whitelists/member/7", `{"group_ids":[]}`)
+	w := enterpriseTestRequest(enterpriseTestHandler(s, "owner"), http.MethodPut, "/api/v1/enterprise/group-whitelists/enterprise/8", `{"group_ids":[]}`)
 	require.Equal(t, 200, w.Code, w.Body.String())
 	require.True(t, called)
 	require.Contains(t, w.Body.String(), `"group_ids":[]`)
@@ -200,6 +200,8 @@ func TestEnterpriseHTTPRoutesMatchW4Contract(t *testing.T) {
 		"GET /:id/allowed-groups", "PUT /:id/allowed-groups", "GET /:id/group-whitelists", "PUT /:id/group-whitelists/:scopeType/:scopeId",
 		"GET /:id/usage", "GET /:id/usage/stats", "GET /:id/usage/trend", "GET /:id/usage/models", "GET /:id/usage/members", "GET /:id/usage/departments", "GET /:id/audit-logs",
 		"GET /:id/usage/api-key-options", "GET /:id/usage/model-options",
+		"POST /:id/import/preview", "POST /:id/import/commit", "POST /:id/members/:memberId/reset-password", "PUT /:id/quotas/members/batch",
+		"GET /:id/usage/models/trend", "GET /:id/usage/members/trend", "GET /:id/usage/departments/trend",
 	})
 	add("/api/v1/enterprise", []string{
 		"GET /overview", "GET /departments", "POST /departments", "PUT /departments/:departmentId", "DELETE /departments/:departmentId",
@@ -208,9 +210,11 @@ func TestEnterpriseHTTPRoutesMatchW4Contract(t *testing.T) {
 		"GET /group-whitelists", "PUT /group-whitelists/:scopeType/:scopeId", "GET /settings", "PUT /settings",
 		"GET /usage", "GET /usage/stats", "GET /usage/trend", "GET /usage/models", "GET /usage/members", "GET /usage/departments", "GET /audit-logs",
 		"GET /usage/api-key-options", "GET /usage/model-options",
+		"POST /import/preview", "POST /import/commit", "POST /members/:memberId/reset-password", "PUT /quotas/members/batch",
+		"GET /usage/models/trend", "GET /usage/members/trend", "GET /usage/departments/trend",
 	})
-	require.Len(t, expected, 57)
-	require.Len(t, r.Routes(), 57)
+	require.Len(t, expected, 71)
+	require.Len(t, r.Routes(), 71)
 	for _, route := range r.Routes() {
 		key := route.Method + " " + route.Path
 		require.True(t, expected[key], "unexpected route: %s", key)

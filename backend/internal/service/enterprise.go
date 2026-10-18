@@ -106,6 +106,7 @@ type EnterpriseDepartment struct {
 	DeletedAt            *time.Time
 }
 type EnterpriseMember struct {
+	AccountCreatedByEnterprise                  bool
 	ID, EnterpriseID, UserID                    int64
 	DepartmentPathIDs                           []int64
 	DepartmentPathNames                         []string

@@ -17,7 +17,7 @@ func NewEnterpriseMemberRepository(client *dbent.Client) service.EnterpriseMembe
 }
 
 const enterpriseMemberSelectColumns = `m.id, m.enterprise_id, m.user_id, m.department_id, m.role, m.status, m.title, m.joined_at,
- m.created_at, m.updated_at, m.deleted_at, COALESCE(u.email, ''), COALESCE(u.username, ''), COALESCE(u.status, ''), COALESCE(d.name, ''), COALESCE(d.path,''), u.last_login_at`
+ m.created_at, m.updated_at, m.deleted_at, COALESCE(u.email, ''), COALESCE(u.username, ''), COALESCE(u.status, ''), COALESCE(d.name, ''), COALESCE(d.path,''), u.last_login_at, m.account_created_by_enterprise`
 const enterpriseMemberJoins = ` FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
  LEFT JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL
  LEFT JOIN enterprise_departments d ON d.id = m.department_id AND d.enterprise_id = m.enterprise_id AND d.deleted_at IS NULL`
@@ -25,7 +25,7 @@ const enterpriseMemberJoins = ` FROM enterprise_members m JOIN enterprises e ON 
 func enterpriseMemberScan(s enterpriseScanner, m *service.EnterpriseMember) error {
 	var path string
 	err := s.Scan(&m.ID, &m.EnterpriseID, &m.UserID, &m.DepartmentID, &m.Role, &m.Status, &m.Title, &m.JoinedAt,
-		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.Email, &m.Username, &m.UserStatus, &m.DepartmentName, &path, &m.LastLoginAt)
+		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.Email, &m.Username, &m.UserStatus, &m.DepartmentName, &path, &m.LastLoginAt, &m.AccountCreatedByEnterprise)
 	if err != nil {
 		return err
 	}
@@ -65,10 +65,10 @@ func (r *enterpriseMemberRepository) Create(ctx context.Context, m *service.Ente
 		if userRole == service.RoleAdmin {
 			return service.ErrEnterpriseMemberAdminForbidden
 		}
-		query := `INSERT INTO enterprise_members (enterprise_id, user_id, department_id, role, status, title) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, joined_at, created_at, updated_at`
-		args := []any{m.EnterpriseID, m.UserID, m.DepartmentID, m.Role, m.Status, m.Title}
+		query := `INSERT INTO enterprise_members (enterprise_id, user_id, department_id, role, status, title, account_created_by_enterprise) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, joined_at, created_at, updated_at`
+		args := []any{m.EnterpriseID, m.UserID, m.DepartmentID, m.Role, m.Status, m.Title, m.AccountCreatedByEnterprise}
 		if !m.JoinedAt.IsZero() {
-			query = `INSERT INTO enterprise_members (enterprise_id, user_id, department_id, role, status, title, joined_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, joined_at, created_at, updated_at`
+			query = `INSERT INTO enterprise_members (enterprise_id, user_id, department_id, role, status, title, account_created_by_enterprise, joined_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, joined_at, created_at, updated_at`
 			args = append(args, m.JoinedAt)
 		}
 		err = enterpriseQueryOne(ctx, client, query, args, func(s enterpriseScanner) error {

@@ -147,6 +147,20 @@ func (_u *EnterpriseMemberUpdate) SetNillableTitle(v *string) *EnterpriseMemberU
 	return _u
 }
 
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (_u *EnterpriseMemberUpdate) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberUpdate {
+	_u.mutation.SetAccountCreatedByEnterprise(v)
+	return _u
+}
+
+// SetNillableAccountCreatedByEnterprise sets the "account_created_by_enterprise" field if the given value is not nil.
+func (_u *EnterpriseMemberUpdate) SetNillableAccountCreatedByEnterprise(v *bool) *EnterpriseMemberUpdate {
+	if v != nil {
+		_u.SetAccountCreatedByEnterprise(*v)
+	}
+	return _u
+}
+
 // SetJoinedAt sets the "joined_at" field.
 func (_u *EnterpriseMemberUpdate) SetJoinedAt(v time.Time) *EnterpriseMemberUpdate {
 	_u.mutation.SetJoinedAt(v)
@@ -296,6 +310,9 @@ func (_u *EnterpriseMemberUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.Title(); ok {
 		_spec.SetField(enterprisemember.FieldTitle, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountCreatedByEnterprise(); ok {
+		_spec.SetField(enterprisemember.FieldAccountCreatedByEnterprise, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.JoinedAt(); ok {
 		_spec.SetField(enterprisemember.FieldJoinedAt, field.TypeTime, value)
@@ -523,6 +540,20 @@ func (_u *EnterpriseMemberUpdateOne) SetNillableTitle(v *string) *EnterpriseMemb
 	return _u
 }
 
+// SetAccountCreatedByEnterprise sets the "account_created_by_enterprise" field.
+func (_u *EnterpriseMemberUpdateOne) SetAccountCreatedByEnterprise(v bool) *EnterpriseMemberUpdateOne {
+	_u.mutation.SetAccountCreatedByEnterprise(v)
+	return _u
+}
+
+// SetNillableAccountCreatedByEnterprise sets the "account_created_by_enterprise" field if the given value is not nil.
+func (_u *EnterpriseMemberUpdateOne) SetNillableAccountCreatedByEnterprise(v *bool) *EnterpriseMemberUpdateOne {
+	if v != nil {
+		_u.SetAccountCreatedByEnterprise(*v)
+	}
+	return _u
+}
+
 // SetJoinedAt sets the "joined_at" field.
 func (_u *EnterpriseMemberUpdateOne) SetJoinedAt(v time.Time) *EnterpriseMemberUpdateOne {
 	_u.mutation.SetJoinedAt(v)
@@ -702,6 +733,9 @@ func (_u *EnterpriseMemberUpdateOne) sqlSave(ctx context.Context) (_node *Enterp
 	}
 	if value, ok := _u.mutation.Title(); ok {
 		_spec.SetField(enterprisemember.FieldTitle, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountCreatedByEnterprise(); ok {
+		_spec.SetField(enterprisemember.FieldAccountCreatedByEnterprise, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.JoinedAt(); ok {
 		_spec.SetField(enterprisemember.FieldJoinedAt, field.TypeTime, value)

@@ -17,6 +17,10 @@ import (
 // enterpriseManagementAPI is deliberately local: test doubles need only the
 // management surface, without extending the application's existing interfaces.
 type enterpriseManagementAPI interface {
+	PreviewImport(context.Context, service.EnterpriseActor, int64, []service.EnterpriseImportRow) (*service.EnterpriseImportPreview, error)
+	CommitImport(context.Context, service.EnterpriseActor, int64, []service.EnterpriseImportRow) (*service.EnterpriseImportCommit, error)
+	ResetMemberPassword(context.Context, service.EnterpriseActor, int64, int64, *string) (*service.EnterprisePasswordResetResult, error)
+	BatchUpdateMemberQuotas(context.Context, service.EnterpriseActor, int64, service.EnterpriseBatchMemberQuotaInput) (*service.EnterpriseBatchMemberQuotaResult, error)
 	ListEnterprises(context.Context, service.EnterpriseActor, pagination.PaginationParams, service.EnterpriseListFilters) ([]service.Enterprise, *pagination.PaginationResult, error)
 	CreateEnterprise(context.Context, service.EnterpriseActor, service.CreateEnterpriseInput) (*service.Enterprise, error)
 	GetEnterprise(context.Context, service.EnterpriseActor, int64) (*service.Enterprise, error)
@@ -84,6 +88,10 @@ func (h *EnterpriseHandler) RegisterEnterpriseRoutes(g *gin.RouterGroup) {
 	g.PUT("/settings", h.bind(false, h.updateSettings))
 }
 func (h *EnterpriseHandler) registerResources(g *gin.RouterGroup, admin bool) {
+	g.POST("/import/preview", h.bind(admin, h.importPreview))
+	g.POST("/import/commit", h.bind(admin, h.importCommit))
+	g.POST("/members/:memberId/reset-password", h.bind(admin, h.resetMemberPassword))
+	g.PUT("/quotas/members/batch", h.bind(admin, h.batchMemberQuotas))
 	g.GET("/departments", h.bind(admin, h.departments))
 	g.POST("/departments", h.bind(admin, h.createDepartment))
 	g.PUT("/departments/:departmentId", h.bind(admin, h.updateDepartment))
@@ -503,6 +511,10 @@ func (h *EnterpriseHandler) whitelists(c *gin.Context, a service.EnterpriseActor
 func (h *EnterpriseHandler) setWhitelist(c *gin.Context, a service.EnterpriseActor, id int64) {
 	scope, scopeID, ok := enterpriseScope(c)
 	if !ok {
+		return
+	}
+	if scope == service.EnterpriseScopeDepartment || scope == service.EnterpriseScopeMember {
+		response.ErrorFrom(c, service.ErrEnterpriseGroupScopeDisabled)
 		return
 	}
 	var r enterpriseGroupsRequest

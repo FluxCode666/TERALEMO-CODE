@@ -110,6 +110,7 @@ type EnterpriseService struct {
 	users            enterpriseManagementUserReader
 	groups           enterpriseManagementGroupReader
 	admin            enterpriseManagementUserCreator
+	sessions         enterpriseSessionRevoker
 	authCache        enterpriseManagementAuthInvalidator
 	billingCache     EnterpriseBillingCache
 	// transact can be replaced in unit tests. Production always uses Ent transactions.

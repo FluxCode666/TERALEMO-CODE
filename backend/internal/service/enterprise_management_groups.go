@@ -114,19 +114,9 @@ func (s *EnterpriseService) ListGroupWhitelists(ctx context.Context, a Enterpris
 	if err != nil {
 		return nil, err
 	}
-	if a.IsAdmin || c.Role == EnterpriseRoleOwner {
-		return items, nil
-	}
 	out := make([]EnterpriseGroupWhitelist, 0)
 	for _, w := range items {
-		if w.ScopeType != EnterpriseScopeMember {
-			continue
-		}
-		m, err := s.members.GetByID(ctx, id, w.ScopeID)
-		if err != nil {
-			return nil, err
-		}
-		if enterpriseSameDepartment(c, m) {
+		if w.ScopeType == EnterpriseScopeEnterprise && w.ScopeID == id {
 			out = append(out, w)
 		}
 	}
@@ -170,6 +160,9 @@ func (s *EnterpriseService) validateWhitelistParents(ctx context.Context, e *Ent
 	return nil
 }
 func (s *EnterpriseService) SetGroupWhitelist(ctx context.Context, a EnterpriseActor, id int64, scope string, scopeID int64, ids []int64) error {
+	if scope == EnterpriseScopeDepartment || scope == EnterpriseScopeMember {
+		return ErrEnterpriseGroupScopeDisabled
+	}
 	ids = enterpriseUniqueGroupIDs(ids)
 	var affectedUID int64
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {

@@ -55,6 +55,9 @@ func CheckEnterprisePermission(c *EnterpriseMemberContext, settings EnterpriseSe
 	if !enterpriseValidRole(c.Role) || (target.Member != nil && target.Member.EnterpriseID != 0 && target.Member.EnterpriseID != c.EnterpriseID) {
 		return ErrEnterprisePermissionDenied
 	}
+	if p == EnterprisePermissionEditWhitelist && target.ScopeType != EnterpriseScopeEnterprise {
+		return ErrEnterpriseGroupScopeDisabled
+	}
 	if c.Role == EnterpriseRoleOwner {
 		return nil
 	}
@@ -76,7 +79,7 @@ func CheckEnterprisePermission(c *EnterpriseMemberContext, settings EnterpriseSe
 	case EnterprisePermissionEditQuota:
 		allowed = c.Role == EnterpriseRoleManager && settings.ManagerCanEditMemberQuota && target.ScopeType == EnterpriseScopeMember && enterpriseSameDepartment(c, target.Member) && target.Member.Role == EnterpriseRoleMember
 	case EnterprisePermissionEditWhitelist:
-		allowed = c.Role == EnterpriseRoleManager && settings.ManagerCanEditMemberGroups && target.ScopeType == EnterpriseScopeMember && enterpriseSameDepartment(c, target.Member) && target.Member.Role == EnterpriseRoleMember
+		allowed = false
 	}
 	if !allowed {
 		return ErrEnterprisePermissionDenied
@@ -101,5 +104,5 @@ func EnterprisePermissionsFor(c *EnterpriseMemberContext, settings EnterpriseSet
 	owner := c.Role == EnterpriseRoleOwner
 	manager := c.Role == EnterpriseRoleManager && c.DepartmentID != nil
 	write := c.EnterpriseStatus == EnterpriseStatusActive
-	return EnterprisePermissions{ManageDepartments: owner && write, ManageMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), CreateMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), EditMemberQuota: write && (owner || (manager && settings.ManagerCanEditMemberQuota)), EditMemberGroups: write && (owner || (manager && settings.ManagerCanEditMemberGroups)), EditQuotas: owner && write, EditSettings: owner && write, ViewMembers: owner || manager, ViewAuditLogs: owner, ViewDepartmentUsage: owner || manager}
+	return EnterprisePermissions{ManageDepartments: owner && write, ManageMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), CreateMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), EditMemberQuota: write && (owner || (manager && settings.ManagerCanEditMemberQuota)), EditMemberGroups: false, EditQuotas: owner && write, EditSettings: owner && write, ViewMembers: owner || manager, ViewAuditLogs: owner, ViewDepartmentUsage: owner || manager}
 }

@@ -22,26 +22,17 @@ func TestEnterpriseConfiguredEmptyPoolDoesNotFallBackToPublicGroups(t *testing.T
 	}
 }
 
-func TestEnterpriseWhitelistCannotGrantGroupsUnderConfiguredEmptyParent(t *testing.T) {
-	for _, parent := range []string{"pool", EnterpriseScopeEnterprise, EnterpriseScopeDepartment} {
-		t.Run(parent, func(t *testing.T) {
-			f := newEnterpriseManagementTestFixture(t)
-			switch parent {
-			case "pool":
-				f.e.e.GroupPoolConfigured = true
-			case EnterpriseScopeEnterprise:
-				f.g.whitelists[EnterpriseQuotaScope{parent, 1}] = EnterpriseGroupWhitelist{GroupIDs: []int64{}}
-			case EnterpriseScopeDepartment:
-				f.g.whitelists[EnterpriseQuotaScope{parent, 3}] = EnterpriseGroupWhitelist{GroupIDs: []int64{}}
-			}
-			err := f.s.SetGroupWhitelist(context.Background(), EnterpriseActor{IsAdmin: true}, 1, EnterpriseScopeMember, 20, []int64{1})
-			require.ErrorIs(t, err, ErrEnterpriseGroupOutOfScope)
-			require.Zero(t, f.g.writes)
-			// Explicit cancellation remains permitted even when an ancestor denies all.
-			err = f.s.SetGroupWhitelist(context.Background(), EnterpriseActor{IsAdmin: true}, 1, EnterpriseScopeMember, 20, []int64{})
-			require.NoError(t, err)
-			_, configured := f.g.whitelists[EnterpriseQuotaScope{EnterpriseScopeMember, 20}]
-			require.False(t, configured)
-		})
+func TestEnterpriseWhitelistPoolBoundaryAndDisabledScopes(t *testing.T) {
+	f := newEnterpriseManagementTestFixture(t)
+	actor := EnterpriseActor{IsAdmin: true}
+	f.e.e.GroupPoolConfigured = true
+	require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeEnterprise, 1, []int64{1}), ErrEnterpriseGroupOutOfScope)
+	for _, scope := range []string{EnterpriseScopeMember, EnterpriseScopeDepartment} {
+		for _, ids := range [][]int64{{1}, {}} {
+			require.ErrorIs(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, scope, 20, ids), ErrEnterpriseGroupScopeDisabled)
+		}
 	}
+	require.Zero(t, f.g.writes)
+	require.NoError(t, f.s.SetGroupWhitelist(context.Background(), actor, 1, EnterpriseScopeEnterprise, 1, []int64{}))
+	require.NotContains(t, f.g.whitelists, EnterpriseQuotaScope{EnterpriseScopeEnterprise, 1})
 }

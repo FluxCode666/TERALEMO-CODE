@@ -67,7 +67,7 @@ func TestEnterpriseGroupConfigurationPersistsEmptyAndExplicitClear(t *testing.T)
 	require.NoError(t, err)
 	c := contexts[m.UserID]
 	require.True(t, c.GroupPoolConfigured)
-	require.True(t, c.GroupWhitelistConfigured)
+	require.False(t, c.GroupWhitelistConfigured)
 	require.Empty(t, c.GroupPoolIDs)
 	require.Empty(t, c.GroupWhitelistIDs)
 	require.False(t, c.AllowsGroup(groupID+1))

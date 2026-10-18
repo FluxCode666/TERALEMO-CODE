@@ -211,7 +211,7 @@ func (r *userRepository) GetByIDIncludeDeleted(ctx context.Context, id int64) (*
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service.User, error) {
-	matches, err := r.client.User.Query().
+	matches, err := clientFromContext(ctx, r.client).User.Query().
 		Where(userEmailLookupPredicate(email)).
 		Order(dbent.Asc(dbuser.FieldID)).
 		All(ctx)
