@@ -7,7 +7,7 @@ import { getEnterpriseTabs, type EnterpriseSection } from '../navigation'
 import EnterpriseQuotaDisplay from '../components/EnterpriseQuotaDisplay.vue'
 import EnterpriseDetailView from '@/views/admin/EnterpriseDetailView.vue'
 
-const { api, getEnterprise, showError } = vi.hoisted(() => ({
+const { api, getEnterprise, showError, updateMemberConcurrency } = vi.hoisted(() => ({
   api: {
     overview: vi.fn(), departments: vi.fn(), createDepartment: vi.fn(), updateDepartment: vi.fn(), deleteDepartment: vi.fn(),
     members: vi.fn(), createMember: vi.fn(), updateMember: vi.fn(), deleteMember: vi.fn(),
@@ -19,6 +19,7 @@ const { api, getEnterprise, showError } = vi.hoisted(() => ({
     auditLogs: vi.fn(), balanceLogs: vi.fn()
   },
   getEnterprise: vi.fn(),
+  updateMemberConcurrency: vi.fn(),
   showError: vi.fn()
 }))
 
@@ -28,7 +29,7 @@ vi.mock('@/api/enterprise', async () => {
 })
 
 vi.mock('@/api/admin/enterprises', () => ({
-  enterprisesAPI: { forEnterprise: () => api, get: getEnterprise }
+  enterprisesAPI: { forEnterprise: () => api, get: getEnterprise, updateMemberConcurrency }
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -473,4 +474,24 @@ it('applies the same layout declarations to administrator enterprise details inc
     await openTab(wrapper, name)
     expect(wrapper.attributes('data-layout')).toBe(['organization', 'usage'].includes(name) ? 'wide' : 'narrow')
   }
+})
+
+it('refreshes administrator data after unified concurrency changes and offers no enterprise-side entry', async () => {
+  const value = { id: 1, name: 'Acme', status: 'active', balance: 0, total_recharged: 0, member_count: 5, department_count: 0, settings: { ...defaultEnterpriseSettings }, member_concurrency: null }
+  getEnterprise.mockResolvedValue(value)
+  updateMemberConcurrency.mockResolvedValue({ member_concurrency: 24, updated_count: 5 })
+  const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 1 }, global: { stubs: { EnterpriseBasicsForm: true, EnterpriseSettingsPanel: true, EnterpriseConfirm: { name: 'EnterpriseConfirm', props: ['show'], emits: ['confirm'], template: '<button v-if="show" data-test="confirm-concurrency" @click="$emit(\'confirm\')">Confirm</button>' } } } })
+  wrappers.push(wrapper); await flushPromises(); await openTab(wrapper, 'settings')
+  expect(wrapper.find('[data-test="member-concurrency-card"]').exists()).toBe(true)
+  await wrapper.get('[data-test="member-concurrency-input"]').setValue('24')
+  await wrapper.get('[data-test="member-concurrency-form"]').trigger('submit')
+  getEnterprise.mockResolvedValue({ ...value, member_concurrency: 24 })
+  const reads = getEnterprise.mock.calls.length
+  await wrapper.get('[data-test="confirm-concurrency"]').trigger('click'); await flushPromises()
+  expect(updateMemberConcurrency).toHaveBeenCalledWith(1, { concurrency: 24 })
+  expect(getEnterprise).toHaveBeenCalledTimes(reads + 1)
+  expect(wrapper.getComponent({ name: 'EnterpriseMemberConcurrencyCard' }).props('enterprise').member_concurrency).toBe(24)
+  const user = mountWorkspace(overview('owner'))
+  await openTab(user, 'settings')
+  expect(user.find('[data-test="member-concurrency-card"]').exists()).toBe(false)
 })

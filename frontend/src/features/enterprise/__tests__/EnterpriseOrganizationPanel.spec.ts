@@ -102,6 +102,17 @@ describe('organization tree and details', () => {
     await departmentWrapper.get('[data-test="department-create-member"]').trigger('click')
     expect(departmentWrapper.getComponent({ name: 'EnterpriseMemberForm' }).props('defaultDepartmentId')).toBe(4)
   })
+  it.each([true, false])('displays the current member concurrency as a read-only field (admin %s)', async admin => {
+    const requests = api()
+    requests.members.mockResolvedValue({ items: members.map(member => ({ ...member, concurrency: 24 })), total: members.length })
+    const wrapper = render(requests, admin ? undefined : { enterprise: { name: 'Acme' }, me: { role: 'owner' }, permissions: { view_members: true } } as EnterpriseOverview)
+    await flushPromises(); await wrapper.get('[data-test="org-node-member-8"]').trigger('click')
+    const field = wrapper.get('[data-test="organization-detail"]').findAll('dl > div').find(row => row.find('dt').text() === 'enterprise.memberConcurrency')!
+    expect(field.get('dd').text()).toBe('24')
+    expect(field.find('input').exists()).toBe(false)
+    expect(field.find('button').exists()).toBe(false)
+  })
+
   it('loads members beyond the first page to populate the tree', async () => {
     const requests = api(); requests.members.mockResolvedValueOnce({ items: members.slice(0, 2), total: 4 }).mockResolvedValueOnce({ items: members.slice(2), total: 4 })
     const wrapper = render(requests); await flushPromises()

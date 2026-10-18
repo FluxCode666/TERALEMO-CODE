@@ -1,5 +1,6 @@
 export default {
   "enterprise": {
+    "memberConcurrency": "并发",
     "passwordReset": {
       "title": "重置密码",
       "method": "重置方式",

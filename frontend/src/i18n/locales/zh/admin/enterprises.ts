@@ -1,5 +1,19 @@
 export default {
   "enterprises": {
+    "memberConcurrency": {
+      "title": "成员并发",
+      "description": "统一设置每位成员的并发上限，包括停用成员，不含已移出成员。仅系统管理员可修改。",
+      "current": "当前统一并发：{value}",
+      "unset": "未统一设置，新成员使用平台默认并发",
+      "input": "每位成员的并发上限",
+      "validation": "请输入 1～2147483647 之间的正整数。",
+      "apply": "应用到全部成员",
+      "clear": "清除统一设置",
+      "confirmApply": "将把 {count} 名当前成员（含停用成员，不含已移出成员）的并发都改为 {value}，且之后新成员默认使用该值。确认后立即生效。",
+      "confirmClear": "清除后，现有成员的并发不变，之后新成员回到平台默认并发。确认后立即生效。",
+      "updated": "已更新 {count} 名成员",
+      "cleared": "已清除统一设置，现有成员并发不变，新成员使用平台默认并发。"
+    },
     "title": "企业管理",
     "description": "管理企业组织、余额与使用权限",
     "create": "创建企业",

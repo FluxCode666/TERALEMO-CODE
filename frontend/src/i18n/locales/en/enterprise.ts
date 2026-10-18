@@ -1,5 +1,6 @@
 export default {
   "enterprise": {
+    "memberConcurrency": "Concurrency",
     "passwordReset": {
       "title": "Reset password",
       "method": "Reset method",

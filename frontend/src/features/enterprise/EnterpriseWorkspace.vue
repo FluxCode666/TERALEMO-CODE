@@ -37,7 +37,7 @@
       <EnterpriseGroupsPanel v-else-if="activeTab === 'groups'" :api="api" :enterprise-id="enterprise.id" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
       <EnterpriseLogsPanel v-else-if="activeTab === 'audit' || activeTab === 'balanceLogs'" :key="activeTab" :api="api" :kind="activeTab" :enterprise="enterprise" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
-      <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" :refresh-key="refreshKey" @updated="updated" /></div>
+      <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseMemberConcurrencyCard v-if="adminEnterprise" :key="adminEnterprise.id" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" :refresh-key="refreshKey" @updated="updated" /></div>
         </component>
       </component>
     </template>
@@ -73,6 +73,7 @@ import EnterpriseUsagePanel from './components/EnterpriseUsagePanel.vue'
 import EnterpriseLogsPanel from './components/EnterpriseLogsPanel.vue'
 import EnterpriseSettingsPanel from './components/EnterpriseSettingsPanel.vue'
 import EnterpriseBasicsForm from './components/EnterpriseBasicsForm.vue'
+import EnterpriseMemberConcurrencyCard from './components/EnterpriseMemberConcurrencyCard.vue'
 import EnterpriseBalanceForm from './components/EnterpriseBalanceForm.vue'
 import EnterpriseOwnerWarning from './components/EnterpriseOwnerWarning.vue'
 import { useEnterpriseAction } from './useEnterpriseAction'

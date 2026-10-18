@@ -249,6 +249,18 @@ describe('administrator enterprise display', () => {
     expect(rows[1].get('[title="enterprise.frozenBalanceHint"]').text()).toBe('$0.0000')
   })
 
+  it('shows unified member concurrency and distinguishes unset or missing fields in the list', async () => {
+    listEnterprises.mockResolvedValue({ ...page(1), items: [
+      { ...enterprise(1), member_concurrency: 24 }, { ...enterprise(2), member_concurrency: null }, enterprise(3)
+    ] })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, EnterpriseTable: false } } })
+    wrappers.push(wrapper); await flushPromises()
+    expect(wrapper.get('thead').text()).toContain('admin.enterprises.memberConcurrency.title')
+    expect(wrapper.get('[data-test="enterprise-concurrency-1"]').text()).toBe('24')
+    expect(wrapper.get('[data-test="enterprise-concurrency-2"]').text()).toBe('—')
+    expect(wrapper.get('[data-test="enterprise-concurrency-3"]').text()).toBe('—')
+  })
+
   it('formats enterprise creation timestamps with the shared date formatter', async () => {
     const timestamp = '2026-10-18T00:15:27.98669+08:00'
     listEnterprises.mockResolvedValue({ ...page(1), items: [{ ...enterprise(1), created_at: timestamp }] })

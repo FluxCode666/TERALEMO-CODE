@@ -204,6 +204,14 @@ describe('admin enterprises API contract', () => {
     expect(remove).toHaveBeenLastCalledWith('/admin/enterprises/12')
   })
 
+  it.each([24, null])('updates unified member concurrency only on the admin endpoint (%s)', async concurrency => {
+    const result = { member_concurrency: concurrency, updated_count: concurrency === null ? 0 : 5 }
+    put.mockResolvedValue({ data: result })
+    expect(await enterprises.updateMemberConcurrency(12, { concurrency })).toEqual(result)
+    expect(put).toHaveBeenCalledWith('/admin/enterprises/12/member-concurrency', { concurrency })
+    expect(enterpriseAPI).not.toHaveProperty('updateMemberConcurrency')
+  })
+
   it('keeps balance adjustment operation and positive amount in the documented payload', async () => {
     const payload = { operation: 'subtract' as const, amount: 1.25, notes: 'Correction' }
     expect(await enterprises.adjustBalance(12, payload)).toEqual({ id: 12 })

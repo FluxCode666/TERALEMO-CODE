@@ -9,6 +9,7 @@ export const enterprisesAPI = {
   create: async (body: CreateEnterpriseRequest): Promise<Enterprise> => (await apiClient.post<Enterprise>(base, body)).data,
   get: async (id: number, options?: FetchOptions): Promise<Enterprise> => (await (options ? apiClient.get<Enterprise>(`${base}/${id}`, options) : apiClient.get<Enterprise>(`${base}/${id}`))).data,
   update: async (id: number, body: UpdateEnterpriseRequest): Promise<Enterprise> => (await apiClient.put<Enterprise>(`${base}/${id}`, body)).data,
+  updateMemberConcurrency: async (id: number, body: { concurrency: number | null }): Promise<{ member_concurrency: number | null; updated_count: number }> => (await apiClient.put<{ member_concurrency: number | null; updated_count: number }>(`${base}/${id}/member-concurrency`, body)).data,
   remove: async (id: number, dissolve?: boolean): Promise<void> => {
     if (dissolve === true) await apiClient.delete(`${base}/${id}`, { params: { dissolve: true } })
     else await apiClient.delete(`${base}/${id}`)

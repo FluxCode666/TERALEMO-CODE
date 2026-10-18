@@ -68,6 +68,7 @@ export interface Enterprise {
   notes: string
   settings: EnterpriseSettings
   member_count: number
+  member_concurrency?: number | null
   department_count: number
   active_owner_count?: number
   quota?: EnterpriseQuota | null
@@ -102,6 +103,7 @@ export interface EnterpriseMember {
   department_path_names?: string[]
   last_login_at?: string | null
   password_resettable?: boolean
+  readonly concurrency?: number
   user_status: EnterpriseStatus
 }
 export interface EnterprisePermissions {

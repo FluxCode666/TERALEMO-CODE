@@ -26,6 +26,7 @@ const total = computed(() => {
 const memberFields = computed(() => member.value ? [
   [t('enterprise.username'), member.value.username || '—'], [t('enterprise.email'), member.value.email],
   [t('enterprise.status'), t(member.value.status === 'active' ? 'enterprise.active' : 'enterprise.disabled')],
+  [t('enterprise.memberConcurrency'), member.value.concurrency == null ? '—' : String(member.value.concurrency)],
   [t('enterprise.titleField'), member.value.title || '—'], [t('enterprise.joinedAt'), member.value.joined_at ? formatDateTime(member.value.joined_at) : '—'],
   [t('enterprise.orgTree.lastLogin'), member.value.last_login_at ? formatDateTime(member.value.last_login_at) : t('enterprise.orgTree.neverLoggedIn')]
 ] : [])
