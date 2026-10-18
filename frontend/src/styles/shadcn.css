@@ -1,0 +1,71 @@
+/*
+ * shadcn-vue 1.0.3 / Tailwind 3：HSL 通道值支持 bg-primary/90 等透明度。
+ * 仅全局声明变量；不添加 * / body reset，也不改变默认 border/ring。
+ * Portal 组件自带 shadcn-scope，直接使用 html.dark 的变量。
+ */
+@layer base {
+  :root {
+    --background: 210.00000 20.00000% 98.03922%; /* gray-50 #f9fafb */
+    --foreground: 220.90909 39.28571% 10.98039%; /* gray-900 #111827 */
+    --card: 0 0% 100%;
+    --card-foreground: 221 39% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 39% 11%;
+    --primary: 174.66667 83.85093% 31.56863%; /* primary-600 #0d9488 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210.00000 40.00000% 96.07843%; /* accent-100 #f1f5f9 */
+    --secondary-foreground: 215.29412 25.00000% 26.66667%; /* accent-700 #334155 */
+    --muted: 210 40% 96.08%;
+    --muted-foreground: 215.38462 16.31799% 46.86275%; /* accent-500 #64748b */
+    --accent: 166.15385 76.47059% 96.66667%; /* primary-50 #f0fdfa */
+    --accent-foreground: 174.66667 83.85093% 31.56863%;
+    --destructive: 0.00000 72.22222% 50.58824%; /* red-600 #dc2626 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 220.00000 13.04348% 90.98039%; /* gray-200 #e5e7eb */
+    --input: 216.00000 12.19512% 83.92157%; /* gray-300 #d1d5db */
+    --ring: 173.41463 80.39216% 40.00000%; /* primary-500 #14b8a6 */
+    --radius: 0.75rem;
+  }
+
+  html.dark {
+    --background: 228.57143 84.00000% 4.90196%; /* dark-950 #020617 */
+    --foreground: 220.00000 14.28571% 95.88235%; /* gray-100 #f3f4f6 */
+    --card: 217.24138 32.58427% 17.45098%; /* dark-800 #1e293b */
+    --card-foreground: 220 14.29% 95.88%;
+    --popover: 217.24 32.58% 17.45%;
+    --popover-foreground: 220 14.29% 95.88%;
+    --primary: 173.41463 80.39216% 40.00000%; /* primary-500 #14b8a6 */
+    --primary-foreground: 178.60465 84.31373% 10.00000%; /* primary-950 #042f2e */
+    --secondary: 215.29412 25.00000% 26.66667%; /* dark-700 #334155 */
+    --secondary-foreground: 210 40% 98.04%;
+    --muted: 215.29 25% 26.67%;
+    --muted-foreground: 215.00000 20.22472% 65.09804%; /* dark-400 #94a3b8 */
+    --accent: 175.93220 60.82474% 19.01961%; /* primary-900 #134e4a */
+    --accent-foreground: 167.23404 85.45455% 89.21569%; /* primary-100 #ccfbf1 */
+    --destructive: 0 72.22% 50.59%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215.29412 25.00000% 26.66667%; /* dark-700 #334155 */
+    --input: 215.29 25% 26.67%;
+    --ring: 173.41 80.39% 40%;
+  }
+
+  /* 默认边框仅作用于明确选择 shadcn 的区域，不改变现有页面。 */
+  .shadcn-scope,
+  .shadcn-scope * {
+    @apply border-border;
+  }
+}
+
+/* Reka 状态过渡也尊重减少动态效果；不修改旧页面的动画。 */
+@media (prefers-reduced-motion: reduce) {
+  .shadcn-scope,
+  .shadcn-scope *,
+  .shadcn-scope::before,
+  .shadcn-scope::after,
+  .shadcn-scope *::before,
+  .shadcn-scope *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

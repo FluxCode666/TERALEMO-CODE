@@ -1,3 +1,26 @@
+import animate from 'tailwindcss-animate'
+import plugin from 'tailwindcss/plugin'
+
+// 插件的 duration/delay/ease 与原有过渡工具类同名；所有动画工具规则均显式收敛。
+const animationScope = ':where(.shadcn-scope, .shadcn-scope *)'
+const shadcnAnimate = plugin((api) => {
+  animate.handler({
+    ...api,
+    addUtilities(utilities, options) {
+      api.addUtilities(Object.fromEntries(Object.entries(utilities).map(([selector, styles]) => [
+        selector.startsWith('@') ? selector : `${selector}${animationScope}`,
+        styles,
+      ])), options)
+    },
+    matchUtilities(utilities, options) {
+      api.matchUtilities(Object.fromEntries(Object.entries(utilities).map(([name, generate]) => [
+        name,
+        (value, extra) => ({ [`&${animationScope}`]: generate(value, extra) }),
+      ])), options)
+    },
+  })
+}, animate.config)
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
@@ -7,6 +30,8 @@ export default {
       colors: {
         // 主色调 - Teal/Cyan 青色系
         primary: {
+          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
           50: '#f0fdfa',
           100: '#ccfbf1',
           200: '#99f6e4',
@@ -21,6 +46,8 @@ export default {
         },
         // 辅助色 - 深蓝灰
         accent: {
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
           50: '#f8fafc',
           100: '#f1f5f9',
           200: '#e2e8f0',
@@ -32,6 +59,28 @@ export default {
           800: '#1e293b',
           900: '#0f172a',
           950: '#020617'
+        },
+        // 仅新增语义色，不改变已有 primary/accent/dark 色阶或默认 border/ring。
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
+        popover: {
+          DEFAULT: 'hsl(var(--popover) / <alpha-value>)',
+          foreground: 'hsl(var(--popover-foreground) / <alpha-value>)'
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+          foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)'
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+          foreground: 'hsl(var(--muted-foreground) / <alpha-value>)'
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)'
         },
         // 深色模式背景
         dark: {
@@ -47,6 +96,14 @@ export default {
           900: '#0f172a',
           950: '#020617'
         }
+      },
+      // colors.card 会额外生成同名 shadow-card 颜色工具类，覆盖现有卡片阴影。
+      // 卡片 token 只用于背景和文字，保留标准 bg-card / text-card-foreground API。
+      backgroundColor: {
+        card: 'hsl(var(--card) / <alpha-value>)'
+      },
+      textColor: {
+        'card-foreground': 'hsl(var(--card-foreground) / <alpha-value>)'
       },
       fontFamily: {
         sans: [
@@ -83,6 +140,8 @@ export default {
           'radial-gradient(at 40% 20%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(20, 184, 166, 0.08) 0px, transparent 50%)'
       },
       animation: {
+        'collapsible-down': 'collapsible-down 0.2s ease-out',
+        'collapsible-up': 'collapsible-up 0.2s ease-out',
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',
@@ -93,6 +152,14 @@ export default {
         glow: 'glow 2s ease-in-out infinite alternate'
       },
       keyframes: {
+        'collapsible-down': {
+          from: { height: '0' },
+          to: { height: 'var(--reka-collapsible-content-height)' }
+        },
+        'collapsible-up': {
+          from: { height: 'var(--reka-collapsible-content-height)' },
+          to: { height: '0' }
+        },
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' }
@@ -126,9 +193,14 @@ export default {
         xs: '2px'
       },
       borderRadius: {
+        // shadcn 专用 token：不覆盖旧页面使用的 sm/md/lg/xl。
+        'ui-sm': 'calc(var(--radius) - 4px)',
+        'ui-md': 'calc(var(--radius) - 2px)',
+        'ui-lg': 'var(--radius)',
+        'ui-xl': 'calc(var(--radius) + 4px)',
         '4xl': '2rem'
       }
     }
   },
-  plugins: []
+  plugins: [shadcnAnimate]
 }

@@ -1014,6 +1014,9 @@ export default {
 
   // Pagination
   pagination: {
+    first: '首页',
+    last: '末页',
+    morePages: '更多页',
     showing: '显示',
     to: '至',
     of: '共',
