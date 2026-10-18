@@ -30,6 +30,9 @@ func (BatchImageJob) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("batch_id").MaxLen(64).Immutable(),
 		field.Int64("user_id"),
+		field.Int64("enterprise_id").Optional().Nillable().Immutable(),
+		field.Int64("enterprise_department_id").Optional().Nillable().Immutable(),
+		field.Int64("enterprise_member_id").Optional().Nillable().Immutable(),
 		field.Int64("api_key_id").Optional().Nillable(),
 		field.Int64("account_id").Optional().Nillable(),
 		field.String("provider").MaxLen(32),

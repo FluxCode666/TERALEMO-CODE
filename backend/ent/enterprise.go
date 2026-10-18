@@ -33,6 +33,8 @@ type Enterprise struct {
 	GroupPoolConfigured bool `json:"group_pool_configured,omitempty"`
 	// Balance holds the value of the "balance" field.
 	Balance float64 `json:"balance,omitempty"`
+	// FrozenBalance holds the value of the "frozen_balance" field.
+	FrozenBalance float64 `json:"frozen_balance,omitempty"`
 	// TotalRecharged holds the value of the "total_recharged" field.
 	TotalRecharged float64 `json:"total_recharged,omitempty"`
 	// LowBalanceThreshold holds the value of the "low_balance_threshold" field.
@@ -91,7 +93,7 @@ func (*Enterprise) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case enterprise.FieldGroupPoolConfigured:
 			values[i] = new(sql.NullBool)
-		case enterprise.FieldBalance, enterprise.FieldTotalRecharged, enterprise.FieldLowBalanceThreshold:
+		case enterprise.FieldBalance, enterprise.FieldFrozenBalance, enterprise.FieldTotalRecharged, enterprise.FieldLowBalanceThreshold:
 			values[i] = new(sql.NullFloat64)
 		case enterprise.FieldID:
 			values[i] = new(sql.NullInt64)
@@ -162,6 +164,12 @@ func (_m *Enterprise) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field balance", values[i])
 			} else if value.Valid {
 				_m.Balance = value.Float64
+			}
+		case enterprise.FieldFrozenBalance:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field frozen_balance", values[i])
+			} else if value.Valid {
+				_m.FrozenBalance = value.Float64
 			}
 		case enterprise.FieldTotalRecharged:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -276,6 +284,9 @@ func (_m *Enterprise) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("balance=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Balance))
+	builder.WriteString(", ")
+	builder.WriteString("frozen_balance=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FrozenBalance))
 	builder.WriteString(", ")
 	builder.WriteString("total_recharged=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TotalRecharged))

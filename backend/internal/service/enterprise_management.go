@@ -327,6 +327,7 @@ func (s *EnterpriseService) Identity(ctx context.Context, userID int64) (*Enterp
 	}
 	if identity.BalanceVisible {
 		identity.Balance = &e.Balance
+		identity.FrozenBalance = &e.FrozenBalance
 	}
 	return identity, nil
 }

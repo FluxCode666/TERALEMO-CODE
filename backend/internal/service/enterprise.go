@@ -82,7 +82,7 @@ type Enterprise struct {
 	ID                                             int64
 	Name, Status                                   string
 	GroupPoolConfigured                            bool
-	Balance, TotalRecharged                        float64
+	Balance, FrozenBalance, TotalRecharged         float64
 	LowBalanceThreshold                            *float64
 	ContactName, ContactEmail, ContactPhone, Notes string
 	Settings                                       EnterpriseSettings
@@ -184,25 +184,6 @@ func (c *EnterpriseMemberContext) ApplyGroupWhitelist(ids []int64) {
 		return
 	}
 	c.GroupWhitelistIDs = slices.DeleteFunc(c.GroupWhitelistIDs, func(id int64) bool { return !slices.Contains(ids, id) })
-}
-
-// EffectiveGroupIDs is nil only when enterprise policy imposes no restriction.
-// Candidate IDs always pass through the gateway's own access predicate.
-func (c *EnterpriseMemberContext) EffectiveGroupIDs() []int64 {
-	if c == nil || (!c.GroupPoolConfigured && !c.GroupWhitelistConfigured) {
-		return nil
-	}
-	candidates := c.GroupWhitelistIDs
-	if c.GroupPoolConfigured {
-		candidates = c.GroupPoolIDs
-	}
-	ids := make([]int64, 0, len(candidates))
-	for _, id := range candidates {
-		if c.AllowsGroup(id) {
-			ids = append(ids, id)
-		}
-	}
-	return enterpriseUniqueGroupIDs(ids)
 }
 
 type EnterpriseListFilters struct{ Search, Status string }

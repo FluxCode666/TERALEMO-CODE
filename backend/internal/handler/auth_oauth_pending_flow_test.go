@@ -57,6 +57,7 @@ func assertAuthEnterpriseResponse(t *testing.T, raw []byte, envelope bool, ident
 	want := *identity
 	if !want.BalanceVisible {
 		want.Balance = nil
+		want.FrozenBalance = nil
 	}
 	wantJSON, err := json.Marshal(want)
 	require.NoError(t, err)

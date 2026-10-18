@@ -38,7 +38,6 @@ type enterpriseManagementAPI interface {
 	ResetQuota(context.Context, service.EnterpriseActor, int64, string, int64, []string) error
 	GetAllowedGroups(context.Context, service.EnterpriseActor, int64) ([]service.Group, error)
 	SetAllowedGroups(context.Context, service.EnterpriseActor, int64, []int64) error
-	GetEffectiveGroups(context.Context, service.EnterpriseActor, int64, int64) (*service.EnterpriseEffectiveGroups, error)
 	ListGroupWhitelists(context.Context, service.EnterpriseActor, int64) ([]service.EnterpriseGroupWhitelist, error)
 	SetGroupWhitelist(context.Context, service.EnterpriseActor, int64, string, int64, []int64) error
 	GetSettings(context.Context, service.EnterpriseActor, int64) (service.EnterpriseSettings, error)
@@ -97,7 +96,6 @@ func (h *EnterpriseHandler) registerResources(g *gin.RouterGroup, admin bool) {
 	g.PUT("/quotas/:scopeType/:scopeId", h.bind(admin, h.updateQuota))
 	g.POST("/quotas/:scopeType/:scopeId/reset", h.bind(admin, h.resetQuota))
 	g.GET("/group-whitelists", h.bind(admin, h.whitelists))
-	g.GET("/group-whitelists/effective", h.bind(admin, h.effectiveGroups))
 	g.PUT("/group-whitelists/:scopeType/:scopeId", h.bind(admin, h.setWhitelist))
 	g.GET("/audit-logs", h.bind(admin, h.auditLogs))
 	h.registerUsageRoutes(g, admin)
@@ -545,18 +543,4 @@ func (h *EnterpriseHandler) overview(c *gin.Context, a service.EnterpriseActor, 
 	}
 	out.Stats = dto.EnterpriseOverviewStats{TodayCost: today, MonthCost: month}
 	response.Success(c, out)
-}
-
-func (h *EnterpriseHandler) effectiveGroups(c *gin.Context, a service.EnterpriseActor, id int64) {
-	var memberID int64
-	if raw, exists := c.GetQuery("member_id"); exists {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			response.BadRequest(c, "Invalid member_id")
-			return
-		}
-		memberID = value
-	}
-	item, err := h.management.GetEffectiveGroups(c.Request.Context(), a, id, memberID)
-	enterpriseSuccess(c, item, err)
 }

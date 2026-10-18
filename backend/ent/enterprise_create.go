@@ -114,6 +114,20 @@ func (_c *EnterpriseCreate) SetNillableBalance(v *float64) *EnterpriseCreate {
 	return _c
 }
 
+// SetFrozenBalance sets the "frozen_balance" field.
+func (_c *EnterpriseCreate) SetFrozenBalance(v float64) *EnterpriseCreate {
+	_c.mutation.SetFrozenBalance(v)
+	return _c
+}
+
+// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
+func (_c *EnterpriseCreate) SetNillableFrozenBalance(v *float64) *EnterpriseCreate {
+	if v != nil {
+		_c.SetFrozenBalance(*v)
+	}
+	return _c
+}
+
 // SetTotalRecharged sets the "total_recharged" field.
 func (_c *EnterpriseCreate) SetTotalRecharged(v float64) *EnterpriseCreate {
 	_c.mutation.SetTotalRecharged(v)
@@ -290,6 +304,10 @@ func (_c *EnterpriseCreate) defaults() error {
 		v := enterprise.DefaultBalance
 		_c.mutation.SetBalance(v)
 	}
+	if _, ok := _c.mutation.FrozenBalance(); !ok {
+		v := enterprise.DefaultFrozenBalance
+		_c.mutation.SetFrozenBalance(v)
+	}
 	if _, ok := _c.mutation.TotalRecharged(); !ok {
 		v := enterprise.DefaultTotalRecharged
 		_c.mutation.SetTotalRecharged(v)
@@ -349,6 +367,9 @@ func (_c *EnterpriseCreate) check() error {
 	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "Enterprise.balance"`)}
+	}
+	if _, ok := _c.mutation.FrozenBalance(); !ok {
+		return &ValidationError{Name: "frozen_balance", err: errors.New(`ent: missing required field "Enterprise.frozen_balance"`)}
 	}
 	if _, ok := _c.mutation.TotalRecharged(); !ok {
 		return &ValidationError{Name: "total_recharged", err: errors.New(`ent: missing required field "Enterprise.total_recharged"`)}
@@ -437,6 +458,10 @@ func (_c *EnterpriseCreate) createSpec() (*Enterprise, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)
 		_node.Balance = value
+	}
+	if value, ok := _c.mutation.FrozenBalance(); ok {
+		_spec.SetField(enterprise.FieldFrozenBalance, field.TypeFloat64, value)
+		_node.FrozenBalance = value
 	}
 	if value, ok := _c.mutation.TotalRecharged(); ok {
 		_spec.SetField(enterprise.FieldTotalRecharged, field.TypeFloat64, value)
@@ -619,6 +644,24 @@ func (u *EnterpriseUpsert) UpdateBalance() *EnterpriseUpsert {
 // AddBalance adds v to the "balance" field.
 func (u *EnterpriseUpsert) AddBalance(v float64) *EnterpriseUpsert {
 	u.Add(enterprise.FieldBalance, v)
+	return u
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (u *EnterpriseUpsert) SetFrozenBalance(v float64) *EnterpriseUpsert {
+	u.Set(enterprise.FieldFrozenBalance, v)
+	return u
+}
+
+// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
+func (u *EnterpriseUpsert) UpdateFrozenBalance() *EnterpriseUpsert {
+	u.SetExcluded(enterprise.FieldFrozenBalance)
+	return u
+}
+
+// AddFrozenBalance adds v to the "frozen_balance" field.
+func (u *EnterpriseUpsert) AddFrozenBalance(v float64) *EnterpriseUpsert {
+	u.Add(enterprise.FieldFrozenBalance, v)
 	return u
 }
 
@@ -864,6 +907,27 @@ func (u *EnterpriseUpsertOne) AddBalance(v float64) *EnterpriseUpsertOne {
 func (u *EnterpriseUpsertOne) UpdateBalance() *EnterpriseUpsertOne {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateBalance()
+	})
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (u *EnterpriseUpsertOne) SetFrozenBalance(v float64) *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetFrozenBalance(v)
+	})
+}
+
+// AddFrozenBalance adds v to the "frozen_balance" field.
+func (u *EnterpriseUpsertOne) AddFrozenBalance(v float64) *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.AddFrozenBalance(v)
+	})
+}
+
+// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
+func (u *EnterpriseUpsertOne) UpdateFrozenBalance() *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateFrozenBalance()
 	})
 }
 
@@ -1292,6 +1356,27 @@ func (u *EnterpriseUpsertBulk) AddBalance(v float64) *EnterpriseUpsertBulk {
 func (u *EnterpriseUpsertBulk) UpdateBalance() *EnterpriseUpsertBulk {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateBalance()
+	})
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (u *EnterpriseUpsertBulk) SetFrozenBalance(v float64) *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetFrozenBalance(v)
+	})
+}
+
+// AddFrozenBalance adds v to the "frozen_balance" field.
+func (u *EnterpriseUpsertBulk) AddFrozenBalance(v float64) *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.AddFrozenBalance(v)
+	})
+}
+
+// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
+func (u *EnterpriseUpsertBulk) UpdateFrozenBalance() *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateFrozenBalance()
 	})
 }
 

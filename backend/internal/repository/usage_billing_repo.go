@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 
@@ -13,11 +15,18 @@ import (
 )
 
 type usageBillingRepository struct {
-	db *sql.DB
+	db              *sql.DB
+	enterpriseCache service.EnterpriseBillingCache
 }
 
 func NewUsageBillingRepository(_ *dbent.Client, sqlDB *sql.DB) service.UsageBillingRepository {
 	return &usageBillingRepository{db: sqlDB}
+}
+
+// ProvideUsageBillingRepository installs cache invalidation for every batch path,
+// including recovery workers. The basic constructor remains useful in tests.
+func ProvideUsageBillingRepository(_ *dbent.Client, db *sql.DB, cache service.EnterpriseBillingCache) service.UsageBillingRepository {
+	return &usageBillingRepository{db: db, enterpriseCache: cache}
 }
 
 func (r *usageBillingRepository) Apply(ctx context.Context, cmd *service.UsageBillingCommand) (_ *service.UsageBillingApplyResult, err error) {
@@ -111,21 +120,22 @@ func (r *usageBillingRepository) claimUsageBillingRequest(ctx context.Context, t
 }
 
 func (r *usageBillingRepository) ReserveBatchImageBalance(ctx context.Context, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
-	return r.applyBatchImageBalanceHold(ctx, cmd, reserveUsageBillingBatchImageBalance)
+	return r.applyBatchImageBalanceHold(ctx, cmd, reserveUsageBillingBatchImageBalance, "reserve")
 }
 
 func (r *usageBillingRepository) CaptureBatchImageBalance(ctx context.Context, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
-	return r.applyBatchImageBalanceHold(ctx, cmd, captureUsageBillingBatchImageBalance)
+	return r.applyBatchImageBalanceHold(ctx, cmd, captureUsageBillingBatchImageBalance, "capture")
 }
 
 func (r *usageBillingRepository) ReleaseBatchImageBalance(ctx context.Context, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
-	return r.applyBatchImageBalanceHold(ctx, cmd, releaseUsageBillingBatchImageBalance)
+	return r.applyBatchImageBalanceHold(ctx, cmd, releaseUsageBillingBatchImageBalance, "release")
 }
 
 func (r *usageBillingRepository) applyBatchImageBalanceHold(
 	ctx context.Context,
 	cmd *service.BatchImageBalanceHoldCommand,
 	apply func(context.Context, *sql.Tx, *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error),
+	operation string,
 ) (_ *service.BatchImageBalanceHoldResult, err error) {
 	if cmd == nil {
 		return &service.BatchImageBalanceHoldResult{}, nil
@@ -133,7 +143,21 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 	if r == nil || r.db == nil {
 		return nil, errors.New("usage billing repository db is nil")
 	}
+	if cmd.EnterpriseID != 0 && (cmd.EnterpriseID < 0 || cmd.EnterpriseMemberID <= 0 || cmd.EnterpriseDepartmentID < 0 ||
+		cmd.HoldAmount < 0 || cmd.ActualAmount < 0 || math.IsNaN(cmd.HoldAmount) || math.IsNaN(cmd.ActualAmount) || math.IsInf(cmd.HoldAmount, 0) || math.IsInf(cmd.ActualAmount, 0)) {
+		return nil, service.ErrBillingServiceUnavailable
+	}
+	if cmd.EnterpriseID > 0 && operation == "capture" && cmd.ActualAmount-cmd.HoldAmount > 0.00000001 {
+		return nil, service.ErrBatchImageSettlementCostExceedsHold
+	}
 	cmd.Normalize()
+	// Preserve the original fingerprint while using the wallet's NUMERIC(20,8)
+	// scale consistently for both sides of each transfer and quota increments.
+	if cmd.EnterpriseID > 0 {
+		cmd.HoldAmount = service.QuantizeUsageBillingAmount(cmd.HoldAmount)
+		cmd.ActualAmount = service.QuantizeUsageBillingAmount(cmd.ActualAmount)
+		defer r.invalidateBatchImageEnterpriseCache(ctx, cmd, operation == "capture")
+	}
 	if cmd.RequestID == "" {
 		return nil, service.ErrUsageBillingRequestIDRequired
 	}
@@ -156,6 +180,31 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 		return &service.BatchImageBalanceHoldResult{Applied: false}, nil
 	}
 
+	if cmd.EnterpriseID > 0 && operation != "reserve" {
+		if cmd.HoldAmount > 0 {
+			held, err := batchImageHoldClaimExists(ctx, tx, service.BatchImageHoldRequestID(cmd.BatchID), cmd.APIKeyID)
+			if err != nil {
+				return nil, err
+			}
+			if !held {
+				if operation == "capture" {
+					return nil, errors.New("batch image hold was never reserved")
+				}
+				return &service.BatchImageBalanceHoldResult{}, nil
+			}
+		}
+		// Capture and release share a terminal claim so they cannot both consume
+		// this job's hold from the enterprise's aggregate frozen pool.
+		terminalFingerprint := fmt.Sprintf("%d|%d|%d|%d|%.8f", cmd.UserID, cmd.EnterpriseID, cmd.EnterpriseDepartmentID, cmd.EnterpriseMemberID, cmd.HoldAmount)
+		finalized, err := r.claimUsageBillingRequest(ctx, tx, "batch_image_finalize:"+cmd.BatchID, cmd.APIKeyID,
+			fmt.Sprintf("%x", sha256.Sum256([]byte(terminalFingerprint))))
+		if err != nil {
+			return nil, err
+		}
+		if !finalized {
+			return &service.BatchImageBalanceHoldResult{Applied: false}, nil
+		}
+	}
 	result, err := apply(ctx, tx, cmd)
 	if err != nil {
 		return nil, err
@@ -301,6 +350,9 @@ func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, am
 }
 
 func reserveUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
+	if cmd.EnterpriseID > 0 {
+		return reserveUsageBillingBatchImageEnterpriseBalance(ctx, tx, cmd)
+	}
 	if cmd.HoldAmount <= 0 {
 		return &service.BatchImageBalanceHoldResult{}, nil
 	}
@@ -328,6 +380,9 @@ func reserveUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *
 }
 
 func captureUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
+	if cmd.EnterpriseID > 0 {
+		return captureUsageBillingBatchImageEnterpriseBalance(ctx, tx, cmd)
+	}
 	if cmd.HoldAmount <= 0 && cmd.ActualAmount <= 0 {
 		return &service.BatchImageBalanceHoldResult{}, nil
 	}
@@ -360,6 +415,9 @@ func captureUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *
 }
 
 func releaseUsageBillingBatchImageBalance(ctx context.Context, tx *sql.Tx, cmd *service.BatchImageBalanceHoldCommand) (*service.BatchImageBalanceHoldResult, error) {
+	if cmd.EnterpriseID > 0 {
+		return releaseUsageBillingBatchImageEnterpriseBalance(ctx, tx, cmd)
+	}
 	if cmd.HoldAmount <= 0 {
 		return &service.BatchImageBalanceHoldResult{}, nil
 	}

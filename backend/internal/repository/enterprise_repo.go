@@ -17,14 +17,14 @@ func NewEnterpriseRepository(client *dbent.Client) service.EnterpriseRepository 
 	return &enterpriseRepository{client: client}
 }
 
-const enterpriseSelectColumns = `e.id, e.name, e.status, e.balance, e.total_recharged, e.low_balance_threshold,
+const enterpriseSelectColumns = `e.id, e.name, e.status, e.balance, e.frozen_balance, e.total_recharged, e.low_balance_threshold,
  e.contact_name, e.contact_email, e.contact_phone, e.notes, e.settings, e.group_pool_configured, e.created_at, e.updated_at, e.deleted_at,
  (SELECT COUNT(*) FROM enterprise_members m WHERE m.enterprise_id = e.id AND m.deleted_at IS NULL),
  (SELECT COUNT(*) FROM enterprise_departments d WHERE d.enterprise_id = e.id AND d.deleted_at IS NULL)`
 
 func enterpriseScan(s enterpriseScanner, e *service.Enterprise) error {
 	var settings []byte
-	if err := s.Scan(&e.ID, &e.Name, &e.Status, &e.Balance, &e.TotalRecharged, &e.LowBalanceThreshold,
+	if err := s.Scan(&e.ID, &e.Name, &e.Status, &e.Balance, &e.FrozenBalance, &e.TotalRecharged, &e.LowBalanceThreshold,
 		&e.ContactName, &e.ContactEmail, &e.ContactPhone, &e.Notes, &settings, &e.GroupPoolConfigured, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
 		&e.MemberCount, &e.DepartmentCount); err != nil {
 		return err
@@ -49,7 +49,7 @@ func (r *enterpriseRepository) Create(ctx context.Context, e *service.Enterprise
 		return enterpriseCreateQuota(ctx, client, e.ID, service.EnterpriseScopeEnterprise, e.ID)
 	})
 	if err == nil {
-		e.Balance, e.TotalRecharged = 0, 0
+		e.Balance, e.FrozenBalance, e.TotalRecharged = 0, 0, 0
 	}
 	return err
 }
@@ -91,6 +91,9 @@ func (r *enterpriseRepository) Delete(ctx context.Context, id int64) error {
 		}
 		if count != 0 {
 			return service.ErrEnterpriseNotEmpty
+		}
+		if err := enterpriseRequireNoFrozenBalance(ctx, client, id); err != nil {
+			return err
 		}
 		queries := []string{
 			`UPDATE enterprise_departments SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND deleted_at IS NULL`,

@@ -20,8 +20,8 @@ func TestAuthSuccessUserEnterpriseUsesSharedResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	balance := 42.5
 	for _, identity := range []*service.EnterpriseIdentity{nil,
-		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active", Balance: &balance},
-		{ID: 2, Name: "Acme", Role: "owner", BalanceVisible: true, Balance: &balance, MemberStatus: "active", EnterpriseStatus: "active"},
+		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active", FrozenBalance: &balance, Balance: &balance},
+		{ID: 2, Name: "Acme", Role: "owner", BalanceVisible: true, FrozenBalance: &balance, Balance: &balance, MemberStatus: "active", EnterpriseStatus: "active"},
 	} {
 		for _, path := range []string{"register", "login"} {
 			t.Run(path, func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestAuthSuccessUserEnterpriseUsesSharedResponse(t *testing.T) {
 
 func TestAuthTokenFallbackAndOAuthResponsesIncludeEnterprise(t *testing.T) {
 	balance := 19.5
-	identity := &service.EnterpriseIdentity{ID: 3, Name: "Acme", Role: "member", Balance: &balance}
+	identity := &service.EnterpriseIdentity{ID: 3, Name: "Acme", Role: "member", FrozenBalance: &balance, Balance: &balance}
 	user := &service.User{ID: 11, Email: "response@example.com", Role: service.RoleUser, Status: service.StatusActive}
 	cfg := &config.Config{JWT: config.JWTConfig{Secret: "auth-response-secret", ExpireHour: 1}}
 	// Missing refresh storage deliberately exercises the legacy token fallback.

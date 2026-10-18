@@ -14,6 +14,9 @@ func (r *enterpriseRepository) Dissolve(ctx context.Context, enterpriseID int64)
 		if err := enterpriseRequireEnterprise(ctx, client, enterpriseID, true); err != nil {
 			return err
 		}
+		if err := enterpriseRequireNoFrozenBalance(ctx, client, enterpriseID); err != nil {
+			return err
+		}
 		queries := []string{
 			`UPDATE enterprise_members SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND deleted_at IS NULL`,
 			`UPDATE enterprise_quotas SET deleted_at = NOW(), updated_at = NOW() WHERE enterprise_id = $1 AND deleted_at IS NULL`,
@@ -31,4 +34,16 @@ func (r *enterpriseRepository) Dissolve(ctx context.Context, enterpriseID int64)
 		}
 		return nil
 	})
+}
+
+// The caller holds the enterprise row lock, serializing this check with holds.
+func enterpriseRequireNoFrozenBalance(ctx context.Context, client *dbent.Client, id int64) error {
+	var frozen float64
+	if err := enterpriseQueryOne(ctx, client, `SELECT frozen_balance FROM enterprises WHERE id = $1`, []any{id}, func(s enterpriseScanner) error { return s.Scan(&frozen) }); err != nil {
+		return err
+	}
+	if frozen > 0 {
+		return service.ErrEnterpriseFrozenBalancePending
+	}
+	return nil
 }

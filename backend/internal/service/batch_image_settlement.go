@@ -250,8 +250,19 @@ func (s *BatchImageSettlementService) failExhaustedSettlement(ctx context.Contex
 }
 
 func (s *BatchImageSettlementService) recordUsageLog(ctx context.Context, job *BatchImageJob, actualCost float64, requestID string, createdAt time.Time) {
-	if s == nil || s.UsageLogRepo == nil || job == nil || job.APIKeyID == nil || job.AccountID == nil {
+	// Enterprise logs commit with capture; personal historical jobs keep their
+	// existing best-effort logging behavior.
+	if s == nil || s.UsageLogRepo == nil || job == nil || job.EnterpriseID != nil {
 		return
+	}
+	if log := buildBatchImageUsageLog(job, actualCost, requestID, createdAt); log != nil {
+		writeUsageLogBestEffort(ctx, s.UsageLogRepo, log, "service.batch_image_settlement")
+	}
+}
+
+func buildBatchImageUsageLog(job *BatchImageJob, actualCost float64, requestID string, createdAt time.Time) *UsageLog {
+	if job == nil || job.APIKeyID == nil || job.AccountID == nil {
+		return nil
 	}
 	billingMode := string(BillingModeImage)
 	accountRateMultiplier := job.AccountRateMultiplier
@@ -280,10 +291,15 @@ func (s *BatchImageSettlementService) recordUsageLog(ctx context.Context, job *B
 		SessionID:             job.SessionID,
 		CreatedAt:             createdAt,
 	}
-	// These jobs froze a personal wallet at submission. Current membership must
-	// never reassign their capture/release or historical usage to an enterprise.
-	ApplyUsageLogPayerIdentity(usageLog, 0, 0)
-	writeUsageLogBestEffort(ctx, s.UsageLogRepo, usageLog, "service.batch_image_settlement")
+	var enterpriseID, departmentID int64
+	if job.EnterpriseID != nil {
+		enterpriseID = *job.EnterpriseID
+	}
+	if job.EnterpriseDepartmentID != nil {
+		departmentID = *job.EnterpriseDepartmentID
+	}
+	ApplyUsageLogPayerIdentity(usageLog, enterpriseID, departmentID)
+	return usageLog
 }
 
 func (s *BatchImageSettlementService) invalidateAuthCache(ctx context.Context, userID int64) {

@@ -12,6 +12,7 @@ type Enterprise struct {
 	Name                string                     `json:"name"`
 	Status              string                     `json:"status"`
 	Balance             float64                    `json:"balance"`
+	FrozenBalance       float64                    `json:"frozen_balance"`
 	TotalRecharged      float64                    `json:"total_recharged"`
 	LowBalanceThreshold *float64                   `json:"low_balance_threshold"`
 	ContactName         string                     `json:"contact_name"`
@@ -31,7 +32,7 @@ func EnterpriseFromService(e *service.Enterprise) *Enterprise {
 	if e == nil {
 		return nil
 	}
-	return &Enterprise{ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, ActiveOwnerCount: e.ActiveOwnerCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
+	return &Enterprise{ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, FrozenBalance: e.FrozenBalance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, ActiveOwnerCount: e.ActiveOwnerCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
 }
 
 type EnterpriseDepartment struct {
@@ -198,6 +199,7 @@ type EnterpriseOverview struct {
 	Me                     EnterpriseOverviewMember      `json:"me"`
 	BalanceVisible         bool                          `json:"balance_visible"`
 	Balance                *float64                      `json:"balance"`
+	FrozenBalance          *float64                      `json:"frozen_balance"`
 	EnterpriseQuota        *EnterpriseQuota              `json:"enterprise_quota"`
 	DepartmentQuotaVisible bool                          `json:"department_quota_visible"`
 	DepartmentQuota        *EnterpriseQuota              `json:"department_quota"`
@@ -231,5 +233,5 @@ func EnterpriseOverviewFromService(o *service.EnterpriseOverviewData) *Enterpris
 		return nil
 	}
 	member := EnterpriseMemberFromService(o.Me)
-	return &EnterpriseOverview{Enterprise: EnterpriseOverviewCompany{ID: o.Enterprise.ID, Name: o.Enterprise.Name, Status: o.Enterprise.Status}, Me: EnterpriseOverviewMember{MemberID: member.ID, UserID: member.UserID, Role: member.Role, Status: member.Status, DepartmentID: member.DepartmentID, DepartmentName: member.DepartmentName, Title: member.Title}, BalanceVisible: o.BalanceVisible, Balance: o.Balance, EnterpriseQuota: EnterpriseQuotaFromService(o.EnterpriseQuota), DepartmentQuotaVisible: o.DepartmentQuotaVisible, DepartmentQuota: EnterpriseQuotaFromService(o.DepartmentQuota), MemberQuotaVisible: o.MemberQuotaVisible, MemberQuota: EnterpriseQuotaFromService(o.MemberQuota), Settings: o.Settings, Permissions: o.Permissions}
+	return &EnterpriseOverview{Enterprise: EnterpriseOverviewCompany{ID: o.Enterprise.ID, Name: o.Enterprise.Name, Status: o.Enterprise.Status}, Me: EnterpriseOverviewMember{MemberID: member.ID, UserID: member.UserID, Role: member.Role, Status: member.Status, DepartmentID: member.DepartmentID, DepartmentName: member.DepartmentName, Title: member.Title}, BalanceVisible: o.BalanceVisible, Balance: o.Balance, FrozenBalance: o.FrozenBalance, EnterpriseQuota: EnterpriseQuotaFromService(o.EnterpriseQuota), DepartmentQuotaVisible: o.DepartmentQuotaVisible, DepartmentQuota: EnterpriseQuotaFromService(o.DepartmentQuota), MemberQuotaVisible: o.MemberQuotaVisible, MemberQuota: EnterpriseQuotaFromService(o.MemberQuota), Settings: o.Settings, Permissions: o.Permissions}
 }

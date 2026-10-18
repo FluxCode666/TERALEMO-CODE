@@ -25,6 +25,7 @@ func readAuthEnterpriseIdentity(ctx context.Context, reader enterpriseIdentityRe
 	copy := *identity
 	if !copy.BalanceVisible {
 		copy.Balance = nil
+		copy.FrozenBalance = nil
 	}
 	return &copy, nil
 }

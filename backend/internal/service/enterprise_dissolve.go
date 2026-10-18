@@ -27,6 +27,9 @@ func (s *EnterpriseService) deleteEnterprise(ctx context.Context, a EnterpriseAc
 	}
 	var userIDs []int64
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, _ *EnterpriseMemberContext) error {
+		if e.FrozenBalance > 0 {
+			return ErrEnterpriseFrozenBalancePending
+		}
 		var err error
 		userIDs, err = s.enterprises.ListMemberUserIDs(ctx, id)
 		if err != nil {

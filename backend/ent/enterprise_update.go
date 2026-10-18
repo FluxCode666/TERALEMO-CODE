@@ -119,6 +119,27 @@ func (_u *EnterpriseUpdate) AddBalance(v float64) *EnterpriseUpdate {
 	return _u
 }
 
+// SetFrozenBalance sets the "frozen_balance" field.
+func (_u *EnterpriseUpdate) SetFrozenBalance(v float64) *EnterpriseUpdate {
+	_u.mutation.ResetFrozenBalance()
+	_u.mutation.SetFrozenBalance(v)
+	return _u
+}
+
+// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
+func (_u *EnterpriseUpdate) SetNillableFrozenBalance(v *float64) *EnterpriseUpdate {
+	if v != nil {
+		_u.SetFrozenBalance(*v)
+	}
+	return _u
+}
+
+// AddFrozenBalance adds value to the "frozen_balance" field.
+func (_u *EnterpriseUpdate) AddFrozenBalance(v float64) *EnterpriseUpdate {
+	_u.mutation.AddFrozenBalance(v)
+	return _u
+}
+
 // SetTotalRecharged sets the "total_recharged" field.
 func (_u *EnterpriseUpdate) SetTotalRecharged(v float64) *EnterpriseUpdate {
 	_u.mutation.ResetTotalRecharged()
@@ -386,6 +407,12 @@ func (_u *EnterpriseUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.AddedBalance(); ok {
 		_spec.AddField(enterprise.FieldBalance, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.FrozenBalance(); ok {
+		_spec.SetField(enterprise.FieldFrozenBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFrozenBalance(); ok {
+		_spec.AddField(enterprise.FieldFrozenBalance, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.TotalRecharged(); ok {
 		_spec.SetField(enterprise.FieldTotalRecharged, field.TypeFloat64, value)
 	}
@@ -579,6 +606,27 @@ func (_u *EnterpriseUpdateOne) SetNillableBalance(v *float64) *EnterpriseUpdateO
 // AddBalance adds value to the "balance" field.
 func (_u *EnterpriseUpdateOne) AddBalance(v float64) *EnterpriseUpdateOne {
 	_u.mutation.AddBalance(v)
+	return _u
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (_u *EnterpriseUpdateOne) SetFrozenBalance(v float64) *EnterpriseUpdateOne {
+	_u.mutation.ResetFrozenBalance()
+	_u.mutation.SetFrozenBalance(v)
+	return _u
+}
+
+// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
+func (_u *EnterpriseUpdateOne) SetNillableFrozenBalance(v *float64) *EnterpriseUpdateOne {
+	if v != nil {
+		_u.SetFrozenBalance(*v)
+	}
+	return _u
+}
+
+// AddFrozenBalance adds value to the "frozen_balance" field.
+func (_u *EnterpriseUpdateOne) AddFrozenBalance(v float64) *EnterpriseUpdateOne {
+	_u.mutation.AddFrozenBalance(v)
 	return _u
 }
 
@@ -878,6 +926,12 @@ func (_u *EnterpriseUpdateOne) sqlSave(ctx context.Context) (_node *Enterprise, 
 	}
 	if value, ok := _u.mutation.AddedBalance(); ok {
 		_spec.AddField(enterprise.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.FrozenBalance(); ok {
+		_spec.SetField(enterprise.FieldFrozenBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFrozenBalance(); ok {
+		_spec.AddField(enterprise.FieldFrozenBalance, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.TotalRecharged(); ok {
 		_spec.SetField(enterprise.FieldTotalRecharged, field.TypeFloat64, value)

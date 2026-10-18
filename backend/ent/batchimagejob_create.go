@@ -34,6 +34,48 @@ func (_c *BatchImageJobCreate) SetUserID(v int64) *BatchImageJobCreate {
 	return _c
 }
 
+// SetEnterpriseID sets the "enterprise_id" field.
+func (_c *BatchImageJobCreate) SetEnterpriseID(v int64) *BatchImageJobCreate {
+	_c.mutation.SetEnterpriseID(v)
+	return _c
+}
+
+// SetNillableEnterpriseID sets the "enterprise_id" field if the given value is not nil.
+func (_c *BatchImageJobCreate) SetNillableEnterpriseID(v *int64) *BatchImageJobCreate {
+	if v != nil {
+		_c.SetEnterpriseID(*v)
+	}
+	return _c
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (_c *BatchImageJobCreate) SetEnterpriseDepartmentID(v int64) *BatchImageJobCreate {
+	_c.mutation.SetEnterpriseDepartmentID(v)
+	return _c
+}
+
+// SetNillableEnterpriseDepartmentID sets the "enterprise_department_id" field if the given value is not nil.
+func (_c *BatchImageJobCreate) SetNillableEnterpriseDepartmentID(v *int64) *BatchImageJobCreate {
+	if v != nil {
+		_c.SetEnterpriseDepartmentID(*v)
+	}
+	return _c
+}
+
+// SetEnterpriseMemberID sets the "enterprise_member_id" field.
+func (_c *BatchImageJobCreate) SetEnterpriseMemberID(v int64) *BatchImageJobCreate {
+	_c.mutation.SetEnterpriseMemberID(v)
+	return _c
+}
+
+// SetNillableEnterpriseMemberID sets the "enterprise_member_id" field if the given value is not nil.
+func (_c *BatchImageJobCreate) SetNillableEnterpriseMemberID(v *int64) *BatchImageJobCreate {
+	if v != nil {
+		_c.SetEnterpriseMemberID(*v)
+	}
+	return _c
+}
+
 // SetAPIKeyID sets the "api_key_id" field.
 func (_c *BatchImageJobCreate) SetAPIKeyID(v int64) *BatchImageJobCreate {
 	_c.mutation.SetAPIKeyID(v)
@@ -787,6 +829,18 @@ func (_c *BatchImageJobCreate) createSpec() (*BatchImageJob, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.UserID(); ok {
 		_spec.SetField(batchimagejob.FieldUserID, field.TypeInt64, value)
 		_node.UserID = value
+	}
+	if value, ok := _c.mutation.EnterpriseID(); ok {
+		_spec.SetField(batchimagejob.FieldEnterpriseID, field.TypeInt64, value)
+		_node.EnterpriseID = &value
+	}
+	if value, ok := _c.mutation.EnterpriseDepartmentID(); ok {
+		_spec.SetField(batchimagejob.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+		_node.EnterpriseDepartmentID = &value
+	}
+	if value, ok := _c.mutation.EnterpriseMemberID(); ok {
+		_spec.SetField(batchimagejob.FieldEnterpriseMemberID, field.TypeInt64, value)
+		_node.EnterpriseMemberID = &value
 	}
 	if value, ok := _c.mutation.APIKeyID(); ok {
 		_spec.SetField(batchimagejob.FieldAPIKeyID, field.TypeInt64, value)
@@ -1677,6 +1731,15 @@ func (u *BatchImageJobUpsertOne) UpdateNewValues() *BatchImageJobUpsertOne {
 	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
 		if _, exists := u.create.mutation.BatchID(); exists {
 			s.SetIgnore(batchimagejob.FieldBatchID)
+		}
+		if _, exists := u.create.mutation.EnterpriseID(); exists {
+			s.SetIgnore(batchimagejob.FieldEnterpriseID)
+		}
+		if _, exists := u.create.mutation.EnterpriseDepartmentID(); exists {
+			s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentID)
+		}
+		if _, exists := u.create.mutation.EnterpriseMemberID(); exists {
+			s.SetIgnore(batchimagejob.FieldEnterpriseMemberID)
 		}
 		if _, exists := u.create.mutation.CreatedAt(); exists {
 			s.SetIgnore(batchimagejob.FieldCreatedAt)
@@ -2674,6 +2737,15 @@ func (u *BatchImageJobUpsertBulk) UpdateNewValues() *BatchImageJobUpsertBulk {
 		for _, b := range u.create.builders {
 			if _, exists := b.mutation.BatchID(); exists {
 				s.SetIgnore(batchimagejob.FieldBatchID)
+			}
+			if _, exists := b.mutation.EnterpriseID(); exists {
+				s.SetIgnore(batchimagejob.FieldEnterpriseID)
+			}
+			if _, exists := b.mutation.EnterpriseDepartmentID(); exists {
+				s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentID)
+			}
+			if _, exists := b.mutation.EnterpriseMemberID(); exists {
+				s.SetIgnore(batchimagejob.FieldEnterpriseMemberID)
 			}
 			if _, exists := b.mutation.CreatedAt(); exists {
 				s.SetIgnore(batchimagejob.FieldCreatedAt)

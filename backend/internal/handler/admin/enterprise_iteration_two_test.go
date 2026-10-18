@@ -15,14 +15,10 @@ import (
 
 type enterpriseIterationManagementStub struct {
 	enterpriseManagementAPI
-	effective func(service.EnterpriseActor, int64, int64) (*service.EnterpriseEffectiveGroups, error)
 }
 
 func (s enterpriseIterationManagementStub) GetEnterprise(_ context.Context, _ service.EnterpriseActor, id int64) (*service.Enterprise, error) {
 	return &service.Enterprise{ID: id}, nil
-}
-func (s enterpriseIterationManagementStub) GetEffectiveGroups(_ context.Context, a service.EnterpriseActor, id, memberID int64) (*service.EnterpriseEffectiveGroups, error) {
-	return s.effective(a, id, memberID)
 }
 
 type enterpriseIterationUsageStub struct {
@@ -52,37 +48,6 @@ func TestEnterpriseUsageSortBothRoutes(t *testing.T) {
 				require.Equal(t, tc.by, usage.params.SortBy)
 				require.Equal(t, tc.order, usage.params.SortOrder)
 				require.Contains(t, w.Body.String(), `"request_type":"ws_v2"`)
-			})
-		}
-	}
-}
-func TestEnterpriseEffectiveGroupsBothRoutes(t *testing.T) {
-	for _, base := range []string{"/api/v1/enterprise", "/api/v1/admin/enterprises/8"} {
-		for _, tc := range []struct {
-			query    string
-			memberID int64
-			status   int
-		}{
-			{"", 0, 200}, {"?member_id=7", 7, 200}, {"?member_id=99", 99, 403}, {"?member_id=0", 0, 400}, {"?member_id=-1", 0, 400}, {"?member_id=abc", 0, 400},
-		} {
-			t.Run(base+tc.query, func(t *testing.T) {
-				called := false
-				mgmt := enterpriseIterationManagementStub{effective: func(a service.EnterpriseActor, id, memberID int64) (*service.EnterpriseEffectiveGroups, error) {
-					called = true
-					require.EqualValues(t, 8, id)
-					require.Equal(t, base == "/api/v1/admin/enterprises/8", a.IsAdmin)
-					require.Equal(t, tc.memberID, memberID)
-					if memberID == 99 {
-						return nil, service.ErrEnterprisePermissionDenied
-					}
-					return &service.EnterpriseEffectiveGroups{MemberID: 7, Groups: []service.EnterpriseEffectiveGroup{}}, nil
-				}}
-				w := enterpriseTestRequest(enterpriseTestHandler(mgmt, "member"), http.MethodGet, base+"/group-whitelists/effective"+tc.query, "")
-				require.Equal(t, tc.status, w.Code, w.Body.String())
-				require.Equal(t, tc.status != 400, called)
-				if tc.status == 403 {
-					require.Contains(t, w.Body.String(), "ENTERPRISE_PERMISSION_DENIED")
-				}
 			})
 		}
 	}

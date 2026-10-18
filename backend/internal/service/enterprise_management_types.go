@@ -65,7 +65,7 @@ type EnterpriseOverviewData struct {
 	Enterprise                                    *Enterprise
 	Me                                            *EnterpriseMember
 	BalanceVisible                                bool
-	Balance                                       *float64
+	Balance, FrozenBalance                        *float64
 	EnterpriseQuota, DepartmentQuota, MemberQuota *EnterpriseQuota
 	DepartmentQuotaVisible, MemberQuotaVisible    bool
 	Settings                                      *EnterpriseSettings
@@ -81,6 +81,7 @@ type EnterpriseIdentity struct {
 	EnterpriseStatus string   `json:"enterprise_status"`
 	BalanceVisible   bool     `json:"balance_visible"`
 	Balance          *float64 `json:"balance"`
+	FrozenBalance    *float64 `json:"frozen_balance"`
 }
 
 type enterpriseManagementUserReader interface {

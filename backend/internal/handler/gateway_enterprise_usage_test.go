@@ -59,6 +59,7 @@ func TestGatewayUsageEnterpriseBalanceVisibilityInAllModes(t *testing.T) {
 					var response map[string]any
 					require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 					require.Equal(t, visible, response["balance_visible"])
+					require.NotContains(t, response, "frozen_balance", "personal /v1/usage does not expose frozen balance")
 					for _, field := range []string{"balance", "remaining"} {
 						require.Contains(t, response, field)
 						if visible {

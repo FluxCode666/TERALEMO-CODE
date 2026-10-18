@@ -194,14 +194,16 @@ type UsageBillingApplyResult struct {
 
 // BatchImageBalanceHoldCommand describes an idempotent balance hold operation.
 type BatchImageBalanceHoldCommand struct {
-	RequestID          string
-	APIKeyID           int64
-	RequestFingerprint string
-	RequestPayloadHash string
-	UserID             int64
-	BatchID            string
-	HoldAmount         float64
-	ActualAmount       float64
+	RequestID                                                string
+	APIKeyID                                                 int64
+	RequestFingerprint                                       string
+	RequestPayloadHash                                       string
+	UserID                                                   int64
+	BatchID                                                  string
+	HoldAmount                                               float64
+	ActualAmount                                             float64
+	EnterpriseID, EnterpriseDepartmentID, EnterpriseMemberID int64
+	UsageLog                                                 *UsageLog // Enterprise capture persists usage in the same transaction.
 }
 
 func (c *BatchImageBalanceHoldCommand) Normalize() {
@@ -229,6 +231,9 @@ func buildBatchImageBalanceHoldFingerprint(c *BatchImageBalanceHoldCommand) stri
 	)
 	if payloadHash := strings.TrimSpace(c.RequestPayloadHash); payloadHash != "" {
 		raw += "|" + payloadHash
+	}
+	if c.EnterpriseID != 0 {
+		raw += fmt.Sprintf("|enterprise:%d|department:%d|member:%d", c.EnterpriseID, c.EnterpriseDepartmentID, c.EnterpriseMemberID)
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

@@ -19,8 +19,8 @@ func TestEnterpriseIdentityOnCurrentUserAndProfile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	visibleBalance := 19.5
 	for _, identity := range []*service.EnterpriseIdentity{nil,
-		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active", Balance: &visibleBalance},
-		{ID: 2, Name: "Acme", Role: "owner", BalanceVisible: true, Balance: &visibleBalance, MemberStatus: "disabled", EnterpriseStatus: "disabled"},
+		{ID: 2, Name: "Acme", Role: "member", MemberStatus: "active", EnterpriseStatus: "active", FrozenBalance: &visibleBalance, Balance: &visibleBalance},
+		{ID: 2, Name: "Acme", Role: "owner", BalanceVisible: true, FrozenBalance: &visibleBalance, Balance: &visibleBalance, MemberStatus: "disabled", EnterpriseStatus: "disabled"},
 	} {
 		for _, currentUser := range []bool{true, false} {
 			repo := &userHandlerRepoStub{user: &service.User{ID: 11, Email: "enterprise@example.com", Role: service.RoleUser, Status: service.StatusActive}}
@@ -48,6 +48,7 @@ func TestEnterpriseIdentityOnCurrentUserAndProfile(t *testing.T) {
 				copy := *identity
 				if !copy.BalanceVisible {
 					copy.Balance = nil
+					copy.FrozenBalance = nil
 				}
 				expected = &copy
 			}

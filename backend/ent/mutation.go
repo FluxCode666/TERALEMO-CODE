@@ -11325,65 +11325,71 @@ func (m *BatchImageItemMutation) ResetEdge(name string) error {
 // BatchImageJobMutation represents an operation that mutates the BatchImageJob nodes in the graph.
 type BatchImageJobMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int64
-	batch_id            *string
-	user_id             *int64
-	adduser_id          *int64
-	api_key_id          *int64
-	addapi_key_id       *int64
-	account_id          *int64
-	addaccount_id       *int64
-	provider            *string
-	model               *string
-	task_name           *string
-	status              *string
-	provider_job_name   *string
-	provider_input_ref  *string
-	provider_output_ref *string
-	gcs_input_uri       *string
-	gcs_output_uri      *string
-	item_count          *int
-	additem_count       *int
-	success_count       *int
-	addsuccess_count    *int
-	fail_count          *int
-	addfail_count       *int
-	cancelled_count     *int
-	addcancelled_count  *int
-	estimated_cost      *float64
-	addestimated_cost   *float64
-	hold_amount         *float64
-	addhold_amount      *float64
-	actual_cost         *float64
-	addactual_cost      *float64
-	currency            *string
-	hold_id             *string
-	idempotency_key     *string
-	request_hash        *string
-	manifest_hash       *string
-	retry_count         *int
-	addretry_count      *int
-	version             *int
-	addversion          *int
-	output_expires_at   *time.Time
-	input_deleted_at    *time.Time
-	output_deleted_at   *time.Time
-	downloaded_at       *time.Time
-	user_deleted_at     *time.Time
-	last_error_code     *string
-	last_error_message  *string
-	created_at          *time.Time
-	updated_at          *time.Time
-	submitted_at        *time.Time
-	started_at          *time.Time
-	finished_at         *time.Time
-	settled_at          *time.Time
-	clearedFields       map[string]struct{}
-	done                bool
-	oldValue            func(context.Context) (*BatchImageJob, error)
-	predicates          []predicate.BatchImageJob
+	op                          Op
+	typ                         string
+	id                          *int64
+	batch_id                    *string
+	user_id                     *int64
+	adduser_id                  *int64
+	enterprise_id               *int64
+	addenterprise_id            *int64
+	enterprise_department_id    *int64
+	addenterprise_department_id *int64
+	enterprise_member_id        *int64
+	addenterprise_member_id     *int64
+	api_key_id                  *int64
+	addapi_key_id               *int64
+	account_id                  *int64
+	addaccount_id               *int64
+	provider                    *string
+	model                       *string
+	task_name                   *string
+	status                      *string
+	provider_job_name           *string
+	provider_input_ref          *string
+	provider_output_ref         *string
+	gcs_input_uri               *string
+	gcs_output_uri              *string
+	item_count                  *int
+	additem_count               *int
+	success_count               *int
+	addsuccess_count            *int
+	fail_count                  *int
+	addfail_count               *int
+	cancelled_count             *int
+	addcancelled_count          *int
+	estimated_cost              *float64
+	addestimated_cost           *float64
+	hold_amount                 *float64
+	addhold_amount              *float64
+	actual_cost                 *float64
+	addactual_cost              *float64
+	currency                    *string
+	hold_id                     *string
+	idempotency_key             *string
+	request_hash                *string
+	manifest_hash               *string
+	retry_count                 *int
+	addretry_count              *int
+	version                     *int
+	addversion                  *int
+	output_expires_at           *time.Time
+	input_deleted_at            *time.Time
+	output_deleted_at           *time.Time
+	downloaded_at               *time.Time
+	user_deleted_at             *time.Time
+	last_error_code             *string
+	last_error_message          *string
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	submitted_at                *time.Time
+	started_at                  *time.Time
+	finished_at                 *time.Time
+	settled_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*BatchImageJob, error)
+	predicates                  []predicate.BatchImageJob
 }
 
 var _ ent.Mutation = (*BatchImageJobMutation)(nil)
@@ -11574,6 +11580,216 @@ func (m *BatchImageJobMutation) AddedUserID() (r int64, exists bool) {
 func (m *BatchImageJobMutation) ResetUserID() {
 	m.user_id = nil
 	m.adduser_id = nil
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (m *BatchImageJobMutation) SetEnterpriseID(i int64) {
+	m.enterprise_id = &i
+	m.addenterprise_id = nil
+}
+
+// EnterpriseID returns the value of the "enterprise_id" field in the mutation.
+func (m *BatchImageJobMutation) EnterpriseID() (r int64, exists bool) {
+	v := m.enterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseID returns the old "enterprise_id" field's value of the BatchImageJob entity.
+// If the BatchImageJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BatchImageJobMutation) OldEnterpriseID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseID: %w", err)
+	}
+	return oldValue.EnterpriseID, nil
+}
+
+// AddEnterpriseID adds i to the "enterprise_id" field.
+func (m *BatchImageJobMutation) AddEnterpriseID(i int64) {
+	if m.addenterprise_id != nil {
+		*m.addenterprise_id += i
+	} else {
+		m.addenterprise_id = &i
+	}
+}
+
+// AddedEnterpriseID returns the value that was added to the "enterprise_id" field in this mutation.
+func (m *BatchImageJobMutation) AddedEnterpriseID() (r int64, exists bool) {
+	v := m.addenterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (m *BatchImageJobMutation) ClearEnterpriseID() {
+	m.enterprise_id = nil
+	m.addenterprise_id = nil
+	m.clearedFields[batchimagejob.FieldEnterpriseID] = struct{}{}
+}
+
+// EnterpriseIDCleared returns if the "enterprise_id" field was cleared in this mutation.
+func (m *BatchImageJobMutation) EnterpriseIDCleared() bool {
+	_, ok := m.clearedFields[batchimagejob.FieldEnterpriseID]
+	return ok
+}
+
+// ResetEnterpriseID resets all changes to the "enterprise_id" field.
+func (m *BatchImageJobMutation) ResetEnterpriseID() {
+	m.enterprise_id = nil
+	m.addenterprise_id = nil
+	delete(m.clearedFields, batchimagejob.FieldEnterpriseID)
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (m *BatchImageJobMutation) SetEnterpriseDepartmentID(i int64) {
+	m.enterprise_department_id = &i
+	m.addenterprise_department_id = nil
+}
+
+// EnterpriseDepartmentID returns the value of the "enterprise_department_id" field in the mutation.
+func (m *BatchImageJobMutation) EnterpriseDepartmentID() (r int64, exists bool) {
+	v := m.enterprise_department_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseDepartmentID returns the old "enterprise_department_id" field's value of the BatchImageJob entity.
+// If the BatchImageJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BatchImageJobMutation) OldEnterpriseDepartmentID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseDepartmentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseDepartmentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseDepartmentID: %w", err)
+	}
+	return oldValue.EnterpriseDepartmentID, nil
+}
+
+// AddEnterpriseDepartmentID adds i to the "enterprise_department_id" field.
+func (m *BatchImageJobMutation) AddEnterpriseDepartmentID(i int64) {
+	if m.addenterprise_department_id != nil {
+		*m.addenterprise_department_id += i
+	} else {
+		m.addenterprise_department_id = &i
+	}
+}
+
+// AddedEnterpriseDepartmentID returns the value that was added to the "enterprise_department_id" field in this mutation.
+func (m *BatchImageJobMutation) AddedEnterpriseDepartmentID() (r int64, exists bool) {
+	v := m.addenterprise_department_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (m *BatchImageJobMutation) ClearEnterpriseDepartmentID() {
+	m.enterprise_department_id = nil
+	m.addenterprise_department_id = nil
+	m.clearedFields[batchimagejob.FieldEnterpriseDepartmentID] = struct{}{}
+}
+
+// EnterpriseDepartmentIDCleared returns if the "enterprise_department_id" field was cleared in this mutation.
+func (m *BatchImageJobMutation) EnterpriseDepartmentIDCleared() bool {
+	_, ok := m.clearedFields[batchimagejob.FieldEnterpriseDepartmentID]
+	return ok
+}
+
+// ResetEnterpriseDepartmentID resets all changes to the "enterprise_department_id" field.
+func (m *BatchImageJobMutation) ResetEnterpriseDepartmentID() {
+	m.enterprise_department_id = nil
+	m.addenterprise_department_id = nil
+	delete(m.clearedFields, batchimagejob.FieldEnterpriseDepartmentID)
+}
+
+// SetEnterpriseMemberID sets the "enterprise_member_id" field.
+func (m *BatchImageJobMutation) SetEnterpriseMemberID(i int64) {
+	m.enterprise_member_id = &i
+	m.addenterprise_member_id = nil
+}
+
+// EnterpriseMemberID returns the value of the "enterprise_member_id" field in the mutation.
+func (m *BatchImageJobMutation) EnterpriseMemberID() (r int64, exists bool) {
+	v := m.enterprise_member_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseMemberID returns the old "enterprise_member_id" field's value of the BatchImageJob entity.
+// If the BatchImageJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BatchImageJobMutation) OldEnterpriseMemberID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseMemberID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseMemberID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseMemberID: %w", err)
+	}
+	return oldValue.EnterpriseMemberID, nil
+}
+
+// AddEnterpriseMemberID adds i to the "enterprise_member_id" field.
+func (m *BatchImageJobMutation) AddEnterpriseMemberID(i int64) {
+	if m.addenterprise_member_id != nil {
+		*m.addenterprise_member_id += i
+	} else {
+		m.addenterprise_member_id = &i
+	}
+}
+
+// AddedEnterpriseMemberID returns the value that was added to the "enterprise_member_id" field in this mutation.
+func (m *BatchImageJobMutation) AddedEnterpriseMemberID() (r int64, exists bool) {
+	v := m.addenterprise_member_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearEnterpriseMemberID clears the value of the "enterprise_member_id" field.
+func (m *BatchImageJobMutation) ClearEnterpriseMemberID() {
+	m.enterprise_member_id = nil
+	m.addenterprise_member_id = nil
+	m.clearedFields[batchimagejob.FieldEnterpriseMemberID] = struct{}{}
+}
+
+// EnterpriseMemberIDCleared returns if the "enterprise_member_id" field was cleared in this mutation.
+func (m *BatchImageJobMutation) EnterpriseMemberIDCleared() bool {
+	_, ok := m.clearedFields[batchimagejob.FieldEnterpriseMemberID]
+	return ok
+}
+
+// ResetEnterpriseMemberID resets all changes to the "enterprise_member_id" field.
+func (m *BatchImageJobMutation) ResetEnterpriseMemberID() {
+	m.enterprise_member_id = nil
+	m.addenterprise_member_id = nil
+	delete(m.clearedFields, batchimagejob.FieldEnterpriseMemberID)
 }
 
 // SetAPIKeyID sets the "api_key_id" field.
@@ -13514,12 +13730,21 @@ func (m *BatchImageJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BatchImageJobMutation) Fields() []string {
-	fields := make([]string, 0, 40)
+	fields := make([]string, 0, 43)
 	if m.batch_id != nil {
 		fields = append(fields, batchimagejob.FieldBatchID)
 	}
 	if m.user_id != nil {
 		fields = append(fields, batchimagejob.FieldUserID)
+	}
+	if m.enterprise_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseID)
+	}
+	if m.enterprise_department_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseDepartmentID)
+	}
+	if m.enterprise_member_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseMemberID)
 	}
 	if m.api_key_id != nil {
 		fields = append(fields, batchimagejob.FieldAPIKeyID)
@@ -13647,6 +13872,12 @@ func (m *BatchImageJobMutation) Field(name string) (ent.Value, bool) {
 		return m.BatchID()
 	case batchimagejob.FieldUserID:
 		return m.UserID()
+	case batchimagejob.FieldEnterpriseID:
+		return m.EnterpriseID()
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		return m.EnterpriseDepartmentID()
+	case batchimagejob.FieldEnterpriseMemberID:
+		return m.EnterpriseMemberID()
 	case batchimagejob.FieldAPIKeyID:
 		return m.APIKeyID()
 	case batchimagejob.FieldAccountID:
@@ -13736,6 +13967,12 @@ func (m *BatchImageJobMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldBatchID(ctx)
 	case batchimagejob.FieldUserID:
 		return m.OldUserID(ctx)
+	case batchimagejob.FieldEnterpriseID:
+		return m.OldEnterpriseID(ctx)
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		return m.OldEnterpriseDepartmentID(ctx)
+	case batchimagejob.FieldEnterpriseMemberID:
+		return m.OldEnterpriseMemberID(ctx)
 	case batchimagejob.FieldAPIKeyID:
 		return m.OldAPIKeyID(ctx)
 	case batchimagejob.FieldAccountID:
@@ -13834,6 +14071,27 @@ func (m *BatchImageJobMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUserID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseDepartmentID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseMemberID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseMemberID(v)
 		return nil
 	case batchimagejob.FieldAPIKeyID:
 		v, ok := value.(int64)
@@ -14112,6 +14370,15 @@ func (m *BatchImageJobMutation) AddedFields() []string {
 	if m.adduser_id != nil {
 		fields = append(fields, batchimagejob.FieldUserID)
 	}
+	if m.addenterprise_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseID)
+	}
+	if m.addenterprise_department_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseDepartmentID)
+	}
+	if m.addenterprise_member_id != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseMemberID)
+	}
 	if m.addapi_key_id != nil {
 		fields = append(fields, batchimagejob.FieldAPIKeyID)
 	}
@@ -14155,6 +14422,12 @@ func (m *BatchImageJobMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case batchimagejob.FieldUserID:
 		return m.AddedUserID()
+	case batchimagejob.FieldEnterpriseID:
+		return m.AddedEnterpriseID()
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		return m.AddedEnterpriseDepartmentID()
+	case batchimagejob.FieldEnterpriseMemberID:
+		return m.AddedEnterpriseMemberID()
 	case batchimagejob.FieldAPIKeyID:
 		return m.AddedAPIKeyID()
 	case batchimagejob.FieldAccountID:
@@ -14192,6 +14465,27 @@ func (m *BatchImageJobMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddUserID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEnterpriseID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEnterpriseDepartmentID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseMemberID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEnterpriseMemberID(v)
 		return nil
 	case batchimagejob.FieldAPIKeyID:
 		v, ok := value.(int64)
@@ -14278,6 +14572,15 @@ func (m *BatchImageJobMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *BatchImageJobMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(batchimagejob.FieldEnterpriseID) {
+		fields = append(fields, batchimagejob.FieldEnterpriseID)
+	}
+	if m.FieldCleared(batchimagejob.FieldEnterpriseDepartmentID) {
+		fields = append(fields, batchimagejob.FieldEnterpriseDepartmentID)
+	}
+	if m.FieldCleared(batchimagejob.FieldEnterpriseMemberID) {
+		fields = append(fields, batchimagejob.FieldEnterpriseMemberID)
+	}
 	if m.FieldCleared(batchimagejob.FieldAPIKeyID) {
 		fields = append(fields, batchimagejob.FieldAPIKeyID)
 	}
@@ -14364,6 +14667,15 @@ func (m *BatchImageJobMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *BatchImageJobMutation) ClearField(name string) error {
 	switch name {
+	case batchimagejob.FieldEnterpriseID:
+		m.ClearEnterpriseID()
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		m.ClearEnterpriseDepartmentID()
+		return nil
+	case batchimagejob.FieldEnterpriseMemberID:
+		m.ClearEnterpriseMemberID()
+		return nil
 	case batchimagejob.FieldAPIKeyID:
 		m.ClearAPIKeyID()
 		return nil
@@ -14449,6 +14761,15 @@ func (m *BatchImageJobMutation) ResetField(name string) error {
 		return nil
 	case batchimagejob.FieldUserID:
 		m.ResetUserID()
+		return nil
+	case batchimagejob.FieldEnterpriseID:
+		m.ResetEnterpriseID()
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentID:
+		m.ResetEnterpriseDepartmentID()
+		return nil
+	case batchimagejob.FieldEnterpriseMemberID:
+		m.ResetEnterpriseMemberID()
 		return nil
 	case batchimagejob.FieldAPIKeyID:
 		m.ResetAPIKeyID()
@@ -20787,6 +21108,8 @@ type EnterpriseMutation struct {
 	group_pool_configured    *bool
 	balance                  *float64
 	addbalance               *float64
+	frozen_balance           *float64
+	addfrozen_balance        *float64
 	total_recharged          *float64
 	addtotal_recharged       *float64
 	low_balance_threshold    *float64
@@ -21188,6 +21511,62 @@ func (m *EnterpriseMutation) ResetBalance() {
 	m.addbalance = nil
 }
 
+// SetFrozenBalance sets the "frozen_balance" field.
+func (m *EnterpriseMutation) SetFrozenBalance(f float64) {
+	m.frozen_balance = &f
+	m.addfrozen_balance = nil
+}
+
+// FrozenBalance returns the value of the "frozen_balance" field in the mutation.
+func (m *EnterpriseMutation) FrozenBalance() (r float64, exists bool) {
+	v := m.frozen_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFrozenBalance returns the old "frozen_balance" field's value of the Enterprise entity.
+// If the Enterprise object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseMutation) OldFrozenBalance(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFrozenBalance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFrozenBalance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFrozenBalance: %w", err)
+	}
+	return oldValue.FrozenBalance, nil
+}
+
+// AddFrozenBalance adds f to the "frozen_balance" field.
+func (m *EnterpriseMutation) AddFrozenBalance(f float64) {
+	if m.addfrozen_balance != nil {
+		*m.addfrozen_balance += f
+	} else {
+		m.addfrozen_balance = &f
+	}
+}
+
+// AddedFrozenBalance returns the value that was added to the "frozen_balance" field in this mutation.
+func (m *EnterpriseMutation) AddedFrozenBalance() (r float64, exists bool) {
+	v := m.addfrozen_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFrozenBalance resets all changes to the "frozen_balance" field.
+func (m *EnterpriseMutation) ResetFrozenBalance() {
+	m.frozen_balance = nil
+	m.addfrozen_balance = nil
+}
+
 // SetTotalRecharged sets the "total_recharged" field.
 func (m *EnterpriseMutation) SetTotalRecharged(f float64) {
 	m.total_recharged = &f
@@ -21582,7 +21961,7 @@ func (m *EnterpriseMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, enterprise.FieldCreatedAt)
 	}
@@ -21603,6 +21982,9 @@ func (m *EnterpriseMutation) Fields() []string {
 	}
 	if m.balance != nil {
 		fields = append(fields, enterprise.FieldBalance)
+	}
+	if m.frozen_balance != nil {
+		fields = append(fields, enterprise.FieldFrozenBalance)
 	}
 	if m.total_recharged != nil {
 		fields = append(fields, enterprise.FieldTotalRecharged)
@@ -21647,6 +22029,8 @@ func (m *EnterpriseMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupPoolConfigured()
 	case enterprise.FieldBalance:
 		return m.Balance()
+	case enterprise.FieldFrozenBalance:
+		return m.FrozenBalance()
 	case enterprise.FieldTotalRecharged:
 		return m.TotalRecharged()
 	case enterprise.FieldLowBalanceThreshold:
@@ -21684,6 +22068,8 @@ func (m *EnterpriseMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldGroupPoolConfigured(ctx)
 	case enterprise.FieldBalance:
 		return m.OldBalance(ctx)
+	case enterprise.FieldFrozenBalance:
+		return m.OldFrozenBalance(ctx)
 	case enterprise.FieldTotalRecharged:
 		return m.OldTotalRecharged(ctx)
 	case enterprise.FieldLowBalanceThreshold:
@@ -21756,6 +22142,13 @@ func (m *EnterpriseMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBalance(v)
 		return nil
+	case enterprise.FieldFrozenBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFrozenBalance(v)
+		return nil
 	case enterprise.FieldTotalRecharged:
 		v, ok := value.(float64)
 		if !ok {
@@ -21816,6 +22209,9 @@ func (m *EnterpriseMutation) AddedFields() []string {
 	if m.addbalance != nil {
 		fields = append(fields, enterprise.FieldBalance)
 	}
+	if m.addfrozen_balance != nil {
+		fields = append(fields, enterprise.FieldFrozenBalance)
+	}
 	if m.addtotal_recharged != nil {
 		fields = append(fields, enterprise.FieldTotalRecharged)
 	}
@@ -21832,6 +22228,8 @@ func (m *EnterpriseMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case enterprise.FieldBalance:
 		return m.AddedBalance()
+	case enterprise.FieldFrozenBalance:
+		return m.AddedFrozenBalance()
 	case enterprise.FieldTotalRecharged:
 		return m.AddedTotalRecharged()
 	case enterprise.FieldLowBalanceThreshold:
@@ -21851,6 +22249,13 @@ func (m *EnterpriseMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddBalance(v)
+		return nil
+	case enterprise.FieldFrozenBalance:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFrozenBalance(v)
 		return nil
 	case enterprise.FieldTotalRecharged:
 		v, ok := value.(float64)
@@ -21928,6 +22333,9 @@ func (m *EnterpriseMutation) ResetField(name string) error {
 		return nil
 	case enterprise.FieldBalance:
 		m.ResetBalance()
+		return nil
+	case enterprise.FieldFrozenBalance:
+		m.ResetFrozenBalance()
 		return nil
 	case enterprise.FieldTotalRecharged:
 		m.ResetTotalRecharged()

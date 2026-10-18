@@ -90,6 +90,11 @@ func Balance(v float64) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldBalance, v))
 }
 
+// FrozenBalance applies equality check predicate on the "frozen_balance" field. It's identical to FrozenBalanceEQ.
+func FrozenBalance(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldFrozenBalance, v))
+}
+
 // TotalRecharged applies equality check predicate on the "total_recharged" field. It's identical to TotalRechargedEQ.
 func TotalRecharged(v float64) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldTotalRecharged, v))
@@ -428,6 +433,46 @@ func BalanceLT(v float64) predicate.Enterprise {
 // BalanceLTE applies the LTE predicate on the "balance" field.
 func BalanceLTE(v float64) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldLTE(FieldBalance, v))
+}
+
+// FrozenBalanceEQ applies the EQ predicate on the "frozen_balance" field.
+func FrozenBalanceEQ(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldFrozenBalance, v))
+}
+
+// FrozenBalanceNEQ applies the NEQ predicate on the "frozen_balance" field.
+func FrozenBalanceNEQ(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNEQ(FieldFrozenBalance, v))
+}
+
+// FrozenBalanceIn applies the In predicate on the "frozen_balance" field.
+func FrozenBalanceIn(vs ...float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldIn(FieldFrozenBalance, vs...))
+}
+
+// FrozenBalanceNotIn applies the NotIn predicate on the "frozen_balance" field.
+func FrozenBalanceNotIn(vs ...float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNotIn(FieldFrozenBalance, vs...))
+}
+
+// FrozenBalanceGT applies the GT predicate on the "frozen_balance" field.
+func FrozenBalanceGT(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldGT(FieldFrozenBalance, v))
+}
+
+// FrozenBalanceGTE applies the GTE predicate on the "frozen_balance" field.
+func FrozenBalanceGTE(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldGTE(FieldFrozenBalance, v))
+}
+
+// FrozenBalanceLT applies the LT predicate on the "frozen_balance" field.
+func FrozenBalanceLT(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldLT(FieldFrozenBalance, v))
+}
+
+// FrozenBalanceLTE applies the LTE predicate on the "frozen_balance" field.
+func FrozenBalanceLTE(v float64) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldLTE(FieldFrozenBalance, v))
 }
 
 // TotalRechargedEQ applies the EQ predicate on the "total_recharged" field.
