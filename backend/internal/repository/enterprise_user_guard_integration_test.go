@@ -140,3 +140,57 @@ func TestEnterpriseConcurrentAccountOwnerDisableRetainsOneOwner(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 1, count)
 }
+
+// 编辑企业负责人账号时，守卫事务会锁住 users 行；并发调整记录与分组倍率由各自仓储写入，
+// 它们的外键检查不能被守卫的行锁阻塞，否则请求会一直等到超时（曾表现为 30 秒后 500）。
+func TestEnterpriseGuardedUserUpdateWithForeignKeySideWritesDoesNotBlock(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	e, err := client.Enterprise.Create().SetName(fmt.Sprintf("enterprise-guard-fk-%d", time.Now().UnixNano())).Save(ctx)
+	require.NoError(t, err)
+	u, err := client.User.Create().SetEmail(fmt.Sprintf("enterprise-guard-fk-%d@example.com", e.ID)).SetPasswordHash("hash").SetRole(service.RoleUser).SetStatus(service.StatusActive).SetConcurrency(5).Save(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		for _, stmt := range []string{
+			`DELETE FROM redeem_codes WHERE used_by = $1`,
+			`DELETE FROM user_group_rate_multipliers WHERE user_id = $1`,
+			`DELETE FROM enterprise_members WHERE user_id = $1`,
+			`DELETE FROM users WHERE id = $1`,
+		} {
+			_, cleanupErr := integrationDB.ExecContext(context.Background(), stmt, u.ID)
+			require.NoError(t, cleanupErr)
+		}
+		_, cleanupErr := integrationDB.ExecContext(context.Background(), `DELETE FROM enterprises WHERE id = $1`, e.ID)
+		require.NoError(t, cleanupErr)
+	})
+	_, err = client.EnterpriseMember.Create().SetEnterpriseID(e.ID).SetUserID(u.ID).SetRole(service.EnterpriseRoleOwner).Save(ctx)
+	require.NoError(t, err)
+	groupID := enterpriseGroupFixture(t, client)
+
+	admin := service.NewAdminService(nil, NewUserRepository(client, integrationDB), nil, nil, nil, nil,
+		NewRedeemCodeRepository(client), NewUserGroupRateRepository(integrationDB), nil, nil, nil, nil, nil, client, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	admin.(interface {
+		SetEnterpriseUserGuard(service.EnterpriseMemberRepository)
+	}).SetEnterpriseUserGuard(NewEnterpriseMemberRepository(client))
+
+	callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	concurrency := 8
+	rate := 1.5
+	notes := "edited by admin"
+	updated, err := admin.UpdateUser(callCtx, u.ID, &service.UpdateUserInput{
+		Role:        service.RoleUser,
+		Notes:       &notes,
+		Concurrency: &concurrency,
+		GroupRates:  map[int64]*float64{groupID: &rate},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 8, updated.Concurrency)
+
+	var adjustments int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM redeem_codes WHERE used_by = $1 AND type = $2`, u.ID, service.AdjustmentTypeAdminConcurrency).Scan(&adjustments))
+	require.Equal(t, 1, adjustments)
+	var storedRate float64
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT rate_multiplier FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = $2`, u.ID, groupID).Scan(&storedRate))
+	require.InDelta(t, 1.5, storedRate, 1e-9)
+}

@@ -73,7 +73,9 @@ func (s *adminServiceImpl) enterpriseUserGuardAttempt(ctx context.Context, userI
 		}
 	}
 	if tx := dbent.TxFromContext(ctx); tx != nil {
-		rows, err := tx.Client().QueryContext(ctx, `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, userID)
+		// FOR NO KEY UPDATE 仍与其他守卫及成员写入互斥，但不阻塞引用 users 的外键检查（FOR KEY SHARE）：
+		// 账号更新期间由其他仓储写入的并发调整记录、分组倍率等不会因此等到超时。
+		rows, err := tx.Client().QueryContext(ctx, `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE`, userID)
 		if err != nil {
 			return err
 		}
