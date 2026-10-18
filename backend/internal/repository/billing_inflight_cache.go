@@ -201,8 +201,43 @@ func (c *billingCache) ReleaseInflightScope(ctx context.Context, scope, requestI
 	return releaseInflightBalanceScript.Run(ctx, c.rdb, []string{zkey, hkey}, requestID).Err()
 }
 
+// KEYS: reservation ZSET/HASH, enterprise balance, balance loaded_at.
+// The balance read, expired-reservation cleanup, sum and admission are atomic
+// with settlement's cached balance deduction. Unlike personal legacy admission,
+// an enterprise's first reservation must also fit its available balance.
+var reserveEnterpriseInflightScript = redis.NewScript(`
+ local balance=tonumber(redis.call('GET',KEYS[3]) or '')
+ local loaded=tonumber(redis.call('GET',KEYS[4]) or '0')
+ local now=tonumber(ARGV[1])
+ if not balance or loaded==0 or now-loaded>=tonumber(ARGV[6]) then return -1 end
+ local expired=redis.call('ZRANGEBYSCORE',KEYS[1],'-inf',now)
+ if #expired>0 then
+  redis.call('ZREMRANGEBYSCORE',KEYS[1],'-inf',now)
+  redis.call('HDEL',KEYS[2],unpack(expired))
+ end
+ local pending=0
+ for _,value in ipairs(redis.call('HVALS',KEYS[2])) do pending=pending+tonumber(value) end
+ local own=tonumber(redis.call('HGET',KEYS[2],ARGV[3]) or '0')
+ if balance-pending+own<tonumber(ARGV[4]) then return 0 end
+ redis.call('ZADD',KEYS[1],ARGV[2],ARGV[3])
+ redis.call('HSET',KEYS[2],ARGV[3],ARGV[4])
+ redis.call('PEXPIRE',KEYS[1],ARGV[5])
+ redis.call('PEXPIRE',KEYS[2],ARGV[5])
+ return 1
+`)
+
+func (c *billingCache) ReserveEnterpriseInflight(ctx context.Context, enterpriseID int64, requestID string, amount float64, ttl time.Duration) (bool, bool, error) {
+	zkey, hkey := billingInflightScopeKeys("ent:" + strconv.FormatInt(enterpriseID, 10))
+	key := enterpriseBillingBalanceKey(enterpriseID)
+	now := time.Now().UnixMilli()
+	ttlMs := max(ttl.Milliseconds(), 1)
+	result, err := reserveEnterpriseInflightScript.Run(ctx, c.rdb, []string{zkey, hkey, key, enterpriseBillingLoadedAtKey(key)}, now, now+ttlMs, requestID, amount, ttlMs, enterpriseBillingMaxFreshness.Milliseconds()).Int64()
+	return result != -1, result == 1, err
+}
+
 var (
-	_ service.InflightBalanceReservationCache   = (*billingCache)(nil)
-	_ service.InflightBalanceReservationRenewer = (*billingCache)(nil)
-	_ service.InflightScopeReservationCache     = (*billingCache)(nil)
+	_ service.InflightBalanceReservationCache    = (*billingCache)(nil)
+	_ service.InflightBalanceReservationRenewer  = (*billingCache)(nil)
+	_ service.InflightScopeReservationCache      = (*billingCache)(nil)
+	_ service.EnterpriseInflightReservationCache = (*billingCache)(nil)
 )

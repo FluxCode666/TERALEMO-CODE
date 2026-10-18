@@ -177,7 +177,7 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id int64) (*service.User, error) {
-	m, err := r.client.User.Query().Where(dbuser.IDEQ(id)).Only(ctx)
+	m, err := clientFromContext(ctx, r.client).User.Query().Where(dbuser.IDEQ(id)).Only(ctx)
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
@@ -211,7 +211,7 @@ func (r *userRepository) GetByIDIncludeDeleted(ctx context.Context, id int64) (*
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service.User, error) {
-	matches, err := r.client.User.Query().
+	matches, err := clientFromContext(ctx, r.client).User.Query().
 		Where(userEmailLookupPredicate(email)).
 		Order(dbent.Asc(dbuser.FieldID)).
 		All(ctx)
@@ -246,23 +246,26 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 		return nil
 	}
 
-	// 使用 ent 事务包裹用户更新与 allowed_groups 同步，避免跨层事务不一致。
-	tx, err := r.client.Tx(ctx)
-	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
-		return err
-	}
-
+	// Reuse the caller's transaction before attempting to start one. A plain
+	// client can start a second transaction even when ctx contains a Tx; doing
+	// that here would detach owner protection and wait on our own user row lock.
+	var tx *dbent.Tx
 	var txClient *dbent.Client
 	txCtx := ctx
-	if err == nil {
-		defer func() { _ = tx.Rollback() }()
-		txClient = tx.Client()
-		txCtx = dbent.NewTxContext(ctx, tx)
+	if existingTx := dbent.TxFromContext(ctx); existingTx != nil {
+		txClient = existingTx.Client()
 	} else {
-		// 已处于外部事务中（ErrTxStarted），复用当前事务 client 并由调用方负责提交/回滚。
-		if existingTx := dbent.TxFromContext(ctx); existingTx != nil {
-			txClient = existingTx.Client()
+		var err error
+		tx, err = r.client.Tx(ctx)
+		if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+			return err
+		}
+		if err == nil {
+			defer func() { _ = tx.Rollback() }()
+			txClient = tx.Client()
+			txCtx = dbent.NewTxContext(ctx, tx)
 		} else {
+			// A transaction client without Tx context remains supported.
 			txClient = r.client
 		}
 	}
@@ -531,6 +534,14 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	}
 
 	q := r.client.User.Query()
+	if filters.EnterpriseID > 0 {
+		q = q.Where(func(s *entsql.Selector) {
+			members := entsql.Table("enterprise_members")
+			s.Where(entsql.Exists(entsql.Select(members.C("user_id")).From(members).
+				Where(entsql.And(entsql.ColumnsEQ(members.C("user_id"), s.C("id")),
+					entsql.EQ(members.C("enterprise_id"), filters.EnterpriseID), entsql.IsNull(members.C("deleted_at"))))))
+		})
+	}
 
 	if filters.Status != "" {
 		q = q.Where(dbuser.StatusEQ(filters.Status))
@@ -1077,13 +1088,24 @@ func (r *userRepository) BatchSetConcurrency(ctx context.Context, userIDs []int6
 	if value < 0 {
 		value = 0
 	}
-	res, err := r.sql.ExecContext(ctx,
+	// Join an outer Ent transaction (enterprise settings + members + audit).
+	// The regular administrator batch path continues using its SQL executor.
+	var executor interface {
+		ExecContext(context.Context, string, ...any) (sql.Result, error)
+	} = r.sql
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		executor = tx.Client()
+	}
+	res, err := executor.ExecContext(ctx,
 		"UPDATE users SET concurrency = $1, updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
 		value, pq.Array(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch set concurrency: %w", err)
 	}
-	affected, _ := res.RowsAffected()
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("batch set concurrency affected rows: %w", err)
+	}
 	return int(affected), nil
 }
 
@@ -1449,7 +1471,7 @@ func (r *userRepository) loadAllowedGroups(ctx context.Context, userIDs []int64)
 		return out, nil
 	}
 
-	rows, err := r.client.UserAllowedGroup.Query().
+	rows, err := clientFromContext(ctx, r.client).UserAllowedGroup.Query().
 		Where(userallowedgroup.UserIDIn(userIDs...)).
 		All(ctx)
 	if err != nil {

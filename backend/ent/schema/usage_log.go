@@ -31,6 +31,9 @@ func (UsageLog) Annotations() []schema.Annotation {
 // Fields 定义使用日志实体的所有字段。
 func (UsageLog) Fields() []ent.Field {
 	return []ent.Field{
+		// 企业归属使用调用时的快照；历史记录为空，不随成员调动变化。
+		field.Int64("enterprise_id").Optional().Nillable(),
+		field.Int64("enterprise_department_id").Optional().Nillable(),
 		// 关联字段
 		field.Int64("user_id"),
 		field.Int64("api_key_id"),
@@ -221,6 +224,8 @@ func (UsageLog) Edges() []ent.Edge {
 // Indexes 定义数据库索引，优化查询性能。
 func (UsageLog) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("enterprise_id", "created_at").StorageKey("idx_usage_logs_enterprise_created").Annotations(entsql.IndexWhere("enterprise_id IS NOT NULL")),
+		index.Fields("enterprise_department_id", "created_at").StorageKey("idx_usage_logs_enterprise_department_created").Annotations(entsql.IndexWhere("enterprise_department_id IS NOT NULL")),
 		index.Fields("user_id"),
 		index.Fields("api_key_id"),
 		index.Fields("account_id"),

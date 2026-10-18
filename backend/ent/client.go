@@ -30,6 +30,15 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorrequesttemplate"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
+	"github.com/Wei-Shaw/sub2api/ent/enterprise"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseallowedgroup"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseauditlog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -93,6 +102,24 @@ type Client struct {
 	ChannelMonitorRequestTemplate *ChannelMonitorRequestTemplateClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
+	// Enterprise is the client for interacting with the Enterprise builders.
+	Enterprise *EnterpriseClient
+	// EnterpriseAllowedGroup is the client for interacting with the EnterpriseAllowedGroup builders.
+	EnterpriseAllowedGroup *EnterpriseAllowedGroupClient
+	// EnterpriseAuditLog is the client for interacting with the EnterpriseAuditLog builders.
+	EnterpriseAuditLog *EnterpriseAuditLogClient
+	// EnterpriseBalanceLog is the client for interacting with the EnterpriseBalanceLog builders.
+	EnterpriseBalanceLog *EnterpriseBalanceLogClient
+	// EnterpriseDepartment is the client for interacting with the EnterpriseDepartment builders.
+	EnterpriseDepartment *EnterpriseDepartmentClient
+	// EnterpriseGroupWhitelist is the client for interacting with the EnterpriseGroupWhitelist builders.
+	EnterpriseGroupWhitelist *EnterpriseGroupWhitelistClient
+	// EnterpriseGroupWhitelistScope is the client for interacting with the EnterpriseGroupWhitelistScope builders.
+	EnterpriseGroupWhitelistScope *EnterpriseGroupWhitelistScopeClient
+	// EnterpriseMember is the client for interacting with the EnterpriseMember builders.
+	EnterpriseMember *EnterpriseMemberClient
+	// EnterpriseQuota is the client for interacting with the EnterpriseQuota builders.
+	EnterpriseQuota *EnterpriseQuotaClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
 	ErrorPassthroughRule *ErrorPassthroughRuleClient
 	// Group is the client for interacting with the Group builders.
@@ -167,6 +194,15 @@ func (c *Client) init() {
 	c.ChannelMonitorHistory = NewChannelMonitorHistoryClient(c.config)
 	c.ChannelMonitorRequestTemplate = NewChannelMonitorRequestTemplateClient(c.config)
 	c.CompositeModelRoute = NewCompositeModelRouteClient(c.config)
+	c.Enterprise = NewEnterpriseClient(c.config)
+	c.EnterpriseAllowedGroup = NewEnterpriseAllowedGroupClient(c.config)
+	c.EnterpriseAuditLog = NewEnterpriseAuditLogClient(c.config)
+	c.EnterpriseBalanceLog = NewEnterpriseBalanceLogClient(c.config)
+	c.EnterpriseDepartment = NewEnterpriseDepartmentClient(c.config)
+	c.EnterpriseGroupWhitelist = NewEnterpriseGroupWhitelistClient(c.config)
+	c.EnterpriseGroupWhitelistScope = NewEnterpriseGroupWhitelistScopeClient(c.config)
+	c.EnterpriseMember = NewEnterpriseMemberClient(c.config)
+	c.EnterpriseQuota = NewEnterpriseQuotaClient(c.config)
 	c.ErrorPassthroughRule = NewErrorPassthroughRuleClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
@@ -298,6 +334,15 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
 		ChannelMonitorRequestTemplate: NewChannelMonitorRequestTemplateClient(cfg),
 		CompositeModelRoute:           NewCompositeModelRouteClient(cfg),
+		Enterprise:                    NewEnterpriseClient(cfg),
+		EnterpriseAllowedGroup:        NewEnterpriseAllowedGroupClient(cfg),
+		EnterpriseAuditLog:            NewEnterpriseAuditLogClient(cfg),
+		EnterpriseBalanceLog:          NewEnterpriseBalanceLogClient(cfg),
+		EnterpriseDepartment:          NewEnterpriseDepartmentClient(cfg),
+		EnterpriseGroupWhitelist:      NewEnterpriseGroupWhitelistClient(cfg),
+		EnterpriseGroupWhitelistScope: NewEnterpriseGroupWhitelistScopeClient(cfg),
+		EnterpriseMember:              NewEnterpriseMemberClient(cfg),
+		EnterpriseQuota:               NewEnterpriseQuotaClient(cfg),
 		ErrorPassthroughRule:          NewErrorPassthroughRuleClient(cfg),
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
@@ -356,6 +401,15 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
 		ChannelMonitorRequestTemplate: NewChannelMonitorRequestTemplateClient(cfg),
 		CompositeModelRoute:           NewCompositeModelRouteClient(cfg),
+		Enterprise:                    NewEnterpriseClient(cfg),
+		EnterpriseAllowedGroup:        NewEnterpriseAllowedGroupClient(cfg),
+		EnterpriseAuditLog:            NewEnterpriseAuditLogClient(cfg),
+		EnterpriseBalanceLog:          NewEnterpriseBalanceLogClient(cfg),
+		EnterpriseDepartment:          NewEnterpriseDepartmentClient(cfg),
+		EnterpriseGroupWhitelist:      NewEnterpriseGroupWhitelistClient(cfg),
+		EnterpriseGroupWhitelistScope: NewEnterpriseGroupWhitelistScopeClient(cfg),
+		EnterpriseMember:              NewEnterpriseMemberClient(cfg),
+		EnterpriseQuota:               NewEnterpriseQuotaClient(cfg),
 		ErrorPassthroughRule:          NewErrorPassthroughRuleClient(cfg),
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
@@ -413,12 +467,15 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
 		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
+		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
+		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
+		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -433,12 +490,15 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
 		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
+		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
+		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
+		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -478,6 +538,24 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ChannelMonitorRequestTemplate.mutate(ctx, m)
 	case *CompositeModelRouteMutation:
 		return c.CompositeModelRoute.mutate(ctx, m)
+	case *EnterpriseMutation:
+		return c.Enterprise.mutate(ctx, m)
+	case *EnterpriseAllowedGroupMutation:
+		return c.EnterpriseAllowedGroup.mutate(ctx, m)
+	case *EnterpriseAuditLogMutation:
+		return c.EnterpriseAuditLog.mutate(ctx, m)
+	case *EnterpriseBalanceLogMutation:
+		return c.EnterpriseBalanceLog.mutate(ctx, m)
+	case *EnterpriseDepartmentMutation:
+		return c.EnterpriseDepartment.mutate(ctx, m)
+	case *EnterpriseGroupWhitelistMutation:
+		return c.EnterpriseGroupWhitelist.mutate(ctx, m)
+	case *EnterpriseGroupWhitelistScopeMutation:
+		return c.EnterpriseGroupWhitelistScope.mutate(ctx, m)
+	case *EnterpriseMemberMutation:
+		return c.EnterpriseMember.mutate(ctx, m)
+	case *EnterpriseQuotaMutation:
+		return c.EnterpriseQuota.mutate(ctx, m)
 	case *ErrorPassthroughRuleMutation:
 		return c.ErrorPassthroughRule.mutate(ctx, m)
 	case *GroupMutation:
@@ -2883,6 +2961,1338 @@ func (c *CompositeModelRouteClient) mutate(ctx context.Context, m *CompositeMode
 	}
 }
 
+// EnterpriseClient is a client for the Enterprise schema.
+type EnterpriseClient struct {
+	config
+}
+
+// NewEnterpriseClient returns a client for the Enterprise from the given config.
+func NewEnterpriseClient(c config) *EnterpriseClient {
+	return &EnterpriseClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprise.Hooks(f(g(h())))`.
+func (c *EnterpriseClient) Use(hooks ...Hook) {
+	c.hooks.Enterprise = append(c.hooks.Enterprise, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprise.Intercept(f(g(h())))`.
+func (c *EnterpriseClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Enterprise = append(c.inters.Enterprise, interceptors...)
+}
+
+// Create returns a builder for creating a Enterprise entity.
+func (c *EnterpriseClient) Create() *EnterpriseCreate {
+	mutation := newEnterpriseMutation(c.config, OpCreate)
+	return &EnterpriseCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Enterprise entities.
+func (c *EnterpriseClient) CreateBulk(builders ...*EnterpriseCreate) *EnterpriseCreateBulk {
+	return &EnterpriseCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseClient) MapCreateBulk(slice any, setFunc func(*EnterpriseCreate, int)) *EnterpriseCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseCreateBulk{err: fmt.Errorf("calling to EnterpriseClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Enterprise.
+func (c *EnterpriseClient) Update() *EnterpriseUpdate {
+	mutation := newEnterpriseMutation(c.config, OpUpdate)
+	return &EnterpriseUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseClient) UpdateOne(_m *Enterprise) *EnterpriseUpdateOne {
+	mutation := newEnterpriseMutation(c.config, OpUpdateOne, withEnterprise(_m))
+	return &EnterpriseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseClient) UpdateOneID(id int64) *EnterpriseUpdateOne {
+	mutation := newEnterpriseMutation(c.config, OpUpdateOne, withEnterpriseID(id))
+	return &EnterpriseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Enterprise.
+func (c *EnterpriseClient) Delete() *EnterpriseDelete {
+	mutation := newEnterpriseMutation(c.config, OpDelete)
+	return &EnterpriseDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseClient) DeleteOne(_m *Enterprise) *EnterpriseDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseClient) DeleteOneID(id int64) *EnterpriseDeleteOne {
+	builder := c.Delete().Where(enterprise.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseDeleteOne{builder}
+}
+
+// Query returns a query builder for Enterprise.
+func (c *EnterpriseClient) Query() *EnterpriseQuery {
+	return &EnterpriseQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterprise},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Enterprise entity by its id.
+func (c *EnterpriseClient) Get(ctx context.Context, id int64) (*Enterprise, error) {
+	return c.Query().Where(enterprise.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseClient) GetX(ctx context.Context, id int64) *Enterprise {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAllowedGroups queries the allowed_groups edge of a Enterprise.
+func (c *EnterpriseClient) QueryAllowedGroups(_m *Enterprise) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprise.Table, enterprise.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, enterprise.AllowedGroupsTable, enterprise.AllowedGroupsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryEnterpriseAllowedGroups queries the enterprise_allowed_groups edge of a Enterprise.
+func (c *EnterpriseClient) QueryEnterpriseAllowedGroups(_m *Enterprise) *EnterpriseAllowedGroupQuery {
+	query := (&EnterpriseAllowedGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprise.Table, enterprise.FieldID, id),
+			sqlgraph.To(enterpriseallowedgroup.Table, enterpriseallowedgroup.EnterpriseColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, enterprise.EnterpriseAllowedGroupsTable, enterprise.EnterpriseAllowedGroupsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseClient) Hooks() []Hook {
+	hooks := c.hooks.Enterprise
+	return append(hooks[:len(hooks):len(hooks)], enterprise.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseClient) Interceptors() []Interceptor {
+	inters := c.inters.Enterprise
+	return append(inters[:len(inters):len(inters)], enterprise.Interceptors[:]...)
+}
+
+func (c *EnterpriseClient) mutate(ctx context.Context, m *EnterpriseMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Enterprise mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseAllowedGroupClient is a client for the EnterpriseAllowedGroup schema.
+type EnterpriseAllowedGroupClient struct {
+	config
+}
+
+// NewEnterpriseAllowedGroupClient returns a client for the EnterpriseAllowedGroup from the given config.
+func NewEnterpriseAllowedGroupClient(c config) *EnterpriseAllowedGroupClient {
+	return &EnterpriseAllowedGroupClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterpriseallowedgroup.Hooks(f(g(h())))`.
+func (c *EnterpriseAllowedGroupClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseAllowedGroup = append(c.hooks.EnterpriseAllowedGroup, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterpriseallowedgroup.Intercept(f(g(h())))`.
+func (c *EnterpriseAllowedGroupClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseAllowedGroup = append(c.inters.EnterpriseAllowedGroup, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseAllowedGroup entity.
+func (c *EnterpriseAllowedGroupClient) Create() *EnterpriseAllowedGroupCreate {
+	mutation := newEnterpriseAllowedGroupMutation(c.config, OpCreate)
+	return &EnterpriseAllowedGroupCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseAllowedGroup entities.
+func (c *EnterpriseAllowedGroupClient) CreateBulk(builders ...*EnterpriseAllowedGroupCreate) *EnterpriseAllowedGroupCreateBulk {
+	return &EnterpriseAllowedGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseAllowedGroupClient) MapCreateBulk(slice any, setFunc func(*EnterpriseAllowedGroupCreate, int)) *EnterpriseAllowedGroupCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseAllowedGroupCreateBulk{err: fmt.Errorf("calling to EnterpriseAllowedGroupClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseAllowedGroupCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseAllowedGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseAllowedGroup.
+func (c *EnterpriseAllowedGroupClient) Update() *EnterpriseAllowedGroupUpdate {
+	mutation := newEnterpriseAllowedGroupMutation(c.config, OpUpdate)
+	return &EnterpriseAllowedGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseAllowedGroupClient) UpdateOne(_m *EnterpriseAllowedGroup) *EnterpriseAllowedGroupUpdateOne {
+	mutation := newEnterpriseAllowedGroupMutation(c.config, OpUpdateOne)
+	mutation.enterprise = &_m.EnterpriseID
+	mutation.group = &_m.GroupID
+	return &EnterpriseAllowedGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseAllowedGroup.
+func (c *EnterpriseAllowedGroupClient) Delete() *EnterpriseAllowedGroupDelete {
+	mutation := newEnterpriseAllowedGroupMutation(c.config, OpDelete)
+	return &EnterpriseAllowedGroupDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Query returns a query builder for EnterpriseAllowedGroup.
+func (c *EnterpriseAllowedGroupClient) Query() *EnterpriseAllowedGroupQuery {
+	return &EnterpriseAllowedGroupQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseAllowedGroup},
+		inters: c.Interceptors(),
+	}
+}
+
+// QueryEnterprise queries the enterprise edge of a EnterpriseAllowedGroup.
+func (c *EnterpriseAllowedGroupClient) QueryEnterprise(_m *EnterpriseAllowedGroup) *EnterpriseQuery {
+	return c.Query().
+		Where(enterpriseallowedgroup.EnterpriseID(_m.EnterpriseID), enterpriseallowedgroup.GroupID(_m.GroupID)).
+		QueryEnterprise()
+}
+
+// QueryGroup queries the group edge of a EnterpriseAllowedGroup.
+func (c *EnterpriseAllowedGroupClient) QueryGroup(_m *EnterpriseAllowedGroup) *GroupQuery {
+	return c.Query().
+		Where(enterpriseallowedgroup.EnterpriseID(_m.EnterpriseID), enterpriseallowedgroup.GroupID(_m.GroupID)).
+		QueryGroup()
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseAllowedGroupClient) Hooks() []Hook {
+	return c.hooks.EnterpriseAllowedGroup
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseAllowedGroupClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseAllowedGroup
+}
+
+func (c *EnterpriseAllowedGroupClient) mutate(ctx context.Context, m *EnterpriseAllowedGroupMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseAllowedGroupCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseAllowedGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseAllowedGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseAllowedGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseAllowedGroup mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseAuditLogClient is a client for the EnterpriseAuditLog schema.
+type EnterpriseAuditLogClient struct {
+	config
+}
+
+// NewEnterpriseAuditLogClient returns a client for the EnterpriseAuditLog from the given config.
+func NewEnterpriseAuditLogClient(c config) *EnterpriseAuditLogClient {
+	return &EnterpriseAuditLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterpriseauditlog.Hooks(f(g(h())))`.
+func (c *EnterpriseAuditLogClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseAuditLog = append(c.hooks.EnterpriseAuditLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterpriseauditlog.Intercept(f(g(h())))`.
+func (c *EnterpriseAuditLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseAuditLog = append(c.inters.EnterpriseAuditLog, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseAuditLog entity.
+func (c *EnterpriseAuditLogClient) Create() *EnterpriseAuditLogCreate {
+	mutation := newEnterpriseAuditLogMutation(c.config, OpCreate)
+	return &EnterpriseAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseAuditLog entities.
+func (c *EnterpriseAuditLogClient) CreateBulk(builders ...*EnterpriseAuditLogCreate) *EnterpriseAuditLogCreateBulk {
+	return &EnterpriseAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseAuditLogClient) MapCreateBulk(slice any, setFunc func(*EnterpriseAuditLogCreate, int)) *EnterpriseAuditLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseAuditLogCreateBulk{err: fmt.Errorf("calling to EnterpriseAuditLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseAuditLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseAuditLog.
+func (c *EnterpriseAuditLogClient) Update() *EnterpriseAuditLogUpdate {
+	mutation := newEnterpriseAuditLogMutation(c.config, OpUpdate)
+	return &EnterpriseAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseAuditLogClient) UpdateOne(_m *EnterpriseAuditLog) *EnterpriseAuditLogUpdateOne {
+	mutation := newEnterpriseAuditLogMutation(c.config, OpUpdateOne, withEnterpriseAuditLog(_m))
+	return &EnterpriseAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseAuditLogClient) UpdateOneID(id int64) *EnterpriseAuditLogUpdateOne {
+	mutation := newEnterpriseAuditLogMutation(c.config, OpUpdateOne, withEnterpriseAuditLogID(id))
+	return &EnterpriseAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseAuditLog.
+func (c *EnterpriseAuditLogClient) Delete() *EnterpriseAuditLogDelete {
+	mutation := newEnterpriseAuditLogMutation(c.config, OpDelete)
+	return &EnterpriseAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseAuditLogClient) DeleteOne(_m *EnterpriseAuditLog) *EnterpriseAuditLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseAuditLogClient) DeleteOneID(id int64) *EnterpriseAuditLogDeleteOne {
+	builder := c.Delete().Where(enterpriseauditlog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseAuditLogDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseAuditLog.
+func (c *EnterpriseAuditLogClient) Query() *EnterpriseAuditLogQuery {
+	return &EnterpriseAuditLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseAuditLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseAuditLog entity by its id.
+func (c *EnterpriseAuditLogClient) Get(ctx context.Context, id int64) (*EnterpriseAuditLog, error) {
+	return c.Query().Where(enterpriseauditlog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseAuditLogClient) GetX(ctx context.Context, id int64) *EnterpriseAuditLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseAuditLogClient) Hooks() []Hook {
+	return c.hooks.EnterpriseAuditLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseAuditLogClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseAuditLog
+}
+
+func (c *EnterpriseAuditLogClient) mutate(ctx context.Context, m *EnterpriseAuditLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseAuditLog mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseBalanceLogClient is a client for the EnterpriseBalanceLog schema.
+type EnterpriseBalanceLogClient struct {
+	config
+}
+
+// NewEnterpriseBalanceLogClient returns a client for the EnterpriseBalanceLog from the given config.
+func NewEnterpriseBalanceLogClient(c config) *EnterpriseBalanceLogClient {
+	return &EnterpriseBalanceLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisebalancelog.Hooks(f(g(h())))`.
+func (c *EnterpriseBalanceLogClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseBalanceLog = append(c.hooks.EnterpriseBalanceLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisebalancelog.Intercept(f(g(h())))`.
+func (c *EnterpriseBalanceLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseBalanceLog = append(c.inters.EnterpriseBalanceLog, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseBalanceLog entity.
+func (c *EnterpriseBalanceLogClient) Create() *EnterpriseBalanceLogCreate {
+	mutation := newEnterpriseBalanceLogMutation(c.config, OpCreate)
+	return &EnterpriseBalanceLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseBalanceLog entities.
+func (c *EnterpriseBalanceLogClient) CreateBulk(builders ...*EnterpriseBalanceLogCreate) *EnterpriseBalanceLogCreateBulk {
+	return &EnterpriseBalanceLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseBalanceLogClient) MapCreateBulk(slice any, setFunc func(*EnterpriseBalanceLogCreate, int)) *EnterpriseBalanceLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseBalanceLogCreateBulk{err: fmt.Errorf("calling to EnterpriseBalanceLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseBalanceLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseBalanceLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseBalanceLog.
+func (c *EnterpriseBalanceLogClient) Update() *EnterpriseBalanceLogUpdate {
+	mutation := newEnterpriseBalanceLogMutation(c.config, OpUpdate)
+	return &EnterpriseBalanceLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseBalanceLogClient) UpdateOne(_m *EnterpriseBalanceLog) *EnterpriseBalanceLogUpdateOne {
+	mutation := newEnterpriseBalanceLogMutation(c.config, OpUpdateOne, withEnterpriseBalanceLog(_m))
+	return &EnterpriseBalanceLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseBalanceLogClient) UpdateOneID(id int64) *EnterpriseBalanceLogUpdateOne {
+	mutation := newEnterpriseBalanceLogMutation(c.config, OpUpdateOne, withEnterpriseBalanceLogID(id))
+	return &EnterpriseBalanceLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseBalanceLog.
+func (c *EnterpriseBalanceLogClient) Delete() *EnterpriseBalanceLogDelete {
+	mutation := newEnterpriseBalanceLogMutation(c.config, OpDelete)
+	return &EnterpriseBalanceLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseBalanceLogClient) DeleteOne(_m *EnterpriseBalanceLog) *EnterpriseBalanceLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseBalanceLogClient) DeleteOneID(id int64) *EnterpriseBalanceLogDeleteOne {
+	builder := c.Delete().Where(enterprisebalancelog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseBalanceLogDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseBalanceLog.
+func (c *EnterpriseBalanceLogClient) Query() *EnterpriseBalanceLogQuery {
+	return &EnterpriseBalanceLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseBalanceLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseBalanceLog entity by its id.
+func (c *EnterpriseBalanceLogClient) Get(ctx context.Context, id int64) (*EnterpriseBalanceLog, error) {
+	return c.Query().Where(enterprisebalancelog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseBalanceLogClient) GetX(ctx context.Context, id int64) *EnterpriseBalanceLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseBalanceLogClient) Hooks() []Hook {
+	return c.hooks.EnterpriseBalanceLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseBalanceLogClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseBalanceLog
+}
+
+func (c *EnterpriseBalanceLogClient) mutate(ctx context.Context, m *EnterpriseBalanceLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseBalanceLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseBalanceLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseBalanceLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseBalanceLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseBalanceLog mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseDepartmentClient is a client for the EnterpriseDepartment schema.
+type EnterpriseDepartmentClient struct {
+	config
+}
+
+// NewEnterpriseDepartmentClient returns a client for the EnterpriseDepartment from the given config.
+func NewEnterpriseDepartmentClient(c config) *EnterpriseDepartmentClient {
+	return &EnterpriseDepartmentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisedepartment.Hooks(f(g(h())))`.
+func (c *EnterpriseDepartmentClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseDepartment = append(c.hooks.EnterpriseDepartment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisedepartment.Intercept(f(g(h())))`.
+func (c *EnterpriseDepartmentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseDepartment = append(c.inters.EnterpriseDepartment, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseDepartment entity.
+func (c *EnterpriseDepartmentClient) Create() *EnterpriseDepartmentCreate {
+	mutation := newEnterpriseDepartmentMutation(c.config, OpCreate)
+	return &EnterpriseDepartmentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseDepartment entities.
+func (c *EnterpriseDepartmentClient) CreateBulk(builders ...*EnterpriseDepartmentCreate) *EnterpriseDepartmentCreateBulk {
+	return &EnterpriseDepartmentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseDepartmentClient) MapCreateBulk(slice any, setFunc func(*EnterpriseDepartmentCreate, int)) *EnterpriseDepartmentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseDepartmentCreateBulk{err: fmt.Errorf("calling to EnterpriseDepartmentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseDepartmentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseDepartmentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) Update() *EnterpriseDepartmentUpdate {
+	mutation := newEnterpriseDepartmentMutation(c.config, OpUpdate)
+	return &EnterpriseDepartmentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseDepartmentClient) UpdateOne(_m *EnterpriseDepartment) *EnterpriseDepartmentUpdateOne {
+	mutation := newEnterpriseDepartmentMutation(c.config, OpUpdateOne, withEnterpriseDepartment(_m))
+	return &EnterpriseDepartmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseDepartmentClient) UpdateOneID(id int64) *EnterpriseDepartmentUpdateOne {
+	mutation := newEnterpriseDepartmentMutation(c.config, OpUpdateOne, withEnterpriseDepartmentID(id))
+	return &EnterpriseDepartmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) Delete() *EnterpriseDepartmentDelete {
+	mutation := newEnterpriseDepartmentMutation(c.config, OpDelete)
+	return &EnterpriseDepartmentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseDepartmentClient) DeleteOne(_m *EnterpriseDepartment) *EnterpriseDepartmentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseDepartmentClient) DeleteOneID(id int64) *EnterpriseDepartmentDeleteOne {
+	builder := c.Delete().Where(enterprisedepartment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseDepartmentDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) Query() *EnterpriseDepartmentQuery {
+	return &EnterpriseDepartmentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseDepartment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseDepartment entity by its id.
+func (c *EnterpriseDepartmentClient) Get(ctx context.Context, id int64) (*EnterpriseDepartment, error) {
+	return c.Query().Where(enterprisedepartment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseDepartmentClient) GetX(ctx context.Context, id int64) *EnterpriseDepartment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryEnterprise queries the enterprise edge of a EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) QueryEnterprise(_m *EnterpriseDepartment) *EnterpriseQuery {
+	query := (&EnterpriseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, id),
+			sqlgraph.To(enterprise.Table, enterprise.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, enterprisedepartment.EnterpriseTable, enterprisedepartment.EnterpriseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryParent queries the parent edge of a EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) QueryParent(_m *EnterpriseDepartment) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, id),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, enterprisedepartment.ParentTable, enterprisedepartment.ParentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryChildren queries the children edge of a EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) QueryChildren(_m *EnterpriseDepartment) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, id),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, enterprisedepartment.ChildrenTable, enterprisedepartment.ChildrenColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseDepartmentClient) Hooks() []Hook {
+	hooks := c.hooks.EnterpriseDepartment
+	return append(hooks[:len(hooks):len(hooks)], enterprisedepartment.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseDepartmentClient) Interceptors() []Interceptor {
+	inters := c.inters.EnterpriseDepartment
+	return append(inters[:len(inters):len(inters)], enterprisedepartment.Interceptors[:]...)
+}
+
+func (c *EnterpriseDepartmentClient) mutate(ctx context.Context, m *EnterpriseDepartmentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseDepartmentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseDepartmentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseDepartmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseDepartmentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseDepartment mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseGroupWhitelistClient is a client for the EnterpriseGroupWhitelist schema.
+type EnterpriseGroupWhitelistClient struct {
+	config
+}
+
+// NewEnterpriseGroupWhitelistClient returns a client for the EnterpriseGroupWhitelist from the given config.
+func NewEnterpriseGroupWhitelistClient(c config) *EnterpriseGroupWhitelistClient {
+	return &EnterpriseGroupWhitelistClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisegroupwhitelist.Hooks(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseGroupWhitelist = append(c.hooks.EnterpriseGroupWhitelist, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisegroupwhitelist.Intercept(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseGroupWhitelist = append(c.inters.EnterpriseGroupWhitelist, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseGroupWhitelist entity.
+func (c *EnterpriseGroupWhitelistClient) Create() *EnterpriseGroupWhitelistCreate {
+	mutation := newEnterpriseGroupWhitelistMutation(c.config, OpCreate)
+	return &EnterpriseGroupWhitelistCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseGroupWhitelist entities.
+func (c *EnterpriseGroupWhitelistClient) CreateBulk(builders ...*EnterpriseGroupWhitelistCreate) *EnterpriseGroupWhitelistCreateBulk {
+	return &EnterpriseGroupWhitelistCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseGroupWhitelistClient) MapCreateBulk(slice any, setFunc func(*EnterpriseGroupWhitelistCreate, int)) *EnterpriseGroupWhitelistCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseGroupWhitelistCreateBulk{err: fmt.Errorf("calling to EnterpriseGroupWhitelistClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseGroupWhitelistCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseGroupWhitelistCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseGroupWhitelist.
+func (c *EnterpriseGroupWhitelistClient) Update() *EnterpriseGroupWhitelistUpdate {
+	mutation := newEnterpriseGroupWhitelistMutation(c.config, OpUpdate)
+	return &EnterpriseGroupWhitelistUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseGroupWhitelistClient) UpdateOne(_m *EnterpriseGroupWhitelist) *EnterpriseGroupWhitelistUpdateOne {
+	mutation := newEnterpriseGroupWhitelistMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelist(_m))
+	return &EnterpriseGroupWhitelistUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseGroupWhitelistClient) UpdateOneID(id int64) *EnterpriseGroupWhitelistUpdateOne {
+	mutation := newEnterpriseGroupWhitelistMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelistID(id))
+	return &EnterpriseGroupWhitelistUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseGroupWhitelist.
+func (c *EnterpriseGroupWhitelistClient) Delete() *EnterpriseGroupWhitelistDelete {
+	mutation := newEnterpriseGroupWhitelistMutation(c.config, OpDelete)
+	return &EnterpriseGroupWhitelistDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseGroupWhitelistClient) DeleteOne(_m *EnterpriseGroupWhitelist) *EnterpriseGroupWhitelistDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseGroupWhitelistClient) DeleteOneID(id int64) *EnterpriseGroupWhitelistDeleteOne {
+	builder := c.Delete().Where(enterprisegroupwhitelist.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseGroupWhitelistDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseGroupWhitelist.
+func (c *EnterpriseGroupWhitelistClient) Query() *EnterpriseGroupWhitelistQuery {
+	return &EnterpriseGroupWhitelistQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseGroupWhitelist},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseGroupWhitelist entity by its id.
+func (c *EnterpriseGroupWhitelistClient) Get(ctx context.Context, id int64) (*EnterpriseGroupWhitelist, error) {
+	return c.Query().Where(enterprisegroupwhitelist.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseGroupWhitelistClient) GetX(ctx context.Context, id int64) *EnterpriseGroupWhitelist {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGroup queries the group edge of a EnterpriseGroupWhitelist.
+func (c *EnterpriseGroupWhitelistClient) QueryGroup(_m *EnterpriseGroupWhitelist) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisegroupwhitelist.Table, enterprisegroupwhitelist.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, enterprisegroupwhitelist.GroupTable, enterprisegroupwhitelist.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseGroupWhitelistClient) Hooks() []Hook {
+	return c.hooks.EnterpriseGroupWhitelist
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseGroupWhitelistClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseGroupWhitelist
+}
+
+func (c *EnterpriseGroupWhitelistClient) mutate(ctx context.Context, m *EnterpriseGroupWhitelistMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseGroupWhitelistCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseGroupWhitelistUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseGroupWhitelistUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseGroupWhitelistDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseGroupWhitelist mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseGroupWhitelistScopeClient is a client for the EnterpriseGroupWhitelistScope schema.
+type EnterpriseGroupWhitelistScopeClient struct {
+	config
+}
+
+// NewEnterpriseGroupWhitelistScopeClient returns a client for the EnterpriseGroupWhitelistScope from the given config.
+func NewEnterpriseGroupWhitelistScopeClient(c config) *EnterpriseGroupWhitelistScopeClient {
+	return &EnterpriseGroupWhitelistScopeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisegroupwhitelistscope.Hooks(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistScopeClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseGroupWhitelistScope = append(c.hooks.EnterpriseGroupWhitelistScope, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisegroupwhitelistscope.Intercept(f(g(h())))`.
+func (c *EnterpriseGroupWhitelistScopeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseGroupWhitelistScope = append(c.inters.EnterpriseGroupWhitelistScope, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseGroupWhitelistScope entity.
+func (c *EnterpriseGroupWhitelistScopeClient) Create() *EnterpriseGroupWhitelistScopeCreate {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpCreate)
+	return &EnterpriseGroupWhitelistScopeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseGroupWhitelistScope entities.
+func (c *EnterpriseGroupWhitelistScopeClient) CreateBulk(builders ...*EnterpriseGroupWhitelistScopeCreate) *EnterpriseGroupWhitelistScopeCreateBulk {
+	return &EnterpriseGroupWhitelistScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseGroupWhitelistScopeClient) MapCreateBulk(slice any, setFunc func(*EnterpriseGroupWhitelistScopeCreate, int)) *EnterpriseGroupWhitelistScopeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseGroupWhitelistScopeCreateBulk{err: fmt.Errorf("calling to EnterpriseGroupWhitelistScopeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseGroupWhitelistScopeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseGroupWhitelistScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Update() *EnterpriseGroupWhitelistScopeUpdate {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdate)
+	return &EnterpriseGroupWhitelistScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseGroupWhitelistScopeClient) UpdateOne(_m *EnterpriseGroupWhitelistScope) *EnterpriseGroupWhitelistScopeUpdateOne {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelistScope(_m))
+	return &EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseGroupWhitelistScopeClient) UpdateOneID(id int64) *EnterpriseGroupWhitelistScopeUpdateOne {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpUpdateOne, withEnterpriseGroupWhitelistScopeID(id))
+	return &EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Delete() *EnterpriseGroupWhitelistScopeDelete {
+	mutation := newEnterpriseGroupWhitelistScopeMutation(c.config, OpDelete)
+	return &EnterpriseGroupWhitelistScopeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseGroupWhitelistScopeClient) DeleteOne(_m *EnterpriseGroupWhitelistScope) *EnterpriseGroupWhitelistScopeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseGroupWhitelistScopeClient) DeleteOneID(id int64) *EnterpriseGroupWhitelistScopeDeleteOne {
+	builder := c.Delete().Where(enterprisegroupwhitelistscope.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseGroupWhitelistScopeDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseGroupWhitelistScope.
+func (c *EnterpriseGroupWhitelistScopeClient) Query() *EnterpriseGroupWhitelistScopeQuery {
+	return &EnterpriseGroupWhitelistScopeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseGroupWhitelistScope},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseGroupWhitelistScope entity by its id.
+func (c *EnterpriseGroupWhitelistScopeClient) Get(ctx context.Context, id int64) (*EnterpriseGroupWhitelistScope, error) {
+	return c.Query().Where(enterprisegroupwhitelistscope.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseGroupWhitelistScopeClient) GetX(ctx context.Context, id int64) *EnterpriseGroupWhitelistScope {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseGroupWhitelistScopeClient) Hooks() []Hook {
+	return c.hooks.EnterpriseGroupWhitelistScope
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseGroupWhitelistScopeClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseGroupWhitelistScope
+}
+
+func (c *EnterpriseGroupWhitelistScopeClient) mutate(ctx context.Context, m *EnterpriseGroupWhitelistScopeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseGroupWhitelistScopeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseGroupWhitelistScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseGroupWhitelistScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseGroupWhitelistScopeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseGroupWhitelistScope mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseMemberClient is a client for the EnterpriseMember schema.
+type EnterpriseMemberClient struct {
+	config
+}
+
+// NewEnterpriseMemberClient returns a client for the EnterpriseMember from the given config.
+func NewEnterpriseMemberClient(c config) *EnterpriseMemberClient {
+	return &EnterpriseMemberClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisemember.Hooks(f(g(h())))`.
+func (c *EnterpriseMemberClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseMember = append(c.hooks.EnterpriseMember, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisemember.Intercept(f(g(h())))`.
+func (c *EnterpriseMemberClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseMember = append(c.inters.EnterpriseMember, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseMember entity.
+func (c *EnterpriseMemberClient) Create() *EnterpriseMemberCreate {
+	mutation := newEnterpriseMemberMutation(c.config, OpCreate)
+	return &EnterpriseMemberCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseMember entities.
+func (c *EnterpriseMemberClient) CreateBulk(builders ...*EnterpriseMemberCreate) *EnterpriseMemberCreateBulk {
+	return &EnterpriseMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseMemberClient) MapCreateBulk(slice any, setFunc func(*EnterpriseMemberCreate, int)) *EnterpriseMemberCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseMemberCreateBulk{err: fmt.Errorf("calling to EnterpriseMemberClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseMemberCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseMember.
+func (c *EnterpriseMemberClient) Update() *EnterpriseMemberUpdate {
+	mutation := newEnterpriseMemberMutation(c.config, OpUpdate)
+	return &EnterpriseMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseMemberClient) UpdateOne(_m *EnterpriseMember) *EnterpriseMemberUpdateOne {
+	mutation := newEnterpriseMemberMutation(c.config, OpUpdateOne, withEnterpriseMember(_m))
+	return &EnterpriseMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseMemberClient) UpdateOneID(id int64) *EnterpriseMemberUpdateOne {
+	mutation := newEnterpriseMemberMutation(c.config, OpUpdateOne, withEnterpriseMemberID(id))
+	return &EnterpriseMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseMember.
+func (c *EnterpriseMemberClient) Delete() *EnterpriseMemberDelete {
+	mutation := newEnterpriseMemberMutation(c.config, OpDelete)
+	return &EnterpriseMemberDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseMemberClient) DeleteOne(_m *EnterpriseMember) *EnterpriseMemberDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseMemberClient) DeleteOneID(id int64) *EnterpriseMemberDeleteOne {
+	builder := c.Delete().Where(enterprisemember.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseMemberDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseMember.
+func (c *EnterpriseMemberClient) Query() *EnterpriseMemberQuery {
+	return &EnterpriseMemberQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseMember},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseMember entity by its id.
+func (c *EnterpriseMemberClient) Get(ctx context.Context, id int64) (*EnterpriseMember, error) {
+	return c.Query().Where(enterprisemember.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseMemberClient) GetX(ctx context.Context, id int64) *EnterpriseMember {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryEnterprise queries the enterprise edge of a EnterpriseMember.
+func (c *EnterpriseMemberClient) QueryEnterprise(_m *EnterpriseMember) *EnterpriseQuery {
+	query := (&EnterpriseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisemember.Table, enterprisemember.FieldID, id),
+			sqlgraph.To(enterprise.Table, enterprise.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, enterprisemember.EnterpriseTable, enterprisemember.EnterpriseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUser queries the user edge of a EnterpriseMember.
+func (c *EnterpriseMemberClient) QueryUser(_m *EnterpriseMember) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisemember.Table, enterprisemember.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, enterprisemember.UserTable, enterprisemember.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryDepartment queries the department edge of a EnterpriseMember.
+func (c *EnterpriseMemberClient) QueryDepartment(_m *EnterpriseMember) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisemember.Table, enterprisemember.FieldID, id),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, enterprisemember.DepartmentTable, enterprisemember.DepartmentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseMemberClient) Hooks() []Hook {
+	hooks := c.hooks.EnterpriseMember
+	return append(hooks[:len(hooks):len(hooks)], enterprisemember.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseMemberClient) Interceptors() []Interceptor {
+	inters := c.inters.EnterpriseMember
+	return append(inters[:len(inters):len(inters)], enterprisemember.Interceptors[:]...)
+}
+
+func (c *EnterpriseMemberClient) mutate(ctx context.Context, m *EnterpriseMemberMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseMemberCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseMember mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseQuotaClient is a client for the EnterpriseQuota schema.
+type EnterpriseQuotaClient struct {
+	config
+}
+
+// NewEnterpriseQuotaClient returns a client for the EnterpriseQuota from the given config.
+func NewEnterpriseQuotaClient(c config) *EnterpriseQuotaClient {
+	return &EnterpriseQuotaClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterprisequota.Hooks(f(g(h())))`.
+func (c *EnterpriseQuotaClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseQuota = append(c.hooks.EnterpriseQuota, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterprisequota.Intercept(f(g(h())))`.
+func (c *EnterpriseQuotaClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseQuota = append(c.inters.EnterpriseQuota, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseQuota entity.
+func (c *EnterpriseQuotaClient) Create() *EnterpriseQuotaCreate {
+	mutation := newEnterpriseQuotaMutation(c.config, OpCreate)
+	return &EnterpriseQuotaCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseQuota entities.
+func (c *EnterpriseQuotaClient) CreateBulk(builders ...*EnterpriseQuotaCreate) *EnterpriseQuotaCreateBulk {
+	return &EnterpriseQuotaCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseQuotaClient) MapCreateBulk(slice any, setFunc func(*EnterpriseQuotaCreate, int)) *EnterpriseQuotaCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseQuotaCreateBulk{err: fmt.Errorf("calling to EnterpriseQuotaClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseQuotaCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseQuotaCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseQuota.
+func (c *EnterpriseQuotaClient) Update() *EnterpriseQuotaUpdate {
+	mutation := newEnterpriseQuotaMutation(c.config, OpUpdate)
+	return &EnterpriseQuotaUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseQuotaClient) UpdateOne(_m *EnterpriseQuota) *EnterpriseQuotaUpdateOne {
+	mutation := newEnterpriseQuotaMutation(c.config, OpUpdateOne, withEnterpriseQuota(_m))
+	return &EnterpriseQuotaUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseQuotaClient) UpdateOneID(id int64) *EnterpriseQuotaUpdateOne {
+	mutation := newEnterpriseQuotaMutation(c.config, OpUpdateOne, withEnterpriseQuotaID(id))
+	return &EnterpriseQuotaUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseQuota.
+func (c *EnterpriseQuotaClient) Delete() *EnterpriseQuotaDelete {
+	mutation := newEnterpriseQuotaMutation(c.config, OpDelete)
+	return &EnterpriseQuotaDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseQuotaClient) DeleteOne(_m *EnterpriseQuota) *EnterpriseQuotaDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseQuotaClient) DeleteOneID(id int64) *EnterpriseQuotaDeleteOne {
+	builder := c.Delete().Where(enterprisequota.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseQuotaDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseQuota.
+func (c *EnterpriseQuotaClient) Query() *EnterpriseQuotaQuery {
+	return &EnterpriseQuotaQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseQuota},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseQuota entity by its id.
+func (c *EnterpriseQuotaClient) Get(ctx context.Context, id int64) (*EnterpriseQuota, error) {
+	return c.Query().Where(enterprisequota.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseQuotaClient) GetX(ctx context.Context, id int64) *EnterpriseQuota {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseQuotaClient) Hooks() []Hook {
+	hooks := c.hooks.EnterpriseQuota
+	return append(hooks[:len(hooks):len(hooks)], enterprisequota.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseQuotaClient) Interceptors() []Interceptor {
+	inters := c.inters.EnterpriseQuota
+	return append(inters[:len(inters):len(inters)], enterprisequota.Interceptors[:]...)
+}
+
+func (c *EnterpriseQuotaClient) mutate(ctx context.Context, m *EnterpriseQuotaMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseQuotaCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseQuotaUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseQuotaUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseQuotaDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseQuota mutation op: %q", m.Op())
+	}
+}
+
 // ErrorPassthroughRuleClient is a client for the ErrorPassthroughRule schema.
 type ErrorPassthroughRuleClient struct {
 	config
@@ -3124,6 +4534,22 @@ func (c *GroupClient) GetX(ctx context.Context, id int64) *Group {
 	return obj
 }
 
+// QueryAllowedEnterprises queries the allowed_enterprises edge of a Group.
+func (c *GroupClient) QueryAllowedEnterprises(_m *Group) *EnterpriseQuery {
+	query := (&EnterpriseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(enterprise.Table, enterprise.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, group.AllowedEnterprisesTable, group.AllowedEnterprisesPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryAPIKeys queries the api_keys edge of a Group.
 func (c *GroupClient) QueryAPIKeys(_m *Group) *APIKeyQuery {
 	query := (&APIKeyClient{config: c.config}).Query()
@@ -3213,6 +4639,22 @@ func (c *GroupClient) QueryAllowedUsers(_m *Group) *UserQuery {
 			sqlgraph.From(group.Table, group.FieldID, id),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, group.AllowedUsersTable, group.AllowedUsersPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryEnterpriseAllowedGroups queries the enterprise_allowed_groups edge of a Group.
+func (c *GroupClient) QueryEnterpriseAllowedGroups(_m *Group) *EnterpriseAllowedGroupQuery {
+	query := (&EnterpriseAllowedGroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(enterpriseallowedgroup.Table, enterpriseallowedgroup.GroupColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, group.EnterpriseAllowedGroupsTable, group.EnterpriseAllowedGroupsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -6844,25 +8286,29 @@ type (
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
-		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
-		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
-		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Hook
+		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
+		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
+		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
+		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
+		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
+		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
+		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
-		Group, IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog,
-		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
-		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
-		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Interceptor
+		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
+		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
+		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
+		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
+		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
+		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
+		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
 	}
 )
 

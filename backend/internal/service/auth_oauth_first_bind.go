@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"entgo.io/ent/dialect"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
+	"github.com/Wei-Shaw/sub2api/ent/user"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -78,8 +81,23 @@ ON CONFLICT (user_id, provider_type, grant_reason) DO NOTHING`,
 	}
 
 	if providerDefaults.Balance != 0 {
-		if err := client.User.UpdateOneID(userID).AddBalance(providerDefaults.Balance).Exec(ctx); err != nil {
-			return fmt.Errorf("apply first bind balance default: %w", err)
+		// Membership creation uses this same user lock. No enterprise lock is
+		// taken here, so the management enterprise -> user order is preserved.
+		if client.Driver().Dialect() == dialect.Postgres {
+			if _, err := client.User.Query().Where(user.IDEQ(userID)).ForUpdate().Only(ctx); err != nil {
+				return fmt.Errorf("lock first bind balance recipient: %w", err)
+			}
+		}
+		member, err := client.EnterpriseMember.Query().Where(enterprisemember.UserIDEQ(userID), enterprisemember.DeletedAtIsNil()).Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("check enterprise first bind balance eligibility: %w", err)
+		}
+		// Binding succeeds and the grant marker is consumed, so leaving the
+		// enterprise later cannot turn the skipped gift into a delayed credit.
+		if !member {
+			if err := client.User.UpdateOneID(userID).AddBalance(providerDefaults.Balance).Exec(ctx); err != nil {
+				return fmt.Errorf("apply first bind balance default: %w", err)
+			}
 		}
 	}
 	if providerDefaults.Concurrency != 0 {

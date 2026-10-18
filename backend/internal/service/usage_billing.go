@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -36,6 +37,12 @@ type UsageBillingCommand struct {
 	CacheReadTokens     int
 	ImageCount          int
 	MediaType           string
+
+	EnterpriseID                int64
+	EnterpriseDepartmentPathIDs []int64
+	EnterpriseDepartmentID      int64
+	EnterpriseMemberID          int64
+	EnterpriseBalanceCost       float64
 
 	BalanceCost         float64
 	SubscriptionCost    float64
@@ -81,6 +88,7 @@ const UsageBillingMonetaryScale = 8
 // 在参数进入 SQL 之前量化一次，两条语句就都拿到已经落在 8 位刻度上的同一个金额，
 // 存储阶段不再发生任何舍入，delta 精确相等。
 func (c *UsageBillingCommand) quantizeMonetaryFields() {
+	c.EnterpriseBalanceCost = QuantizeUsageBillingAmount(c.EnterpriseBalanceCost)
 	c.BalanceCost = QuantizeUsageBillingAmount(c.BalanceCost)
 	c.SubscriptionCost = QuantizeUsageBillingAmount(c.SubscriptionCost)
 	c.APIKeyQuotaCost = QuantizeUsageBillingAmount(c.APIKeyQuotaCost)
@@ -132,6 +140,13 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 	if payloadHash := strings.TrimSpace(c.RequestPayloadHash); payloadHash != "" {
 		raw += "|" + payloadHash
 	}
+	// Keep the exact legacy fingerprint for every non-enterprise command.
+	if c.EnterpriseID != 0 {
+		raw += fmt.Sprintf("|enterprise:%d|%d|%d|%0.10f", c.EnterpriseID, c.EnterpriseDepartmentID, c.EnterpriseMemberID, c.EnterpriseBalanceCost)
+		if len(c.EnterpriseDepartmentPathIDs) > 1 {
+			raw += "|path:" + EnterpriseDepartmentPath(c.EnterpriseDepartmentPathIDs)
+		}
+	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
 }
@@ -162,24 +177,38 @@ type AccountQuotaState struct {
 	WeeklyLimit float64
 }
 
+// EnterpriseBillingWindowStarts is the exact set of natural window starts used
+// by the committed enterprise quota SQL. Cache updates must use these starts,
+// rather than recomputing them after a transaction crosses a window boundary.
+type EnterpriseBillingWindowStarts struct {
+	Daily   time.Time
+	Weekly  time.Time
+	Monthly time.Time
+}
+
 type UsageBillingApplyResult struct {
-	Applied              bool
-	APIKeyQuotaExhausted bool
-	NewBalance           *float64           // post-deduction balance (nil = no balance deduction)
-	BalanceOverdrafted   bool               // true when the sufficient-balance guard missed and debt was still recorded
-	QuotaState           *AccountQuotaState // post-increment quota state (nil = no quota increment)
+	Applied                bool
+	APIKeyQuotaExhausted   bool
+	NewEnterpriseBalance   *float64                       // post-deduction enterprise balance (nil = no enterprise deduction)
+	EnterpriseQuotaWindows *EnterpriseBillingWindowStarts // nil when no enterprise quota SQL was applied
+	NewBalance             *float64                       // post-deduction balance (nil = no balance deduction)
+	BalanceOverdrafted     bool                           // true when the sufficient-balance guard missed and debt was still recorded
+	QuotaState             *AccountQuotaState             // post-increment quota state (nil = no quota increment)
 }
 
 // BatchImageBalanceHoldCommand describes an idempotent balance hold operation.
 type BatchImageBalanceHoldCommand struct {
-	RequestID          string
-	APIKeyID           int64
-	RequestFingerprint string
-	RequestPayloadHash string
-	UserID             int64
-	BatchID            string
-	HoldAmount         float64
-	ActualAmount       float64
+	RequestID                                                string
+	APIKeyID                                                 int64
+	RequestFingerprint                                       string
+	RequestPayloadHash                                       string
+	UserID                                                   int64
+	BatchID                                                  string
+	HoldAmount                                               float64
+	ActualAmount                                             float64
+	EnterpriseID, EnterpriseDepartmentID, EnterpriseMemberID int64
+	EnterpriseDepartmentPathIDs                              []int64
+	UsageLog                                                 *UsageLog // Enterprise capture persists usage in the same transaction.
 }
 
 func (c *BatchImageBalanceHoldCommand) Normalize() {
@@ -207,6 +236,12 @@ func buildBatchImageBalanceHoldFingerprint(c *BatchImageBalanceHoldCommand) stri
 	)
 	if payloadHash := strings.TrimSpace(c.RequestPayloadHash); payloadHash != "" {
 		raw += "|" + payloadHash
+	}
+	if c.EnterpriseID != 0 {
+		raw += fmt.Sprintf("|enterprise:%d|department:%d|member:%d", c.EnterpriseID, c.EnterpriseDepartmentID, c.EnterpriseMemberID)
+		if len(c.EnterpriseDepartmentPathIDs) > 1 {
+			raw += "|path:" + EnterpriseDepartmentPath(c.EnterpriseDepartmentPathIDs)
+		}
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

@@ -65,10 +65,11 @@ var (
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
-	Status    string // User status filter
-	Role      string // User role filter
-	Search    string // Search in email, username
-	GroupName string // Filter by allowed group name (fuzzy match)
+	EnterpriseID int64  // Current non-deleted enterprise membership; 0 means no filter.
+	Status       string // User status filter
+	Role         string // User role filter
+	Search       string // Search in email, username
+	GroupName    string // Filter by allowed group name (fuzzy match)
 	// APIKeyGroupID filters users who own at least one non-soft-deleted API key
 	// bound to this group (api_keys.group_id). 0 = no filter. Covers all three
 	// group types since it matches the key's group directly, not allowed_groups.
@@ -290,12 +291,13 @@ type ChangePasswordRequest struct {
 
 // UserService 用户服务
 type UserService struct {
-	userRepo             UserRepository
-	settingRepo          SettingRepository
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	billingCache         BillingCache
-	lastActiveTouchL1    sync.Map
-	lastActiveTouchSF    singleflight.Group
+	userRepo              UserRepository
+	settingRepo           SettingRepository
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	billingCache          BillingCache
+	enterpriseMemberships EnterpriseMembershipReader
+	lastActiveTouchL1     sync.Map
+	lastActiveTouchSF     singleflight.Group
 }
 
 // NewUserService 创建用户服务实例
@@ -306,6 +308,12 @@ func NewUserService(userRepo UserRepository, settingRepo SettingRepository, auth
 		authCacheInvalidator: authCacheInvalidator,
 		billingCache:         billingCache,
 	}
+}
+
+// SetEnterpriseMembershipReader protects the unused legacy consumption API.
+// Administrative balance adjustments use their own explicit service entry point.
+func (s *UserService) SetEnterpriseMembershipReader(reader EnterpriseMembershipReader) {
+	s.enterpriseMemberships = reader
 }
 
 // GetFirstAdmin 获取首个管理员用户（用于 Admin API Key 认证）
@@ -1149,8 +1157,20 @@ func (s *UserService) List(ctx context.Context, params pagination.PaginationPara
 	return users, pagination, nil
 }
 
-// UpdateBalance 更新用户余额（管理员功能）
+// UpdateBalance 更新个人余额。消费扣款不能绕过企业事务计费。
 func (s *UserService) UpdateBalance(ctx context.Context, userID int64, amount float64) error {
+	if amount < 0 {
+		if s.enterpriseMemberships == nil {
+			return ErrEnterpriseBillingLegacyUnsupported
+		}
+		member, err := s.enterpriseMemberships.GetMemberContextByUserID(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("check enterprise membership: %w", err)
+		}
+		if member != nil {
+			return ErrEnterpriseBillingLegacyUnsupported
+		}
+	}
 	if err := s.userRepo.UpdateBalance(ctx, userID, amount); err != nil {
 		return fmt.Errorf("update balance: %w", err)
 	}

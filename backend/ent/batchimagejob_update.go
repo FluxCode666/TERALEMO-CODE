@@ -919,6 +919,15 @@ func (_u *BatchImageJobUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(batchimagejob.FieldUserID, field.TypeInt64, value)
 	}
+	if _u.mutation.EnterpriseIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseID, field.TypeInt64)
+	}
+	if _u.mutation.EnterpriseDepartmentIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseDepartmentID, field.TypeInt64)
+	}
+	if _u.mutation.EnterpriseMemberIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseMemberID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.APIKeyID(); ok {
 		_spec.SetField(batchimagejob.FieldAPIKeyID, field.TypeInt64, value)
 	}
@@ -2075,6 +2084,15 @@ func (_u *BatchImageJobUpdateOne) sqlSave(ctx context.Context) (_node *BatchImag
 	}
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(batchimagejob.FieldUserID, field.TypeInt64, value)
+	}
+	if _u.mutation.EnterpriseIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseID, field.TypeInt64)
+	}
+	if _u.mutation.EnterpriseDepartmentIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseDepartmentID, field.TypeInt64)
+	}
+	if _u.mutation.EnterpriseMemberIDCleared() {
+		_spec.ClearField(batchimagejob.FieldEnterpriseMemberID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.APIKeyID(); ok {
 		_spec.SetField(batchimagejob.FieldAPIKeyID, field.TypeInt64, value)

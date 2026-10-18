@@ -189,6 +189,114 @@ func (f CompositeModelRouteFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CompositeModelRouteMutation", m)
 }
 
+// The EnterpriseFunc type is an adapter to allow the use of ordinary
+// function as Enterprise mutator.
+type EnterpriseFunc func(context.Context, *ent.EnterpriseMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseMutation", m)
+}
+
+// The EnterpriseAllowedGroupFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseAllowedGroup mutator.
+type EnterpriseAllowedGroupFunc func(context.Context, *ent.EnterpriseAllowedGroupMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseAllowedGroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseAllowedGroupMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseAllowedGroupMutation", m)
+}
+
+// The EnterpriseAuditLogFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseAuditLog mutator.
+type EnterpriseAuditLogFunc func(context.Context, *ent.EnterpriseAuditLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseAuditLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseAuditLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseAuditLogMutation", m)
+}
+
+// The EnterpriseBalanceLogFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseBalanceLog mutator.
+type EnterpriseBalanceLogFunc func(context.Context, *ent.EnterpriseBalanceLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseBalanceLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseBalanceLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseBalanceLogMutation", m)
+}
+
+// The EnterpriseDepartmentFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseDepartment mutator.
+type EnterpriseDepartmentFunc func(context.Context, *ent.EnterpriseDepartmentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseDepartmentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseDepartmentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseDepartmentMutation", m)
+}
+
+// The EnterpriseGroupWhitelistFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseGroupWhitelist mutator.
+type EnterpriseGroupWhitelistFunc func(context.Context, *ent.EnterpriseGroupWhitelistMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseGroupWhitelistFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseGroupWhitelistMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseGroupWhitelistMutation", m)
+}
+
+// The EnterpriseGroupWhitelistScopeFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseGroupWhitelistScope mutator.
+type EnterpriseGroupWhitelistScopeFunc func(context.Context, *ent.EnterpriseGroupWhitelistScopeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseGroupWhitelistScopeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseGroupWhitelistScopeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseGroupWhitelistScopeMutation", m)
+}
+
+// The EnterpriseMemberFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseMember mutator.
+type EnterpriseMemberFunc func(context.Context, *ent.EnterpriseMemberMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseMemberMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseMemberMutation", m)
+}
+
+// The EnterpriseQuotaFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseQuota mutator.
+type EnterpriseQuotaFunc func(context.Context, *ent.EnterpriseQuotaMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseQuotaFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseQuotaMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseQuotaMutation", m)
+}
+
 // The ErrorPassthroughRuleFunc type is an adapter to allow the use of ordinary
 // function as ErrorPassthroughRule mutator.
 type ErrorPassthroughRuleFunc func(context.Context, *ent.ErrorPassthroughRuleMutation) (ent.Value, error)

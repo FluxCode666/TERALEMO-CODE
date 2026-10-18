@@ -161,8 +161,18 @@ export default {
     }
   },
 
+  header: {
+    enterpriseRoles: {
+      owner: 'Owner',
+      manager: 'Manager',
+      member: 'Member'
+    }
+  },
+
   // Navigation
   nav: {
+    enterprise: 'My enterprise',
+    enterprises: 'Enterprises',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',

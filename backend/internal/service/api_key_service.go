@@ -24,16 +24,17 @@ import (
 )
 
 var (
-	ErrAPIKeyNotFound       = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
-	ErrGroupNotAllowed      = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
-	ErrAPIKeyExists         = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyTooShort       = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
-	ErrAPIKeyInvalidChars   = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
-	ErrAPIKeyRateLimited    = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
-	ErrAPIKeyCreateLimited  = infraerrors.TooManyRequests("API_KEY_CREATE_RATE_LIMITED", "too many api keys created recently, please try again later")
-	ErrAPIKeyCountExceeded  = infraerrors.Forbidden("API_KEY_COUNT_EXCEEDED", "api key count limit reached, please delete unused keys first")
-	ErrAPIKeyAuthOverloaded = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
-	ErrInvalidIPPattern     = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
+	ErrAPIKeyNotFound                 = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
+	ErrGroupNotAllowed                = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
+	ErrEnterpriseGatewayGroupRequired = infraerrors.BadRequest("ENTERPRISE_GROUP_NOT_ALLOWED", "企业成员必须绑定分组")
+	ErrAPIKeyExists                   = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
+	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
+	ErrAPIKeyInvalidChars             = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
+	ErrAPIKeyRateLimited              = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
+	ErrAPIKeyCreateLimited            = infraerrors.TooManyRequests("API_KEY_CREATE_RATE_LIMITED", "too many api keys created recently, please try again later")
+	ErrAPIKeyCountExceeded            = infraerrors.Forbidden("API_KEY_COUNT_EXCEEDED", "api key count limit reached, please delete unused keys first")
+	ErrAPIKeyAuthOverloaded           = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
+	ErrInvalidIPPattern               = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 	// ErrAPIKeyExpired        = infraerrors.Forbidden("API_KEY_EXPIRED", "api key has expired")
 	ErrAPIKeyExpired = infraerrors.Forbidden("API_KEY_EXPIRED", "api key 已过期")
 	// ErrAPIKeyQuotaExhausted = infraerrors.TooManyRequests("API_KEY_QUOTA_EXHAUSTED", "api key quota exhausted")
@@ -290,6 +291,7 @@ type RateLimitCacheInvalidator interface {
 type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
+	enterpriseRepo            EnterpriseRepository
 	groupRepo                 GroupRepository
 	userSubRepo               UserSubscriptionRepository
 	userGroupRateRepo         UserGroupRateRepository
@@ -372,6 +374,29 @@ func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidat
 
 func (s *APIKeyService) SetConcurrencyService(concurrencyService *ConcurrencyService) {
 	s.concurrencyService = concurrencyService
+}
+
+// SetEnterpriseRepository supplies the narrow organization repository without widening UserRepository.
+func (s *APIKeyService) SetEnterpriseRepository(repo EnterpriseRepository) {
+	s.enterpriseRepo = repo
+}
+
+func (s *APIKeyService) getUserForGroupAccess(ctx context.Context, userID int64) (*User, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if s.enterpriseRepo != nil {
+		membership, err := s.enterpriseRepo.GetMemberContextByUserID(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("get enterprise membership: %w", err)
+		}
+		// Repositories may reuse user objects: do not mutate the personal source object.
+		copy := *user
+		copy.Enterprise = membership
+		user = &copy
+	}
+	return user, nil
 }
 
 func (s *APIKeyService) compileAPIKeyIPRules(apiKey *APIKey) {
@@ -481,6 +506,9 @@ func (s *APIKeyService) incrementAPIKeyErrorCount(ctx context.Context, userID in
 // 对于订阅类型分组：检查用户是否有有效订阅
 // 对于标准类型分组：使用原有的 AllowedGroups 和 IsExclusive 逻辑
 func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group *Group) bool {
+	if user.Enterprise != nil && !user.Enterprise.AllowsGroup(group.ID) {
+		return false
+	}
 	// 订阅类型分组：需要有效订阅
 	if group.IsSubscriptionType() {
 		_, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, user.ID, group.ID)
@@ -496,9 +524,12 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		return nil, err
 	}
 	// 验证用户存在
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.getUserForGroupAccess(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
+	}
+	if user.Enterprise != nil && (req.GroupID == nil || *req.GroupID <= 0) {
+		return nil, ErrEnterpriseGatewayGroupRequired
 	}
 
 	// 验证 IP 白名单格式
@@ -806,6 +837,15 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if apiKey.UserID != userID {
 		return nil, ErrInsufficientPerms
 	}
+	if apiKey.User != nil && apiKey.User.Enterprise != nil {
+		effectiveGroupID := apiKey.GroupID
+		if req.GroupID != nil {
+			effectiveGroupID = req.GroupID
+		}
+		if effectiveGroupID == nil || *effectiveGroupID <= 0 {
+			return nil, ErrEnterpriseGatewayGroupRequired
+		}
+	}
 
 	// 验证 IP 白名单格式
 	if req.IPWhitelist != nil && len(*req.IPWhitelist) > 0 {
@@ -836,7 +876,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	if req.GroupID != nil {
 		// 验证分组权限
-		user, err := s.userRepo.GetByID(ctx, userID)
+		user, err := s.getUserForGroupAccess(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
@@ -985,7 +1025,7 @@ func (s *APIKeyService) ValidateKey(ctx context.Context, key string) (*APIKey, *
 	}
 
 	// 获取用户信息
-	user, err := s.userRepo.GetByID(ctx, apiKey.UserID)
+	user, err := s.getUserForGroupAccess(ctx, apiKey.UserID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get user: %w", err)
 	}
@@ -1050,7 +1090,7 @@ func (s *APIKeyService) IncrementUsage(ctx context.Context, keyID int64) error {
 // - 订阅类型分组：用户有有效订阅的
 func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error) {
 	// 获取用户信息
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.getUserForGroupAccess(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
@@ -1086,6 +1126,9 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
 func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
+	if user.Enterprise != nil && !user.Enterprise.AllowsGroup(group.ID) {
+		return false
+	}
 	// 订阅类型分组：需要有效订阅
 	if group.IsSubscriptionType() {
 		return subscribedGroupIDs[group.ID]
@@ -1108,7 +1151,7 @@ func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword
 // 与 GetAvailableGroups 的区别：这里保留普通授权分组的「橱窗」语义，不检查
 // 分组是否活跃；有效订阅也授予对应分组的可见性。返回值恒非 nil。
 func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64) (map[int64]struct{}, bool, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.getUserForGroupAccess(ctx, userID)
 	if err != nil {
 		return nil, false, fmt.Errorf("get user: %w", err)
 	}
@@ -1122,6 +1165,24 @@ func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64
 	}
 	for _, sub := range subscriptions {
 		allowed[sub.GroupID] = struct{}{}
+	}
+	if user.Enterprise != nil && (user.Enterprise.GroupPoolConfigured || user.Enterprise.GroupWhitelistConfigured) {
+		// A finite enterprise scope must also restrict public group discovery.
+		groups, err := s.groupRepo.ListActive(ctx)
+		if err != nil {
+			return nil, false, fmt.Errorf("list active groups: %w", err)
+		}
+		subscribed := make(map[int64]bool, len(subscriptions))
+		for _, sub := range subscriptions {
+			subscribed[sub.GroupID] = true
+		}
+		visible := make(map[int64]struct{})
+		for _, group := range groups {
+			if s.canUserBindGroupInternal(user, &group, subscribed) {
+				visible[group.ID] = struct{}{}
+			}
+		}
+		return visible, true, nil
 	}
 	return allowed, user.RestrictPublicGroups, nil
 }

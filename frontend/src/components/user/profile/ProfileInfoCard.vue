@@ -60,14 +60,15 @@
 
             <div class="grid gap-3 sm:grid-cols-3">
               <div
+                v-if="displayBalance !== null"
                 data-testid="profile-overview-metric-balance"
                 class="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-white/70 dark:bg-dark-900/60 dark:ring-dark-700"
               >
                 <p class="text-xs font-medium uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
-                  {{ t('profile.accountBalance') }}
+                  {{ user?.enterprise ? t('enterprise.balance') : t('profile.accountBalance') }}
                 </p>
                 <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ formatCurrency(user?.balance || 0) }}
+                  {{ formatCurrency(displayBalance) }}
                 </p>
               </div>
               <div
@@ -208,6 +209,11 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const displayBalance = computed(() => {
+  const enterprise = props.user?.enterprise
+  if (enterprise) return enterprise.balance_visible && enterprise.balance != null ? enterprise.balance : null
+  return props.user?.balance ?? 0
+})
 
 function normalizeBindingStatus(binding: boolean | UserAuthBindingStatus | undefined): boolean | null {
   if (typeof binding === 'boolean') {

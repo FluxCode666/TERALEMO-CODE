@@ -3,6 +3,7 @@
  * Centralized exports for all admin API modules
  */
 
+import enterprisesAPI from './enterprises'
 import dashboardAPI from './dashboard'
 import usersAPI from './users'
 import groupsAPI from './groups'
@@ -41,6 +42,7 @@ import pluginsAPI from './plugins'
  * Unified admin API object for convenient access
  */
 export const adminAPI = {
+  enterprises: enterprisesAPI,
   dashboard: dashboardAPI,
   users: usersAPI,
   groups: groupsAPI,
@@ -77,7 +79,7 @@ export const adminAPI = {
 }
 
 export {
-  dashboardAPI,
+  enterprisesAPI,  dashboardAPI,
   usersAPI,
   groupsAPI,
   accountsAPI,

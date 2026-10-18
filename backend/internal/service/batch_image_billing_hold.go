@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"go.uber.org/zap"
@@ -44,10 +45,21 @@ func buildBatchImageHoldCommand(job *BatchImageJob, requestID string, actualAmou
 	if actualAmount < 0 {
 		actualAmount = 0
 	}
+	var enterpriseID, departmentID, memberID int64
+	if job.EnterpriseID != nil {
+		enterpriseID = *job.EnterpriseID
+	}
+	if job.EnterpriseDepartmentID != nil {
+		departmentID = *job.EnterpriseDepartmentID
+	}
+	if job.EnterpriseMemberID != nil {
+		memberID = *job.EnterpriseMemberID
+	}
 	return &BatchImageBalanceHoldCommand{
-		RequestID:          requestID,
-		APIKeyID:           *job.APIKeyID,
-		UserID:             job.UserID,
+		RequestID:    requestID,
+		APIKeyID:     *job.APIKeyID,
+		UserID:       job.UserID,
+		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID, EnterpriseDepartmentPathIDs: FrozenEnterpriseDepartmentIDs(job.EnterpriseDepartmentPathIDs, departmentID),
 		BatchID:            job.BatchID,
 		HoldAmount:         holdAmount,
 		ActualAmount:       actualAmount,
@@ -67,6 +79,9 @@ func reserveBatchImageBalanceHold(ctx context.Context, repo UsageBillingReposito
 		return nil
 	}
 	if _, err := repo.ReserveBatchImageBalance(ctx, cmd); err != nil {
+		if errors.Is(err, ErrEnterpriseBillingBalanceInsufficient) {
+			return ErrEnterpriseBillingBalanceInsufficient
+		}
 		if errors.Is(err, ErrBatchImageInsufficientBalance) {
 			return ErrBatchImageInsufficientBalance
 		}
@@ -82,6 +97,9 @@ func captureBatchImageBalanceHold(ctx context.Context, repo UsageBillingReposito
 	cmd, err := buildBatchImageHoldCommand(job, BatchImageCaptureRequestID(job.BatchID), actualAmount, payloadHash)
 	if err != nil {
 		return err
+	}
+	if cmd.EnterpriseID > 0 {
+		cmd.UsageLog = buildBatchImageUsageLog(job, actualAmount, BatchImageCaptureRequestID(job.BatchID), time.Now())
 	}
 	if _, err := repo.CaptureBatchImageBalance(ctx, cmd); err != nil {
 		return ErrBatchImageSettlementBillingFailed.WithCause(err)

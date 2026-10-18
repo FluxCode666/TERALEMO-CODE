@@ -6,6 +6,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	mathrand "math/rand"
@@ -934,6 +935,12 @@ func (s *GatewayService) resolveGatewayGroup(ctx context.Context, groupID *int64
 
 		group, err := s.resolveGroupByID(ctx, currentID)
 		if err != nil {
+			return nil, nil, err
+		}
+		if err := s.checkEnterpriseResolvedGroup(ctx, group, *groupID); err != nil {
+			if currentID != *groupID && errors.Is(err, ErrEnterpriseGatewayGroupNotAllowed) {
+				return nil, nil, ErrClaudeCodeOnly
+			}
 			return nil, nil, err
 		}
 

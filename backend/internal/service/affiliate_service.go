@@ -229,10 +229,11 @@ type AffiliateUserOverview struct {
 }
 
 type AffiliateService struct {
-	repo                 AffiliateRepository
-	settingService       *SettingService
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	billingCacheService  *BillingCacheService
+	enterpriseMemberships EnterpriseMembershipReader
+	repo                  AffiliateRepository
+	settingService        *SettingService
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	billingCacheService   *BillingCacheService
 }
 
 func NewAffiliateService(repo AffiliateRepository, settingService *SettingService, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCacheService *BillingCacheService) *AffiliateService {
@@ -435,6 +436,9 @@ func (s *AffiliateService) globalRebateRatePercent(ctx context.Context) float64 
 func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID int64) (float64, float64, error) {
 	if s == nil || s.repo == nil {
 		return 0, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if err := checkEnterprisePersonalWallet(ctx, s.enterpriseMemberships, userID); err != nil {
+		return 0, 0, err
 	}
 
 	transferred, balance, err := s.repo.TransferQuotaToBalance(ctx, userID)

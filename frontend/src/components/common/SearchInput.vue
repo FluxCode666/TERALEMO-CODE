@@ -8,6 +8,7 @@
       type="text"
       class="input pl-10"
       :placeholder="placeholder"
+      :aria-label="ariaLabel ?? placeholder"
     />
   </div>
 </template>
@@ -20,6 +21,7 @@ import Icon from '@/components/icons/Icon.vue'
 const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
+  ariaLabel?: string
   debounceMs?: number
 }>(), {
   placeholder: 'Search...',

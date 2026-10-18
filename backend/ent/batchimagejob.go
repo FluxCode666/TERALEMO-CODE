@@ -21,6 +21,14 @@ type BatchImageJob struct {
 	BatchID string `json:"batch_id,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
+	// EnterpriseID holds the value of the "enterprise_id" field.
+	EnterpriseID *int64 `json:"enterprise_id,omitempty"`
+	// EnterpriseDepartmentPath holds the value of the "enterprise_department_path" field.
+	EnterpriseDepartmentPath string `json:"enterprise_department_path,omitempty"`
+	// EnterpriseDepartmentID holds the value of the "enterprise_department_id" field.
+	EnterpriseDepartmentID *int64 `json:"enterprise_department_id,omitempty"`
+	// EnterpriseMemberID holds the value of the "enterprise_member_id" field.
+	EnterpriseMemberID *int64 `json:"enterprise_member_id,omitempty"`
 	// APIKeyID holds the value of the "api_key_id" field.
 	APIKeyID *int64 `json:"api_key_id,omitempty"`
 	// AccountID holds the value of the "account_id" field.
@@ -107,9 +115,9 @@ func (*BatchImageJob) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case batchimagejob.FieldEstimatedCost, batchimagejob.FieldHoldAmount, batchimagejob.FieldActualCost:
 			values[i] = new(sql.NullFloat64)
-		case batchimagejob.FieldID, batchimagejob.FieldUserID, batchimagejob.FieldAPIKeyID, batchimagejob.FieldAccountID, batchimagejob.FieldItemCount, batchimagejob.FieldSuccessCount, batchimagejob.FieldFailCount, batchimagejob.FieldCancelledCount, batchimagejob.FieldRetryCount, batchimagejob.FieldVersion:
+		case batchimagejob.FieldID, batchimagejob.FieldUserID, batchimagejob.FieldEnterpriseID, batchimagejob.FieldEnterpriseDepartmentID, batchimagejob.FieldEnterpriseMemberID, batchimagejob.FieldAPIKeyID, batchimagejob.FieldAccountID, batchimagejob.FieldItemCount, batchimagejob.FieldSuccessCount, batchimagejob.FieldFailCount, batchimagejob.FieldCancelledCount, batchimagejob.FieldRetryCount, batchimagejob.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case batchimagejob.FieldBatchID, batchimagejob.FieldProvider, batchimagejob.FieldModel, batchimagejob.FieldTaskName, batchimagejob.FieldStatus, batchimagejob.FieldProviderJobName, batchimagejob.FieldProviderInputRef, batchimagejob.FieldProviderOutputRef, batchimagejob.FieldGcsInputURI, batchimagejob.FieldGcsOutputURI, batchimagejob.FieldCurrency, batchimagejob.FieldHoldID, batchimagejob.FieldIdempotencyKey, batchimagejob.FieldRequestHash, batchimagejob.FieldManifestHash, batchimagejob.FieldLastErrorCode, batchimagejob.FieldLastErrorMessage:
+		case batchimagejob.FieldBatchID, batchimagejob.FieldEnterpriseDepartmentPath, batchimagejob.FieldProvider, batchimagejob.FieldModel, batchimagejob.FieldTaskName, batchimagejob.FieldStatus, batchimagejob.FieldProviderJobName, batchimagejob.FieldProviderInputRef, batchimagejob.FieldProviderOutputRef, batchimagejob.FieldGcsInputURI, batchimagejob.FieldGcsOutputURI, batchimagejob.FieldCurrency, batchimagejob.FieldHoldID, batchimagejob.FieldIdempotencyKey, batchimagejob.FieldRequestHash, batchimagejob.FieldManifestHash, batchimagejob.FieldLastErrorCode, batchimagejob.FieldLastErrorMessage:
 			values[i] = new(sql.NullString)
 		case batchimagejob.FieldOutputExpiresAt, batchimagejob.FieldInputDeletedAt, batchimagejob.FieldOutputDeletedAt, batchimagejob.FieldDownloadedAt, batchimagejob.FieldUserDeletedAt, batchimagejob.FieldCreatedAt, batchimagejob.FieldUpdatedAt, batchimagejob.FieldSubmittedAt, batchimagejob.FieldStartedAt, batchimagejob.FieldFinishedAt, batchimagejob.FieldSettledAt:
 			values[i] = new(sql.NullTime)
@@ -145,6 +153,33 @@ func (_m *BatchImageJob) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = value.Int64
+			}
+		case batchimagejob.FieldEnterpriseID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field enterprise_id", values[i])
+			} else if value.Valid {
+				_m.EnterpriseID = new(int64)
+				*_m.EnterpriseID = value.Int64
+			}
+		case batchimagejob.FieldEnterpriseDepartmentPath:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field enterprise_department_path", values[i])
+			} else if value.Valid {
+				_m.EnterpriseDepartmentPath = value.String
+			}
+		case batchimagejob.FieldEnterpriseDepartmentID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field enterprise_department_id", values[i])
+			} else if value.Valid {
+				_m.EnterpriseDepartmentID = new(int64)
+				*_m.EnterpriseDepartmentID = value.Int64
+			}
+		case batchimagejob.FieldEnterpriseMemberID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field enterprise_member_id", values[i])
+			} else if value.Valid {
+				_m.EnterpriseMemberID = new(int64)
+				*_m.EnterpriseMemberID = value.Int64
 			}
 		case batchimagejob.FieldAPIKeyID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -439,6 +474,24 @@ func (_m *BatchImageJob) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	builder.WriteString(", ")
+	if v := _m.EnterpriseID; v != nil {
+		builder.WriteString("enterprise_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("enterprise_department_path=")
+	builder.WriteString(_m.EnterpriseDepartmentPath)
+	builder.WriteString(", ")
+	if v := _m.EnterpriseDepartmentID; v != nil {
+		builder.WriteString("enterprise_department_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.EnterpriseMemberID; v != nil {
+		builder.WriteString("enterprise_member_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.APIKeyID; v != nil {
 		builder.WriteString("api_key_id=")

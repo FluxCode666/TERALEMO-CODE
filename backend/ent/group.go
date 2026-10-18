@@ -162,6 +162,8 @@ type Group struct {
 
 // GroupEdges holds the relations/edges for other nodes in the graph.
 type GroupEdges struct {
+	// AllowedEnterprises holds the value of the allowed_enterprises edge.
+	AllowedEnterprises []*Enterprise `json:"allowed_enterprises,omitempty"`
 	// APIKeys holds the value of the api_keys edge.
 	APIKeys []*APIKey `json:"api_keys,omitempty"`
 	// RedeemCodes holds the value of the redeem_codes edge.
@@ -174,19 +176,30 @@ type GroupEdges struct {
 	Accounts []*Account `json:"accounts,omitempty"`
 	// AllowedUsers holds the value of the allowed_users edge.
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
+	// EnterpriseAllowedGroups holds the value of the enterprise_allowed_groups edge.
+	EnterpriseAllowedGroups []*EnterpriseAllowedGroup `json:"enterprise_allowed_groups,omitempty"`
 	// AccountGroups holds the value of the account_groups edge.
 	AccountGroups []*AccountGroup `json:"account_groups,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [10]bool
+}
+
+// AllowedEnterprisesOrErr returns the AllowedEnterprises value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) AllowedEnterprisesOrErr() ([]*Enterprise, error) {
+	if e.loadedTypes[0] {
+		return e.AllowedEnterprises, nil
+	}
+	return nil, &NotLoadedError{edge: "allowed_enterprises"}
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
-	if e.loadedTypes[0] {
+	if e.loadedTypes[1] {
 		return e.APIKeys, nil
 	}
 	return nil, &NotLoadedError{edge: "api_keys"}
@@ -195,7 +208,7 @@ func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
 // RedeemCodesOrErr returns the RedeemCodes value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) RedeemCodesOrErr() ([]*RedeemCode, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.RedeemCodes, nil
 	}
 	return nil, &NotLoadedError{edge: "redeem_codes"}
@@ -204,7 +217,7 @@ func (e GroupEdges) RedeemCodesOrErr() ([]*RedeemCode, error) {
 // SubscriptionsOrErr returns the Subscriptions value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) SubscriptionsOrErr() ([]*UserSubscription, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.Subscriptions, nil
 	}
 	return nil, &NotLoadedError{edge: "subscriptions"}
@@ -213,7 +226,7 @@ func (e GroupEdges) SubscriptionsOrErr() ([]*UserSubscription, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -222,7 +235,7 @@ func (e GroupEdges) UsageLogsOrErr() ([]*UsageLog, error) {
 // AccountsOrErr returns the Accounts value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AccountsOrErr() ([]*Account, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.Accounts, nil
 	}
 	return nil, &NotLoadedError{edge: "accounts"}
@@ -231,16 +244,25 @@ func (e GroupEdges) AccountsOrErr() ([]*Account, error) {
 // AllowedUsersOrErr returns the AllowedUsers value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AllowedUsersOrErr() ([]*User, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.AllowedUsers, nil
 	}
 	return nil, &NotLoadedError{edge: "allowed_users"}
 }
 
+// EnterpriseAllowedGroupsOrErr returns the EnterpriseAllowedGroups value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) EnterpriseAllowedGroupsOrErr() ([]*EnterpriseAllowedGroup, error) {
+	if e.loadedTypes[7] {
+		return e.EnterpriseAllowedGroups, nil
+	}
+	return nil, &NotLoadedError{edge: "enterprise_allowed_groups"}
+}
+
 // AccountGroupsOrErr returns the AccountGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AccountGroupsOrErr() ([]*AccountGroup, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[8] {
 		return e.AccountGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "account_groups"}
@@ -249,7 +271,7 @@ func (e GroupEdges) AccountGroupsOrErr() ([]*AccountGroup, error) {
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[9] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -745,6 +767,11 @@ func (_m *Group) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryAllowedEnterprises queries the "allowed_enterprises" edge of the Group entity.
+func (_m *Group) QueryAllowedEnterprises() *EnterpriseQuery {
+	return NewGroupClient(_m.config).QueryAllowedEnterprises(_m)
+}
+
 // QueryAPIKeys queries the "api_keys" edge of the Group entity.
 func (_m *Group) QueryAPIKeys() *APIKeyQuery {
 	return NewGroupClient(_m.config).QueryAPIKeys(_m)
@@ -773,6 +800,11 @@ func (_m *Group) QueryAccounts() *AccountQuery {
 // QueryAllowedUsers queries the "allowed_users" edge of the Group entity.
 func (_m *Group) QueryAllowedUsers() *UserQuery {
 	return NewGroupClient(_m.config).QueryAllowedUsers(_m)
+}
+
+// QueryEnterpriseAllowedGroups queries the "enterprise_allowed_groups" edge of the Group entity.
+func (_m *Group) QueryEnterpriseAllowedGroups() *EnterpriseAllowedGroupQuery {
+	return NewGroupClient(_m.config).QueryEnterpriseAllowedGroups(_m)
 }
 
 // QueryAccountGroups queries the "account_groups" edge of the Group entity.

@@ -24,6 +24,9 @@ func (s *UserRepoAPIKeyGroupFilterSuite) SetupTest() {
 	s.client = testEntClient(s.T())
 	s.repo = newUserRepositoryWithSQL(s.client, integrationDB)
 	// api_keys 必须先于 users 清理（外键）；groups 也清理避免跨用例串扰。
+	// 企业成员也引用 users，先清理，避免忽略 DELETE 错误后污染全用户断言。
+	_, err := integrationDB.ExecContext(s.ctx, "DELETE FROM enterprise_members")
+	s.Require().NoError(err)
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM api_keys")
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM user_allowed_groups")
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM user_subscriptions")

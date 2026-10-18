@@ -27,6 +27,34 @@ type UsageLogCreate struct {
 	conflict []sql.ConflictOption
 }
 
+// SetEnterpriseID sets the "enterprise_id" field.
+func (_c *UsageLogCreate) SetEnterpriseID(v int64) *UsageLogCreate {
+	_c.mutation.SetEnterpriseID(v)
+	return _c
+}
+
+// SetNillableEnterpriseID sets the "enterprise_id" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableEnterpriseID(v *int64) *UsageLogCreate {
+	if v != nil {
+		_c.SetEnterpriseID(*v)
+	}
+	return _c
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (_c *UsageLogCreate) SetEnterpriseDepartmentID(v int64) *UsageLogCreate {
+	_c.mutation.SetEnterpriseDepartmentID(v)
+	return _c
+}
+
+// SetNillableEnterpriseDepartmentID sets the "enterprise_department_id" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableEnterpriseDepartmentID(v *int64) *UsageLogCreate {
+	if v != nil {
+		_c.SetEnterpriseDepartmentID(*v)
+	}
+	return _c
+}
+
 // SetUserID sets the "user_id" field.
 func (_c *UsageLogCreate) SetUserID(v int64) *UsageLogCreate {
 	_c.mutation.SetUserID(v)
@@ -967,6 +995,14 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec = sqlgraph.NewCreateSpec(usagelog.Table, sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt64))
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.EnterpriseID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseID, field.TypeInt64, value)
+		_node.EnterpriseID = &value
+	}
+	if value, ok := _c.mutation.EnterpriseDepartmentID(); ok {
+		_spec.SetField(usagelog.FieldEnterpriseDepartmentID, field.TypeInt64, value)
+		_node.EnterpriseDepartmentID = &value
+	}
 	if value, ok := _c.mutation.RequestID(); ok {
 		_spec.SetField(usagelog.FieldRequestID, field.TypeString, value)
 		_node.RequestID = value
@@ -1227,7 +1263,7 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 // of the `INSERT` statement. For example:
 //
 //	client.UsageLog.Create().
-//		SetUserID(v).
+//		SetEnterpriseID(v).
 //		OnConflict(
 //			// Update the row with the new values
 //			// the was proposed for insertion.
@@ -1236,7 +1272,7 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.UsageLogUpsert) {
-//			SetUserID(v+v).
+//			SetEnterpriseID(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *UsageLogCreate) OnConflict(opts ...sql.ConflictOption) *UsageLogUpsertOne {
@@ -1271,6 +1307,54 @@ type (
 		*sql.UpdateSet
 	}
 )
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (u *UsageLogUpsert) SetEnterpriseID(v int64) *UsageLogUpsert {
+	u.Set(usagelog.FieldEnterpriseID, v)
+	return u
+}
+
+// UpdateEnterpriseID sets the "enterprise_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateEnterpriseID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldEnterpriseID)
+	return u
+}
+
+// AddEnterpriseID adds v to the "enterprise_id" field.
+func (u *UsageLogUpsert) AddEnterpriseID(v int64) *UsageLogUpsert {
+	u.Add(usagelog.FieldEnterpriseID, v)
+	return u
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (u *UsageLogUpsert) ClearEnterpriseID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldEnterpriseID)
+	return u
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (u *UsageLogUpsert) SetEnterpriseDepartmentID(v int64) *UsageLogUpsert {
+	u.Set(usagelog.FieldEnterpriseDepartmentID, v)
+	return u
+}
+
+// UpdateEnterpriseDepartmentID sets the "enterprise_department_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateEnterpriseDepartmentID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldEnterpriseDepartmentID)
+	return u
+}
+
+// AddEnterpriseDepartmentID adds v to the "enterprise_department_id" field.
+func (u *UsageLogUpsert) AddEnterpriseDepartmentID(v int64) *UsageLogUpsert {
+	u.Add(usagelog.FieldEnterpriseDepartmentID, v)
+	return u
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (u *UsageLogUpsert) ClearEnterpriseDepartmentID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldEnterpriseDepartmentID)
+	return u
+}
 
 // SetUserID sets the "user_id" field.
 func (u *UsageLogUpsert) SetUserID(v int64) *UsageLogUpsert {
@@ -2125,6 +2209,62 @@ func (u *UsageLogUpsertOne) Update(set func(*UsageLogUpsert)) *UsageLogUpsertOne
 		set(&UsageLogUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (u *UsageLogUpsertOne) SetEnterpriseID(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEnterpriseID(v)
+	})
+}
+
+// AddEnterpriseID adds v to the "enterprise_id" field.
+func (u *UsageLogUpsertOne) AddEnterpriseID(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddEnterpriseID(v)
+	})
+}
+
+// UpdateEnterpriseID sets the "enterprise_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateEnterpriseID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEnterpriseID()
+	})
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (u *UsageLogUpsertOne) ClearEnterpriseID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearEnterpriseID()
+	})
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (u *UsageLogUpsertOne) SetEnterpriseDepartmentID(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEnterpriseDepartmentID(v)
+	})
+}
+
+// AddEnterpriseDepartmentID adds v to the "enterprise_department_id" field.
+func (u *UsageLogUpsertOne) AddEnterpriseDepartmentID(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddEnterpriseDepartmentID(v)
+	})
+}
+
+// UpdateEnterpriseDepartmentID sets the "enterprise_department_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateEnterpriseDepartmentID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEnterpriseDepartmentID()
+	})
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (u *UsageLogUpsertOne) ClearEnterpriseDepartmentID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearEnterpriseDepartmentID()
+	})
 }
 
 // SetUserID sets the "user_id" field.
@@ -3207,7 +3347,7 @@ func (_c *UsageLogCreateBulk) ExecX(ctx context.Context) {
 //		// Override some of the fields with custom
 //		// update values.
 //		Update(func(u *ent.UsageLogUpsert) {
-//			SetUserID(v+v).
+//			SetEnterpriseID(v+v).
 //		}).
 //		Exec(ctx)
 func (_c *UsageLogCreateBulk) OnConflict(opts ...sql.ConflictOption) *UsageLogUpsertBulk {
@@ -3281,6 +3421,62 @@ func (u *UsageLogUpsertBulk) Update(set func(*UsageLogUpsert)) *UsageLogUpsertBu
 		set(&UsageLogUpsert{UpdateSet: update})
 	}))
 	return u
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (u *UsageLogUpsertBulk) SetEnterpriseID(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEnterpriseID(v)
+	})
+}
+
+// AddEnterpriseID adds v to the "enterprise_id" field.
+func (u *UsageLogUpsertBulk) AddEnterpriseID(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddEnterpriseID(v)
+	})
+}
+
+// UpdateEnterpriseID sets the "enterprise_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateEnterpriseID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEnterpriseID()
+	})
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (u *UsageLogUpsertBulk) ClearEnterpriseID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearEnterpriseID()
+	})
+}
+
+// SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
+func (u *UsageLogUpsertBulk) SetEnterpriseDepartmentID(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetEnterpriseDepartmentID(v)
+	})
+}
+
+// AddEnterpriseDepartmentID adds v to the "enterprise_department_id" field.
+func (u *UsageLogUpsertBulk) AddEnterpriseDepartmentID(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddEnterpriseDepartmentID(v)
+	})
+}
+
+// UpdateEnterpriseDepartmentID sets the "enterprise_department_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateEnterpriseDepartmentID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateEnterpriseDepartmentID()
+	})
+}
+
+// ClearEnterpriseDepartmentID clears the value of the "enterprise_department_id" field.
+func (u *UsageLogUpsertBulk) ClearEnterpriseDepartmentID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearEnterpriseDepartmentID()
+	})
 }
 
 // SetUserID sets the "user_id" field.

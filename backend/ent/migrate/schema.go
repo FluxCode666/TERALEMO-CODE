@@ -519,6 +519,10 @@ var (
 		{Name: "id", Type: field.TypeInt64, Increment: true},
 		{Name: "batch_id", Type: field.TypeString, Size: 64},
 		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "enterprise_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "enterprise_department_path", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "enterprise_department_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "enterprise_member_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "api_key_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "account_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "provider", Type: field.TypeString, Size: 32},
@@ -572,22 +576,22 @@ var (
 			{
 				Name:    "batchimagejob_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[2], BatchImageJobsColumns[35]},
+				Columns: []*schema.Column{BatchImageJobsColumns[2], BatchImageJobsColumns[39]},
 			},
 			{
 				Name:    "batchimagejob_status",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[8]},
+				Columns: []*schema.Column{BatchImageJobsColumns[12]},
 			},
 			{
 				Name:    "batchimagejob_provider_status",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[5], BatchImageJobsColumns[8]},
+				Columns: []*schema.Column{BatchImageJobsColumns[9], BatchImageJobsColumns[12]},
 			},
 			{
 				Name:    "batchimagejob_idempotency_key",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[23]},
+				Columns: []*schema.Column{BatchImageJobsColumns[27]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "idempotency_key IS NOT NULL AND idempotency_key <> ''",
 				},
@@ -595,7 +599,7 @@ var (
 			{
 				Name:    "batchimagejob_manifest_hash",
 				Unique:  true,
-				Columns: []*schema.Column{BatchImageJobsColumns[25]},
+				Columns: []*schema.Column{BatchImageJobsColumns[29]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "manifest_hash IS NOT NULL AND manifest_hash <> ''",
 				},
@@ -603,17 +607,17 @@ var (
 			{
 				Name:    "batchimagejob_output_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[28]},
+				Columns: []*schema.Column{BatchImageJobsColumns[32]},
 			},
 			{
 				Name:    "batchimagejob_downloaded_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[31]},
+				Columns: []*schema.Column{BatchImageJobsColumns[35]},
 			},
 			{
 				Name:    "batchimagejob_user_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[32]},
+				Columns: []*schema.Column{BatchImageJobsColumns[36]},
 			},
 		},
 	}
@@ -860,6 +864,356 @@ var (
 				Name:    "compositemodelroute_priority",
 				Unique:  false,
 				Columns: []*schema.Column{CompositeModelRoutesColumns[9]},
+			},
+		},
+	}
+	// EnterprisesColumns holds the columns for the "enterprises" table.
+	EnterprisesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "group_pool_configured", Type: field.TypeBool, Default: false},
+		{Name: "member_concurrency", Type: field.TypeInt, Nullable: true, SchemaType: map[string]string{"postgres": "integer"}},
+		{Name: "balance", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "frozen_balance", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "total_recharged", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "low_balance_threshold", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "contact_name", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "contact_email", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "contact_phone", Type: field.TypeString, Size: 50, Default: ""},
+		{Name: "notes", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "settings", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
+	}
+	// EnterprisesTable holds the schema information for the "enterprises" table.
+	EnterprisesTable = &schema.Table{
+		Name:       "enterprises",
+		Columns:    EnterprisesColumns,
+		PrimaryKey: []*schema.Column{EnterprisesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprises_name_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterprisesColumns[4]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+		},
+	}
+	// EnterpriseAllowedGroupsColumns holds the columns for the "enterprise_allowed_groups" table.
+	EnterpriseAllowedGroupsColumns = []*schema.Column{
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "group_id", Type: field.TypeInt64},
+	}
+	// EnterpriseAllowedGroupsTable holds the schema information for the "enterprise_allowed_groups" table.
+	EnterpriseAllowedGroupsTable = &schema.Table{
+		Name:       "enterprise_allowed_groups",
+		Columns:    EnterpriseAllowedGroupsColumns,
+		PrimaryKey: []*schema.Column{EnterpriseAllowedGroupsColumns[1], EnterpriseAllowedGroupsColumns[2]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "enterprise_allowed_groups_enterprises_enterprise",
+				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[1]},
+				RefColumns: []*schema.Column{EnterprisesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "enterprise_allowed_groups_groups_group",
+				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[2]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
+	// EnterpriseAuditLogsColumns holds the columns for the "enterprise_audit_logs" table.
+	EnterpriseAuditLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "actor_user_id", Type: field.TypeInt64},
+		{Name: "actor_role", Type: field.TypeString, Size: 20},
+		{Name: "action", Type: field.TypeString, Size: 64},
+		{Name: "target_type", Type: field.TypeString, Size: 32, Default: ""},
+		{Name: "target_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "detail", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// EnterpriseAuditLogsTable holds the schema information for the "enterprise_audit_logs" table.
+	EnterpriseAuditLogsTable = &schema.Table{
+		Name:       "enterprise_audit_logs",
+		Columns:    EnterpriseAuditLogsColumns,
+		PrimaryKey: []*schema.Column{EnterpriseAuditLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_audit_logs_enterprise_created",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseAuditLogsColumns[1], EnterpriseAuditLogsColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						EnterpriseAuditLogsColumns[8].Name: true,
+					},
+				},
+			},
+		},
+	}
+	// EnterpriseBalanceLogsColumns holds the columns for the "enterprise_balance_logs" table.
+	EnterpriseBalanceLogsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "type", Type: field.TypeString, Size: 20},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "balance_before", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "balance_after", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "operator_user_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "notes", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// EnterpriseBalanceLogsTable holds the schema information for the "enterprise_balance_logs" table.
+	EnterpriseBalanceLogsTable = &schema.Table{
+		Name:       "enterprise_balance_logs",
+		Columns:    EnterpriseBalanceLogsColumns,
+		PrimaryKey: []*schema.Column{EnterpriseBalanceLogsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_balance_logs_enterprise_created",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseBalanceLogsColumns[1], EnterpriseBalanceLogsColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					DescColumns: map[string]bool{
+						EnterpriseBalanceLogsColumns[8].Name: true,
+					},
+				},
+			},
+		},
+	}
+	// EnterpriseDepartmentsColumns holds the columns for the "enterprise_departments" table.
+	EnterpriseDepartmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "path", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "depth", Type: field.TypeInt, Default: 1},
+		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "parent_id", Type: field.TypeInt64, Nullable: true},
+	}
+	// EnterpriseDepartmentsTable holds the schema information for the "enterprise_departments" table.
+	EnterpriseDepartmentsTable = &schema.Table{
+		Name:       "enterprise_departments",
+		Columns:    EnterpriseDepartmentsColumns,
+		PrimaryKey: []*schema.Column{EnterpriseDepartmentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "enterprise_departments_enterprises_enterprise",
+				Columns:    []*schema.Column{EnterpriseDepartmentsColumns[8]},
+				RefColumns: []*schema.Column{EnterprisesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "enterprise_departments_enterprise_departments_children",
+				Columns:    []*schema.Column{EnterpriseDepartmentsColumns[9]},
+				RefColumns: []*schema.Column{EnterpriseDepartmentsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_departments_sibling_name_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[9], EnterpriseDepartmentsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL AND parent_id IS NOT NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_departments_root_name_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL AND parent_id IS NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_departments_parent",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[9]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_departments_tree_path",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[4]},
+			},
+		},
+	}
+	// EnterpriseGroupWhitelistsColumns holds the columns for the "enterprise_group_whitelists" table.
+	EnterpriseGroupWhitelistsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "scope_type", Type: field.TypeString, Size: 20},
+		{Name: "scope_id", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "group_id", Type: field.TypeInt64},
+	}
+	// EnterpriseGroupWhitelistsTable holds the schema information for the "enterprise_group_whitelists" table.
+	EnterpriseGroupWhitelistsTable = &schema.Table{
+		Name:       "enterprise_group_whitelists",
+		Columns:    EnterpriseGroupWhitelistsColumns,
+		PrimaryKey: []*schema.Column{EnterpriseGroupWhitelistsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "enterprise_group_whitelists_groups_group",
+				Columns:    []*schema.Column{EnterpriseGroupWhitelistsColumns[5]},
+				RefColumns: []*schema.Column{GroupsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_group_whitelists_scope_group",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistsColumns[2], EnterpriseGroupWhitelistsColumns[3], EnterpriseGroupWhitelistsColumns[5]},
+			},
+			{
+				Name:    "idx_enterprise_group_whitelists_enterprise",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistsColumns[1]},
+			},
+		},
+	}
+	// EnterpriseGroupWhitelistScopesColumns holds the columns for the "enterprise_group_whitelist_scopes" table.
+	EnterpriseGroupWhitelistScopesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "scope_type", Type: field.TypeString, Size: 20},
+		{Name: "scope_id", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// EnterpriseGroupWhitelistScopesTable holds the schema information for the "enterprise_group_whitelist_scopes" table.
+	EnterpriseGroupWhitelistScopesTable = &schema.Table{
+		Name:       "enterprise_group_whitelist_scopes",
+		Columns:    EnterpriseGroupWhitelistScopesColumns,
+		PrimaryKey: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "uq_enterprise_group_whitelist_scopes_scope",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[2], EnterpriseGroupWhitelistScopesColumns[3]},
+			},
+			{
+				Name:    "idx_enterprise_group_whitelist_scopes_enterprise",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseGroupWhitelistScopesColumns[1]},
+			},
+		},
+	}
+	// EnterpriseMembersColumns holds the columns for the "enterprise_members" table.
+	EnterpriseMembersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "role", Type: field.TypeString, Size: 20, Default: "member"},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "title", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "account_created_by_enterprise", Type: field.TypeBool, Default: false},
+		{Name: "joined_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "department_id", Type: field.TypeInt64, Nullable: true},
+	}
+	// EnterpriseMembersTable holds the schema information for the "enterprise_members" table.
+	EnterpriseMembersTable = &schema.Table{
+		Name:       "enterprise_members",
+		Columns:    EnterpriseMembersColumns,
+		PrimaryKey: []*schema.Column{EnterpriseMembersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "enterprise_members_enterprises_enterprise",
+				Columns:    []*schema.Column{EnterpriseMembersColumns[9]},
+				RefColumns: []*schema.Column{EnterprisesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "enterprise_members_users_user",
+				Columns:    []*schema.Column{EnterpriseMembersColumns[10]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "enterprise_members_enterprise_departments_department",
+				Columns:    []*schema.Column{EnterpriseMembersColumns[11]},
+				RefColumns: []*schema.Column{EnterpriseDepartmentsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_members_user_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseMembersColumns[10]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_members_enterprise",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseMembersColumns[9]},
+			},
+			{
+				Name:    "idx_enterprise_members_department",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseMembersColumns[11]},
+			},
+		},
+	}
+	// EnterpriseQuotasColumns holds the columns for the "enterprise_quotas" table.
+	EnterpriseQuotasColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "scope_type", Type: field.TypeString, Size: 20},
+		{Name: "scope_id", Type: field.TypeInt64},
+		{Name: "daily_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "weekly_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "monthly_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "total_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "daily_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "weekly_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "monthly_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "total_usage_usd", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "daily_window_start", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "weekly_window_start", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "monthly_window_start", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// EnterpriseQuotasTable holds the schema information for the "enterprise_quotas" table.
+	EnterpriseQuotasTable = &schema.Table{
+		Name:       "enterprise_quotas",
+		Columns:    EnterpriseQuotasColumns,
+		PrimaryKey: []*schema.Column{EnterpriseQuotasColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "idx_enterprise_quotas_scope_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseQuotasColumns[5], EnterpriseQuotasColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_quotas_enterprise",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseQuotasColumns[4]},
 			},
 		},
 	}
@@ -1638,6 +1992,8 @@ var (
 	// UsageLogsColumns holds the columns for the "usage_logs" table.
 	UsageLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "enterprise_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "enterprise_department_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "request_id", Type: field.TypeString, Size: 64},
 		{Name: "model", Type: field.TypeString, Size: 100},
 		{Name: "requested_model", Type: field.TypeString, Nullable: true, Size: 100},
@@ -1694,95 +2050,111 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[43]},
+				Columns:    []*schema.Column{UsageLogsColumns[45]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_accounts_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[44]},
+				Columns:    []*schema.Column{UsageLogsColumns[46]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[45]},
+				Columns:    []*schema.Column{UsageLogsColumns[47]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[46]},
+				Columns:    []*schema.Column{UsageLogsColumns[48]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_user_subscriptions_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[47]},
+				Columns:    []*schema.Column{UsageLogsColumns[49]},
 				RefColumns: []*schema.Column{UserSubscriptionsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
+				Name:    "idx_usage_logs_enterprise_created",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[1], UsageLogsColumns[44]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "enterprise_id IS NOT NULL",
+				},
+			},
+			{
+				Name:    "idx_usage_logs_enterprise_department_created",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[2], UsageLogsColumns[44]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "enterprise_department_id IS NOT NULL",
+				},
+			},
+			{
 				Name:    "usagelog_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[46]},
+				Columns: []*schema.Column{UsageLogsColumns[48]},
 			},
 			{
 				Name:    "usagelog_api_key_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[45]},
 			},
 			{
 				Name:    "usagelog_account_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[44]},
+				Columns: []*schema.Column{UsageLogsColumns[46]},
 			},
 			{
 				Name:    "usagelog_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[45]},
+				Columns: []*schema.Column{UsageLogsColumns[47]},
 			},
 			{
 				Name:    "usagelog_subscription_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[47]},
+				Columns: []*schema.Column{UsageLogsColumns[49]},
 			},
 			{
 				Name:    "usagelog_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[44]},
 			},
 			{
 				Name:    "usagelog_model",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[2]},
+				Columns: []*schema.Column{UsageLogsColumns[4]},
 			},
 			{
 				Name:    "usagelog_requested_model",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[3]},
+				Columns: []*schema.Column{UsageLogsColumns[5]},
 			},
 			{
 				Name:    "usagelog_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[3]},
 			},
 			{
 				Name:    "usagelog_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[46], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[48], UsageLogsColumns[44]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[43], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[45], UsageLogsColumns[44]},
 			},
 			{
 				Name:    "usagelog_group_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[45], UsageLogsColumns[42]},
+				Columns: []*schema.Column{UsageLogsColumns[47], UsageLogsColumns[44]},
 			},
 		},
 	}
@@ -2105,6 +2477,15 @@ var (
 		ChannelMonitorHistoriesTable,
 		ChannelMonitorRequestTemplatesTable,
 		CompositeModelRoutesTable,
+		EnterprisesTable,
+		EnterpriseAllowedGroupsTable,
+		EnterpriseAuditLogsTable,
+		EnterpriseBalanceLogsTable,
+		EnterpriseDepartmentsTable,
+		EnterpriseGroupWhitelistsTable,
+		EnterpriseGroupWhitelistScopesTable,
+		EnterpriseMembersTable,
+		EnterpriseQuotasTable,
 		ErrorPassthroughRulesTable,
 		GroupsTable,
 		IdempotencyRecordsTable,
@@ -2191,6 +2572,41 @@ func init() {
 	CompositeModelRoutesTable.ForeignKeys[0].RefTable = GroupsTable
 	CompositeModelRoutesTable.Annotation = &entsql.Annotation{
 		Table: "composite_model_routes",
+	}
+	EnterprisesTable.Annotation = &entsql.Annotation{
+		Table: "enterprises",
+	}
+	EnterpriseAllowedGroupsTable.ForeignKeys[0].RefTable = EnterprisesTable
+	EnterpriseAllowedGroupsTable.ForeignKeys[1].RefTable = GroupsTable
+	EnterpriseAllowedGroupsTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_allowed_groups",
+	}
+	EnterpriseAuditLogsTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_audit_logs",
+	}
+	EnterpriseBalanceLogsTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_balance_logs",
+	}
+	EnterpriseDepartmentsTable.ForeignKeys[0].RefTable = EnterprisesTable
+	EnterpriseDepartmentsTable.ForeignKeys[1].RefTable = EnterpriseDepartmentsTable
+	EnterpriseDepartmentsTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_departments",
+	}
+	EnterpriseGroupWhitelistsTable.ForeignKeys[0].RefTable = GroupsTable
+	EnterpriseGroupWhitelistsTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_group_whitelists",
+	}
+	EnterpriseGroupWhitelistScopesTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_group_whitelist_scopes",
+	}
+	EnterpriseMembersTable.ForeignKeys[0].RefTable = EnterprisesTable
+	EnterpriseMembersTable.ForeignKeys[1].RefTable = UsersTable
+	EnterpriseMembersTable.ForeignKeys[2].RefTable = EnterpriseDepartmentsTable
+	EnterpriseMembersTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_members",
+	}
+	EnterpriseQuotasTable.Annotation = &entsql.Annotation{
+		Table: "enterprise_quotas",
 	}
 	ErrorPassthroughRulesTable.Annotation = &entsql.Annotation{
 		Table: "error_passthrough_rules",

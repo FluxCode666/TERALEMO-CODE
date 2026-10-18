@@ -14,7 +14,23 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 24 // v24: group model_allowlist field (renamed from models_list_config, enforcing semantics)
+const apiKeyAuthSnapshotVersion = 27 // v27: only enterprise-level group whitelists apply
+
+func cloneEnterpriseMemberContext(src *EnterpriseMemberContext) *EnterpriseMemberContext {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.DepartmentPathIDs = append([]int64(nil), src.DepartmentPathIDs...)
+	dst.DepartmentSubtreeIDs = append([]int64(nil), src.DepartmentSubtreeIDs...)
+	dst.GroupPoolIDs = append([]int64(nil), src.GroupPoolIDs...)
+	dst.GroupWhitelistIDs = append([]int64(nil), src.GroupWhitelistIDs...)
+	if src.DepartmentID != nil {
+		departmentID := *src.DepartmentID
+		dst.DepartmentID = &departmentID
+	}
+	return &dst
+}
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -357,6 +373,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Balance:                    apiKey.User.Balance,
 			Concurrency:                apiKey.User.Concurrency,
 			AllowedGroups:              apiKey.User.AllowedGroups,
+			Enterprise:                 cloneEnterpriseMemberContext(apiKey.User.Enterprise),
 			Email:                      apiKey.User.Email,
 			Username:                   apiKey.User.Username,
 			BalanceNotifyEnabled:       apiKey.User.BalanceNotifyEnabled,
@@ -466,6 +483,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Balance:                    snapshot.User.Balance,
 			Concurrency:                snapshot.User.Concurrency,
 			AllowedGroups:              snapshot.User.AllowedGroups,
+			Enterprise:                 cloneEnterpriseMemberContext(snapshot.User.Enterprise),
 			Email:                      snapshot.User.Email,
 			Username:                   snapshot.User.Username,
 			BalanceNotifyEnabled:       snapshot.User.BalanceNotifyEnabled,

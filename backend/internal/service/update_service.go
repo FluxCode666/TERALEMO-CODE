@@ -27,10 +27,13 @@ var (
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
 )
 
+// UpdateGitHubRepo 是系统更新检查、下载与回滚所用的 GitHub Releases 仓库。
+const UpdateGitHubRepo = "FluxCode666/TERALEMO-CODE"
+
 const (
 	updateCacheKey = "update_check_cache"
 	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "Wei-Shaw/sub2api"
+	githubRepo     = UpdateGitHubRepo
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"

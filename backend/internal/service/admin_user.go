@@ -195,6 +195,27 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
+	if s.enterpriseMembers != nil && (input.Role != "" || input.Status != "") {
+		var updated *User
+		var enterpriseMember bool
+		err := s.withEnterpriseUserGuard(ctx, id, func(txCtx context.Context, member *EnterpriseMember, owners int64) error {
+			enterpriseMember = member != nil
+			if err := s.checkEnterpriseUserUpdate(txCtx, id, input, member, owners); err != nil {
+				return err
+			}
+			var err error
+			updated, err = s.updateUser(txCtx, id, input)
+			return err
+		})
+		if err == nil && updated != nil && enterpriseMember && s.authCacheInvalidator != nil {
+			invalidateEnterpriseMembersAuthCache(ctx, []int64{id}, s.authCacheInvalidator)
+		}
+		return updated, err
+	}
+	return s.updateUser(ctx, id, input)
+}
+
+func (s *adminServiceImpl) updateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
 	// 校验用户专属分组倍率：必须 > 0（nil 合法，表示清除专属倍率）
 	if input.GroupRates != nil {
 		for groupID, rate := range input.GroupRates {
@@ -357,6 +378,22 @@ func sameInt64Set(a, b []int64) bool {
 }
 
 func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
+	if s.enterpriseMembers != nil {
+		err := s.withEnterpriseUserGuard(ctx, id, func(txCtx context.Context, member *EnterpriseMember, _ int64) error {
+			if member != nil {
+				return ErrEnterpriseMemberUserDeleteForbidden
+			}
+			return s.deleteUser(txCtx, id)
+		})
+		if err == nil && s.authCacheInvalidator != nil {
+			invalidateEnterpriseMembersAuthCache(ctx, []int64{id}, s.authCacheInvalidator)
+		}
+		return err
+	}
+	return s.deleteUser(ctx, id)
+}
+
+func (s *adminServiceImpl) deleteUser(ctx context.Context, id int64) error {
 	// Protect admin users: cannot delete admin accounts
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
@@ -371,7 +408,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		return err
 	}
 
-	if s.entClient != nil {
+	if s.entClient != nil && dbent.TxFromContext(ctx) == nil {
 		tx, err := s.entClient.Tx(ctx)
 		if err != nil {
 			return err
@@ -586,6 +623,16 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 func (s *adminServiceImpl) tryAccrueAffiliateRebateForAdminRecharge(ctx context.Context, userID int64, operation string, amount float64) {
 	if operation != "add" || amount <= 0 || s.settingService == nil || s.affiliateService == nil {
 		return
+	}
+	if s.enterpriseMembers != nil {
+		member, err := s.enterpriseMembers.GetByUserID(ctx, userID)
+		if err != nil && !errors.Is(err, ErrEnterpriseMemberNotFound) {
+			logger.LegacyPrintf("service.admin", "skip recharge rebate: enterprise membership lookup failed: user_id=%d err=%v", userID, err)
+			return
+		}
+		if member != nil {
+			return
+		}
 	}
 	if !s.settingService.IsAffiliateAdminRechargeEnabled(ctx) {
 		return

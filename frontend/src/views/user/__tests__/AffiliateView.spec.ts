@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AffiliateView from '../AffiliateView.vue'
 
-const { copyToClipboard, getAffiliateDetail } = vi.hoisted(() => ({
+const { copyToClipboard, getAffiliateDetail, auth } = vi.hoisted(() => ({
   copyToClipboard: vi.fn(),
   getAffiliateDetail: vi.fn(),
+  auth: { user: { enterprise: null as { id: number } | null }, refreshUser: vi.fn() },
 }))
 
 vi.mock('@/api/user', () => ({
@@ -23,9 +24,7 @@ vi.mock('@/stores/app', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    refreshUser: vi.fn(),
-  }),
+  useAuthStore: () => auth,
 }))
 
 vi.mock('@/composables/useClipboard', () => ({
@@ -47,6 +46,7 @@ describe('AffiliateView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    auth.user.enterprise = null
     copyToClipboard.mockResolvedValue(true)
     getAffiliateDetail.mockResolvedValue({
       user_id: 1,
@@ -59,6 +59,17 @@ describe('AffiliateView', () => {
       effective_rebate_rate_percent: 10,
       invitees: [],
     })
+  })
+
+  it('企业成员保留邀请信息并隐藏转入个人余额入口', async () => {
+    auth.user.enterprise = { id: 1 }
+    const wrapper = mount(AffiliateView, {
+      global: { stubs: { AppLayout: { template: '<main><slot /></main>' }, Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="affiliate-transfer-balance"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain(affiliateCode)
+    expect(wrapper.text()).not.toContain('affiliate.transfer.button')
   })
 
   it('stacks long values and copy controls on mobile while retaining desktop rows', async () => {

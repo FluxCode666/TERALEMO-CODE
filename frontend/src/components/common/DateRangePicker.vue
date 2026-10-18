@@ -3,6 +3,7 @@
     <button
       type="button"
       @click="toggle"
+      :aria-expanded="isOpen"
       :class="['date-picker-trigger', isOpen && 'date-picker-trigger-open']"
     >
       <span class="date-picker-icon">
@@ -25,6 +26,7 @@
         <!-- Quick presets -->
         <div class="date-picker-presets">
           <button
+            type="button"
             v-for="preset in presets"
             :key="preset.value"
             @click="selectPreset(preset)"
@@ -66,7 +68,7 @@
 
         <!-- Apply button -->
         <div class="date-picker-actions">
-          <button @click="apply" class="date-picker-apply">
+          <button type="button" @click="apply" class="date-picker-apply">
             {{ t('dates.apply') }}
           </button>
         </div>

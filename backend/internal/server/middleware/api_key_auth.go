@@ -157,6 +157,12 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		if abortIfEnterpriseMembershipDisabled(c, apiKey.User.Enterprise) {
+			return
+		}
+		if apiKey.User.Enterprise != nil && (apiKey.GroupID == nil || apiKey.Group == nil) && abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+			return
+		}
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}
@@ -164,6 +170,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+		if apiKey.User.Enterprise != nil {
+			ctx = service.WithEnterpriseGatewayUser(ctx, apiKey.User)
+		}
 		c.Request = c.Request.WithContext(ctx)
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
 		// Async image task polling only reads data that already belongs to the
@@ -260,7 +269,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+				if apiKey.User.Enterprise == nil && apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 					return
 				}
@@ -419,15 +428,38 @@ func abortIfAPIKeyGroupNotAllowed(c *gin.Context, apiKey *service.APIKey) bool {
 	}
 	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 	MarkIngressRejected(c, IngressRejectGroupNotAllowed)
-	AbortWithError(c, 403, "GROUP_NOT_ALLOWED", "API Key 所属专属分组不再允许当前用户使用")
+	if apiKey.User != nil && apiKey.User.Enterprise != nil {
+		AbortWithError(c, 403, "ENTERPRISE_GROUP_NOT_ALLOWED", service.ErrEnterpriseGatewayGroupNotAllowed.Message)
+	} else {
+		AbortWithError(c, 403, "GROUP_NOT_ALLOWED", "API Key 所属专属分组不再允许当前用户使用")
+	}
+	return true
+}
+
+func abortIfEnterpriseMembershipDisabled(c *gin.Context, membership *service.EnterpriseMemberContext) bool {
+	if membership == nil || membership.Active() {
+		return false
+	}
+	if membership.EnterpriseStatus != service.EnterpriseStatusActive {
+		AbortWithError(c, http.StatusForbidden, "ENTERPRISE_DISABLED", service.ErrEnterpriseGatewayDisabled.Message)
+	} else {
+		AbortWithError(c, http.StatusForbidden, "ENTERPRISE_MEMBER_DISABLED", service.ErrEnterpriseGatewayMemberDisabled.Message)
+	}
 	return true
 }
 
 func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
-	if apiKey == nil || apiKey.GroupID == nil || apiKey.User == nil || apiKey.Group == nil {
+	if apiKey == nil || apiKey.User == nil {
 		return true
 	}
+	if apiKey.GroupID == nil || apiKey.Group == nil {
+		// Every enterprise request needs an explicit group, including legacy keys.
+		return apiKey.User.Enterprise == nil
+	}
 	group := apiKey.Group
+	if apiKey.User.Enterprise != nil && !apiKey.User.Enterprise.AllowsGroup(group.ID) {
+		return false
+	}
 	if group.IsSubscriptionType() {
 		return true
 	}

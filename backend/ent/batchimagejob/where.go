@@ -64,6 +64,26 @@ func UserID(v int64) predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldEQ(FieldUserID, v))
 }
 
+// EnterpriseID applies equality check predicate on the "enterprise_id" field. It's identical to EnterpriseIDEQ.
+func EnterpriseID(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseID, v))
+}
+
+// EnterpriseDepartmentPath applies equality check predicate on the "enterprise_department_path" field. It's identical to EnterpriseDepartmentPathEQ.
+func EnterpriseDepartmentPath(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentID applies equality check predicate on the "enterprise_department_id" field. It's identical to EnterpriseDepartmentIDEQ.
+func EnterpriseDepartmentID(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseMemberID applies equality check predicate on the "enterprise_member_id" field. It's identical to EnterpriseMemberIDEQ.
+func EnterpriseMemberID(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseMemberID, v))
+}
+
 // APIKeyID applies equality check predicate on the "api_key_id" field. It's identical to APIKeyIDEQ.
 func APIKeyID(v int64) predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldEQ(FieldAPIKeyID, v))
@@ -357,6 +377,221 @@ func UserIDLT(v int64) predicate.BatchImageJob {
 // UserIDLTE applies the LTE predicate on the "user_id" field.
 func UserIDLTE(v int64) predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldLTE(FieldUserID, v))
+}
+
+// EnterpriseIDEQ applies the EQ predicate on the "enterprise_id" field.
+func EnterpriseIDEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDNEQ applies the NEQ predicate on the "enterprise_id" field.
+func EnterpriseIDNEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNEQ(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDIn applies the In predicate on the "enterprise_id" field.
+func EnterpriseIDIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIn(FieldEnterpriseID, vs...))
+}
+
+// EnterpriseIDNotIn applies the NotIn predicate on the "enterprise_id" field.
+func EnterpriseIDNotIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotIn(FieldEnterpriseID, vs...))
+}
+
+// EnterpriseIDGT applies the GT predicate on the "enterprise_id" field.
+func EnterpriseIDGT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGT(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDGTE applies the GTE predicate on the "enterprise_id" field.
+func EnterpriseIDGTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGTE(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDLT applies the LT predicate on the "enterprise_id" field.
+func EnterpriseIDLT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLT(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDLTE applies the LTE predicate on the "enterprise_id" field.
+func EnterpriseIDLTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLTE(FieldEnterpriseID, v))
+}
+
+// EnterpriseIDIsNil applies the IsNil predicate on the "enterprise_id" field.
+func EnterpriseIDIsNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIsNull(FieldEnterpriseID))
+}
+
+// EnterpriseIDNotNil applies the NotNil predicate on the "enterprise_id" field.
+func EnterpriseIDNotNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotNull(FieldEnterpriseID))
+}
+
+// EnterpriseDepartmentPathEQ applies the EQ predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathEQ(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathNEQ applies the NEQ predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathNEQ(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNEQ(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathIn applies the In predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathIn(vs ...string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIn(FieldEnterpriseDepartmentPath, vs...))
+}
+
+// EnterpriseDepartmentPathNotIn applies the NotIn predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathNotIn(vs ...string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotIn(FieldEnterpriseDepartmentPath, vs...))
+}
+
+// EnterpriseDepartmentPathGT applies the GT predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathGT(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGT(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathGTE applies the GTE predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathGTE(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGTE(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathLT applies the LT predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathLT(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLT(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathLTE applies the LTE predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathLTE(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLTE(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathContains applies the Contains predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathContains(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldContains(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathHasPrefix applies the HasPrefix predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathHasPrefix(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldHasPrefix(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathHasSuffix applies the HasSuffix predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathHasSuffix(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldHasSuffix(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathEqualFold applies the EqualFold predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathEqualFold(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEqualFold(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathContainsFold applies the ContainsFold predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathContainsFold(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldContainsFold(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentIDEQ applies the EQ predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDNEQ applies the NEQ predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDNEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNEQ(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDIn applies the In predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIn(FieldEnterpriseDepartmentID, vs...))
+}
+
+// EnterpriseDepartmentIDNotIn applies the NotIn predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDNotIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotIn(FieldEnterpriseDepartmentID, vs...))
+}
+
+// EnterpriseDepartmentIDGT applies the GT predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDGT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGT(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDGTE applies the GTE predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDGTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGTE(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDLT applies the LT predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDLT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLT(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDLTE applies the LTE predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDLTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLTE(FieldEnterpriseDepartmentID, v))
+}
+
+// EnterpriseDepartmentIDIsNil applies the IsNil predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDIsNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIsNull(FieldEnterpriseDepartmentID))
+}
+
+// EnterpriseDepartmentIDNotNil applies the NotNil predicate on the "enterprise_department_id" field.
+func EnterpriseDepartmentIDNotNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotNull(FieldEnterpriseDepartmentID))
+}
+
+// EnterpriseMemberIDEQ applies the EQ predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDNEQ applies the NEQ predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDNEQ(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNEQ(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDIn applies the In predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIn(FieldEnterpriseMemberID, vs...))
+}
+
+// EnterpriseMemberIDNotIn applies the NotIn predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDNotIn(vs ...int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotIn(FieldEnterpriseMemberID, vs...))
+}
+
+// EnterpriseMemberIDGT applies the GT predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDGT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGT(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDGTE applies the GTE predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDGTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGTE(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDLT applies the LT predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDLT(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLT(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDLTE applies the LTE predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDLTE(v int64) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLTE(FieldEnterpriseMemberID, v))
+}
+
+// EnterpriseMemberIDIsNil applies the IsNil predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDIsNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIsNull(FieldEnterpriseMemberID))
+}
+
+// EnterpriseMemberIDNotNil applies the NotNil predicate on the "enterprise_member_id" field.
+func EnterpriseMemberIDNotNil() predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotNull(FieldEnterpriseMemberID))
 }
 
 // APIKeyIDEQ applies the EQ predicate on the "api_key_id" field.

@@ -36,7 +36,7 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 	}
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -52,7 +52,7 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: model, Kind: service.InflightEstimateAudio, AudioMode: "realtime", AudioUnits: 1})
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -141,9 +141,9 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 	}
 	defer func() { _ = conn.CloseNow() }()
 
-	started := time.Now()
-	audioObserved, proxyErr := h.gatewayService.ProxyGrokRealtimeConn(c.Request.Context(), c, conn, upstream)
-	elapsed := time.Since(started)
+	proxyErr := h.proxyAndBillGrokRealtime(c, apiKey, selection.Account, subscription, model, func() (bool, error) {
+		return h.gatewayService.ProxyGrokRealtimeConn(c.Request.Context(), c, conn, upstream)
+	})
 	if proxyErr != nil {
 		reqLog.Info("grok_realtime.proxy_failed", zap.Error(proxyErr))
 		if !isExpectedGrokRealtimeClose(proxyErr) {
@@ -151,9 +151,50 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 			return
 		}
 	}
-	if result := grokRealtimeBillingResult(model, elapsed, audioObserved); result != nil {
-		h.recordGrokVoiceUsage(c, apiKey, selection.Account, subscription, "realtime", nil, result)
+}
+
+// Billing belongs to the consumed session, including malformed frames and failed
+// relays. Submit it before the caller handles the transport error or closes WS.
+func (h *OpenAIGatewayHandler) proxyAndBillGrokRealtime(c *gin.Context, key *service.APIKey, account *service.Account, subscription *service.UserSubscription, model string, relay func() (bool, error)) error {
+	key, subscription = freezeGrokRealtimeBillingIdentity(key, subscription)
+	started := time.Now()
+	audioObserved, proxyErr := relay()
+	if result := grokRealtimeBillingResult(model, time.Since(started), audioObserved); result != nil {
+		h.recordGrokVoiceUsage(c, key, account, subscription, "realtime", nil, result)
 	}
+	return proxyErr
+}
+
+func freezeGrokRealtimeBillingIdentity(key *service.APIKey, subscription *service.UserSubscription) (*service.APIKey, *service.UserSubscription) {
+	if key != nil {
+		copy := *key
+		key = &copy
+		if key.GroupID != nil {
+			groupID := *key.GroupID
+			key.GroupID = &groupID
+		}
+		if key.User != nil {
+			user := *key.User
+			key.User = &user
+			if user.Enterprise != nil {
+				enterprise := *user.Enterprise
+				user.Enterprise = &enterprise
+				if enterprise.DepartmentID != nil {
+					departmentID := *enterprise.DepartmentID
+					enterprise.DepartmentID = &departmentID
+				}
+			}
+		}
+		if key.Group != nil {
+			group := *key.Group
+			key.Group = &group
+		}
+	}
+	if subscription != nil {
+		copy := *subscription
+		subscription = &copy
+	}
+	return key, subscription
 }
 
 func grokRealtimeBillingResult(model string, elapsed time.Duration, audioObserved bool) *service.OpenAIForwardResult {
@@ -193,7 +234,7 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 	}
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -227,7 +268,7 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokVoiceInflightEstimate(endpoint, body))
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}

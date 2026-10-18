@@ -99,6 +99,7 @@ type UsageLogFilters = usagestats.UsageLogFilters
 func (r *usageLogRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters UsageLogFilters) ([]service.UsageLog, *pagination.PaginationResult, error) {
 	conditions := make([]string, 0, 9)
 	args := make([]any, 0, 9)
+	conditions, args = appendEnterpriseUsageWhereConditions(conditions, args, filters, "")
 
 	if filters.UserID > 0 {
 		conditions = append(conditions, fmt.Sprintf("user_id = $%d", len(args)+1))
@@ -169,7 +170,7 @@ func upstreamModelMismatchCondition(column string, mismatch bool) string {
 }
 
 func shouldUseFastUsageLogTotal(filters UsageLogFilters) bool {
-	if filters.ExactTotal {
+	if filters.ExactTotal || filters.EnterpriseID != 0 || filters.EnterpriseDepartmentID != 0 {
 		return false
 	}
 	// 强选择过滤下记录集通常较小，保留精确总数。

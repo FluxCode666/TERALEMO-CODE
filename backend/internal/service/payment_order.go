@@ -23,6 +23,9 @@ import (
 // --- Order Creation ---
 
 func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
+	if err := checkEnterprisePersonalWallet(ctx, s.enterpriseMemberships, req.UserID); err != nil {
+		return nil, err
+	}
 	if req.OrderType == "" {
 		req.OrderType = payment.OrderTypeBalance
 	}

@@ -24,11 +24,12 @@ var (
 
 // PromoService 优惠码服务
 type PromoService struct {
-	promoRepo            PromoCodeRepository
-	userRepo             UserRepository
-	billingCacheService  *BillingCacheService
-	entClient            *dbent.Client
-	authCacheInvalidator APIKeyAuthCacheInvalidator
+	enterpriseMemberships EnterpriseMembershipReader
+	promoRepo             PromoCodeRepository
+	userRepo              UserRepository
+	billingCacheService   *BillingCacheService
+	entClient             *dbent.Client
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
 }
 
 // NewPromoService 创建优惠码服务实例
@@ -92,6 +93,11 @@ func (s *PromoService) ApplyPromoCode(ctx context.Context, userID int64, code st
 	code = strings.TrimSpace(code)
 	if code == "" {
 		return nil
+	}
+	// All current promo codes grant balance. Reject before opening a transaction
+	// or consuming the code, including for disabled enterprise memberships.
+	if err := checkEnterprisePersonalWallet(ctx, s.enterpriseMemberships, userID); err != nil {
+		return err
 	}
 
 	// 开启事务

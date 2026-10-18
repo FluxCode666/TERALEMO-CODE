@@ -67,6 +67,18 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
 	}
+	if apiKey.User != nil && apiKey.User.Enterprise != nil && isGrokVideoCreateEndpoint(endpoint) {
+		err := service.ErrEnterpriseGatewayFeatureUnsupported
+		h.errorResponse(c, http.StatusForbidden, err.Reason, "Asynchronous video tasks are unavailable for enterprise members.")
+		return
+	}
+	// Enterprise video submission is disabled. An owned task polled after its
+	// creator joined an enterprise therefore retains its original personal payer.
+	// Keep the authenticated key/user untouched for authorization and other calls.
+	historicalPersonalVideo := endpoint.IsVideoLookupRequest() && apiKey.User != nil && apiKey.User.Enterprise != nil
+	if historicalPersonalVideo {
+		apiKey = personalAsyncVideoBillingKey(apiKey)
+	}
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
@@ -165,7 +177,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("grok_media.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -176,7 +188,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -496,6 +508,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				VideoResolution:      result.VideoResolution,
 				VideoDurationSeconds: result.VideoDurationSeconds,
 				OriginalModel:        clientRequestedModel(c, requestModel),
+				BillingIdentity:      newGrokVideoBillingIdentity(apiKey, subscription),
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
@@ -536,6 +549,17 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		)
 		return
 	}
+}
+
+func personalAsyncVideoBillingKey(key *service.APIKey) *service.APIKey {
+	if key == nil || key.User == nil || key.User.Enterprise == nil {
+		return key
+	}
+	copy := *key
+	user := *key.User
+	user.Enterprise = nil
+	copy.User = &user
+	return &copy
 }
 
 func (h *OpenAIGatewayHandler) ensureGrokMediaAccountEligibility(ctx context.Context, account *service.Account) (bool, string, error) {
@@ -658,6 +682,7 @@ func prepareGrokVideoCompletionBilling(
 	// Re-merge with pending: resolution is request-only; model/duration fill gaps.
 	merged := *statusResult
 	if pending != nil {
+		merged.AsyncVideoBillingIdentity = pending.BillingIdentity
 		if strings.TrimSpace(merged.Model) == "" {
 			merged.Model = firstNonEmptyString(pending.BillingModel, pending.Model, pending.OriginalModel)
 		}
@@ -728,6 +753,17 @@ func recordGrokMediaUsage(
 	body []byte,
 	requestID string,
 ) {
+	if result != nil && result.AsyncVideoBillingIdentity != nil {
+		var err error
+		apiKey, subscription, err = restoreGrokVideoBillingIdentity(apiKey, result.AsyncVideoBillingIdentity)
+		if err != nil {
+			reqLog.Error("grok_media.video_billing_identity_invalid", zap.String("request_id", requestID), zap.Error(err))
+			if releaseErr := h.gatewayService.ReleaseGrokVideoBilling(c.Request.Context(), requestID, subject.UserID, apiKey.ID); releaseErr != nil {
+				reqLog.Warn("grok_media.video_billing_claim_release_failed", zap.Error(releaseErr))
+			}
+			return
+		}
+	}
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := ip.GetClientIP(c)
 	sessionID := service.ExtractClientSessionID(c)
@@ -793,4 +829,42 @@ func recordGrokMediaUsage(
 			reqLog.Debug("grok_media.record_usage_failed", zap.Error(err))
 		}
 	})
+}
+
+func newGrokVideoBillingIdentity(key *service.APIKey, subscription *service.UserSubscription) *service.GrokVideoBillingIdentity {
+	if key == nil || key.User == nil || key.Group == nil {
+		return nil
+	}
+	identity := &service.GrokVideoBillingIdentity{UserID: key.User.ID, GroupID: key.Group.ID, BillingType: service.BillingTypeBalance}
+	if subscription != nil && key.Group.IsSubscriptionType() {
+		identity.BillingType = service.BillingTypeSubscription
+		identity.SubscriptionID = subscription.ID
+		identity.SubscriptionUserID = subscription.UserID
+		identity.SubscriptionGroupID = subscription.GroupID
+	}
+	return identity
+}
+
+func restoreGrokVideoBillingIdentity(key *service.APIKey, identity *service.GrokVideoBillingIdentity) (*service.APIKey, *service.UserSubscription, error) {
+	if key == nil || key.User == nil || key.Group == nil || identity == nil || identity.UserID <= 0 || identity.UserID != key.User.ID || identity.UserID != key.UserID || identity.GroupID <= 0 {
+		return key, nil, errors.New("async video billing identity does not match task owner")
+	}
+	copy := *personalAsyncVideoBillingKey(key)
+	group := *key.Group
+	group.ID = identity.GroupID
+	copy.Group = &group
+	copy.GroupID = &group.ID
+	switch identity.BillingType {
+	case service.BillingTypeSubscription:
+		if identity.SubscriptionID <= 0 || identity.SubscriptionUserID != identity.UserID || identity.SubscriptionGroupID != identity.GroupID {
+			return key, nil, errors.New("async video subscription identity does not match task owner and group")
+		}
+		group.SubscriptionType = service.SubscriptionTypeSubscription
+		return &copy, &service.UserSubscription{ID: identity.SubscriptionID, UserID: identity.UserID, GroupID: identity.GroupID}, nil
+	case service.BillingTypeBalance:
+		group.SubscriptionType = ""
+		return &copy, nil, nil
+	default:
+		return key, nil, errors.New("async video billing mode is invalid")
+	}
 }

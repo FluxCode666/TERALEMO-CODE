@@ -8,7 +8,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const updateCacheKey = "update:latest"
+// 缓存键带上发布仓库：切换仓库后，新仓库拉取失败时不会把旧仓库的缓存当作回退结果返回。
+const updateCacheKey = "update:latest:" + service.UpdateGitHubRepo
 
 type updateCache struct {
 	rdb *redis.Client

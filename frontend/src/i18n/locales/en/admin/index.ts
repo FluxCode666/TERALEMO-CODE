@@ -1,4 +1,5 @@
 import overview from './overview'
+import enterprises from './enterprises'
 import channels from './channels'
 import accounts from './accounts'
 import resources from './resources'
@@ -10,6 +11,7 @@ import plugins from './plugins'
 
 export default {
   ...overview,
+  ...enterprises,
   ...channels,
   ...accounts,
   ...resources,

@@ -161,8 +161,18 @@ export default {
     }
   },
 
+  header: {
+    enterpriseRoles: {
+      owner: '企业负责人',
+      manager: '部门负责人',
+      member: '员工'
+    }
+  },
+
   // Navigation
   nav: {
+    enterprise: '我的企业',
+    enterprises: '企业管理',
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',

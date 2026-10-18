@@ -1,3 +1,6 @@
+import type { EnterpriseIdentity, EnterpriseSummary } from './enterprise'
+export * from './enterprise'
+
 /**
  * Core Type Definitions for Sub2API Frontend
  */
@@ -85,6 +88,7 @@ export interface User {
   oidc_bound?: boolean
   wechat_bound?: boolean
   role: 'admin' | 'user' // User role for authorization
+  enterprise?: EnterpriseIdentity | null
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests
@@ -101,7 +105,8 @@ export interface User {
   deleted_at?: string | null
 }
 
-export interface AdminUser extends User {
+export interface AdminUser extends Omit<User, 'enterprise'> {
+  enterprise: EnterpriseSummary | null
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null

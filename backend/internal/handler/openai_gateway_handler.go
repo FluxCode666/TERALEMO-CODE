@@ -608,7 +608,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -620,7 +620,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if err != nil {
 		reqLog.Info("openai.inflight_reservation_rejected", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1257,7 +1257,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1268,7 +1268,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
 	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
 	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, inflightErr)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -1584,10 +1584,10 @@ func resolveOpenAIMessagesMetadataSession(c *gin.Context, sessionHash, promptCac
 func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int, errType, message string) {
 	c.JSON(status, gin.H{
 		"type": "error",
-		"error": gin.H{
+		"error": withEnterpriseBillingMetadata(c, gin.H{
 			"type":    errType,
 			"message": message,
-		},
+		}),
 	})
 }
 
@@ -1599,10 +1599,10 @@ func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, stat
 		if ok {
 			errPayload, _ := json.Marshal(gin.H{
 				"type": "error",
-				"error": gin.H{
+				"error": withEnterpriseBillingMetadata(c, gin.H{
 					"type":    errType,
 					"message": message,
-				},
+				}),
 			})
 			fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errPayload) //nolint:errcheck
 			flusher.Flush()
@@ -2140,10 +2140,11 @@ type openAIWSTurnAPIKeyLookup interface {
 // 取快照，缓存失效后即生效。
 //
 // 因此后续 turn 在 BeforeTurn（与 HTTP 请求进入认证中间件同位）经同一认证缓存
-// 重取快照，只采用其中的分组，作为该 turn 利润门准入与用量计费共同的分组；用户、
-// Key 限额、订阅仍沿用建连快照。只在同一把 Key、同一分组且平台与订阅类型未变时
+// 重取快照，作为该 turn 利润门准入与用量计费共同的分组；个人用户、
+// Key 限额、订阅仍沿用建连快照。企业成员同时采用最新成员上下文，企业或成员身份
+// 改变则要求重连，避免沿用连接绑定的旧钱包预留。分组只在同一把 Key、同一分组且平台与订阅类型未变时
 // 采用：Key 换组或分组改平台/订阅类型不是调价，该连接按建连分组调度，继续按建连
-// 快照计费；重取失败同样保留建连快照，不断连。
+// 快照计费；无法刷新用户状态时拒绝后续轮并要求重连。
 //
 // 首轮沿用刚经认证中间件取得的建连快照；没有经过 BeforeTurn 的 turn 回退建连
 // 快照。只保留当前与上一个 turn：下一 turn 的 BeforeTurn 先于上一 turn 的
@@ -2155,13 +2156,24 @@ type openAIWSTurnBillingAPIKeys struct {
 
 // begin 在 BeforeTurn 重装利润门前调用：后续 turn 重取计费分组并按 turn 记下，
 // 返回换入该分组的上下文供本 turn 的利润门使用。
-func (k *openAIWSTurnBillingAPIKeys) begin(ctx context.Context, apiKeyService *service.APIKeyService, turn int, conn *service.APIKey) context.Context {
+func (k *openAIWSTurnBillingAPIKeys) begin(ctx context.Context, apiKeyService *service.APIKeyService, turn int, conn *service.APIKey) (context.Context, error) {
 	turnKey := conn
-	if turn > 1 && apiKeyService != nil {
-		turnKey = refreshOpenAIWSTurnBillingAPIKey(ctx, apiKeyService, conn)
+	if turn > 1 {
+		var lookup openAIWSTurnAPIKeyLookup
+		if apiKeyService != nil {
+			lookup = apiKeyService
+		}
+		var err error
+		turnKey, err = refreshOpenAIWSTurnBillingAPIKeyChecked(ctx, lookup, conn)
+		if err != nil {
+			return ctx, err
+		}
 	}
 	k.set(turn, turnKey)
-	return withOpenAIWSTurnBillingGroup(ctx, turnKey)
+	if turnKey != nil {
+		ctx = service.WithEnterpriseGatewayUser(ctx, turnKey.User)
+	}
+	return withOpenAIWSTurnBillingGroup(ctx, turnKey), nil
 }
 
 func (k *openAIWSTurnBillingAPIKeys) set(turn int, key *service.APIKey) {
@@ -2187,25 +2199,111 @@ func (k *openAIWSTurnBillingAPIKeys) forTurn(turn int, conn *service.APIKey) *se
 	return conn
 }
 
-// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：分组取当前认证
-// 快照，其余字段与建连快照共享。不满足采用条件时原样返回建连快照。
+// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：刷新认证快照
+// 中的用户状态、完整企业用户与兼容的分组。付款身份或部门改变，或无法确认
+// 当前用户状态时返回 nil，由调用方关闭连接并要求重连。
 func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAPIKeyLookup, conn *service.APIKey) *service.APIKey {
-	if lookup == nil || conn == nil || conn.Key == "" || conn.GroupID == nil || conn.Group == nil {
+	if conn == nil {
 		return conn
 	}
+	var member *service.EnterpriseMemberContext
+	if conn.User != nil {
+		member = conn.User.Enterprise
+	}
+	if lookup == nil || conn.Key == "" {
+		return nil
+	}
 	latest, err := lookup.GetByKey(ctx, conn.Key)
-	if err != nil || latest == nil || latest.ID != conn.ID || latest.GroupID == nil || *latest.GroupID != *conn.GroupID {
-		return conn
+	if err != nil || latest == nil || latest.ID != conn.ID || latest.User == nil || conn.User == nil {
+		return nil
+	}
+	var latestMember *service.EnterpriseMemberContext
+	if latest.User != nil {
+		latestMember = latest.User.Enterprise
+	}
+	if (member == nil) != (latestMember == nil) {
+		return nil
+	}
+	turnKey := conn
+	// Account status applies to every turn, independently of routing-group
+	// compatibility. Keep the existing personal billing snapshot otherwise.
+	if member == nil && latest.User != nil && conn.User != nil {
+		if latest.User.ID != conn.User.ID {
+			return nil
+		}
+		if latest.User.Status != conn.User.Status {
+			userSnapshot := *conn.User
+			userSnapshot.Status = latest.User.Status
+			keySnapshot := *conn
+			keySnapshot.User = &userSnapshot
+			turnKey = &keySnapshot
+		}
+	}
+	if member != nil {
+		if latest.User.ID != conn.User.ID || member.EnterpriseID != latestMember.EnterpriseID || member.MemberID != latestMember.MemberID {
+			return nil
+		}
+		if (member.DepartmentID == nil) != (latestMember.DepartmentID == nil) ||
+			(member.DepartmentID != nil && *member.DepartmentID != *latestMember.DepartmentID) {
+			return nil
+		}
+		// Freeze the complete current user snapshot and its membership. An admitted
+		// turn keeps its payer and permissions even if the auth cache changes later.
+		memberSnapshot := *latestMember
+		memberSnapshot.GroupPoolIDs = append([]int64(nil), latestMember.GroupPoolIDs...)
+		memberSnapshot.GroupWhitelistIDs = append([]int64(nil), latestMember.GroupWhitelistIDs...)
+		if latestMember.DepartmentID != nil {
+			departmentID := *latestMember.DepartmentID
+			memberSnapshot.DepartmentID = &departmentID
+		}
+		userSnapshot := *latest.User
+		userSnapshot.AllowedGroups = append([]int64(nil), latest.User.AllowedGroups...)
+		userSnapshot.Enterprise = &memberSnapshot
+		keySnapshot := *conn
+		keySnapshot.User = &userSnapshot
+		turnKey = &keySnapshot
+	}
+	if conn.GroupID == nil || conn.Group == nil || latest.GroupID == nil || *latest.GroupID != *conn.GroupID {
+		return turnKey
 	}
 	group := latest.Group
 	if group == nil || group.ID != conn.Group.ID ||
 		group.Platform != conn.Group.Platform ||
 		group.SubscriptionType != conn.Group.SubscriptionType {
-		return conn
+		return turnKey
 	}
-	turnKey := *conn
-	turnKey.Group = group
-	return &turnKey
+	keySnapshot := *turnKey
+	keySnapshot.Group = group
+	if member == nil && latest.User != nil {
+		userSnapshot := *latest.User
+		userSnapshot.AllowedGroups = append([]int64(nil), latest.User.AllowedGroups...)
+		keySnapshot.User = &userSnapshot
+	}
+	return &keySnapshot
+}
+
+var errOpenAIWSEnterpriseBillingReconnect = errors.New("enterprise billing identity changed or is unavailable; please reconnect")
+
+func refreshOpenAIWSTurnBillingAPIKeyChecked(ctx context.Context, lookup openAIWSTurnAPIKeyLookup, conn *service.APIKey) (*service.APIKey, error) {
+	turnKey := refreshOpenAIWSTurnBillingAPIKey(ctx, lookup, conn)
+	if turnKey == nil {
+		return nil, errOpenAIWSEnterpriseBillingReconnect
+	}
+	return turnKey, nil
+}
+
+func (h *OpenAIGatewayHandler) checkOpenAIWSTurnEnterpriseBilling(ctx context.Context, turnKey *service.APIKey, subscription *service.UserSubscription) error {
+	if turnKey == nil || turnKey.User == nil {
+		return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "user account is not active", service.ErrGatewayUserInactive)
+	}
+	if err := h.billingCacheService.CheckEnterpriseSessionEligibility(ctx, turnKey.User, turnKey, turnKey.Group, subscription, service.QuotaPlatform(ctx, turnKey)); err != nil {
+		reason := "enterprise billing check failed"
+		if errors.Is(err, service.ErrGatewayUserInactive) {
+			reason = "user account is not active"
+		}
+		return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, reason, err)
+	}
+	return nil
 }
 
 // withOpenAIWSTurnBillingGroup 把本 turn 的计费分组换进认证分组上下文，使利润门
@@ -2432,6 +2530,22 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		zap.Bool("openai_ws_mode", true),
 	)
 	if !h.ensureResponsesDependencies(c, reqLog) {
+		return
+	}
+	subscription, _ := middleware2.GetSubscriptionFromContext(c)
+	initialQuotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+	var admissionErr error
+	if apiKey.User == nil || !apiKey.User.IsActive() {
+		admissionErr = service.ErrGatewayUserInactive
+	} else {
+		admissionErr = h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, initialQuotaPlatform)
+	}
+	if admissionErr != nil {
+		status, code, message, retry := billingErrorDetailsForContext(c, admissionErr)
+		if retry > 0 {
+			c.Header("Retry-After", strconv.Itoa(retry))
+		}
+		h.errorResponse(c, status, code, message)
 		return
 	}
 	reqLog.Info("openai.websocket_ingress_started")
@@ -2663,16 +2777,17 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		return true
 	}
 
-	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(ctx, apiKey)
 	requiredTransport := service.OpenAIUpstreamTransportResponsesWebsocketV2Ingress
 	if requestPlatform == service.PlatformGrok {
 		requiredTransport = service.OpenAIUpstreamTransportHTTPSSE
 	}
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
-		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
-		return
+	if resolvedPlatform := service.QuotaPlatform(ctx, apiKey); resolvedPlatform != initialQuotaPlatform {
+		if err := h.billingCacheService.CheckResolvedSessionPlatformQuota(ctx, apiKey.User, apiKey.Group, subscription, resolvedPlatform); err != nil {
+			writeOpenAIBillingWSError(ctx, wsConn, err)
+			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
+			return
+		}
 	}
 
 	// 余额模式在途预留（会话级）：按首帧估算一次，会话期间续期；每轮计费任务接管引用，
@@ -2680,6 +2795,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	inflightCtx, inflightDone, inflightErr := reserveInflightBalanceCtx(ctx, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, firstMessage))
 	if inflightErr != nil {
 		reqLog.Info("openai.websocket_inflight_reservation_rejected", zap.Error(inflightErr))
+		writeOpenAIBillingWSError(ctx, wsConn, inflightErr)
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
 	}
@@ -2962,6 +3078,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		var turnBillingAPIKeys openAIWSTurnBillingAPIKeys
 		// Passthrough ingress does not invoke BeforeTurn for the first frame.
 		if err := checkSimpleModeTurnBilling(); err != nil {
+			writeOpenAIBillingWSError(ctx, wsConn, err)
 			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 			return
 		}
@@ -3047,7 +3164,16 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				// 长连接跨峰谷/倍率刷新防护：每个 turn 按当前时刻重装门并复核
 				// 当前账号，越线即要求客户端重连重选（连接绑定单一上游账号，
 				// 无法中途换号）。本 turn 的准入与计费共用同一 pricingAt。
-				turnBillingCtx := turnBillingAPIKeys.begin(ctx, h.apiKeyService, turn, apiKey)
+				turnBillingCtx, err := turnBillingAPIKeys.begin(ctx, h.apiKeyService, turn, apiKey)
+				if err != nil {
+					writeOpenAIBillingWSError(ctx, wsConn, err)
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "enterprise billing identity changed or is unavailable, please reconnect", err)
+				}
+				turnBillingAPIKey := turnBillingAPIKeys.forTurn(turn, apiKey)
+				if err := h.checkOpenAIWSTurnEnterpriseBilling(turnBillingCtx, turnBillingAPIKey, subscription); err != nil {
+					writeOpenAIBillingWSError(turnBillingCtx, wsConn, err)
+					return err
+				}
 				turnCtx, turnAt := h.gatewayService.WithOpenAITurnPricingContext(turnBillingCtx, apiKey.GroupID)
 				if _, vetoed, reason := h.gatewayService.ProfitControlVetoLatest(turnCtx, account); vetoed {
 					reqLog.Info("openai.websocket_turn_profit_vetoed",
@@ -3085,9 +3211,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				currentUserRelease = wrapReleaseOnDone(ctx, userReleaseFunc)
 				currentAccountRelease = wrapReleaseOnDone(ctx, accountReleaseFunc)
-				return checkSimpleModeTurnBilling()
+				if err := checkSimpleModeTurnBilling(); err != nil {
+					writeOpenAIBillingWSError(ctx, wsConn, err)
+					return err
+				}
+				return nil
 			},
 			AfterTurn: func(turn int, result *service.OpenAIForwardResult, turnErr error) {
+				turnBillingAPIKey := turnBillingAPIKeys.forTurn(turn, apiKey)
 				turnStart := getTurnStart(turn)
 				cyberBlockBody := takeCyberTurnBody(turn)
 				// 每次 attempt 都清 cyber mark；failover 链结束前保留 recorded guard，
@@ -3118,11 +3249,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				turnUsageFields := turnMapping.ToUsageFields(turnRequestedModel, turnUpstreamModel)
 				cyberMarked := service.GetOpsCyberPolicy(c) != nil
-				h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, turnRequestedModel, turnErr != nil, cyberBlockBody, turnUsageFields, requestPayloadHash)
+				h.recordCyberPolicyIfMarked(c, turnBillingAPIKey, account, subscription, turnRequestedModel, turnErr != nil, cyberBlockBody, turnUsageFields, requestPayloadHash)
 				cyberBlockedThisConn, cyberBlockPendingAfterFailover = advanceOpenAIWSCyberBlockState(
 					cyberBlockedThisConn,
 					cyberBlockPendingAfterFailover,
-					cyberMarked && !h.cyberPolicyLogOnly(c, apiKey),
+					cyberMarked && !h.cyberPolicyLogOnly(c, turnBillingAPIKey),
 					turnErr,
 				)
 				if turnErr != nil {
@@ -3161,16 +3292,15 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				h.gatewayService.ReportOpenAIAccountScheduleResult(account, scheduleModel, openAIForwardSucceededForScheduling(result), result.FirstTokenMs)
 				inboundEndpoint := GetInboundEndpoint(c)
 				upstreamEndpoint := resolveOpenAIUpstreamEndpoint(c, account, result)
-				quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
+				quotaPlatform := service.QuotaPlatform(c.Request.Context(), turnBillingAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
 				turnRecordPricingAt := turnPricing.currentOr(turnStart)
-				turnBillingAPIKey := turnBillingAPIKeys.forTurn(turn, apiKey)
 				cyberBlocked := service.GetOpsCyberPolicy(c) != nil
 				h.submitOpenAIUsageRecordTask(ctx, result, func(taskCtx context.Context) {
 					if err := h.gatewayService.RecordUsage(taskCtx, &service.OpenAIRecordUsageInput{
 						Result:             result,
 						APIKey:             turnBillingAPIKey,
-						User:               apiKey.User,
+						User:               turnBillingAPIKey.User,
 						Account:            account,
 						Subscription:       subscription,
 						InboundEndpoint:    inboundEndpoint,
@@ -3738,7 +3868,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 			if code != "" {
 				errorObject["code"] = code
 			}
-			payload, err := json.Marshal(gin.H{"error": errorObject})
+			payload, err := json.Marshal(gin.H{"error": withEnterpriseBillingMetadata(c, errorObject)})
 			if err != nil {
 				payload = []byte(`{"error":{"type":"upstream_error","message":"Upstream request failed"}}`)
 			}
@@ -3756,9 +3886,9 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 		h.errorResponse(c, status, errType, message)
 		return
 	}
-	c.JSON(status, gin.H{"error": gin.H{
+	c.JSON(status, gin.H{"error": withEnterpriseBillingMetadata(c, gin.H{
 		"type": errType, "code": code, "message": message,
-	}})
+	})})
 }
 
 func (h *OpenAIGatewayHandler) ensureOpenAIStreamReadErrorResponse(c *gin.Context, err error, streamStarted bool) bool {
@@ -3903,10 +4033,10 @@ func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType
 		}
 	}
 	c.JSON(status, gin.H{
-		"error": gin.H{
+		"error": withEnterpriseBillingMetadata(c, gin.H{
 			"type":    errType,
 			"message": message,
-		},
+		}),
 	})
 }
 

@@ -155,6 +155,8 @@ interface Props {
   id?: string
   ariaLabel?: string
   ariaDescribedby?: string
+  /** Override only when the menu must remain below a surrounding layout header. */
+  dropdownZIndex?: number
   /** 远程搜索模式：输入不在本地过滤 options，而是防抖后 emit('search', query)，由父组件请求数据更新 options */
   remote?: boolean
   /** 远程搜索模式下的加载态：options 为空时下拉显示 loading 文案 */
@@ -229,7 +231,7 @@ const dropdownStyle = computed(() => {
     left: `${left}px`,
     minWidth: `${minWidth}px`,
     maxWidth: `${availableWidth}px`,
-    zIndex: '100000020'
+    zIndex: String(props.dropdownZIndex ?? 100000020)
   }
 
   if (dropdownPosition.value === 'top') {

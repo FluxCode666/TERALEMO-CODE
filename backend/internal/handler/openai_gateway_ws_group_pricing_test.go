@@ -166,14 +166,16 @@ func TestOpenAIResponsesWebSocket_KeyMovedToAnotherGroupKeepsConnectionGroup(t *
 		"a key moved to another group keeps the connection's group: the connection was scheduled from it")
 }
 
-func TestOpenAIResponsesWebSocket_FailedKeyRefreshKeepsConnectionGroup(t *testing.T) {
+func TestOpenAIResponsesWebSocket_FailedKeyRefreshRequiresReconnect(t *testing.T) {
 	repo := newWSGroupPricingAPIKeyRepoStub(3.0)
 	apiKeyService := newWSGroupPricingAPIKeyService(repo)
 	got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
-		firstPayload:     wsGroupPricingFirst,
-		secondPayload:    wsGroupPricingSecond,
-		apiKeyService:    apiKeyService,
-		apiKeyCredential: wsGroupPricingKey,
+		firstPayload:            wsGroupPricingFirst,
+		secondPayload:           wsGroupPricingSecond,
+		apiKeyService:           apiKeyService,
+		apiKeyCredential:        wsGroupPricingKey,
+		secondTurnCloseExpected: true,
+		closeReason:             "enterprise billing identity changed or is unavailable",
 		afterFirstUpstreamRequest: func(*service.ChannelService) error {
 			return repo.adminUpdate(apiKeyService, func(_ *service.APIKey, group *service.Group) {
 				group.RateMultiplier = 0.3
@@ -182,8 +184,8 @@ func TestOpenAIResponsesWebSocket_FailedKeyRefreshKeepsConnectionGroup(t *testin
 		},
 	})
 
-	require.Len(t, got.logs, 2)
-	require.InDelta(t, 3.0, got.logs[1].RateMultiplier, 1e-12, "a failed refresh keeps the connection snapshot")
+	require.Len(t, got.logs, 1, "unknown current user status prevents the next turn")
+	require.InDelta(t, 3.0, got.logs[0].RateMultiplier, 1e-12, "the admitted first turn keeps its billing snapshot")
 	require.GreaterOrEqual(t, repo.lookupCount(), 2, "the second turn must have attempted a refresh")
 }
 
@@ -217,14 +219,15 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 		return k
 	}
 
-	t.Run("same group adopts the latest group and nothing else", func(t *testing.T) {
+	t.Run("same group adopts the latest group and user snapshot", func(t *testing.T) {
 		got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(ctx context.Context, key string) (*service.APIKey, error) {
 			require.Equal(t, "sk-conn", key)
 			return latestWith(nil), nil
 		}), conn)
 		require.NotSame(t, conn, got)
 		require.InDelta(t, 0.3, got.Group.RateMultiplier, 1e-12)
-		require.Same(t, conn.User, got.User, "only the group snapshot is refreshed")
+		require.NotSame(t, conn.User, got.User)
+		require.Equal(t, 123.0, got.User.Balance)
 		require.Equal(t, conn.ID, got.ID)
 		require.InDelta(t, 3.0, conn.Group.RateMultiplier, 1e-12, "the connection snapshot is never mutated")
 	})
@@ -255,11 +258,17 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 	}
 	for name, lookup := range keep {
 		t.Run(name+" keeps the connection snapshot", func(t *testing.T) {
-			require.Same(t, conn, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, conn))
+			got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, conn)
+			switch name {
+			case "lookup error", "not found", "nil key", "different key id":
+				require.Nil(t, got, "unknown current user status must close the session")
+			default:
+				require.Same(t, conn, got)
+			}
 		})
 	}
 
-	t.Run("no credential or no group skips the lookup", func(t *testing.T) {
+	t.Run("no credential closes and no group still refreshes status", func(t *testing.T) {
 		called := false
 		lookup := wsTurnAPIKeyLookupFunc(func(ctx context.Context, key string) (*service.APIKey, error) {
 			called = true
@@ -267,13 +276,13 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 		})
 		noKey := *conn
 		noKey.Key = ""
-		require.Same(t, &noKey, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, &noKey))
+		require.Nil(t, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, &noKey))
 		noGroup := *conn
 		noGroup.Group = nil
 		require.Same(t, &noGroup, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, &noGroup))
 		require.Nil(t, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, nil))
-		require.Same(t, conn, refreshOpenAIWSTurnBillingAPIKey(context.Background(), nil, conn))
-		require.False(t, called)
+		require.Nil(t, refreshOpenAIWSTurnBillingAPIKey(context.Background(), nil, conn))
+		require.True(t, called)
 	})
 }
 

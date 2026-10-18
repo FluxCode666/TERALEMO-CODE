@@ -109,9 +109,38 @@
             </span>
           </div>
 
+          <template v-for="item in personalNavItems" :key="item.path">
+            <template v-if="item.children">
+              <button
+                type="button"
+                class="sidebar-link mb-1 w-full"
+                :class="{ 'sidebar-link-active': isGroupActive(item) && !isGroupExpanded(item), 'sidebar-link-collapsed': sidebarCollapsed }"
+                :title="sidebarCollapsed ? item.label : undefined"
+                :aria-expanded="!sidebarCollapsed && isGroupExpanded(item)"
+                :data-nav-group="item.path"
+                @click="handleGroupClick(item)"
+              >
+                <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+                  <span class="min-w-0 truncate">{{ item.label }}</span>
+                  <ChevronDownIcon class="h-4 w-4 flex-shrink-0 transition-transform duration-200" :class="isGroupExpanded(item) ? 'rotate-180' : ''" />
+                </span>
+              </button>
+              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600">
+                <router-link
+                  v-for="child in item.children" :key="child.path" :to="child.path"
+                  class="sidebar-link mb-0.5 min-w-0 py-1.5 text-sm"
+                  :class="{ 'sidebar-link-active': route.path === child.path }"
+                  :aria-current="route.path === child.path ? 'page' : undefined"
+                  @click="handleMenuItemClick(child.path)"
+                >
+                  <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
+                  <span class="min-w-0 truncate">{{ child.label }}</span>
+                </router-link>
+              </div>
+            </template>
           <router-link
-            v-for="item in personalNavItems"
-            :key="item.path"
+            v-else
             :to="item.path"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
@@ -123,15 +152,45 @@
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
           </router-link>
+          </template>
         </div>
       </template>
 
       <!-- Regular User View -->
       <template v-else-if="!appStore.backendModeEnabled">
         <div class="sidebar-section">
+          <template v-for="item in userNavItems" :key="item.path">
+            <template v-if="item.children">
+              <button
+                type="button"
+                class="sidebar-link mb-1 w-full"
+                :class="{ 'sidebar-link-active': isGroupActive(item) && !isGroupExpanded(item), 'sidebar-link-collapsed': sidebarCollapsed }"
+                :title="sidebarCollapsed ? item.label : undefined"
+                :aria-expanded="!sidebarCollapsed && isGroupExpanded(item)"
+                :data-nav-group="item.path"
+                @click="handleGroupClick(item)"
+              >
+                <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+                  <span class="min-w-0 truncate">{{ item.label }}</span>
+                  <ChevronDownIcon class="h-4 w-4 flex-shrink-0 transition-transform duration-200" :class="isGroupExpanded(item) ? 'rotate-180' : ''" />
+                </span>
+              </button>
+              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600">
+                <router-link
+                  v-for="child in item.children" :key="child.path" :to="child.path"
+                  class="sidebar-link mb-0.5 min-w-0 py-1.5 text-sm"
+                  :class="{ 'sidebar-link-active': route.path === child.path }"
+                  :aria-current="route.path === child.path ? 'page' : undefined"
+                  @click="handleMenuItemClick(child.path)"
+                >
+                  <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
+                  <span class="min-w-0 truncate">{{ child.label }}</span>
+                </router-link>
+              </div>
+            </template>
           <router-link
-            v-for="item in userNavItems"
-            :key="item.path"
+            v-else
             :to="item.path"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
@@ -143,6 +202,7 @@
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
           </router-link>
+          </template>
         </div>
       </template>
     </nav>
@@ -198,7 +258,12 @@ import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
+import { Building2 } from '@lucide/vue'
+import { useEnterpriseStore } from '@/stores/enterprise'
+import { canAccessEnterprise, enterpriseSectionPath } from '@/features/enterprise/navigation'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+
+const BuildingIcon = { render: () => h(Building2, { strokeWidth: 1.5 }) }
 
 interface NavItem {
   path: string
@@ -710,7 +775,16 @@ const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
 const flagPluginManagement = makeSidebarFlag(FeatureFlags.pluginManagement)
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
 const flagAdminPayment = () => adminSettingsStore.paymentEnabled
-const flagBatchImageAccess = () => canUseBatchImage.value
+const flagBatchImageAccess = () => !authStore.user?.enterprise && canUseBatchImage.value
+const flagPersonalPayment = () => !authStore.user?.enterprise && flagPayment()
+const flagPersonalWallet = () => !authStore.user?.enterprise
+const flagEnterpriseManagement = () => {
+  return canAccessEnterprise(authStore.user?.enterprise, authStore.isAdmin)
+}
+
+const enterpriseStore = computed(() => flagEnterpriseManagement() ? useEnterpriseStore() : null)
+watch(enterpriseStore, store => { if (store) void store.ensureLoaded() }, { immediate: true })
+const enterpriseIcons = { overview: DashboardIcon, organization: UsersIcon, quotas: CreditCardIcon, groups: FolderIcon, usage: ChartIcon, audit: ShieldIcon, settings: CogIcon }
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
@@ -723,15 +797,22 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
+    {
+      path: '/enterprise', label: t('nav.enterprise'), icon: BuildingIcon,
+      featureFlag: flagEnterpriseManagement, expandOnly: true,
+      children: (enterpriseStore.value?.tabs ?? []).filter(tab => tab !== 'balanceLogs').map(tab => ({
+        path: enterpriseSectionPath(tab), label: t(`enterprise.${tab}`), icon: enterpriseIcons[tab]
+      }))
+    },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
-    { path: '/purchase', label: purchaseNavLabel.value, icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/purchase', label: purchaseNavLabel.value, icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPersonalPayment },
+    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPersonalPayment },
+    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, featureFlag: flagPersonalWallet },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
@@ -777,6 +858,7 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/enterprises', label: t('nav.enterprises'), icon: BuildingIcon },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
     {
@@ -931,6 +1013,10 @@ function handleGroupClick(item: NavItem) {
   }
   groupExpandOverrides.value.set(item.path, true)
 }
+
+watch(() => route.path, path => {
+  if (path.startsWith('/enterprise/')) groupExpandOverrides.value.set('/enterprise', true)
+})
 
 // Initialize theme
 const savedTheme = localStorage.getItem('theme')

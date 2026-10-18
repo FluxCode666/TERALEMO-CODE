@@ -76,9 +76,14 @@ type BatchImageReferenceInput struct {
 }
 
 type BatchImageOwner struct {
-	UserID   int64
-	APIKeyID int64
-	GroupID  *int64
+	UserID     int64
+	APIKeyID   int64
+	GroupID    *int64
+	Enterprise *EnterpriseMemberContext
+}
+
+type batchImageEnterpriseReader interface {
+	GetMemberContextByUserID(context.Context, int64) (*EnterpriseMemberContext, error)
 }
 
 type BatchImagePublicService struct {
@@ -92,6 +97,8 @@ type BatchImagePublicService struct {
 	BillingRepo       UsageBillingRepository
 	AuthCache         APIKeyAuthCacheInvalidator
 	Config            *config.Config
+	EnterpriseRepo    batchImageEnterpriseReader
+	BillingCache      *BillingCacheService
 }
 
 type BatchImagePricingSnapshot struct {
@@ -198,6 +205,14 @@ func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRe
 }
 
 func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, idempotencyKey string) (*BatchImagePublicBatch, error) {
+	// Refresh once at submission. Settlement exclusively uses the persisted payer.
+	if s.EnterpriseRepo != nil {
+		member, err := s.EnterpriseRepo.GetMemberContextByUserID(ctx, owner.UserID)
+		if err != nil {
+			return nil, ErrBillingServiceUnavailable.WithCause(err)
+		}
+		owner.Enterprise = member
+	}
 	if !s.enabled() {
 		return nil, ErrBatchImageDisabled
 	}
@@ -209,6 +224,24 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	// 避免两个入口校验口径不一致留下防御纵深缺口。
 	if err := s.ensureGroupAllowsBatchImage(ctx, owner.GroupID); err != nil {
 		return nil, err
+	}
+	if owner.Enterprise != nil {
+		var group *Group
+		if owner.GroupID != nil && s.GroupRepo != nil {
+			group, err = s.GroupRepo.GetByIDLite(ctx, *owner.GroupID)
+			if err != nil {
+				return nil, ErrBillingServiceUnavailable.WithCause(err)
+			}
+		}
+		if err := checkEnterpriseGatewayEligibility(owner.Enterprise, group); err != nil {
+			return nil, err
+		}
+		if s.BillingCache == nil {
+			return nil, ErrBillingServiceUnavailable
+		}
+		if err := s.BillingCache.checkEnterpriseBillingEligibility(ctx, owner.Enterprise, group, 0); err != nil {
+			return nil, err
+		}
 	}
 	requestHash := HashBatchImageSubmitRequest(normalized)
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
@@ -257,9 +290,18 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	accountID := account.ID
 	holdID := BatchImageHoldRequestID(batchID)
 	holdAmount := pricingSnapshot.HoldAmount
+	var enterpriseID, departmentID, memberID *int64
+	departmentPathIDs := []int64{}
+	if owner.Enterprise != nil {
+		enterpriseID = &owner.Enterprise.EnterpriseID
+		departmentID = owner.Enterprise.DepartmentID
+		departmentPathIDs = FrozenEnterpriseDepartmentIDs(owner.Enterprise.DepartmentPathIDs, valueOrZero(departmentID))
+		memberID = &owner.Enterprise.MemberID
+	}
 	job, err := s.Repo.CreateBatchImageJob(ctx, CreateBatchImageJobParams{
-		BatchID:                 batchID,
-		UserID:                  owner.UserID,
+		BatchID:      batchID,
+		UserID:       owner.UserID,
+		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID, EnterpriseDepartmentPathIDs: departmentPathIDs,
 		APIKeyID:                &apiKeyID,
 		AccountID:               &accountID,
 		Provider:                provider.Name(),
@@ -289,7 +331,7 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	}
 	if err := reserveBatchImageBalanceHold(ctx, s.BillingRepo, job, requestHash); err != nil {
 		code := "BILLING_HOLD_FAILED"
-		if errors.Is(err, ErrBatchImageInsufficientBalance) {
+		if errors.Is(err, ErrBatchImageInsufficientBalance) || errors.Is(err, ErrEnterpriseBillingBalanceInsufficient) {
 			code = "INSUFFICIENT_BALANCE"
 		}
 		_ = s.Repo.RecordBatchImageJobSubmitFailure(ctx, job.BatchID, code, sanitizeBatchImagePublicMessage(err.Error()), true)

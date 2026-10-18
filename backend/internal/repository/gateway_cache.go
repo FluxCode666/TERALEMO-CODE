@@ -422,6 +422,11 @@ func (c *gatewayCache) SaveLiveCall(ctx context.Context, record *service.LiveCal
 		"inbound_endpoint": record.InboundEndpoint,
 		"attestation":      record.AttestationCiphertext,
 	}
+	if record.EnterpriseID != 0 {
+		values["enterprise_id"] = record.EnterpriseID
+		values["enterprise_department_id"] = record.EnterpriseDepartmentID
+		values["enterprise_member_id"] = record.EnterpriseMemberID
+	}
 	key := liveCallKey(record.CallHash)
 	pipe := c.rdb.TxPipeline()
 	pipe.HSet(ctx, key, values)
@@ -445,6 +450,10 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 	createdAt := time.UnixMilli(parseInt("created_at"))
 	expiresAt := time.UnixMilli(parseInt("expires_at"))
 	return &service.LiveCallRecord{
+		EnterpriseID:           parseInt("enterprise_id"),
+		EnterpriseDepartmentID: parseInt("enterprise_department_id"),
+		EnterpriseMemberID:     parseInt("enterprise_member_id"),
+
 		CallID:                values["call_id"],
 		CallHash:              callHash,
 		AccountID:             parseInt("account_id"),

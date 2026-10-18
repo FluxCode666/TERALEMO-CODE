@@ -20,6 +20,15 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorrequesttemplate"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
+	"github.com/Wei-Shaw/sub2api/ent/enterprise"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseallowedgroup"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseauditlog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisebalancelog"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisedepartment"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelist"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisegroupwhitelistscope"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisequota"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -502,102 +511,106 @@ func init() {
 	batchimagejobDescBatchID := batchimagejobFields[0].Descriptor()
 	// batchimagejob.BatchIDValidator is a validator for the "batch_id" field. It is called by the builders before save.
 	batchimagejob.BatchIDValidator = batchimagejobDescBatchID.Validators[0].(func(string) error)
+	// batchimagejobDescEnterpriseDepartmentPath is the schema descriptor for enterprise_department_path field.
+	batchimagejobDescEnterpriseDepartmentPath := batchimagejobFields[3].Descriptor()
+	// batchimagejob.DefaultEnterpriseDepartmentPath holds the default value on creation for the enterprise_department_path field.
+	batchimagejob.DefaultEnterpriseDepartmentPath = batchimagejobDescEnterpriseDepartmentPath.Default.(string)
 	// batchimagejobDescProvider is the schema descriptor for provider field.
-	batchimagejobDescProvider := batchimagejobFields[4].Descriptor()
+	batchimagejobDescProvider := batchimagejobFields[8].Descriptor()
 	// batchimagejob.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
 	batchimagejob.ProviderValidator = batchimagejobDescProvider.Validators[0].(func(string) error)
 	// batchimagejobDescModel is the schema descriptor for model field.
-	batchimagejobDescModel := batchimagejobFields[5].Descriptor()
+	batchimagejobDescModel := batchimagejobFields[9].Descriptor()
 	// batchimagejob.ModelValidator is a validator for the "model" field. It is called by the builders before save.
 	batchimagejob.ModelValidator = batchimagejobDescModel.Validators[0].(func(string) error)
 	// batchimagejobDescTaskName is the schema descriptor for task_name field.
-	batchimagejobDescTaskName := batchimagejobFields[6].Descriptor()
+	batchimagejobDescTaskName := batchimagejobFields[10].Descriptor()
 	// batchimagejob.DefaultTaskName holds the default value on creation for the task_name field.
 	batchimagejob.DefaultTaskName = batchimagejobDescTaskName.Default.(string)
 	// batchimagejob.TaskNameValidator is a validator for the "task_name" field. It is called by the builders before save.
 	batchimagejob.TaskNameValidator = batchimagejobDescTaskName.Validators[0].(func(string) error)
 	// batchimagejobDescStatus is the schema descriptor for status field.
-	batchimagejobDescStatus := batchimagejobFields[7].Descriptor()
+	batchimagejobDescStatus := batchimagejobFields[11].Descriptor()
 	// batchimagejob.DefaultStatus holds the default value on creation for the status field.
 	batchimagejob.DefaultStatus = batchimagejobDescStatus.Default.(string)
 	// batchimagejob.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	batchimagejob.StatusValidator = batchimagejobDescStatus.Validators[0].(func(string) error)
 	// batchimagejobDescProviderJobName is the schema descriptor for provider_job_name field.
-	batchimagejobDescProviderJobName := batchimagejobFields[8].Descriptor()
+	batchimagejobDescProviderJobName := batchimagejobFields[12].Descriptor()
 	// batchimagejob.ProviderJobNameValidator is a validator for the "provider_job_name" field. It is called by the builders before save.
 	batchimagejob.ProviderJobNameValidator = batchimagejobDescProviderJobName.Validators[0].(func(string) error)
 	// batchimagejobDescProviderInputRef is the schema descriptor for provider_input_ref field.
-	batchimagejobDescProviderInputRef := batchimagejobFields[9].Descriptor()
+	batchimagejobDescProviderInputRef := batchimagejobFields[13].Descriptor()
 	// batchimagejob.ProviderInputRefValidator is a validator for the "provider_input_ref" field. It is called by the builders before save.
 	batchimagejob.ProviderInputRefValidator = batchimagejobDescProviderInputRef.Validators[0].(func(string) error)
 	// batchimagejobDescProviderOutputRef is the schema descriptor for provider_output_ref field.
-	batchimagejobDescProviderOutputRef := batchimagejobFields[10].Descriptor()
+	batchimagejobDescProviderOutputRef := batchimagejobFields[14].Descriptor()
 	// batchimagejob.ProviderOutputRefValidator is a validator for the "provider_output_ref" field. It is called by the builders before save.
 	batchimagejob.ProviderOutputRefValidator = batchimagejobDescProviderOutputRef.Validators[0].(func(string) error)
 	// batchimagejobDescGcsInputURI is the schema descriptor for gcs_input_uri field.
-	batchimagejobDescGcsInputURI := batchimagejobFields[11].Descriptor()
+	batchimagejobDescGcsInputURI := batchimagejobFields[15].Descriptor()
 	// batchimagejob.GcsInputURIValidator is a validator for the "gcs_input_uri" field. It is called by the builders before save.
 	batchimagejob.GcsInputURIValidator = batchimagejobDescGcsInputURI.Validators[0].(func(string) error)
 	// batchimagejobDescGcsOutputURI is the schema descriptor for gcs_output_uri field.
-	batchimagejobDescGcsOutputURI := batchimagejobFields[12].Descriptor()
+	batchimagejobDescGcsOutputURI := batchimagejobFields[16].Descriptor()
 	// batchimagejob.GcsOutputURIValidator is a validator for the "gcs_output_uri" field. It is called by the builders before save.
 	batchimagejob.GcsOutputURIValidator = batchimagejobDescGcsOutputURI.Validators[0].(func(string) error)
 	// batchimagejobDescSuccessCount is the schema descriptor for success_count field.
-	batchimagejobDescSuccessCount := batchimagejobFields[14].Descriptor()
+	batchimagejobDescSuccessCount := batchimagejobFields[18].Descriptor()
 	// batchimagejob.DefaultSuccessCount holds the default value on creation for the success_count field.
 	batchimagejob.DefaultSuccessCount = batchimagejobDescSuccessCount.Default.(int)
 	// batchimagejobDescFailCount is the schema descriptor for fail_count field.
-	batchimagejobDescFailCount := batchimagejobFields[15].Descriptor()
+	batchimagejobDescFailCount := batchimagejobFields[19].Descriptor()
 	// batchimagejob.DefaultFailCount holds the default value on creation for the fail_count field.
 	batchimagejob.DefaultFailCount = batchimagejobDescFailCount.Default.(int)
 	// batchimagejobDescCancelledCount is the schema descriptor for cancelled_count field.
-	batchimagejobDescCancelledCount := batchimagejobFields[16].Descriptor()
+	batchimagejobDescCancelledCount := batchimagejobFields[20].Descriptor()
 	// batchimagejob.DefaultCancelledCount holds the default value on creation for the cancelled_count field.
 	batchimagejob.DefaultCancelledCount = batchimagejobDescCancelledCount.Default.(int)
 	// batchimagejobDescEstimatedCost is the schema descriptor for estimated_cost field.
-	batchimagejobDescEstimatedCost := batchimagejobFields[17].Descriptor()
+	batchimagejobDescEstimatedCost := batchimagejobFields[21].Descriptor()
 	// batchimagejob.DefaultEstimatedCost holds the default value on creation for the estimated_cost field.
 	batchimagejob.DefaultEstimatedCost = batchimagejobDescEstimatedCost.Default.(float64)
 	// batchimagejobDescCurrency is the schema descriptor for currency field.
-	batchimagejobDescCurrency := batchimagejobFields[20].Descriptor()
+	batchimagejobDescCurrency := batchimagejobFields[24].Descriptor()
 	// batchimagejob.DefaultCurrency holds the default value on creation for the currency field.
 	batchimagejob.DefaultCurrency = batchimagejobDescCurrency.Default.(string)
 	// batchimagejob.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	batchimagejob.CurrencyValidator = batchimagejobDescCurrency.Validators[0].(func(string) error)
 	// batchimagejobDescHoldID is the schema descriptor for hold_id field.
-	batchimagejobDescHoldID := batchimagejobFields[21].Descriptor()
+	batchimagejobDescHoldID := batchimagejobFields[25].Descriptor()
 	// batchimagejob.HoldIDValidator is a validator for the "hold_id" field. It is called by the builders before save.
 	batchimagejob.HoldIDValidator = batchimagejobDescHoldID.Validators[0].(func(string) error)
 	// batchimagejobDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	batchimagejobDescIdempotencyKey := batchimagejobFields[22].Descriptor()
+	batchimagejobDescIdempotencyKey := batchimagejobFields[26].Descriptor()
 	// batchimagejob.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	batchimagejob.IdempotencyKeyValidator = batchimagejobDescIdempotencyKey.Validators[0].(func(string) error)
 	// batchimagejobDescRequestHash is the schema descriptor for request_hash field.
-	batchimagejobDescRequestHash := batchimagejobFields[23].Descriptor()
+	batchimagejobDescRequestHash := batchimagejobFields[27].Descriptor()
 	// batchimagejob.RequestHashValidator is a validator for the "request_hash" field. It is called by the builders before save.
 	batchimagejob.RequestHashValidator = batchimagejobDescRequestHash.Validators[0].(func(string) error)
 	// batchimagejobDescManifestHash is the schema descriptor for manifest_hash field.
-	batchimagejobDescManifestHash := batchimagejobFields[24].Descriptor()
+	batchimagejobDescManifestHash := batchimagejobFields[28].Descriptor()
 	// batchimagejob.ManifestHashValidator is a validator for the "manifest_hash" field. It is called by the builders before save.
 	batchimagejob.ManifestHashValidator = batchimagejobDescManifestHash.Validators[0].(func(string) error)
 	// batchimagejobDescRetryCount is the schema descriptor for retry_count field.
-	batchimagejobDescRetryCount := batchimagejobFields[25].Descriptor()
+	batchimagejobDescRetryCount := batchimagejobFields[29].Descriptor()
 	// batchimagejob.DefaultRetryCount holds the default value on creation for the retry_count field.
 	batchimagejob.DefaultRetryCount = batchimagejobDescRetryCount.Default.(int)
 	// batchimagejobDescVersion is the schema descriptor for version field.
-	batchimagejobDescVersion := batchimagejobFields[26].Descriptor()
+	batchimagejobDescVersion := batchimagejobFields[30].Descriptor()
 	// batchimagejob.DefaultVersion holds the default value on creation for the version field.
 	batchimagejob.DefaultVersion = batchimagejobDescVersion.Default.(int)
 	// batchimagejobDescLastErrorCode is the schema descriptor for last_error_code field.
-	batchimagejobDescLastErrorCode := batchimagejobFields[32].Descriptor()
+	batchimagejobDescLastErrorCode := batchimagejobFields[36].Descriptor()
 	// batchimagejob.LastErrorCodeValidator is a validator for the "last_error_code" field. It is called by the builders before save.
 	batchimagejob.LastErrorCodeValidator = batchimagejobDescLastErrorCode.Validators[0].(func(string) error)
 	// batchimagejobDescCreatedAt is the schema descriptor for created_at field.
-	batchimagejobDescCreatedAt := batchimagejobFields[34].Descriptor()
+	batchimagejobDescCreatedAt := batchimagejobFields[38].Descriptor()
 	// batchimagejob.DefaultCreatedAt holds the default value on creation for the created_at field.
 	batchimagejob.DefaultCreatedAt = batchimagejobDescCreatedAt.Default.(func() time.Time)
 	// batchimagejobDescUpdatedAt is the schema descriptor for updated_at field.
-	batchimagejobDescUpdatedAt := batchimagejobFields[35].Descriptor()
+	batchimagejobDescUpdatedAt := batchimagejobFields[39].Descriptor()
 	// batchimagejob.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	batchimagejob.DefaultUpdatedAt = batchimagejobDescUpdatedAt.Default.(func() time.Time)
 	// batchimagejob.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -941,6 +954,294 @@ func init() {
 	compositemodelrouteDescEnabled := compositemodelrouteFields[7].Descriptor()
 	// compositemodelroute.DefaultEnabled holds the default value on creation for the enabled field.
 	compositemodelroute.DefaultEnabled = compositemodelrouteDescEnabled.Default.(bool)
+	enterpriseMixin := schema.Enterprise{}.Mixin()
+	enterpriseMixinHooks1 := enterpriseMixin[1].Hooks()
+	enterprise.Hooks[0] = enterpriseMixinHooks1[0]
+	enterpriseMixinInters1 := enterpriseMixin[1].Interceptors()
+	enterprise.Interceptors[0] = enterpriseMixinInters1[0]
+	enterpriseMixinFields0 := enterpriseMixin[0].Fields()
+	_ = enterpriseMixinFields0
+	enterpriseFields := schema.Enterprise{}.Fields()
+	_ = enterpriseFields
+	// enterpriseDescCreatedAt is the schema descriptor for created_at field.
+	enterpriseDescCreatedAt := enterpriseMixinFields0[0].Descriptor()
+	// enterprise.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprise.DefaultCreatedAt = enterpriseDescCreatedAt.Default.(func() time.Time)
+	// enterpriseDescUpdatedAt is the schema descriptor for updated_at field.
+	enterpriseDescUpdatedAt := enterpriseMixinFields0[1].Descriptor()
+	// enterprise.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	enterprise.DefaultUpdatedAt = enterpriseDescUpdatedAt.Default.(func() time.Time)
+	// enterprise.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	enterprise.UpdateDefaultUpdatedAt = enterpriseDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// enterpriseDescName is the schema descriptor for name field.
+	enterpriseDescName := enterpriseFields[0].Descriptor()
+	// enterprise.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	enterprise.NameValidator = func() func(string) error {
+		validators := enterpriseDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// enterpriseDescStatus is the schema descriptor for status field.
+	enterpriseDescStatus := enterpriseFields[1].Descriptor()
+	// enterprise.DefaultStatus holds the default value on creation for the status field.
+	enterprise.DefaultStatus = enterpriseDescStatus.Default.(string)
+	// enterprise.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	enterprise.StatusValidator = enterpriseDescStatus.Validators[0].(func(string) error)
+	// enterpriseDescGroupPoolConfigured is the schema descriptor for group_pool_configured field.
+	enterpriseDescGroupPoolConfigured := enterpriseFields[2].Descriptor()
+	// enterprise.DefaultGroupPoolConfigured holds the default value on creation for the group_pool_configured field.
+	enterprise.DefaultGroupPoolConfigured = enterpriseDescGroupPoolConfigured.Default.(bool)
+	// enterpriseDescMemberConcurrency is the schema descriptor for member_concurrency field.
+	enterpriseDescMemberConcurrency := enterpriseFields[3].Descriptor()
+	// enterprise.MemberConcurrencyValidator is a validator for the "member_concurrency" field. It is called by the builders before save.
+	enterprise.MemberConcurrencyValidator = enterpriseDescMemberConcurrency.Validators[0].(func(int) error)
+	// enterpriseDescBalance is the schema descriptor for balance field.
+	enterpriseDescBalance := enterpriseFields[4].Descriptor()
+	// enterprise.DefaultBalance holds the default value on creation for the balance field.
+	enterprise.DefaultBalance = enterpriseDescBalance.Default.(float64)
+	// enterpriseDescFrozenBalance is the schema descriptor for frozen_balance field.
+	enterpriseDescFrozenBalance := enterpriseFields[5].Descriptor()
+	// enterprise.DefaultFrozenBalance holds the default value on creation for the frozen_balance field.
+	enterprise.DefaultFrozenBalance = enterpriseDescFrozenBalance.Default.(float64)
+	// enterpriseDescTotalRecharged is the schema descriptor for total_recharged field.
+	enterpriseDescTotalRecharged := enterpriseFields[6].Descriptor()
+	// enterprise.DefaultTotalRecharged holds the default value on creation for the total_recharged field.
+	enterprise.DefaultTotalRecharged = enterpriseDescTotalRecharged.Default.(float64)
+	// enterpriseDescContactName is the schema descriptor for contact_name field.
+	enterpriseDescContactName := enterpriseFields[8].Descriptor()
+	// enterprise.DefaultContactName holds the default value on creation for the contact_name field.
+	enterprise.DefaultContactName = enterpriseDescContactName.Default.(string)
+	// enterprise.ContactNameValidator is a validator for the "contact_name" field. It is called by the builders before save.
+	enterprise.ContactNameValidator = enterpriseDescContactName.Validators[0].(func(string) error)
+	// enterpriseDescContactEmail is the schema descriptor for contact_email field.
+	enterpriseDescContactEmail := enterpriseFields[9].Descriptor()
+	// enterprise.DefaultContactEmail holds the default value on creation for the contact_email field.
+	enterprise.DefaultContactEmail = enterpriseDescContactEmail.Default.(string)
+	// enterprise.ContactEmailValidator is a validator for the "contact_email" field. It is called by the builders before save.
+	enterprise.ContactEmailValidator = enterpriseDescContactEmail.Validators[0].(func(string) error)
+	// enterpriseDescContactPhone is the schema descriptor for contact_phone field.
+	enterpriseDescContactPhone := enterpriseFields[10].Descriptor()
+	// enterprise.DefaultContactPhone holds the default value on creation for the contact_phone field.
+	enterprise.DefaultContactPhone = enterpriseDescContactPhone.Default.(string)
+	// enterprise.ContactPhoneValidator is a validator for the "contact_phone" field. It is called by the builders before save.
+	enterprise.ContactPhoneValidator = enterpriseDescContactPhone.Validators[0].(func(string) error)
+	// enterpriseDescNotes is the schema descriptor for notes field.
+	enterpriseDescNotes := enterpriseFields[11].Descriptor()
+	// enterprise.DefaultNotes holds the default value on creation for the notes field.
+	enterprise.DefaultNotes = enterpriseDescNotes.Default.(string)
+	// enterpriseDescSettings is the schema descriptor for settings field.
+	enterpriseDescSettings := enterpriseFields[12].Descriptor()
+	// enterprise.DefaultSettings holds the default value on creation for the settings field.
+	enterprise.DefaultSettings = enterpriseDescSettings.Default.(func() domain.EnterpriseSettings)
+	enterpriseallowedgroupFields := schema.EnterpriseAllowedGroup{}.Fields()
+	_ = enterpriseallowedgroupFields
+	// enterpriseallowedgroupDescCreatedAt is the schema descriptor for created_at field.
+	enterpriseallowedgroupDescCreatedAt := enterpriseallowedgroupFields[2].Descriptor()
+	// enterpriseallowedgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterpriseallowedgroup.DefaultCreatedAt = enterpriseallowedgroupDescCreatedAt.Default.(func() time.Time)
+	enterpriseauditlogFields := schema.EnterpriseAuditLog{}.Fields()
+	_ = enterpriseauditlogFields
+	// enterpriseauditlogDescActorRole is the schema descriptor for actor_role field.
+	enterpriseauditlogDescActorRole := enterpriseauditlogFields[2].Descriptor()
+	// enterpriseauditlog.ActorRoleValidator is a validator for the "actor_role" field. It is called by the builders before save.
+	enterpriseauditlog.ActorRoleValidator = enterpriseauditlogDescActorRole.Validators[0].(func(string) error)
+	// enterpriseauditlogDescAction is the schema descriptor for action field.
+	enterpriseauditlogDescAction := enterpriseauditlogFields[3].Descriptor()
+	// enterpriseauditlog.ActionValidator is a validator for the "action" field. It is called by the builders before save.
+	enterpriseauditlog.ActionValidator = enterpriseauditlogDescAction.Validators[0].(func(string) error)
+	// enterpriseauditlogDescTargetType is the schema descriptor for target_type field.
+	enterpriseauditlogDescTargetType := enterpriseauditlogFields[4].Descriptor()
+	// enterpriseauditlog.DefaultTargetType holds the default value on creation for the target_type field.
+	enterpriseauditlog.DefaultTargetType = enterpriseauditlogDescTargetType.Default.(string)
+	// enterpriseauditlog.TargetTypeValidator is a validator for the "target_type" field. It is called by the builders before save.
+	enterpriseauditlog.TargetTypeValidator = enterpriseauditlogDescTargetType.Validators[0].(func(string) error)
+	// enterpriseauditlogDescDetail is the schema descriptor for detail field.
+	enterpriseauditlogDescDetail := enterpriseauditlogFields[6].Descriptor()
+	// enterpriseauditlog.DefaultDetail holds the default value on creation for the detail field.
+	enterpriseauditlog.DefaultDetail = enterpriseauditlogDescDetail.Default.(func() map[string]interface{})
+	// enterpriseauditlogDescCreatedAt is the schema descriptor for created_at field.
+	enterpriseauditlogDescCreatedAt := enterpriseauditlogFields[7].Descriptor()
+	// enterpriseauditlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterpriseauditlog.DefaultCreatedAt = enterpriseauditlogDescCreatedAt.Default.(func() time.Time)
+	enterprisebalancelogFields := schema.EnterpriseBalanceLog{}.Fields()
+	_ = enterprisebalancelogFields
+	// enterprisebalancelogDescType is the schema descriptor for type field.
+	enterprisebalancelogDescType := enterprisebalancelogFields[1].Descriptor()
+	// enterprisebalancelog.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	enterprisebalancelog.TypeValidator = enterprisebalancelogDescType.Validators[0].(func(string) error)
+	// enterprisebalancelogDescNotes is the schema descriptor for notes field.
+	enterprisebalancelogDescNotes := enterprisebalancelogFields[6].Descriptor()
+	// enterprisebalancelog.DefaultNotes holds the default value on creation for the notes field.
+	enterprisebalancelog.DefaultNotes = enterprisebalancelogDescNotes.Default.(string)
+	// enterprisebalancelogDescCreatedAt is the schema descriptor for created_at field.
+	enterprisebalancelogDescCreatedAt := enterprisebalancelogFields[7].Descriptor()
+	// enterprisebalancelog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisebalancelog.DefaultCreatedAt = enterprisebalancelogDescCreatedAt.Default.(func() time.Time)
+	enterprisedepartmentMixin := schema.EnterpriseDepartment{}.Mixin()
+	enterprisedepartmentMixinHooks1 := enterprisedepartmentMixin[1].Hooks()
+	enterprisedepartment.Hooks[0] = enterprisedepartmentMixinHooks1[0]
+	enterprisedepartmentMixinInters1 := enterprisedepartmentMixin[1].Interceptors()
+	enterprisedepartment.Interceptors[0] = enterprisedepartmentMixinInters1[0]
+	enterprisedepartmentMixinFields0 := enterprisedepartmentMixin[0].Fields()
+	_ = enterprisedepartmentMixinFields0
+	enterprisedepartmentFields := schema.EnterpriseDepartment{}.Fields()
+	_ = enterprisedepartmentFields
+	// enterprisedepartmentDescCreatedAt is the schema descriptor for created_at field.
+	enterprisedepartmentDescCreatedAt := enterprisedepartmentMixinFields0[0].Descriptor()
+	// enterprisedepartment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisedepartment.DefaultCreatedAt = enterprisedepartmentDescCreatedAt.Default.(func() time.Time)
+	// enterprisedepartmentDescUpdatedAt is the schema descriptor for updated_at field.
+	enterprisedepartmentDescUpdatedAt := enterprisedepartmentMixinFields0[1].Descriptor()
+	// enterprisedepartment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	enterprisedepartment.DefaultUpdatedAt = enterprisedepartmentDescUpdatedAt.Default.(func() time.Time)
+	// enterprisedepartment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	enterprisedepartment.UpdateDefaultUpdatedAt = enterprisedepartmentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// enterprisedepartmentDescPath is the schema descriptor for path field.
+	enterprisedepartmentDescPath := enterprisedepartmentFields[2].Descriptor()
+	// enterprisedepartment.DefaultPath holds the default value on creation for the path field.
+	enterprisedepartment.DefaultPath = enterprisedepartmentDescPath.Default.(string)
+	// enterprisedepartmentDescDepth is the schema descriptor for depth field.
+	enterprisedepartmentDescDepth := enterprisedepartmentFields[3].Descriptor()
+	// enterprisedepartment.DefaultDepth holds the default value on creation for the depth field.
+	enterprisedepartment.DefaultDepth = enterprisedepartmentDescDepth.Default.(int)
+	// enterprisedepartment.DepthValidator is a validator for the "depth" field. It is called by the builders before save.
+	enterprisedepartment.DepthValidator = enterprisedepartmentDescDepth.Validators[0].(func(int) error)
+	// enterprisedepartmentDescName is the schema descriptor for name field.
+	enterprisedepartmentDescName := enterprisedepartmentFields[4].Descriptor()
+	// enterprisedepartment.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	enterprisedepartment.NameValidator = func() func(string) error {
+		validators := enterprisedepartmentDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// enterprisedepartmentDescSortOrder is the schema descriptor for sort_order field.
+	enterprisedepartmentDescSortOrder := enterprisedepartmentFields[5].Descriptor()
+	// enterprisedepartment.DefaultSortOrder holds the default value on creation for the sort_order field.
+	enterprisedepartment.DefaultSortOrder = enterprisedepartmentDescSortOrder.Default.(int)
+	enterprisegroupwhitelistFields := schema.EnterpriseGroupWhitelist{}.Fields()
+	_ = enterprisegroupwhitelistFields
+	// enterprisegroupwhitelistDescScopeType is the schema descriptor for scope_type field.
+	enterprisegroupwhitelistDescScopeType := enterprisegroupwhitelistFields[1].Descriptor()
+	// enterprisegroupwhitelist.ScopeTypeValidator is a validator for the "scope_type" field. It is called by the builders before save.
+	enterprisegroupwhitelist.ScopeTypeValidator = enterprisegroupwhitelistDescScopeType.Validators[0].(func(string) error)
+	// enterprisegroupwhitelistDescCreatedAt is the schema descriptor for created_at field.
+	enterprisegroupwhitelistDescCreatedAt := enterprisegroupwhitelistFields[4].Descriptor()
+	// enterprisegroupwhitelist.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisegroupwhitelist.DefaultCreatedAt = enterprisegroupwhitelistDescCreatedAt.Default.(func() time.Time)
+	enterprisegroupwhitelistscopeFields := schema.EnterpriseGroupWhitelistScope{}.Fields()
+	_ = enterprisegroupwhitelistscopeFields
+	// enterprisegroupwhitelistscopeDescScopeType is the schema descriptor for scope_type field.
+	enterprisegroupwhitelistscopeDescScopeType := enterprisegroupwhitelistscopeFields[1].Descriptor()
+	// enterprisegroupwhitelistscope.ScopeTypeValidator is a validator for the "scope_type" field. It is called by the builders before save.
+	enterprisegroupwhitelistscope.ScopeTypeValidator = enterprisegroupwhitelistscopeDescScopeType.Validators[0].(func(string) error)
+	// enterprisegroupwhitelistscopeDescCreatedAt is the schema descriptor for created_at field.
+	enterprisegroupwhitelistscopeDescCreatedAt := enterprisegroupwhitelistscopeFields[3].Descriptor()
+	// enterprisegroupwhitelistscope.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisegroupwhitelistscope.DefaultCreatedAt = enterprisegroupwhitelistscopeDescCreatedAt.Default.(func() time.Time)
+	enterprisememberMixin := schema.EnterpriseMember{}.Mixin()
+	enterprisememberMixinHooks1 := enterprisememberMixin[1].Hooks()
+	enterprisemember.Hooks[0] = enterprisememberMixinHooks1[0]
+	enterprisememberMixinInters1 := enterprisememberMixin[1].Interceptors()
+	enterprisemember.Interceptors[0] = enterprisememberMixinInters1[0]
+	enterprisememberMixinFields0 := enterprisememberMixin[0].Fields()
+	_ = enterprisememberMixinFields0
+	enterprisememberFields := schema.EnterpriseMember{}.Fields()
+	_ = enterprisememberFields
+	// enterprisememberDescCreatedAt is the schema descriptor for created_at field.
+	enterprisememberDescCreatedAt := enterprisememberMixinFields0[0].Descriptor()
+	// enterprisemember.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisemember.DefaultCreatedAt = enterprisememberDescCreatedAt.Default.(func() time.Time)
+	// enterprisememberDescUpdatedAt is the schema descriptor for updated_at field.
+	enterprisememberDescUpdatedAt := enterprisememberMixinFields0[1].Descriptor()
+	// enterprisemember.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	enterprisemember.DefaultUpdatedAt = enterprisememberDescUpdatedAt.Default.(func() time.Time)
+	// enterprisemember.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	enterprisemember.UpdateDefaultUpdatedAt = enterprisememberDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// enterprisememberDescRole is the schema descriptor for role field.
+	enterprisememberDescRole := enterprisememberFields[3].Descriptor()
+	// enterprisemember.DefaultRole holds the default value on creation for the role field.
+	enterprisemember.DefaultRole = enterprisememberDescRole.Default.(string)
+	// enterprisemember.RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	enterprisemember.RoleValidator = enterprisememberDescRole.Validators[0].(func(string) error)
+	// enterprisememberDescStatus is the schema descriptor for status field.
+	enterprisememberDescStatus := enterprisememberFields[4].Descriptor()
+	// enterprisemember.DefaultStatus holds the default value on creation for the status field.
+	enterprisemember.DefaultStatus = enterprisememberDescStatus.Default.(string)
+	// enterprisemember.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	enterprisemember.StatusValidator = enterprisememberDescStatus.Validators[0].(func(string) error)
+	// enterprisememberDescTitle is the schema descriptor for title field.
+	enterprisememberDescTitle := enterprisememberFields[5].Descriptor()
+	// enterprisemember.DefaultTitle holds the default value on creation for the title field.
+	enterprisemember.DefaultTitle = enterprisememberDescTitle.Default.(string)
+	// enterprisemember.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	enterprisemember.TitleValidator = enterprisememberDescTitle.Validators[0].(func(string) error)
+	// enterprisememberDescAccountCreatedByEnterprise is the schema descriptor for account_created_by_enterprise field.
+	enterprisememberDescAccountCreatedByEnterprise := enterprisememberFields[6].Descriptor()
+	// enterprisemember.DefaultAccountCreatedByEnterprise holds the default value on creation for the account_created_by_enterprise field.
+	enterprisemember.DefaultAccountCreatedByEnterprise = enterprisememberDescAccountCreatedByEnterprise.Default.(bool)
+	// enterprisememberDescJoinedAt is the schema descriptor for joined_at field.
+	enterprisememberDescJoinedAt := enterprisememberFields[7].Descriptor()
+	// enterprisemember.DefaultJoinedAt holds the default value on creation for the joined_at field.
+	enterprisemember.DefaultJoinedAt = enterprisememberDescJoinedAt.Default.(func() time.Time)
+	enterprisequotaMixin := schema.EnterpriseQuota{}.Mixin()
+	enterprisequotaMixinHooks1 := enterprisequotaMixin[1].Hooks()
+	enterprisequota.Hooks[0] = enterprisequotaMixinHooks1[0]
+	enterprisequotaMixinInters1 := enterprisequotaMixin[1].Interceptors()
+	enterprisequota.Interceptors[0] = enterprisequotaMixinInters1[0]
+	enterprisequotaMixinFields0 := enterprisequotaMixin[0].Fields()
+	_ = enterprisequotaMixinFields0
+	enterprisequotaFields := schema.EnterpriseQuota{}.Fields()
+	_ = enterprisequotaFields
+	// enterprisequotaDescCreatedAt is the schema descriptor for created_at field.
+	enterprisequotaDescCreatedAt := enterprisequotaMixinFields0[0].Descriptor()
+	// enterprisequota.DefaultCreatedAt holds the default value on creation for the created_at field.
+	enterprisequota.DefaultCreatedAt = enterprisequotaDescCreatedAt.Default.(func() time.Time)
+	// enterprisequotaDescUpdatedAt is the schema descriptor for updated_at field.
+	enterprisequotaDescUpdatedAt := enterprisequotaMixinFields0[1].Descriptor()
+	// enterprisequota.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	enterprisequota.DefaultUpdatedAt = enterprisequotaDescUpdatedAt.Default.(func() time.Time)
+	// enterprisequota.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	enterprisequota.UpdateDefaultUpdatedAt = enterprisequotaDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// enterprisequotaDescScopeType is the schema descriptor for scope_type field.
+	enterprisequotaDescScopeType := enterprisequotaFields[1].Descriptor()
+	// enterprisequota.ScopeTypeValidator is a validator for the "scope_type" field. It is called by the builders before save.
+	enterprisequota.ScopeTypeValidator = enterprisequotaDescScopeType.Validators[0].(func(string) error)
+	// enterprisequotaDescDailyUsageUsd is the schema descriptor for daily_usage_usd field.
+	enterprisequotaDescDailyUsageUsd := enterprisequotaFields[7].Descriptor()
+	// enterprisequota.DefaultDailyUsageUsd holds the default value on creation for the daily_usage_usd field.
+	enterprisequota.DefaultDailyUsageUsd = enterprisequotaDescDailyUsageUsd.Default.(float64)
+	// enterprisequotaDescWeeklyUsageUsd is the schema descriptor for weekly_usage_usd field.
+	enterprisequotaDescWeeklyUsageUsd := enterprisequotaFields[8].Descriptor()
+	// enterprisequota.DefaultWeeklyUsageUsd holds the default value on creation for the weekly_usage_usd field.
+	enterprisequota.DefaultWeeklyUsageUsd = enterprisequotaDescWeeklyUsageUsd.Default.(float64)
+	// enterprisequotaDescMonthlyUsageUsd is the schema descriptor for monthly_usage_usd field.
+	enterprisequotaDescMonthlyUsageUsd := enterprisequotaFields[9].Descriptor()
+	// enterprisequota.DefaultMonthlyUsageUsd holds the default value on creation for the monthly_usage_usd field.
+	enterprisequota.DefaultMonthlyUsageUsd = enterprisequotaDescMonthlyUsageUsd.Default.(float64)
+	// enterprisequotaDescTotalUsageUsd is the schema descriptor for total_usage_usd field.
+	enterprisequotaDescTotalUsageUsd := enterprisequotaFields[10].Descriptor()
+	// enterprisequota.DefaultTotalUsageUsd holds the default value on creation for the total_usage_usd field.
+	enterprisequota.DefaultTotalUsageUsd = enterprisequotaDescTotalUsageUsd.Default.(float64)
 	errorpassthroughruleMixin := schema.ErrorPassthroughRule{}.Mixin()
 	errorpassthroughruleMixinFields0 := errorpassthroughruleMixin[0].Fields()
 	_ = errorpassthroughruleMixinFields0
@@ -1991,7 +2292,7 @@ func init() {
 	usagelogFields := schema.UsageLog{}.Fields()
 	_ = usagelogFields
 	// usagelogDescRequestID is the schema descriptor for request_id field.
-	usagelogDescRequestID := usagelogFields[3].Descriptor()
+	usagelogDescRequestID := usagelogFields[5].Descriptor()
 	// usagelog.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
 	usagelog.RequestIDValidator = func() func(string) error {
 		validators := usagelogDescRequestID.Validators
@@ -2009,7 +2310,7 @@ func init() {
 		}
 	}()
 	// usagelogDescModel is the schema descriptor for model field.
-	usagelogDescModel := usagelogFields[4].Descriptor()
+	usagelogDescModel := usagelogFields[6].Descriptor()
 	// usagelog.ModelValidator is a validator for the "model" field. It is called by the builders before save.
 	usagelog.ModelValidator = func() func(string) error {
 		validators := usagelogDescModel.Validators
@@ -2027,135 +2328,135 @@ func init() {
 		}
 	}()
 	// usagelogDescRequestedModel is the schema descriptor for requested_model field.
-	usagelogDescRequestedModel := usagelogFields[5].Descriptor()
+	usagelogDescRequestedModel := usagelogFields[7].Descriptor()
 	// usagelog.RequestedModelValidator is a validator for the "requested_model" field. It is called by the builders before save.
 	usagelog.RequestedModelValidator = usagelogDescRequestedModel.Validators[0].(func(string) error)
 	// usagelogDescUpstreamModel is the schema descriptor for upstream_model field.
-	usagelogDescUpstreamModel := usagelogFields[6].Descriptor()
+	usagelogDescUpstreamModel := usagelogFields[8].Descriptor()
 	// usagelog.UpstreamModelValidator is a validator for the "upstream_model" field. It is called by the builders before save.
 	usagelog.UpstreamModelValidator = usagelogDescUpstreamModel.Validators[0].(func(string) error)
 	// usagelogDescUpstreamResponseModel is the schema descriptor for upstream_response_model field.
-	usagelogDescUpstreamResponseModel := usagelogFields[7].Descriptor()
+	usagelogDescUpstreamResponseModel := usagelogFields[9].Descriptor()
 	// usagelog.UpstreamResponseModelValidator is a validator for the "upstream_response_model" field. It is called by the builders before save.
 	usagelog.UpstreamResponseModelValidator = usagelogDescUpstreamResponseModel.Validators[0].(func(string) error)
 	// usagelogDescModelMappingChain is the schema descriptor for model_mapping_chain field.
-	usagelogDescModelMappingChain := usagelogFields[10].Descriptor()
+	usagelogDescModelMappingChain := usagelogFields[12].Descriptor()
 	// usagelog.ModelMappingChainValidator is a validator for the "model_mapping_chain" field. It is called by the builders before save.
 	usagelog.ModelMappingChainValidator = usagelogDescModelMappingChain.Validators[0].(func(string) error)
 	// usagelogDescBillingTier is the schema descriptor for billing_tier field.
-	usagelogDescBillingTier := usagelogFields[11].Descriptor()
+	usagelogDescBillingTier := usagelogFields[13].Descriptor()
 	// usagelog.BillingTierValidator is a validator for the "billing_tier" field. It is called by the builders before save.
 	usagelog.BillingTierValidator = usagelogDescBillingTier.Validators[0].(func(string) error)
 	// usagelogDescBillingMode is the schema descriptor for billing_mode field.
-	usagelogDescBillingMode := usagelogFields[12].Descriptor()
+	usagelogDescBillingMode := usagelogFields[14].Descriptor()
 	// usagelog.BillingModeValidator is a validator for the "billing_mode" field. It is called by the builders before save.
 	usagelog.BillingModeValidator = usagelogDescBillingMode.Validators[0].(func(string) error)
 	// usagelogDescInputTokens is the schema descriptor for input_tokens field.
-	usagelogDescInputTokens := usagelogFields[15].Descriptor()
+	usagelogDescInputTokens := usagelogFields[17].Descriptor()
 	// usagelog.DefaultInputTokens holds the default value on creation for the input_tokens field.
 	usagelog.DefaultInputTokens = usagelogDescInputTokens.Default.(int)
 	// usagelogDescOutputTokens is the schema descriptor for output_tokens field.
-	usagelogDescOutputTokens := usagelogFields[16].Descriptor()
+	usagelogDescOutputTokens := usagelogFields[18].Descriptor()
 	// usagelog.DefaultOutputTokens holds the default value on creation for the output_tokens field.
 	usagelog.DefaultOutputTokens = usagelogDescOutputTokens.Default.(int)
 	// usagelogDescCacheCreationTokens is the schema descriptor for cache_creation_tokens field.
-	usagelogDescCacheCreationTokens := usagelogFields[17].Descriptor()
+	usagelogDescCacheCreationTokens := usagelogFields[19].Descriptor()
 	// usagelog.DefaultCacheCreationTokens holds the default value on creation for the cache_creation_tokens field.
 	usagelog.DefaultCacheCreationTokens = usagelogDescCacheCreationTokens.Default.(int)
 	// usagelogDescCacheReadTokens is the schema descriptor for cache_read_tokens field.
-	usagelogDescCacheReadTokens := usagelogFields[18].Descriptor()
+	usagelogDescCacheReadTokens := usagelogFields[20].Descriptor()
 	// usagelog.DefaultCacheReadTokens holds the default value on creation for the cache_read_tokens field.
 	usagelog.DefaultCacheReadTokens = usagelogDescCacheReadTokens.Default.(int)
 	// usagelogDescCacheCreation5mTokens is the schema descriptor for cache_creation_5m_tokens field.
-	usagelogDescCacheCreation5mTokens := usagelogFields[19].Descriptor()
+	usagelogDescCacheCreation5mTokens := usagelogFields[21].Descriptor()
 	// usagelog.DefaultCacheCreation5mTokens holds the default value on creation for the cache_creation_5m_tokens field.
 	usagelog.DefaultCacheCreation5mTokens = usagelogDescCacheCreation5mTokens.Default.(int)
 	// usagelogDescCacheCreation1hTokens is the schema descriptor for cache_creation_1h_tokens field.
-	usagelogDescCacheCreation1hTokens := usagelogFields[20].Descriptor()
+	usagelogDescCacheCreation1hTokens := usagelogFields[22].Descriptor()
 	// usagelog.DefaultCacheCreation1hTokens holds the default value on creation for the cache_creation_1h_tokens field.
 	usagelog.DefaultCacheCreation1hTokens = usagelogDescCacheCreation1hTokens.Default.(int)
 	// usagelogDescInputCost is the schema descriptor for input_cost field.
-	usagelogDescInputCost := usagelogFields[21].Descriptor()
+	usagelogDescInputCost := usagelogFields[23].Descriptor()
 	// usagelog.DefaultInputCost holds the default value on creation for the input_cost field.
 	usagelog.DefaultInputCost = usagelogDescInputCost.Default.(float64)
 	// usagelogDescOutputCost is the schema descriptor for output_cost field.
-	usagelogDescOutputCost := usagelogFields[22].Descriptor()
+	usagelogDescOutputCost := usagelogFields[24].Descriptor()
 	// usagelog.DefaultOutputCost holds the default value on creation for the output_cost field.
 	usagelog.DefaultOutputCost = usagelogDescOutputCost.Default.(float64)
 	// usagelogDescCacheCreationCost is the schema descriptor for cache_creation_cost field.
-	usagelogDescCacheCreationCost := usagelogFields[23].Descriptor()
+	usagelogDescCacheCreationCost := usagelogFields[25].Descriptor()
 	// usagelog.DefaultCacheCreationCost holds the default value on creation for the cache_creation_cost field.
 	usagelog.DefaultCacheCreationCost = usagelogDescCacheCreationCost.Default.(float64)
 	// usagelogDescCacheReadCost is the schema descriptor for cache_read_cost field.
-	usagelogDescCacheReadCost := usagelogFields[24].Descriptor()
+	usagelogDescCacheReadCost := usagelogFields[26].Descriptor()
 	// usagelog.DefaultCacheReadCost holds the default value on creation for the cache_read_cost field.
 	usagelog.DefaultCacheReadCost = usagelogDescCacheReadCost.Default.(float64)
 	// usagelogDescTotalCost is the schema descriptor for total_cost field.
-	usagelogDescTotalCost := usagelogFields[25].Descriptor()
+	usagelogDescTotalCost := usagelogFields[27].Descriptor()
 	// usagelog.DefaultTotalCost holds the default value on creation for the total_cost field.
 	usagelog.DefaultTotalCost = usagelogDescTotalCost.Default.(float64)
 	// usagelogDescActualCost is the schema descriptor for actual_cost field.
-	usagelogDescActualCost := usagelogFields[26].Descriptor()
+	usagelogDescActualCost := usagelogFields[28].Descriptor()
 	// usagelog.DefaultActualCost holds the default value on creation for the actual_cost field.
 	usagelog.DefaultActualCost = usagelogDescActualCost.Default.(float64)
 	// usagelogDescRateMultiplier is the schema descriptor for rate_multiplier field.
-	usagelogDescRateMultiplier := usagelogFields[27].Descriptor()
+	usagelogDescRateMultiplier := usagelogFields[29].Descriptor()
 	// usagelog.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
 	usagelog.DefaultRateMultiplier = usagelogDescRateMultiplier.Default.(float64)
 	// usagelogDescLongContextBillingApplied is the schema descriptor for long_context_billing_applied field.
-	usagelogDescLongContextBillingApplied := usagelogFields[28].Descriptor()
+	usagelogDescLongContextBillingApplied := usagelogFields[30].Descriptor()
 	// usagelog.DefaultLongContextBillingApplied holds the default value on creation for the long_context_billing_applied field.
 	usagelog.DefaultLongContextBillingApplied = usagelogDescLongContextBillingApplied.Default.(bool)
 	// usagelogDescBillingType is the schema descriptor for billing_type field.
-	usagelogDescBillingType := usagelogFields[30].Descriptor()
+	usagelogDescBillingType := usagelogFields[32].Descriptor()
 	// usagelog.DefaultBillingType holds the default value on creation for the billing_type field.
 	usagelog.DefaultBillingType = usagelogDescBillingType.Default.(int8)
 	// usagelogDescStream is the schema descriptor for stream field.
-	usagelogDescStream := usagelogFields[31].Descriptor()
+	usagelogDescStream := usagelogFields[33].Descriptor()
 	// usagelog.DefaultStream holds the default value on creation for the stream field.
 	usagelog.DefaultStream = usagelogDescStream.Default.(bool)
 	// usagelogDescUserAgent is the schema descriptor for user_agent field.
-	usagelogDescUserAgent := usagelogFields[34].Descriptor()
+	usagelogDescUserAgent := usagelogFields[36].Descriptor()
 	// usagelog.UserAgentValidator is a validator for the "user_agent" field. It is called by the builders before save.
 	usagelog.UserAgentValidator = usagelogDescUserAgent.Validators[0].(func(string) error)
 	// usagelogDescIPAddress is the schema descriptor for ip_address field.
-	usagelogDescIPAddress := usagelogFields[35].Descriptor()
+	usagelogDescIPAddress := usagelogFields[37].Descriptor()
 	// usagelog.IPAddressValidator is a validator for the "ip_address" field. It is called by the builders before save.
 	usagelog.IPAddressValidator = usagelogDescIPAddress.Validators[0].(func(string) error)
 	// usagelogDescImageCount is the schema descriptor for image_count field.
-	usagelogDescImageCount := usagelogFields[36].Descriptor()
+	usagelogDescImageCount := usagelogFields[38].Descriptor()
 	// usagelog.DefaultImageCount holds the default value on creation for the image_count field.
 	usagelog.DefaultImageCount = usagelogDescImageCount.Default.(int)
 	// usagelogDescImageSize is the schema descriptor for image_size field.
-	usagelogDescImageSize := usagelogFields[37].Descriptor()
+	usagelogDescImageSize := usagelogFields[39].Descriptor()
 	// usagelog.ImageSizeValidator is a validator for the "image_size" field. It is called by the builders before save.
 	usagelog.ImageSizeValidator = usagelogDescImageSize.Validators[0].(func(string) error)
 	// usagelogDescImageInputSize is the schema descriptor for image_input_size field.
-	usagelogDescImageInputSize := usagelogFields[38].Descriptor()
+	usagelogDescImageInputSize := usagelogFields[40].Descriptor()
 	// usagelog.ImageInputSizeValidator is a validator for the "image_input_size" field. It is called by the builders before save.
 	usagelog.ImageInputSizeValidator = usagelogDescImageInputSize.Validators[0].(func(string) error)
 	// usagelogDescImageOutputSize is the schema descriptor for image_output_size field.
-	usagelogDescImageOutputSize := usagelogFields[39].Descriptor()
+	usagelogDescImageOutputSize := usagelogFields[41].Descriptor()
 	// usagelog.ImageOutputSizeValidator is a validator for the "image_output_size" field. It is called by the builders before save.
 	usagelog.ImageOutputSizeValidator = usagelogDescImageOutputSize.Validators[0].(func(string) error)
 	// usagelogDescImageSizeSource is the schema descriptor for image_size_source field.
-	usagelogDescImageSizeSource := usagelogFields[40].Descriptor()
+	usagelogDescImageSizeSource := usagelogFields[42].Descriptor()
 	// usagelog.ImageSizeSourceValidator is a validator for the "image_size_source" field. It is called by the builders before save.
 	usagelog.ImageSizeSourceValidator = usagelogDescImageSizeSource.Validators[0].(func(string) error)
 	// usagelogDescVideoCount is the schema descriptor for video_count field.
-	usagelogDescVideoCount := usagelogFields[42].Descriptor()
+	usagelogDescVideoCount := usagelogFields[44].Descriptor()
 	// usagelog.DefaultVideoCount holds the default value on creation for the video_count field.
 	usagelog.DefaultVideoCount = usagelogDescVideoCount.Default.(int)
 	// usagelogDescVideoResolution is the schema descriptor for video_resolution field.
-	usagelogDescVideoResolution := usagelogFields[43].Descriptor()
+	usagelogDescVideoResolution := usagelogFields[45].Descriptor()
 	// usagelog.VideoResolutionValidator is a validator for the "video_resolution" field. It is called by the builders before save.
 	usagelog.VideoResolutionValidator = usagelogDescVideoResolution.Validators[0].(func(string) error)
 	// usagelogDescCacheTTLOverridden is the schema descriptor for cache_ttl_overridden field.
-	usagelogDescCacheTTLOverridden := usagelogFields[45].Descriptor()
+	usagelogDescCacheTTLOverridden := usagelogFields[47].Descriptor()
 	// usagelog.DefaultCacheTTLOverridden holds the default value on creation for the cache_ttl_overridden field.
 	usagelog.DefaultCacheTTLOverridden = usagelogDescCacheTTLOverridden.Default.(bool)
 	// usagelogDescCreatedAt is the schema descriptor for created_at field.
-	usagelogDescCreatedAt := usagelogFields[46].Descriptor()
+	usagelogDescCreatedAt := usagelogFields[48].Descriptor()
 	// usagelog.DefaultCreatedAt holds the default value on creation for the created_at field.
 	usagelog.DefaultCreatedAt = usagelogDescCreatedAt.Default.(func() time.Time)
 	userMixin := schema.User{}.Mixin()

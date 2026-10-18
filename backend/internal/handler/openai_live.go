@@ -89,7 +89,7 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		subscription,
 		service.QuotaPlatform(c.Request.Context(), apiKey),
 	); err != nil {
-		status, code, message, retryAfter := billingErrorDetails(err)
+		status, code, message, retryAfter := billingErrorDetailsForContext(c, err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -166,7 +166,19 @@ func liveCallIdentity(
 		value := subscription.ID
 		subscriptionID = &value
 	}
+	var enterpriseID, departmentID, memberID int64
+	if apiKey.User != nil && apiKey.User.Enterprise != nil {
+		enterpriseID = apiKey.User.Enterprise.EnterpriseID
+		memberID = apiKey.User.Enterprise.MemberID
+		if apiKey.User.Enterprise.DepartmentID != nil {
+			departmentID = *apiKey.User.Enterprise.DepartmentID
+		}
+	}
 	return service.LiveCallIdentity{
+		EnterpriseID:           enterpriseID,
+		EnterpriseDepartmentID: departmentID,
+		EnterpriseMemberID:     memberID,
+
 		APIKeyID:        apiKey.ID,
 		UserID:          userID,
 		GroupID:         apiKey.GroupID,

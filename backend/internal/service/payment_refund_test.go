@@ -196,7 +196,11 @@ func TestExecuteRefundUsesActualAvailableBalanceDeduction(t *testing.T) {
 		Reason: "concurrent spend", Force: true, DeductionType: payment.DeductionTypeBalance, BalanceToDeduct: 100,
 	}
 
-	result, err := (&PaymentService{entClient: client, userRepo: repo}).ExecuteRefund(ctx, plan)
+	// A historical personal payment remains refundable after joining an
+	// enterprise. Refund deduction must not consult current membership.
+	result, err := (&PaymentService{entClient: client, userRepo: repo,
+		enterpriseMemberships: walletMembershipStub{err: errors.New("refund must not read enterprise membership")},
+	}).ExecuteRefund(ctx, plan)
 	require.NoError(t, err)
 	require.True(t, result.Success)
 	require.Equal(t, 25.0, plan.BalanceToDeduct)

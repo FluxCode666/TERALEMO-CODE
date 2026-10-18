@@ -1010,6 +1010,9 @@ export default {
 
   // Pagination
   pagination: {
+    first: 'First',
+    last: 'Last',
+    morePages: 'More pages',
     showing: 'Showing',
     to: 'to',
     of: 'of',

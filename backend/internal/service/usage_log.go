@@ -108,6 +108,9 @@ type UsageLog struct {
 	AccountID int64
 	RequestID string
 	Model     string
+
+	EnterpriseID           *int64
+	EnterpriseDepartmentID *int64
 	// RequestedModel is the client-requested model name recorded for stable user/admin display.
 	// Empty should be treated as Model for backward compatibility with historical rows.
 	RequestedModel string
@@ -215,6 +218,31 @@ type UsageLog struct {
 	Account      *Account
 	Group        *Group
 	Subscription *UserSubscription
+}
+
+// ApplyUsageLogPayerIdentity copies the frozen payer's enterprise scope into the
+// log. A zero enterprise ID explicitly denotes a personal payer, including
+// historical batch jobs, regardless of the user's current membership.
+func ApplyUsageLogPayerIdentity(log *UsageLog, enterpriseID, departmentID int64) {
+	if log == nil {
+		return
+	}
+	log.EnterpriseID, log.EnterpriseDepartmentID = nil, nil
+	if enterpriseID == 0 {
+		return
+	}
+	log.EnterpriseID = &enterpriseID
+	if departmentID != 0 {
+		log.EnterpriseDepartmentID = &departmentID
+	}
+}
+
+func applyEnterpriseUsageSnapshot(log *UsageLog, user *User) {
+	if user == nil || user.Enterprise == nil {
+		ApplyUsageLogPayerIdentity(log, 0, 0)
+		return
+	}
+	ApplyUsageLogPayerIdentity(log, user.Enterprise.EnterpriseID, valueOrZero(user.Enterprise.DepartmentID))
 }
 
 func (u *UsageLog) TotalTokens() int {

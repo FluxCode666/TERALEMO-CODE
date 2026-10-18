@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/enterprisemember"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -237,6 +238,29 @@ func (r *affiliateRepository) TransferQuotaToBalance(ctx context.Context, userID
 	var newBalance float64
 
 	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		// Membership creation also locks the user after its enterprise. Taking
+		// only this user lock serializes the wallet transfer without introducing
+		// the reverse users -> enterprises lock order.
+		rows, err := txClient.QueryContext(txCtx, `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, userID)
+		if err != nil {
+			return err
+		}
+		found := rows.Next()
+		readErr := rows.Err()
+		_ = rows.Close()
+		if readErr != nil {
+			return readErr
+		}
+		if !found {
+			return service.ErrUserNotFound
+		}
+		member, err := txClient.EnterpriseMember.Query().Where(enterprisemember.UserIDEQ(userID), enterprisemember.DeletedAtIsNil()).Exist(txCtx)
+		if err != nil {
+			return err
+		}
+		if member {
+			return service.ErrEnterpriseMemberWalletDisabled
+		}
 		if _, err := ensureUserAffiliateWithClient(txCtx, txClient, userID); err != nil {
 			return err
 		}
@@ -246,7 +270,7 @@ func (r *affiliateRepository) TransferQuotaToBalance(ctx context.Context, userID
 			return fmt.Errorf("thaw before transfer: %w", err)
 		}
 
-		rows, err := txClient.QueryContext(txCtx, `
+		rows, err = txClient.QueryContext(txCtx, `
 WITH claimed AS (
 	SELECT aff_quota::double precision AS amount
 	FROM user_affiliates

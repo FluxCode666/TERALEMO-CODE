@@ -139,15 +139,16 @@ type RedeemCodeBatchUpdateResult struct {
 
 // RedeemService 兑换码服务
 type RedeemService struct {
-	redeemRepo           RedeemCodeRepository
-	userRepo             UserRepository
-	redeemUserRepo       RedeemUserAdjustmentRepository
-	subscriptionService  *SubscriptionService
-	cache                RedeemCache
-	billingCacheService  *BillingCacheService
-	entClient            *dbent.Client
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	affiliateService     *AffiliateService
+	enterpriseMemberships EnterpriseMembershipReader
+	redeemRepo            RedeemCodeRepository
+	userRepo              UserRepository
+	redeemUserRepo        RedeemUserAdjustmentRepository
+	subscriptionService   *SubscriptionService
+	cache                 RedeemCache
+	billingCacheService   *BillingCacheService
+	entClient             *dbent.Client
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	affiliateService      *AffiliateService
 }
 
 // NewRedeemService 创建兑换码服务实例
@@ -437,6 +438,14 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	}
 
 	// 检查兑换码状态和码本身的过期时间
+	// Only user-initiated redemption is a new personal-wallet operation. Trusted
+	// fulfillment must still settle orders created before enterprise membership.
+	if rateLimitPolicy == enforceRedeemRateLimit && redeemCode.Type == RedeemTypeBalance {
+		if err := checkEnterprisePersonalWallet(ctx, s.enterpriseMemberships, userID); err != nil {
+			return nil, err
+		}
+	}
+
 	if redeemCode.IsExpired() {
 		if rateLimitPolicy == enforceRedeemRateLimit {
 			s.incrementRedeemErrorCount(ctx, userID)

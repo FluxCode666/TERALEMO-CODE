@@ -14,6 +14,10 @@ const (
 	Label = "usage_log"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldEnterpriseID holds the string denoting the enterprise_id field in the database.
+	FieldEnterpriseID = "enterprise_id"
+	// FieldEnterpriseDepartmentID holds the string denoting the enterprise_department_id field in the database.
+	FieldEnterpriseDepartmentID = "enterprise_department_id"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
 	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
@@ -160,6 +164,8 @@ const (
 // Columns holds all SQL columns for usagelog fields.
 var Columns = []string{
 	FieldID,
+	FieldEnterpriseID,
+	FieldEnterpriseDepartmentID,
 	FieldUserID,
 	FieldAPIKeyID,
 	FieldAccountID,
@@ -298,6 +304,16 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByEnterpriseID orders the results by the enterprise_id field.
+func ByEnterpriseID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnterpriseID, opts...).ToFunc()
+}
+
+// ByEnterpriseDepartmentID orders the results by the enterprise_department_id field.
+func ByEnterpriseDepartmentID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnterpriseDepartmentID, opts...).ToFunc()
 }
 
 // ByUserID orders the results by the user_id field.

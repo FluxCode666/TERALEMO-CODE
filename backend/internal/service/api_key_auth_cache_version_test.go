@@ -59,3 +59,11 @@ func TestAPIKeyService_RejectsV15AuthSnapshotWithoutReasoningEffortPolicy(t *tes
 		t.Fatalf("expected no API key from stale snapshot, got %#v", apiKey)
 	}
 }
+
+func TestAPIKeyServiceRejectsV26EnterpriseScopeWhitelists(t *testing.T) {
+	svc := &APIKeyService{}
+	key, used, err := svc.applyAuthCacheEntry("legacy-enterprise-whitelist", &APIKeyAuthCacheEntry{Snapshot: &APIKeyAuthSnapshot{Version: 26, User: APIKeyAuthUserSnapshot{Enterprise: &EnterpriseMemberContext{GroupWhitelistConfigured: true, GroupWhitelistIDs: []int64{1}}}}})
+	if err != nil || used || key != nil {
+		t.Fatalf("v26 enterprise whitelist snapshot must be reloaded: key=%v used=%v err=%v", key, used, err)
+	}
+}
