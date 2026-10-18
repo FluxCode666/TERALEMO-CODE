@@ -4,7 +4,9 @@ export default {
     auditDetails: {
       title: 'Audit details', view: 'View details', before: 'Before', after: 'After', changedTo: 'Changed to',
       copyJson: 'Copy JSON', copied: 'Copied', copyError: 'Copy failed. Select the text to copy manually.',
-      fields: { name: 'Name', status: 'Status', role: 'Role', department_id: 'Department ID', member_id: 'Member ID', user_id: 'User ID', amount: 'Amount', operation: 'Operation', notes: 'Notes', title: 'Job title', email: 'Email', group_ids: 'Group IDs', sort_order: 'Sort order', daily_limit_usd: 'Daily limit', weekly_limit_usd: 'Weekly limit', monthly_limit_usd: 'Monthly limit', total_limit_usd: 'Total limit' }
+      added: 'Added', removed: 'Removed',
+      references: { enterprise: 'Enterprise', department: 'Department', member: 'Member', user: 'User', group: 'Group' },
+      fields: { name: 'Name', status: 'Status', role: 'Role', department_id: 'Department', department_ids: 'Departments', member_id: 'Member', member_ids: 'Members', user_id: 'User', user_ids: 'Users', amount: 'Amount', operation: 'Operation', notes: 'Notes', title: 'Job title', email: 'Email', group_id: 'Group', group_ids: 'Groups', allowed_group_ids: 'Allowed groups', sort_order: 'Sort order', daily_limit_usd: 'Daily limit', weekly_limit_usd: 'Weekly limit', monthly_limit_usd: 'Monthly limit', total_limit_usd: 'Total limit' }
     },
 
     "title": "My enterprise",

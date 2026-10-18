@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DOMWrapper, type VueWrapper, flushPromises, mount } from '@vue/test-utils'
 import EnterpriseLogsPanel from '../components/EnterpriseLogsPanel.vue'
+import EnterpriseAuditDetail from '../components/EnterpriseAuditDetail.vue'
 import EnterpriseDeleteDialog from '../components/EnterpriseDeleteDialog.vue'
 import type { EnterpriseAuditLog } from '@/types/enterprise'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
@@ -44,8 +45,8 @@ describe('企业 shadcn 审计详情', () => {
     const dialog = await openDetail({ before: { status: 'active', settings: { visible: false } }, after: { status: 'disabled', settings: { visible: true } }, reason: 'policy' })
     const comparisons = dialog.findAll('[data-test="audit-detail-comparison"]')
     expect(comparisons).toHaveLength(2)
-    expect(comparisons[0].findAll('pre').map(item => item.text())).toEqual(['active', 'disabled'])
-    expect(comparisons[1].findAll('pre').map(item => item.text())).toEqual(['false', 'true'])
+    expect(comparisons[0].findAll('[data-test="audit-value"]').map(item => item.text())).toEqual(['active', 'disabled'])
+    expect(comparisons[1].findAll('[data-test="audit-value"]').map(item => item.text())).toEqual(['false', 'true'])
     expect(dialog.text()).toContain('settings.visible')
     expect(dialog.text()).toContain('reasonpolicy')
     expect(dialog.text()).toContain('enterprise.auditDetails.before')
@@ -62,6 +63,39 @@ describe('企业 shadcn 审计详情', () => {
     await flushPromises()
     expect(writeText).toHaveBeenCalledWith(JSON.stringify(detail, null, 2))
     expect(dialog.text()).toContain('enterprise.auditDetails.copied')
+  })
+
+  it.each(['group_pool.update', 'group_whitelist.update'])('将 %s 根层级分组数组映射为名称并标明新增与移除，复制仍保留原始 ID', async action => {
+    const detail = { before: [2, 3, 4], after: [2, 3, 5] }
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    wrappers.push(mount(EnterpriseAuditDetail, { attachTo: document.body, props: {
+      log: { ...log, action, detail }, actionLabel: action, targetLabel: 'Acme',
+      catalog: { groups: [{ id: 2, name: 'Claude' }, { id: 3, name: 'Gemini' }, { id: 5, name: 'GPT' }] }
+    } }))
+    await flushPromises()
+    const dialog = new DOMWrapper(document.querySelector<HTMLElement>('[role="dialog"]')!)
+    expect(dialog.text()).toContain('Acme')
+    expect(dialog.text()).toContain('Claude')
+    expect(dialog.text()).toContain('Gemini')
+    expect(dialog.get('[data-change="removed"]').text()).toBe('enterprise.auditDetails.removed ·enterprise.auditDetails.references.group #4')
+    expect(dialog.get('[data-change="added"]').text()).toBe('enterprise.auditDetails.added ·GPT')
+    expect(dialog.findAll('[data-change]')).toHaveLength(2)
+    await dialog.get('[data-test="audit-detail-copy"]').trigger('click'); await flushPromises()
+    expect(writeText).toHaveBeenCalledWith(JSON.stringify(detail, null, 2))
+  })
+
+  it('映射嵌套 allowed_group_ids、成员和部门字段，未知 ID 结构仍保留 JSON', async () => {
+    wrappers.push(mount(EnterpriseAuditDetail, { attachTo: document.body, props: {
+      log: { ...log, detail: { before: { allowed_group_ids: [2], department_id: 3 }, after: { allowed_group_ids: [5], department_id: 4 }, member_ids: [7], user_id: 70, group_ids: [{ future: 1 }] } }, actionLabel: '', targetLabel: 'Alice',
+      catalog: { groups: [{ id: 2, name: 'Claude' }, { id: 5, name: 'GPT' }], departments: [{ id: 3, name: '研发' }, { id: 4, name: '设计' }], members: [{ id: 7, user_id: 70, username: 'Alice', email: 'alice@example.com' }] }
+    } }))
+    await flushPromises()
+    const dialog = new DOMWrapper(document.querySelector<HTMLElement>('[role="dialog"]')!)
+    expect(dialog.text()).toContain('Claude'); expect(dialog.text()).toContain('GPT')
+    expect(dialog.text()).toContain('研发'); expect(dialog.text()).toContain('设计')
+    expect(dialog.findAll('[data-test="audit-reference-values"]').filter(item => item.text() === 'Alice')).toHaveLength(2)
+    expect(dialog.get('pre').text()).toBe(JSON.stringify([{ future: 1 }], null, 2))
   })
 })
 

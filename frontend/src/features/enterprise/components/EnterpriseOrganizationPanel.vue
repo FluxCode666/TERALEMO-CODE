@@ -36,7 +36,15 @@
             <template #cell-status="{ value }"><Badge data-test="enterprise-status-badge" class="whitespace-nowrap" :variant="value === 'active' ? 'secondary' : 'destructive'">{{ t(value === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</Badge></template>
             <template #cell-department_name="{ value }">{{ value || t('enterprise.noDepartment') }}</template>
             <template #cell-joined_at="{ row }">{{ formatDateTime(row.joined_at) }}</template>
-            <template #cell-actions="{ row }"><div v-if="canManageMembers && canManageMember(row)" class="flex gap-3"><Button variant="ghost" class="text-primary" @click="openMember(row)">{{ t('enterprise.edit') }}</Button><Button variant="ghost" class="text-red-600 dark:text-red-400" @click="deleting = { kind: 'member', row }">{{ t('enterprise.removeMember') }}</Button></div></template>
+            <template #cell-actions="{ row }">
+              <DropdownMenu v-if="canManageMembers && canManageMember(row)">
+                <DropdownMenuTrigger as-child><Button variant="ghost" size="icon" :aria-label="`${row.username || row.email} · ${t('enterprise.actions')}`" :data-test="`member-menu-${row.id}`"><MoreHorizontal class="size-4" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem :data-test="`member-edit-${row.id}`" @select="openMember(row)">{{ t('enterprise.edit') }}</DropdownMenuItem>
+                  <DropdownMenuItem class="text-destructive focus:text-destructive" :data-test="`member-remove-${row.id}`" @select="deleting = { kind: 'member', row }">{{ t('enterprise.removeMember') }}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </template>
             <template #empty><EnterpriseEmpty :title="t('enterprise.empty')" :description="t('enterprise.organizationUi.emptyMembers')" /></template>
           </EnterpriseTable>
           <EnterprisePagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; load()" @update:page-size="pageSize = $event; page = 1; load()" />

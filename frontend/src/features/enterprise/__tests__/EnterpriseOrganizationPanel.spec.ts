@@ -28,7 +28,7 @@ function api() {
   return {
     departments: vi.fn().mockResolvedValue(departments),
     members: vi.fn().mockImplementation((query = {}) => Promise.resolve({ items: members.filter(item => query.department_id === undefined || (item.department_id ?? 0) === query.department_id), total: query.department_id === undefined ? 3 : 1 })),
-    deleteDepartment: vi.fn().mockResolvedValue(undefined), updateDepartment: vi.fn().mockResolvedValue({}), createMember: vi.fn().mockResolvedValue({})
+    deleteDepartment: vi.fn().mockResolvedValue(undefined), updateDepartment: vi.fn().mockResolvedValue({}), createMember: vi.fn().mockResolvedValue({}), deleteMember: vi.fn().mockResolvedValue(undefined)
   }
 }
 function render(requests: ReturnType<typeof api>, overview?: EnterpriseOverview) {
@@ -38,6 +38,33 @@ function render(requests: ReturnType<typeof api>, overview?: EnterpriseOverview)
 beforeEach(() => vi.clearAllMocks())
 afterEach(() => wrappers.splice(0).forEach(wrapper => wrapper.unmount()))
 describe('enterprise organization tree', () => {
+  it('uses one member action menu and retains edit and confirmed removal', async () => {
+    const requests = api(), wrapper = render(requests)
+    await flushPromises()
+    expect(wrapper.findAll('[data-test^="member-menu-"]')).toHaveLength(3)
+    expect(wrapper.find('[data-test="member-edit-7"]').exists()).toBe(false)
+    await clickMenuItem(wrapper, '[data-test="member-menu-7"]', '[data-test="member-edit-7"]')
+    expect(wrapper.getComponent({ name: 'EnterpriseMemberForm' }).props('member')).toEqual(members[0])
+    await clickMenuItem(wrapper, '[data-test="member-menu-7"]', '[data-test="member-remove-7"]')
+    expect(requests.deleteMember).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="confirm-remove"]').trigger('click'); await flushPromises()
+    expect(requests.deleteMember).toHaveBeenCalledWith(7)
+  })
+  it('restricts menus to managers’ own department employees and hides all menus without manage permission or in readonly mode', async () => {
+    const requests = api()
+    requests.members.mockResolvedValue({ items: [...members, { ...members[0], id: 10, role: 'manager' }], total: 4 })
+    const overview = { enterprise: { name: 'Acme' }, me: { role: 'manager', department_id: 3 }, permissions: { view_members: true, manage_members: true } } as EnterpriseOverview
+    const wrapper = render(requests, overview); await flushPromises()
+    expect(wrapper.findAll('[data-test^="member-menu-"]').map(item => item.attributes('data-test'))).toEqual(['member-menu-7'])
+    await wrapper.get('[data-test="member-menu-7"]').trigger('keydown', { key: 'Enter' }); await flushPromises()
+    expect(document.querySelector('[data-test="member-edit-7"]')).not.toBeNull()
+    expect(document.querySelector('[data-test="member-remove-7"]')).not.toBeNull()
+    await wrapper.get('[data-test="member-menu-7"]').trigger('keydown', { key: 'Escape' }); await flushPromises()
+    await wrapper.setProps({ readonly: true })
+    expect(wrapper.find('[data-test^="member-menu-"]').exists()).toBe(false)
+    await wrapper.setProps({ readonly: false, overview: { ...overview, permissions: { ...overview.permissions, manage_members: false } } })
+    expect(wrapper.find('[data-test^="member-menu-"]').exists()).toBe(false)
+  })
   it('shows counts, sorts departments, and filters members using department IDs including zero', async () => {
     const requests = api(), wrapper = render(requests)
     await flushPromises()

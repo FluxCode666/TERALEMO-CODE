@@ -4,7 +4,9 @@ export default {
     auditDetails: {
       title: '审计详情', view: '查看详情', before: '修改前', after: '修改后', changedTo: '变更为',
       copyJson: '复制 JSON', copied: '已复制', copyError: '复制失败，请手动选择复制',
-      fields: { name: '名称', status: '状态', role: '角色', department_id: '部门 ID', member_id: '成员 ID', user_id: '用户 ID', amount: '金额', operation: '操作', notes: '备注', title: '职位', email: '邮箱', group_ids: '分组 ID', sort_order: '排序', daily_limit_usd: '每日上限', weekly_limit_usd: '每周上限', monthly_limit_usd: '每月上限', total_limit_usd: '总额上限' }
+      added: '新增', removed: '移除',
+      references: { enterprise: '企业', department: '部门', member: '成员', user: '用户', group: '分组' },
+      fields: { name: '名称', status: '状态', role: '角色', department_id: '部门', department_ids: '部门', member_id: '成员', member_ids: '成员', user_id: '用户', user_ids: '用户', amount: '金额', operation: '操作', notes: '备注', title: '职位', email: '邮箱', group_id: '分组', group_ids: '分组', allowed_group_ids: '允许调用的分组', sort_order: '排序', daily_limit_usd: '每日上限', weekly_limit_usd: '每周上限', monthly_limit_usd: '每月上限', total_limit_usd: '总额上限' }
     },
 
     "title": "我的企业",
