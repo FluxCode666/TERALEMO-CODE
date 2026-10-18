@@ -114,13 +114,10 @@ export default defineConfig(({ mode }) => {
          */
         manualChunks(id: string) {
           if (id.includes('node_modules')) {
-            // Vue 核心库
-            if (
-              id.includes('/vue/') ||
-              id.includes('/vue-router/') ||
-              id.includes('/pinia/') ||
-              id.includes('/@vue/')
-            ) {
+            // Vue 核心库：只匹配包目录本身。宽松的 '/vue/' 会误收 @floating-ui/vue、
+            // @lucide/vue 等适配包，它们依赖 vendor-misc 中的库，使两个 chunk 互相引用，
+            // 生产包启动即报 "Cannot access before initialization"。
+            if (/\/node_modules\/(?:vue|vue-router|pinia|@vue\/[^/]+)\//.test(id)) {
               return 'vendor-vue'
             }
 
