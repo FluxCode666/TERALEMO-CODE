@@ -92,6 +92,8 @@ func (h *EnterpriseHandler) usageQuery(c *gin.Context, a service.EnterpriseActor
 	switch kind {
 	case "list":
 		p := enterprisePagination(c)
+		p.SortBy, p.SortOrder = c.Query("sort_by"), c.Query("sort_order")
+		p = service.NormalizeEnterpriseUsageSort(p)
 		items, page, err := h.usage.List(ctx, scope, p, filters)
 		if items == nil {
 			items = []service.EnterpriseUsageLog{}

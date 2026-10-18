@@ -79,7 +79,7 @@ func TestEnterpriseUsageDTORedactsSensitiveAssociations(t *testing.T) {
 	value := EnterpriseUsageLog{ID: 1, User: EnterpriseUsageUser{ID: 2, Username: "a", Email: "a@example.com"}, APIKey: &EnterpriseUsageNamedResource{ID: 3, Name: "key"}, ActualCost: 2}
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
-	for _, s := range []string{`"key":`, `"balance":`, `"account":`, `"account_id":`, `"rate_multiplier":`, `"upstream_endpoint":`, `"ip_address":`, `"total_cost":`} {
+	for _, s := range []string{`"key":`, `"balance":`, `"account":`, `"account_id":`, `"upstream_endpoint":`, `"account_rate_multiplier":`, `"account_stats_cost":`, `"session_id":`} {
 		require.NotContains(t, string(data), s)
 	}
 	require.Contains(t, string(data), `"api_key":{"id":3,"name":"key"}`)

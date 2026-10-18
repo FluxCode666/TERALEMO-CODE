@@ -128,3 +128,72 @@ func TestEnterpriseUsageSnapshotIsolationAndPreaggregates(t *testing.T) {
 	require.EqualValues(t, 1, stats.TotalRequests)
 	require.InDelta(t, 1, stats.TotalActualCost, 1e-9)
 }
+
+func TestEnterpriseUsageDetailProjectionAndSort(t *testing.T) {
+	tx := testEntTx(t)
+	ctx := dbent.NewTxContext(context.Background(), tx)
+	client := tx.Client()
+	repo := newUsageLogRepositoryWithSQL(client, tx)
+	e := enterpriseFixture(t, ctx)
+	dr := NewEnterpriseDepartmentRepository(client)
+	department := &service.EnterpriseDepartment{EnterpriseID: e.ID, Name: "Snapshot department"}
+	require.NoError(t, dr.Create(ctx, department))
+	member := enterpriseMemberFixture(t, ctx, e.ID, &department.ID)
+	key := mustCreateApiKey(t, client, &service.APIKey{UserID: member.UserID, Key: "sk-enterprise-details-private", Name: "display-key"})
+	account := mustCreateAccount(t, client, &service.Account{Name: "private-upstream"})
+	group := mustCreateGroup(t, client, &service.Group{Name: "detail-group", Platform: "openai"})
+	str := func(s string) *string { return &s }
+	duration, first := 1234, 12
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	log := &service.UsageLog{
+		UserID: member.UserID, APIKeyID: key.ID, AccountID: account.ID, EnterpriseID: &e.ID, EnterpriseDepartmentID: &department.ID, GroupID: &group.ID,
+		RequestID: "enterprise-detail-request", Model: "z-billing-model", RequestedModel: "a-requested-model", UpstreamModel: str("private-model"),
+		ServiceTier: str("priority"), ReasoningEffort: str("high"), RequestedReasoningEffort: str(" max "), InboundEndpoint: str("/v1/messages"), UpstreamEndpoint: str("/private"),
+		InputTokens: 11, OutputTokens: 12, CacheCreationTokens: 13, CacheReadTokens: 14, CacheCreation5mTokens: 5, CacheCreation1hTokens: 8,
+		InputCost: 1.1, OutputCost: 1.2, CacheCreationCost: 1.3, CacheReadCost: 1.4, TotalCost: 5, ActualCost: 6, RateMultiplier: 1.2, LongContextBillingApplied: true,
+		RequestType: service.RequestTypeWSV2, Stream: true, OpenAIWSMode: true, NativeCompactionV2: true, DurationMs: &duration, FirstTokenMs: &first,
+		ImageCount: 2, ImageSize: str("1K"), ImageInputSize: str("2K"), ImageOutputSize: str("1K"), ImageInputTokens: 21, ImageInputCost: 2.1, ImageOutputTokens: 22, ImageOutputCost: 2.2,
+		ImageSizeSource: str("output"), ImageSizeBreakdown: map[string]int{"1K": 2}, UserAgent: str("enterprise-client"), IPAddress: str("127.0.0.1"), CacheTTLOverridden: true, BillingMode: str("image"), CreatedAt: now,
+	}
+	_, err := repo.Create(ctx, log)
+	require.NoError(t, err)
+	other := &service.UsageLog{UserID: member.UserID, APIKeyID: key.ID, AccountID: account.ID, EnterpriseID: &e.ID, EnterpriseDepartmentID: &department.ID, RequestID: "enterprise-sort-request", Model: "z-legacy-model", InputTokens: 1, CreatedAt: now.Add(-time.Second)}
+	_, err = repo.Create(ctx, other)
+	require.NoError(t, err)
+	// Exercise historical fallback through a raw NULL requested_model and unknown request_type.
+	_, err = tx.ExecContext(ctx, `UPDATE usage_logs SET requested_model=NULL, request_type=0, stream=true WHERE id=$1`, other.ID)
+	require.NoError(t, err)
+	filters := usagestats.UsageLogFilters{EnterpriseID: e.ID}
+	rows, page, err := repo.ListEnterpriseUsageLogs(ctx, pagination.PaginationParams{Page: 1, PageSize: 10, SortBy: "model", SortOrder: "asc"}, filters)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, page.Total)
+	require.Equal(t, []int64{log.ID, other.ID}, []int64{rows[0].ID, rows[1].ID})
+	want := service.EnterpriseUsageLogFromUsageLog(log)
+	want.User = rows[0].User
+	want.DepartmentName = &department.Name
+	want.APIKey = &service.EnterpriseUsageNamedResource{ID: key.ID, Name: key.Name}
+	want.Group = &service.EnterpriseUsageGroup{ID: group.ID, Name: group.Name, Platform: group.Platform}
+	require.Equal(t, want, rows[0])
+	require.Equal(t, "z-legacy-model", rows[1].Model)
+	require.Equal(t, "stream", rows[1].RequestType)
+	require.Nil(t, rows[1].DurationMs)
+	for _, tc := range []struct {
+		by, order string
+		first     int64
+	}{
+		{"model", "desc", other.ID}, {"created_at", "asc", other.ID}, {"created_at", "desc", log.ID}, {"invalid", "asc", log.ID}, {"model", "invalid", log.ID},
+	} {
+		rows, _, err = repo.ListEnterpriseUsageLogs(ctx, pagination.PaginationParams{Page: 1, PageSize: 1, SortBy: tc.by, SortOrder: tc.order}, filters)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.Equal(t, tc.first, rows[0].ID)
+	}
+	// Current membership moves cannot rewrite the department on historical usage.
+	_, err = tx.ExecContext(ctx, `UPDATE enterprise_members SET department_id=NULL WHERE id=$1`, member.ID)
+	require.NoError(t, err)
+	require.NoError(t, dr.Delete(ctx, e.ID, department.ID))
+	rows, _, err = repo.ListEnterpriseUsageLogs(ctx, pagination.DefaultPagination(), filters)
+	require.NoError(t, err)
+	require.Equal(t, &department.ID, rows[0].DepartmentID)
+	require.Nil(t, rows[0].DepartmentName)
+}

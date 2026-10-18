@@ -132,12 +132,7 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 			if !configured {
 				continue
 			}
-			if !c.GroupWhitelistConfigured {
-				c.GroupWhitelistConfigured = true
-				c.GroupWhitelistIDs = slices.Clone(ids)
-				continue
-			}
-			c.GroupWhitelistIDs = enterpriseIntersectSortedGroupIDs(c.GroupWhitelistIDs, ids)
+			c.ApplyGroupWhitelist(ids)
 		}
 	}
 	return out, nil
@@ -155,23 +150,6 @@ func enterpriseContextPlaceholders(ids []int64, args *[]any) string {
 		placeholders[i] = fmt.Sprintf("$%d", len(*args))
 	}
 	return strings.Join(placeholders, ",")
-}
-
-func enterpriseIntersectSortedGroupIDs(left, right []int64) []int64 {
-	out := make([]int64, 0)
-	for i, j := 0, 0; i < len(left) && j < len(right); {
-		switch {
-		case left[i] < right[j]:
-			i++
-		case left[i] > right[j]:
-			j++
-		default:
-			out = append(out, left[i])
-			i++
-			j++
-		}
-	}
-	return out
 }
 
 func (r *enterpriseRepository) ListMemberUserIDs(ctx context.Context, enterpriseID int64) ([]int64, error) {

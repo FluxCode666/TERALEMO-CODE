@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -32,24 +33,147 @@ type EnterpriseUsageNamedResource struct {
 // EnterpriseUsageLog deliberately contains only the enterprise-visible fields.
 // Never serialize UsageLog or its full User/APIKey/Account associations here.
 type EnterpriseUsageLog struct {
-	ID                  int64                         `json:"id"`
-	User                EnterpriseUsageUser           `json:"user"`
-	DepartmentID        *int64                        `json:"department_id"`
-	APIKey              *EnterpriseUsageNamedResource `json:"api_key"`
-	Group               *EnterpriseUsageNamedResource `json:"group"`
-	Model               string                        `json:"model"`
-	InputTokens         int                           `json:"input_tokens"`
-	OutputTokens        int                           `json:"output_tokens"`
-	CacheCreationTokens int                           `json:"cache_creation_tokens"`
-	CacheReadTokens     int                           `json:"cache_read_tokens"`
-	ActualCost          float64                       `json:"actual_cost"`
-	BillingType         int8                          `json:"billing_type"`
-	RequestType         RequestType                   `json:"request_type"`
-	Stream              bool                          `json:"stream"`
-	DurationMs          int                           `json:"duration_ms"`
-	FirstTokenMs        *int                          `json:"first_token_ms"`
-	CreatedAt           time.Time                     `json:"created_at"`
+	ID                        int64                         `json:"id"`
+	UserID                    int64                         `json:"user_id"`
+	APIKeyID                  int64                         `json:"api_key_id"`
+	RequestID                 string                        `json:"request_id"`
+	Model                     string                        `json:"model"`
+	ServiceTier               *string                       `json:"service_tier,omitempty"`
+	ReasoningEffort           *string                       `json:"reasoning_effort,omitempty"`
+	InboundEndpoint           *string                       `json:"inbound_endpoint,omitempty"`
+	GroupID                   *int64                        `json:"group_id"`
+	InputTokens               int                           `json:"input_tokens"`
+	OutputTokens              int                           `json:"output_tokens"`
+	CacheCreationTokens       int                           `json:"cache_creation_tokens"`
+	CacheReadTokens           int                           `json:"cache_read_tokens"`
+	CacheCreation5mTokens     int                           `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens     int                           `json:"cache_creation_1h_tokens"`
+	InputCost                 float64                       `json:"input_cost"`
+	OutputCost                float64                       `json:"output_cost"`
+	CacheCreationCost         float64                       `json:"cache_creation_cost"`
+	CacheReadCost             float64                       `json:"cache_read_cost"`
+	TotalCost                 float64                       `json:"total_cost"`
+	ActualCost                float64                       `json:"actual_cost"`
+	RateMultiplier            float64                       `json:"rate_multiplier"`
+	LongContextBillingApplied bool                          `json:"long_context_billing_applied"`
+	BillingType               int8                          `json:"billing_type"`
+	RequestType               string                        `json:"request_type"`
+	Stream                    bool                          `json:"stream"`
+	OpenAIWSMode              bool                          `json:"openai_ws_mode"`
+	NativeCompactionV2        bool                          `json:"native_compaction_v2"`
+	DurationMs                *int                          `json:"duration_ms"`
+	FirstTokenMs              *int                          `json:"first_token_ms"`
+	ImageCount                int                           `json:"image_count"`
+	ImageSize                 *string                       `json:"image_size"`
+	ImageInputSize            *string                       `json:"image_input_size"`
+	ImageOutputSize           *string                       `json:"image_output_size"`
+	ImageInputTokens          int                           `json:"image_input_tokens"`
+	ImageInputCost            float64                       `json:"image_input_cost"`
+	ImageOutputTokens         int                           `json:"image_output_tokens"`
+	ImageOutputCost           float64                       `json:"image_output_cost"`
+	ImageSizeSource           *string                       `json:"image_size_source"`
+	ImageSizeBreakdown        map[string]int                `json:"image_size_breakdown"`
+	MediaType                 *string                       `json:"media_type"`
+	UserAgent                 *string                       `json:"user_agent"`
+	IPAddress                 *string                       `json:"ip_address,omitempty"`
+	CacheTTLOverridden        bool                          `json:"cache_ttl_overridden"`
+	BillingMode               *string                       `json:"billing_mode,omitempty"`
+	CreatedAt                 time.Time                     `json:"created_at"`
+	User                      EnterpriseUsageUser           `json:"user"`
+	DepartmentID              *int64                        `json:"department_id"`
+	DepartmentName            *string                       `json:"department_name"`
+	APIKey                    *EnterpriseUsageNamedResource `json:"api_key"`
+	Group                     *EnterpriseUsageGroup         `json:"group"`
 }
+type EnterpriseUsageGroup struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Platform string `json:"platform"`
+}
+
+// EnterpriseUsageLogFromUsageLog projects only client-visible usage data.
+func EnterpriseUsageLogFromUsageLog(l *UsageLog) EnterpriseUsageLog {
+	requestType := l.EffectiveRequestType()
+	stream, ws := ApplyLegacyRequestFields(requestType, l.Stream, l.OpenAIWSMode)
+	model := l.RequestedModel
+	if model == "" {
+		model = l.Model
+	}
+	effort := l.ReasoningEffort
+	if l.RequestedReasoningEffort != nil {
+		if requested := strings.TrimSpace(*l.RequestedReasoningEffort); requested != "" {
+			effort = &requested
+		}
+	}
+	return EnterpriseUsageLog{
+		ID:                        l.ID,
+		UserID:                    l.UserID,
+		APIKeyID:                  l.APIKeyID,
+		RequestID:                 l.RequestID,
+		Model:                     model,
+		ServiceTier:               l.ServiceTier,
+		ReasoningEffort:           effort,
+		InboundEndpoint:           l.InboundEndpoint,
+		GroupID:                   l.GroupID,
+		InputTokens:               l.InputTokens,
+		OutputTokens:              l.OutputTokens,
+		CacheCreationTokens:       l.CacheCreationTokens,
+		CacheReadTokens:           l.CacheReadTokens,
+		CacheCreation5mTokens:     l.CacheCreation5mTokens,
+		CacheCreation1hTokens:     l.CacheCreation1hTokens,
+		InputCost:                 l.InputCost,
+		OutputCost:                l.OutputCost,
+		CacheCreationCost:         l.CacheCreationCost,
+		CacheReadCost:             l.CacheReadCost,
+		TotalCost:                 l.TotalCost,
+		ActualCost:                l.ActualCost,
+		RateMultiplier:            l.RateMultiplier,
+		LongContextBillingApplied: l.LongContextBillingApplied,
+		BillingType:               l.BillingType,
+		RequestType:               requestType.String(),
+		Stream:                    stream,
+		OpenAIWSMode:              ws,
+		NativeCompactionV2:        l.NativeCompactionV2,
+		DurationMs:                l.DurationMs,
+		FirstTokenMs:              l.FirstTokenMs,
+		ImageCount:                l.ImageCount,
+		ImageSize:                 l.ImageSize,
+		ImageInputSize:            l.ImageInputSize,
+		ImageOutputSize:           l.ImageOutputSize,
+		ImageInputTokens:          l.ImageInputTokens,
+		ImageInputCost:            l.ImageInputCost,
+		ImageOutputTokens:         l.ImageOutputTokens,
+		ImageOutputCost:           l.ImageOutputCost,
+		ImageSizeSource:           l.ImageSizeSource,
+		ImageSizeBreakdown:        l.ImageSizeBreakdown,
+		MediaType:                 l.MediaType,
+		UserAgent:                 l.UserAgent,
+		IPAddress:                 l.IPAddress,
+		CacheTTLOverridden:        l.CacheTTLOverridden,
+		BillingMode:               l.BillingMode,
+		CreatedAt:                 l.CreatedAt,
+		DepartmentID:              l.EnterpriseDepartmentID,
+		User:                      EnterpriseUsageUser{ID: l.UserID},
+	}
+}
+
+// NormalizeEnterpriseUsageSort accepts the same sort columns as personal usage.
+// Any invalid component resets the complete sort to the default.
+func NormalizeEnterpriseUsageSort(params pagination.PaginationParams) pagination.PaginationParams {
+	by, order := strings.ToLower(strings.TrimSpace(params.SortBy)), strings.ToLower(strings.TrimSpace(params.SortOrder))
+	if by == "" {
+		by = "created_at"
+	}
+	if order == "" {
+		order = "desc"
+	}
+	if (by != "created_at" && by != "model") || (order != "asc" && order != "desc") {
+		by, order = "created_at", "desc"
+	}
+	params.SortBy, params.SortOrder = by, order
+	return params
+}
+
 type EnterpriseUsageStats struct {
 	TotalRequests   int64   `json:"total_requests"`
 	TotalTokens     int64   `json:"total_tokens"`
@@ -169,7 +293,7 @@ func (s *EnterpriseUsageService) List(ctx context.Context, scope EnterpriseUsage
 	if !ok {
 		return nil, nil, fmt.Errorf("enterprise usage list repository unavailable")
 	}
-	return r.ListEnterpriseUsageLogs(ctx, params, f)
+	return r.ListEnterpriseUsageLogs(ctx, NormalizeEnterpriseUsageSort(params), f)
 }
 func (s *EnterpriseUsageService) Stats(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) (*EnterpriseUsageStats, error) {
 	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())

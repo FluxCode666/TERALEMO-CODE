@@ -197,18 +197,18 @@ func TestEnterpriseHTTPRoutesMatchW4Contract(t *testing.T) {
 		"GET /:id/departments", "POST /:id/departments", "PUT /:id/departments/:departmentId", "DELETE /:id/departments/:departmentId",
 		"GET /:id/members", "POST /:id/members", "PUT /:id/members/:memberId", "DELETE /:id/members/:memberId",
 		"GET /:id/quotas", "PUT /:id/quotas/:scopeType/:scopeId", "POST /:id/quotas/:scopeType/:scopeId/reset",
-		"GET /:id/allowed-groups", "PUT /:id/allowed-groups", "GET /:id/group-whitelists", "PUT /:id/group-whitelists/:scopeType/:scopeId",
+		"GET /:id/allowed-groups", "PUT /:id/allowed-groups", "GET /:id/group-whitelists", "GET /:id/group-whitelists/effective", "PUT /:id/group-whitelists/:scopeType/:scopeId",
 		"GET /:id/usage", "GET /:id/usage/stats", "GET /:id/usage/trend", "GET /:id/usage/models", "GET /:id/usage/members", "GET /:id/usage/departments", "GET /:id/audit-logs",
 	})
 	add("/api/v1/enterprise", []string{
 		"GET /overview", "GET /departments", "POST /departments", "PUT /departments/:departmentId", "DELETE /departments/:departmentId",
 		"GET /members", "POST /members", "PUT /members/:memberId", "DELETE /members/:memberId",
 		"GET /quotas", "PUT /quotas/:scopeType/:scopeId", "POST /quotas/:scopeType/:scopeId/reset", "GET /groups",
-		"GET /group-whitelists", "PUT /group-whitelists/:scopeType/:scopeId", "GET /settings", "PUT /settings",
+		"GET /group-whitelists", "GET /group-whitelists/effective", "PUT /group-whitelists/:scopeType/:scopeId", "GET /settings", "PUT /settings",
 		"GET /usage", "GET /usage/stats", "GET /usage/trend", "GET /usage/models", "GET /usage/members", "GET /usage/departments", "GET /audit-logs",
 	})
-	require.Len(t, expected, 53)
-	require.Len(t, r.Routes(), 53)
+	require.Len(t, expected, 55)
+	require.Len(t, r.Routes(), 55)
 	for _, route := range r.Routes() {
 		key := route.Method + " " + route.Path
 		require.True(t, expected[key], "unexpected route: %s", key)

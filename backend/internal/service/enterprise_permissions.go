@@ -5,19 +5,20 @@ package service
 type EnterprisePermission string
 
 const (
-	EnterprisePermissionRead              EnterprisePermission = "read"
-	EnterprisePermissionManageDepartments EnterprisePermission = "manage_departments"
-	EnterprisePermissionViewMembers       EnterprisePermission = "view_members"
-	EnterprisePermissionManageMember      EnterprisePermission = "manage_member"
-	EnterprisePermissionCreateMember      EnterprisePermission = "create_member"
-	EnterprisePermissionViewQuota         EnterprisePermission = "view_quota"
-	EnterprisePermissionEditQuota         EnterprisePermission = "edit_quota"
-	EnterprisePermissionResetQuota        EnterprisePermission = "reset_quota"
-	EnterprisePermissionViewWhitelists    EnterprisePermission = "view_whitelists"
-	EnterprisePermissionEditWhitelist     EnterprisePermission = "edit_whitelist"
-	EnterprisePermissionSettings          EnterprisePermission = "settings"
-	EnterprisePermissionAudit             EnterprisePermission = "audit"
-	EnterprisePermissionDepartmentUsage   EnterprisePermission = "department_usage"
+	EnterprisePermissionRead                EnterprisePermission = "read"
+	EnterprisePermissionManageDepartments   EnterprisePermission = "manage_departments"
+	EnterprisePermissionViewMembers         EnterprisePermission = "view_members"
+	EnterprisePermissionManageMember        EnterprisePermission = "manage_member"
+	EnterprisePermissionCreateMember        EnterprisePermission = "create_member"
+	EnterprisePermissionViewQuota           EnterprisePermission = "view_quota"
+	EnterprisePermissionEditQuota           EnterprisePermission = "edit_quota"
+	EnterprisePermissionResetQuota          EnterprisePermission = "reset_quota"
+	EnterprisePermissionViewWhitelists      EnterprisePermission = "view_whitelists"
+	EnterprisePermissionViewEffectiveGroups EnterprisePermission = "view_effective_groups"
+	EnterprisePermissionEditWhitelist       EnterprisePermission = "edit_whitelist"
+	EnterprisePermissionSettings            EnterprisePermission = "settings"
+	EnterprisePermissionAudit               EnterprisePermission = "audit"
+	EnterprisePermissionDepartmentUsage     EnterprisePermission = "department_usage"
 )
 
 type EnterprisePermissionTarget struct {
@@ -61,6 +62,8 @@ func CheckEnterprisePermission(c *EnterpriseMemberContext, settings EnterpriseSe
 		allowed = true
 	case EnterprisePermissionViewMembers, EnterprisePermissionViewWhitelists:
 		allowed = c.Role == EnterpriseRoleManager && c.DepartmentID != nil
+	case EnterprisePermissionViewEffectiveGroups:
+		allowed = target.ScopeType == EnterpriseScopeMember && target.Member != nil && ((c.Role == EnterpriseRoleManager && enterpriseSameDepartment(c, target.Member)) || (c.Role == EnterpriseRoleMember && c.MemberID == target.Member.ID))
 	case EnterprisePermissionCreateMember, EnterprisePermissionManageMember:
 		allowed = c.Role == EnterpriseRoleManager && settings.ManagerCanManageMembers && enterpriseSameDepartment(c, target.Member) && target.Member.Role == EnterpriseRoleMember
 	case EnterprisePermissionViewQuota:

@@ -175,6 +175,36 @@ func (c *EnterpriseMemberContext) AllowsGroup(id int64) bool {
 	return c == nil || ((!c.GroupPoolConfigured || slices.Contains(c.GroupPoolIDs, id)) && (!c.GroupWhitelistConfigured || slices.Contains(c.GroupWhitelistIDs, id)))
 }
 
+// ApplyGroupWhitelist combines one configured scope into the authentication snapshot.
+// An empty configured scope is a restriction that denies every group.
+func (c *EnterpriseMemberContext) ApplyGroupWhitelist(ids []int64) {
+	if !c.GroupWhitelistConfigured {
+		c.GroupWhitelistConfigured = true
+		c.GroupWhitelistIDs = append([]int64{}, ids...)
+		return
+	}
+	c.GroupWhitelistIDs = slices.DeleteFunc(c.GroupWhitelistIDs, func(id int64) bool { return !slices.Contains(ids, id) })
+}
+
+// EffectiveGroupIDs is nil only when enterprise policy imposes no restriction.
+// Candidate IDs always pass through the gateway's own access predicate.
+func (c *EnterpriseMemberContext) EffectiveGroupIDs() []int64 {
+	if c == nil || (!c.GroupPoolConfigured && !c.GroupWhitelistConfigured) {
+		return nil
+	}
+	candidates := c.GroupWhitelistIDs
+	if c.GroupPoolConfigured {
+		candidates = c.GroupPoolIDs
+	}
+	ids := make([]int64, 0, len(candidates))
+	for _, id := range candidates {
+		if c.AllowsGroup(id) {
+			ids = append(ids, id)
+		}
+	}
+	return enterpriseUniqueGroupIDs(ids)
+}
+
 type EnterpriseListFilters struct{ Search, Status string }
 type EnterpriseMemberListFilters struct {
 	Search, Role, Status string

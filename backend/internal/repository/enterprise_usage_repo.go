@@ -73,11 +73,67 @@ func (r *usageLogRepository) ListEnterpriseUsageLogs(ctx context.Context, params
 	if err := scanSingleRow(ctx, r.sql, "SELECT COUNT(*) FROM usage_logs ul "+where, args, &total); err != nil {
 		return nil, nil, translatePersistenceError(err, nil, nil)
 	}
-	query := `SELECT ul.id,ul.user_id,COALESCE(u.username,''),COALESCE(u.email,''),ul.enterprise_department_id,
- k.id,COALESCE(k.name,''),g.id,COALESCE(g.name,''),COALESCE(NULLIF(TRIM(ul.requested_model),''),ul.model),
- ul.input_tokens,ul.output_tokens,ul.cache_creation_tokens,ul.cache_read_tokens,ul.actual_cost,ul.billing_type,ul.request_type,ul.stream,COALESCE(ul.duration_ms,0),ul.first_token_ms,ul.created_at
- FROM usage_logs ul LEFT JOIN users u ON u.id=ul.user_id LEFT JOIN api_keys k ON k.id=ul.api_key_id LEFT JOIN groups g ON g.id=ul.group_id ` + where
-	query += fmt.Sprintf(" ORDER BY ul.created_at DESC,ul.id DESC LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	params = service.NormalizeEnterpriseUsageSort(params)
+	query := `SELECT ul.id,
+ ul.user_id,
+ ul.api_key_id,
+ COALESCE(ul.request_id,''),
+ ul.service_tier,
+ ul.inbound_endpoint,
+ ul.group_id,
+ ul.input_tokens,
+ ul.output_tokens,
+ ul.cache_creation_tokens,
+ ul.cache_read_tokens,
+ ul.cache_creation_5m_tokens,
+ ul.cache_creation_1h_tokens,
+ ul.input_cost,
+ ul.output_cost,
+ ul.cache_creation_cost,
+ ul.cache_read_cost,
+ ul.total_cost,
+ ul.actual_cost,
+ ul.rate_multiplier,
+ ul.long_context_billing_applied,
+ ul.billing_type,
+ ul.stream,
+ ul.openai_ws_mode,
+ ul.native_compaction_v2,
+ ul.duration_ms,
+ ul.first_token_ms,
+ ul.image_count,
+ ul.image_size,
+ ul.image_input_size,
+ ul.image_output_size,
+ ul.image_input_tokens,
+ ul.image_input_cost,
+ ul.image_output_tokens,
+ ul.image_output_cost,
+ ul.image_size_source,
+ ul.image_size_breakdown,
+ ul.user_agent,
+ ul.ip_address,
+ ul.cache_ttl_overridden,
+ ul.billing_mode,
+ ul.created_at,
+ ul.model,
+ COALESCE(NULLIF(TRIM(ul.requested_model),''),ul.model) AS requested_model,
+ ul.reasoning_effort,
+ ul.requested_reasoning_effort,
+ ul.request_type,
+ ul.enterprise_department_id,
+ COALESCE(u.username,''),
+ COALESCE(u.email,''),
+ d.name,
+ k.id AS api_key_resource_id,
+ COALESCE(k.name,''),
+ g.id AS group_resource_id,
+ COALESCE(g.name,''),
+ COALESCE(g.platform,'')
+ FROM usage_logs ul LEFT JOIN users u ON u.id=ul.user_id LEFT JOIN api_keys k ON k.id=ul.api_key_id LEFT JOIN groups g ON g.id=ul.group_id
+ LEFT JOIN enterprise_departments d ON d.id=ul.enterprise_department_id AND d.enterprise_id=ul.enterprise_id AND d.deleted_at IS NULL ` + where
+	// Resolve sort columns against a derived table to reuse the personal usage ordering.
+	query = "SELECT * FROM (" + query + ") enterprise_usage ORDER BY " + usageLogOrderBy(params) + fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	args = append(args, params.Limit(), params.Offset())
 	rows, err := r.sql.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -86,25 +142,80 @@ func (r *usageLogRepository) ListEnterpriseUsageLogs(ctx context.Context, params
 	defer func() { _ = rows.Close() }()
 	out := make([]service.EnterpriseUsageLog, 0)
 	for rows.Next() {
-		var v service.EnterpriseUsageLog
-		var dept, key, group sql.NullInt64
-		var first sql.NullInt64
-		var keyName, groupName string
-		if err := rows.Scan(&v.ID, &v.User.ID, &v.User.Username, &v.User.Email, &dept, &key, &keyName, &group, &groupName, &v.Model, &v.InputTokens, &v.OutputTokens, &v.CacheCreationTokens, &v.CacheReadTokens, &v.ActualCost, &v.BillingType, &v.RequestType, &v.Stream, &v.DurationMs, &first, &v.CreatedAt); err != nil {
+		var log service.UsageLog
+		var requestType int16
+		var imageSizeBreakdown sql.NullString
+		var key, group sql.NullInt64
+		var departmentName *string
+		var username, email, keyName, groupName, platform string
+		if err := rows.Scan(&log.ID,
+			&log.UserID,
+			&log.APIKeyID,
+			&log.RequestID,
+			&log.ServiceTier,
+			&log.InboundEndpoint,
+			&log.GroupID,
+			&log.InputTokens,
+			&log.OutputTokens,
+			&log.CacheCreationTokens,
+			&log.CacheReadTokens,
+			&log.CacheCreation5mTokens,
+			&log.CacheCreation1hTokens,
+			&log.InputCost,
+			&log.OutputCost,
+			&log.CacheCreationCost,
+			&log.CacheReadCost,
+			&log.TotalCost,
+			&log.ActualCost,
+			&log.RateMultiplier,
+			&log.LongContextBillingApplied,
+			&log.BillingType,
+			&log.Stream,
+			&log.OpenAIWSMode,
+			&log.NativeCompactionV2,
+			&log.DurationMs,
+			&log.FirstTokenMs,
+			&log.ImageCount,
+			&log.ImageSize,
+			&log.ImageInputSize,
+			&log.ImageOutputSize,
+			&log.ImageInputTokens,
+			&log.ImageInputCost,
+			&log.ImageOutputTokens,
+			&log.ImageOutputCost,
+			&log.ImageSizeSource,
+			&imageSizeBreakdown,
+			&log.UserAgent,
+			&log.IPAddress,
+			&log.CacheTTLOverridden,
+			&log.BillingMode,
+			&log.CreatedAt,
+			&log.Model,
+			&log.RequestedModel,
+			&log.ReasoningEffort,
+			&log.RequestedReasoningEffort,
+			&requestType,
+			&log.EnterpriseDepartmentID,
+			&username,
+			&email,
+			&departmentName,
+			&key,
+			&keyName,
+			&group,
+			&groupName,
+			&platform); err != nil {
 			return nil, nil, err
 		}
-		if dept.Valid {
-			v.DepartmentID = &dept.Int64
-		}
+		log.ImageSizeBreakdown = stringIntMapFromNullJSON(imageSizeBreakdown)
+		log.RequestType = service.RequestTypeFromInt16(requestType)
+		v := service.EnterpriseUsageLogFromUsageLog(&log)
+		v.User.Username, v.User.Email = username, email
+		v.DepartmentName = departmentName
 		if key.Valid {
 			v.APIKey = &service.EnterpriseUsageNamedResource{ID: key.Int64, Name: keyName}
 		}
 		if group.Valid {
-			v.Group = &service.EnterpriseUsageNamedResource{ID: group.Int64, Name: groupName}
-		}
-		if first.Valid {
-			n := int(first.Int64)
-			v.FirstTokenMs = &n
+			v.Group = &service.EnterpriseUsageGroup{ID: group.Int64, Name: groupName, Platform: platform}
 		}
 		out = append(out, v)
 	}
