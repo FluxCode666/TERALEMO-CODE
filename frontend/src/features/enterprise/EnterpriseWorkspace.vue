@@ -17,11 +17,8 @@
         <TabsContent :value="activeTab" class="mt-5" data-tab-content>
       <section v-if="activeTab === 'overview'" class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <EnterpriseMetric v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="balance" currency>
-            <template v-if="!admin && frozenBalance !== null" #footer><p data-test="enterprise-frozen-balance" :title="t('enterprise.frozenBalanceHint')" class="mt-2 break-words text-xs text-muted-foreground">{{ t('enterprise.frozenAmount', { amount: money(frozenBalance) }) }}</p></template>
-          </EnterpriseMetric>
+          <EnterpriseMetric v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="balance" currency />
           <template v-if="adminEnterprise">
-            <EnterpriseMetric v-if="frozenBalance !== null" data-test="enterprise-frozen-balance" :title="t('enterprise.frozenBalance')" :value="frozenBalance" currency><template #footer><p class="mt-2 text-xs text-muted-foreground">{{ t('enterprise.frozenBalanceHint') }}</p></template></EnterpriseMetric>
             <EnterpriseMetric :title="t('enterprise.totalRecharged')" :value="adminEnterprise.total_recharged" currency />
             <EnterpriseMetric :title="t('enterprise.memberCount')" :value="adminEnterprise.member_count" />
             <EnterpriseMetric :title="t('enterprise.departmentCount')" :value="adminEnterprise.department_count" />
@@ -89,7 +86,6 @@ const api = computed(() => props.admin ? enterprisesAPI.forEnterprise(props.ente
 const readonly = computed(() => !props.admin && (enterprise.value?.status !== 'active' || props.overview?.me.status !== 'active'))
 const balanceVisible = computed(() => props.admin || props.overview?.balance_visible)
 const balance = computed(() => props.admin ? adminEnterprise.value?.balance ?? null : props.overview?.balance ?? null)
-const frozenBalance = computed(() => props.admin ? adminEnterprise.value?.frozen_balance ?? null : props.overview?.frozen_balance ?? null)
 const enterpriseQuota = computed(() => props.admin ? adminEnterprise.value?.quota : props.overview?.enterprise_quota)
 const tabs = computed(() => {
   const permissions = props.overview?.permissions
@@ -110,7 +106,6 @@ watch(activeTab, animateTab)
 watch(enterprise, animateTab)
 onMounted(animateTab)
 const refreshKey = ref(0)
-const money = (value: number) => `$${value.toFixed(4)}`
 watch(tabs, value => { if (!value.includes(activeTab.value)) activeTab.value = 'overview' })
 watch(() => props.overview, () => { if (!props.admin) refreshKey.value++ })
 async function refresh() {

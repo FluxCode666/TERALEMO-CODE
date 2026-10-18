@@ -176,26 +176,15 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     expect(wrapper.find('[data-test="enterprise-balance"]').exists()).toBe(true)
   })
 
-  it.each([7.25, 0])('shows the visible enterprise frozen balance %s below the balance card', async frozen_balance => {
-    const wrapper = mountWorkspace(overview('member', { balance_visible: true, balance: 120.5, frozen_balance }))
+  it('does not show the enterprise frozen balance in the member overview', async () => {
+    const wrapper = mountWorkspace(overview('member', { balance_visible: true, balance: 120.5, frozen_balance: 7.25 }))
     await flushPromises()
-    const frozen = wrapper.get('[data-test="enterprise-frozen-balance"]')
-    expect(frozen.text()).toBe(`enterprise.frozenAmount $${frozen_balance.toFixed(4)}`)
-    expect(frozen.attributes('title')).toBe('enterprise.frozenBalanceHint')
+    expect(wrapper.find('[data-test="enterprise-frozen-balance"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('enterprise.frozen')
     expect(wrapper.get('[data-test="enterprise-balance"]').text()).toContain('$120.5000')
   })
 
-  it.each([
-    { balance_visible: true, balance: 120.5, frozen_balance: null },
-    { balance_visible: false, balance: null, frozen_balance: 7.25 },
-    { balance_visible: true, balance: null, frozen_balance: null }
-  ])('hides unavailable frozen balances in overview (%j)', async balances => {
-    const wrapper = mountWorkspace(overview('member', balances))
-    await flushPromises()
-    expect(wrapper.find('[data-test="enterprise-frozen-balance"]').exists()).toBe(false)
-  })
-
-  it('shows the administrator frozen balance card separately with its explanation', async () => {
+  it('does not show the enterprise frozen balance in the administrator overview', async () => {
     getEnterprise.mockResolvedValue({
       id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 7.25,
       total_recharged: 150, member_count: 2, department_count: 1
@@ -203,10 +192,8 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 1 } })
     wrappers.push(wrapper)
     await flushPromises()
-    const frozen = wrapper.get('[data-test="enterprise-frozen-balance"]')
-    expect(frozen.text()).toContain('enterprise.frozenBalance')
-    expect(frozen.text()).toContain('$7.2500')
-    expect(frozen.text()).toContain('enterprise.frozenBalanceHint')
+    expect(wrapper.find('[data-test="enterprise-frozen-balance"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('$7.2500')
     expect(wrapper.get('[data-test="enterprise-balance"]').text()).toContain('$100.0000')
   })
 

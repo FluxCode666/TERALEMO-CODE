@@ -211,7 +211,6 @@ export default {
     "balance": "Enterprise balance",
     "availableBalance": "Enterprise available balance",
     "frozenBalance": "Frozen balance",
-    "frozenAmount": "Frozen {amount}",
     "frozenBalanceHint": "Frozen balance is reserved for batch image tasks in progress. Tasks settle at their actual cost on completion; failed tasks release the hold automatically.",
     "balanceAdjustmentHint": "Deductions apply only to available balance. Frozen balance cannot be deducted.",
     "totalRecharged": "Total recharged",

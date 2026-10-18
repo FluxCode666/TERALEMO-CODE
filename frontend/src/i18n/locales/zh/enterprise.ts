@@ -211,7 +211,6 @@ export default {
     "balance": "企业余额",
     "availableBalance": "企业可用余额",
     "frozenBalance": "冻结余额",
-    "frozenAmount": "冻结 {amount}",
     "frozenBalanceHint": "冻结余额是为进行中的批量图片任务预先冻结的金额，任务完成后按实际费用结算，失败自动解冻。",
     "balanceAdjustmentHint": "扣减仅作用于可用余额，冻结余额不可扣减。",
     "totalRecharged": "累计充值",
