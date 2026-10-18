@@ -3634,6 +3634,38 @@ func (c *EnterpriseDepartmentClient) QueryEnterprise(_m *EnterpriseDepartment) *
 	return query
 }
 
+// QueryParent queries the parent edge of a EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) QueryParent(_m *EnterpriseDepartment) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, id),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, enterprisedepartment.ParentTable, enterprisedepartment.ParentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryChildren queries the children edge of a EnterpriseDepartment.
+func (c *EnterpriseDepartmentClient) QueryChildren(_m *EnterpriseDepartment) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, id),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, enterprisedepartment.ChildrenTable, enterprisedepartment.ChildrenColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *EnterpriseDepartmentClient) Hooks() []Hook {
 	hooks := c.hooks.EnterpriseDepartment

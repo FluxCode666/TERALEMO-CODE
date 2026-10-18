@@ -36,34 +36,41 @@ func EnterpriseFromService(e *service.Enterprise) *Enterprise {
 }
 
 type EnterpriseDepartment struct {
-	ID           int64     `json:"id"`
-	EnterpriseID int64     `json:"enterprise_id"`
-	Name         string    `json:"name"`
-	SortOrder    int       `json:"sort_order"`
-	MemberCount  int64     `json:"member_count"`
-	CreatedAt    time.Time `json:"created_at"`
+	ParentID         *int64    `json:"parent_id"`
+	PathIDs          []int64   `json:"path_ids"`
+	PathNames        []string  `json:"path_names"`
+	Depth            int       `json:"depth"`
+	TotalMemberCount int64     `json:"total_member_count"`
+	ID               int64     `json:"id"`
+	EnterpriseID     int64     `json:"enterprise_id"`
+	Name             string    `json:"name"`
+	SortOrder        int       `json:"sort_order"`
+	MemberCount      int64     `json:"member_count"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 func EnterpriseDepartmentFromService(d *service.EnterpriseDepartment) *EnterpriseDepartment {
 	if d == nil {
 		return nil
 	}
-	return &EnterpriseDepartment{ID: d.ID, EnterpriseID: d.EnterpriseID, Name: d.Name, SortOrder: d.SortOrder, MemberCount: d.MemberCount, CreatedAt: d.CreatedAt}
+	return &EnterpriseDepartment{ParentID: d.ParentID, PathIDs: append([]int64{}, d.PathIDs...), PathNames: append([]string{}, d.PathNames...), Depth: d.Depth, TotalMemberCount: d.TotalMemberCount, ID: d.ID, EnterpriseID: d.EnterpriseID, Name: d.Name, SortOrder: d.SortOrder, MemberCount: d.MemberCount, CreatedAt: d.CreatedAt}
 }
 
 type EnterpriseMember struct {
-	ID             int64     `json:"id"`
-	EnterpriseID   int64     `json:"enterprise_id"`
-	UserID         int64     `json:"user_id"`
-	Email          string    `json:"email"`
-	Username       string    `json:"username"`
-	DepartmentID   *int64    `json:"department_id"`
-	DepartmentName *string   `json:"department_name"`
-	Role           string    `json:"role"`
-	Status         string    `json:"status"`
-	Title          string    `json:"title"`
-	JoinedAt       time.Time `json:"joined_at"`
-	UserStatus     string    `json:"user_status"`
+	DepartmentPathNames []string   `json:"department_path_names"`
+	LastLoginAt         *time.Time `json:"last_login_at"`
+	ID                  int64      `json:"id"`
+	EnterpriseID        int64      `json:"enterprise_id"`
+	UserID              int64      `json:"user_id"`
+	Email               string     `json:"email"`
+	Username            string     `json:"username"`
+	DepartmentID        *int64     `json:"department_id"`
+	DepartmentName      *string    `json:"department_name"`
+	Role                string     `json:"role"`
+	Status              string     `json:"status"`
+	Title               string     `json:"title"`
+	JoinedAt            time.Time  `json:"joined_at"`
+	UserStatus          string     `json:"user_status"`
 }
 
 func EnterpriseMemberFromService(m *service.EnterpriseMember) *EnterpriseMember {
@@ -75,7 +82,7 @@ func EnterpriseMemberFromService(m *service.EnterpriseMember) *EnterpriseMember 
 		n := m.DepartmentName
 		departmentName = &n
 	}
-	return &EnterpriseMember{ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
+	return &EnterpriseMember{DepartmentPathNames: append([]string{}, m.DepartmentPathNames...), LastLoginAt: m.LastLoginAt, ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
 }
 
 type EnterpriseQuota struct {
@@ -215,13 +222,14 @@ type EnterpriseOverviewCompany struct {
 	Status string `json:"status"`
 }
 type EnterpriseOverviewMember struct {
-	MemberID       int64   `json:"member_id"`
-	UserID         int64   `json:"user_id"`
-	Role           string  `json:"role"`
-	Status         string  `json:"status"`
-	DepartmentID   *int64  `json:"department_id"`
-	DepartmentName *string `json:"department_name"`
-	Title          string  `json:"title"`
+	DepartmentPathNames []string `json:"department_path_names"`
+	MemberID            int64    `json:"member_id"`
+	UserID              int64    `json:"user_id"`
+	Role                string   `json:"role"`
+	Status              string   `json:"status"`
+	DepartmentID        *int64   `json:"department_id"`
+	DepartmentName      *string  `json:"department_name"`
+	Title               string   `json:"title"`
 }
 type EnterpriseOverviewStats struct {
 	TodayCost float64 `json:"today_cost"`
@@ -233,5 +241,9 @@ func EnterpriseOverviewFromService(o *service.EnterpriseOverviewData) *Enterpris
 		return nil
 	}
 	member := EnterpriseMemberFromService(o.Me)
-	return &EnterpriseOverview{Enterprise: EnterpriseOverviewCompany{ID: o.Enterprise.ID, Name: o.Enterprise.Name, Status: o.Enterprise.Status}, Me: EnterpriseOverviewMember{MemberID: member.ID, UserID: member.UserID, Role: member.Role, Status: member.Status, DepartmentID: member.DepartmentID, DepartmentName: member.DepartmentName, Title: member.Title}, BalanceVisible: o.BalanceVisible, Balance: o.Balance, FrozenBalance: o.FrozenBalance, EnterpriseQuota: EnterpriseQuotaFromService(o.EnterpriseQuota), DepartmentQuotaVisible: o.DepartmentQuotaVisible, DepartmentQuota: EnterpriseQuotaFromService(o.DepartmentQuota), MemberQuotaVisible: o.MemberQuotaVisible, MemberQuota: EnterpriseQuotaFromService(o.MemberQuota), Settings: o.Settings, Permissions: o.Permissions}
+	if o.Me.DepartmentID != nil {
+		name := service.EnterpriseMemberDepartmentPathName(o.Me)
+		member.DepartmentName = &name
+	}
+	return &EnterpriseOverview{Enterprise: EnterpriseOverviewCompany{ID: o.Enterprise.ID, Name: o.Enterprise.Name, Status: o.Enterprise.Status}, Me: EnterpriseOverviewMember{DepartmentPathNames: member.DepartmentPathNames, MemberID: member.ID, UserID: member.UserID, Role: member.Role, Status: member.Status, DepartmentID: member.DepartmentID, DepartmentName: member.DepartmentName, Title: member.Title}, BalanceVisible: o.BalanceVisible, Balance: o.Balance, FrozenBalance: o.FrozenBalance, EnterpriseQuota: EnterpriseQuotaFromService(o.EnterpriseQuota), DepartmentQuotaVisible: o.DepartmentQuotaVisible, DepartmentQuota: EnterpriseQuotaFromService(o.DepartmentQuota), MemberQuotaVisible: o.MemberQuotaVisible, MemberQuota: EnterpriseQuotaFromService(o.MemberQuota), Settings: o.Settings, Permissions: o.Permissions}
 }

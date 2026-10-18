@@ -306,6 +306,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if enterprise := p.User.Enterprise; enterprise != nil {
 		cmd.EnterpriseID = enterprise.EnterpriseID
 		cmd.EnterpriseDepartmentID = valueOrZero(enterprise.DepartmentID)
+		cmd.EnterpriseDepartmentPathIDs = FrozenEnterpriseDepartmentIDs(enterprise.DepartmentPathIDs, cmd.EnterpriseDepartmentID)
 		cmd.EnterpriseMemberID = enterprise.MemberID
 	}
 	if usageLog != nil {

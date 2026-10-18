@@ -14,13 +14,15 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: enterprise membership, status, pool and whitelist snapshot
+const apiKeyAuthSnapshotVersion = 26 // v26: frozen ancestor chain and department subtree scope
 
 func cloneEnterpriseMemberContext(src *EnterpriseMemberContext) *EnterpriseMemberContext {
 	if src == nil {
 		return nil
 	}
 	dst := *src
+	dst.DepartmentPathIDs = append([]int64(nil), src.DepartmentPathIDs...)
+	dst.DepartmentSubtreeIDs = append([]int64(nil), src.DepartmentSubtreeIDs...)
 	dst.GroupPoolIDs = append([]int64(nil), src.GroupPoolIDs...)
 	dst.GroupWhitelistIDs = append([]int64(nil), src.GroupWhitelistIDs...)
 	if src.DepartmentID != nil {

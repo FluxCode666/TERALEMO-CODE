@@ -26,6 +26,12 @@ type EnterpriseDepartment struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// EnterpriseID holds the value of the "enterprise_id" field.
 	EnterpriseID int64 `json:"enterprise_id,omitempty"`
+	// ParentID holds the value of the "parent_id" field.
+	ParentID *int64 `json:"parent_id,omitempty"`
+	// Path holds the value of the "path" field.
+	Path string `json:"path,omitempty"`
+	// Depth holds the value of the "depth" field.
+	Depth int `json:"depth,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// SortOrder holds the value of the "sort_order" field.
@@ -40,9 +46,13 @@ type EnterpriseDepartment struct {
 type EnterpriseDepartmentEdges struct {
 	// Enterprise holds the value of the enterprise edge.
 	Enterprise *Enterprise `json:"enterprise,omitempty"`
+	// Parent holds the value of the parent edge.
+	Parent *EnterpriseDepartment `json:"parent,omitempty"`
+	// Children holds the value of the children edge.
+	Children []*EnterpriseDepartment `json:"children,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // EnterpriseOrErr returns the Enterprise value or an error if the edge
@@ -56,14 +66,34 @@ func (e EnterpriseDepartmentEdges) EnterpriseOrErr() (*Enterprise, error) {
 	return nil, &NotLoadedError{edge: "enterprise"}
 }
 
+// ParentOrErr returns the Parent value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e EnterpriseDepartmentEdges) ParentOrErr() (*EnterpriseDepartment, error) {
+	if e.Parent != nil {
+		return e.Parent, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: enterprisedepartment.Label}
+	}
+	return nil, &NotLoadedError{edge: "parent"}
+}
+
+// ChildrenOrErr returns the Children value or an error if the edge
+// was not loaded in eager-loading.
+func (e EnterpriseDepartmentEdges) ChildrenOrErr() ([]*EnterpriseDepartment, error) {
+	if e.loadedTypes[2] {
+		return e.Children, nil
+	}
+	return nil, &NotLoadedError{edge: "children"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*EnterpriseDepartment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case enterprisedepartment.FieldID, enterprisedepartment.FieldEnterpriseID, enterprisedepartment.FieldSortOrder:
+		case enterprisedepartment.FieldID, enterprisedepartment.FieldEnterpriseID, enterprisedepartment.FieldParentID, enterprisedepartment.FieldDepth, enterprisedepartment.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
-		case enterprisedepartment.FieldName:
+		case enterprisedepartment.FieldPath, enterprisedepartment.FieldName:
 			values[i] = new(sql.NullString)
 		case enterprisedepartment.FieldCreatedAt, enterprisedepartment.FieldUpdatedAt, enterprisedepartment.FieldDeletedAt:
 			values[i] = new(sql.NullTime)
@@ -113,6 +143,25 @@ func (_m *EnterpriseDepartment) assignValues(columns []string, values []any) err
 			} else if value.Valid {
 				_m.EnterpriseID = value.Int64
 			}
+		case enterprisedepartment.FieldParentID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field parent_id", values[i])
+			} else if value.Valid {
+				_m.ParentID = new(int64)
+				*_m.ParentID = value.Int64
+			}
+		case enterprisedepartment.FieldPath:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field path", values[i])
+			} else if value.Valid {
+				_m.Path = value.String
+			}
+		case enterprisedepartment.FieldDepth:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field depth", values[i])
+			} else if value.Valid {
+				_m.Depth = int(value.Int64)
+			}
 		case enterprisedepartment.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
@@ -141,6 +190,16 @@ func (_m *EnterpriseDepartment) Value(name string) (ent.Value, error) {
 // QueryEnterprise queries the "enterprise" edge of the EnterpriseDepartment entity.
 func (_m *EnterpriseDepartment) QueryEnterprise() *EnterpriseQuery {
 	return NewEnterpriseDepartmentClient(_m.config).QueryEnterprise(_m)
+}
+
+// QueryParent queries the "parent" edge of the EnterpriseDepartment entity.
+func (_m *EnterpriseDepartment) QueryParent() *EnterpriseDepartmentQuery {
+	return NewEnterpriseDepartmentClient(_m.config).QueryParent(_m)
+}
+
+// QueryChildren queries the "children" edge of the EnterpriseDepartment entity.
+func (_m *EnterpriseDepartment) QueryChildren() *EnterpriseDepartmentQuery {
+	return NewEnterpriseDepartmentClient(_m.config).QueryChildren(_m)
 }
 
 // Update returns a builder for updating this EnterpriseDepartment.
@@ -179,6 +238,17 @@ func (_m *EnterpriseDepartment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("enterprise_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.EnterpriseID))
+	builder.WriteString(", ")
+	if v := _m.ParentID; v != nil {
+		builder.WriteString("parent_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("path=")
+	builder.WriteString(_m.Path)
+	builder.WriteString(", ")
+	builder.WriteString("depth=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Depth))
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

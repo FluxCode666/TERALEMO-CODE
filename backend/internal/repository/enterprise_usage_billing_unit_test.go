@@ -26,12 +26,12 @@ func TestUsageBillingEnterpriseEffectsLocksWalletBeforeSortedQuotas(t *testing.T
 	mock.ExpectQuery(`(?s)UPDATE enterprises.*SET balance = balance - \$1.*RETURNING balance`).WithArgs(2.5, int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"balance"}).AddRow(-1.25))
 	mock.ExpectQuery(`(?s)WITH locked AS MATERIALIZED.*ORDER BY id FOR UPDATE.*UPDATE enterprise_quotas.*CASE WHEN q.daily_window_start.*CASE WHEN q.weekly_window_start.*CASE WHEN q.monthly_window_start.*total_usage_usd = q.total_usage_usd \+ \$1.*SELECT COUNT\(\*\) FROM updated`).
-		WithArgs(2.5, int64(1), int64(2), int64(3), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+		WithArgs(2.5, int64(1), "{7,4,9,2}", int64(3), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(6))
 	mock.ExpectCommit()
 	result := &service.UsageBillingApplyResult{}
 	err = (&usageBillingRepository{}).applyUsageBillingEffects(ctx, tx, &service.UsageBillingCommand{
-		EnterpriseID: 1, EnterpriseDepartmentID: 2, EnterpriseMemberID: 3, EnterpriseBalanceCost: 2.5,
+		EnterpriseID: 1, EnterpriseDepartmentID: 2, EnterpriseDepartmentPathIDs: []int64{7, 4, 9, 2}, EnterpriseMemberID: 3, EnterpriseBalanceCost: 2.5,
 	}, result)
 	require.NoError(t, err)
 	require.Equal(t, -1.25, *result.NewEnterpriseBalance)
@@ -56,7 +56,7 @@ func TestUsageBillingEnterpriseMissingQuotaKeepsPaymentAndLogsIncident(t *testin
 	mock.ExpectQuery(`(?s)UPDATE enterprises.*WHERE id = \$2\s+RETURNING balance`).WithArgs(1.0, int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"balance"}).AddRow(9.0))
 	mock.ExpectQuery(`WITH locked AS MATERIALIZED`).
-		WithArgs(1.0, int64(1), int64(0), int64(3), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(1.0, int64(1), "{}", int64(3), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectCommit()
 	result := &service.UsageBillingApplyResult{}

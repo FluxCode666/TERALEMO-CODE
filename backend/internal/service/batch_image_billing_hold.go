@@ -59,7 +59,7 @@ func buildBatchImageHoldCommand(job *BatchImageJob, requestID string, actualAmou
 		RequestID:    requestID,
 		APIKeyID:     *job.APIKeyID,
 		UserID:       job.UserID,
-		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID,
+		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID, EnterpriseDepartmentPathIDs: FrozenEnterpriseDepartmentIDs(job.EnterpriseDepartmentPathIDs, departmentID),
 		BatchID:            job.BatchID,
 		HoldAmount:         holdAmount,
 		ActualAmount:       actualAmount,

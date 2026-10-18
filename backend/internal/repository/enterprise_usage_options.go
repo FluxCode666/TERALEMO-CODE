@@ -21,10 +21,16 @@ func (r *usageLogRepository) GetEnterpriseUsageAPIKeyOptions(ctx context.Context
  JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
  WHERE m.enterprise_id = $1 AND k.deleted_at IS NULL`
 	args := []any{filters.EnterpriseID}
+	for _, id := range []int64{filters.EnterpriseDepartmentID, filters.EnterpriseDepartmentScopeID} {
+		if id > 0 {
+			query += fmt.Sprintf(" AND m.department_id IN ("+enterpriseDepartmentSubtreeSQL+")", len(args)+1)
+			args = append(args, id)
+		}
+	}
 	for _, v := range []struct {
 		column string
 		value  int64
-	}{{"m.department_id", filters.EnterpriseDepartmentID}, {"u.id", filters.UserID}, {"k.id", filters.APIKeyID}} {
+	}{{"u.id", filters.UserID}, {"k.id", filters.APIKeyID}} {
 		if v.value > 0 {
 			query += fmt.Sprintf(" AND %s = $%d", v.column, len(args)+1)
 			args = append(args, v.value)

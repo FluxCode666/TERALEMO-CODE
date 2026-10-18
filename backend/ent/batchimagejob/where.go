@@ -69,6 +69,11 @@ func EnterpriseID(v int64) predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseID, v))
 }
 
+// EnterpriseDepartmentPath applies equality check predicate on the "enterprise_department_path" field. It's identical to EnterpriseDepartmentPathEQ.
+func EnterpriseDepartmentPath(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentPath, v))
+}
+
 // EnterpriseDepartmentID applies equality check predicate on the "enterprise_department_id" field. It's identical to EnterpriseDepartmentIDEQ.
 func EnterpriseDepartmentID(v int64) predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentID, v))
@@ -422,6 +427,71 @@ func EnterpriseIDIsNil() predicate.BatchImageJob {
 // EnterpriseIDNotNil applies the NotNil predicate on the "enterprise_id" field.
 func EnterpriseIDNotNil() predicate.BatchImageJob {
 	return predicate.BatchImageJob(sql.FieldNotNull(FieldEnterpriseID))
+}
+
+// EnterpriseDepartmentPathEQ applies the EQ predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathEQ(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEQ(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathNEQ applies the NEQ predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathNEQ(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNEQ(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathIn applies the In predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathIn(vs ...string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldIn(FieldEnterpriseDepartmentPath, vs...))
+}
+
+// EnterpriseDepartmentPathNotIn applies the NotIn predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathNotIn(vs ...string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldNotIn(FieldEnterpriseDepartmentPath, vs...))
+}
+
+// EnterpriseDepartmentPathGT applies the GT predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathGT(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGT(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathGTE applies the GTE predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathGTE(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldGTE(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathLT applies the LT predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathLT(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLT(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathLTE applies the LTE predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathLTE(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldLTE(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathContains applies the Contains predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathContains(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldContains(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathHasPrefix applies the HasPrefix predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathHasPrefix(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldHasPrefix(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathHasSuffix applies the HasSuffix predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathHasSuffix(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldHasSuffix(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathEqualFold applies the EqualFold predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathEqualFold(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldEqualFold(FieldEnterpriseDepartmentPath, v))
+}
+
+// EnterpriseDepartmentPathContainsFold applies the ContainsFold predicate on the "enterprise_department_path" field.
+func EnterpriseDepartmentPathContainsFold(v string) predicate.BatchImageJob {
+	return predicate.BatchImageJob(sql.FieldContainsFold(FieldEnterpriseDepartmentPath, v))
 }
 
 // EnterpriseDepartmentIDEQ applies the EQ predicate on the "enterprise_department_id" field.

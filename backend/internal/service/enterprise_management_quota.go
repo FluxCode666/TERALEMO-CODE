@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -17,12 +18,14 @@ func (s *EnterpriseService) scopeTarget(ctx context.Context, id int64, scope str
 			return target, ErrEnterpriseInvalidScope
 		}
 	case EnterpriseScopeDepartment:
-		if _, err := s.departments.GetByID(ctx, id, scopeID); err != nil {
+		d, err := s.departments.GetByID(ctx, id, scopeID)
+		if err != nil {
 			if errors.Is(err, ErrEnterpriseDepartmentNotFound) {
 				return target, ErrEnterpriseInvalidScope
 			}
 			return target, err
 		}
+		target.Department = d
 	case EnterpriseScopeMember:
 		m, err := s.members.GetByID(ctx, id, scopeID)
 		if err != nil {
@@ -57,14 +60,9 @@ func (s *EnterpriseService) ListQuotas(ctx context.Context, a EnterpriseActor, i
 			out = append(out, q)
 			continue
 		}
-		target := EnterprisePermissionTarget{ScopeType: q.ScopeType, ScopeID: q.ScopeID}
-		if q.ScopeType == EnterpriseScopeMember {
-			// Check the scope against its own current membership, never a caller supplied ID.
-			m, err := s.members.GetByID(ctx, id, q.ScopeID)
-			if err != nil {
-				return nil, err
-			}
-			target.Member = m
+		target, err := s.scopeTarget(ctx, id, q.ScopeType, q.ScopeID)
+		if err != nil {
+			return nil, err
 		}
 		visible := CheckEnterprisePermission(c, e.Settings, EnterprisePermissionViewQuota, target) == nil
 		// Editors need the limit values even when usage visibility is disabled.
@@ -94,12 +92,12 @@ func enterpriseValidateQuotaParent(q, parent *EnterpriseQuota) error {
 	return nil
 }
 func (s *EnterpriseService) validateQuotaParents(ctx context.Context, id int64, target EnterprisePermissionTarget, q *EnterpriseQuota) error {
-	if target.ScopeType == EnterpriseScopeEnterprise {
-		return nil
+	scopes, err := s.parentScopes(ctx, id, target)
+	if err != nil {
+		return err
 	}
-	scopes := []EnterpriseQuotaScope{{ScopeType: EnterpriseScopeEnterprise, ScopeID: id}}
-	if target.Member != nil && target.Member.DepartmentID != nil {
-		scopes = append(scopes, EnterpriseQuotaScope{ScopeType: EnterpriseScopeDepartment, ScopeID: *target.Member.DepartmentID})
+	if len(scopes) == 0 {
+		return nil
 	}
 	parents, err := s.quotas.GetByScopes(ctx, id, scopes)
 	if err != nil {
@@ -145,6 +143,9 @@ func (s *EnterpriseService) UpdateQuota(ctx context.Context, a EnterpriseActor, 
 		q.MonthlyLimitUSD = in.MonthlyLimitUSD
 		q.TotalLimitUSD = in.TotalLimitUSD
 		if err = s.validateQuotaParents(ctx, id, target, q); err != nil {
+			return err
+		}
+		if err = s.validateQuotaDescendants(ctx, id, target, q); err != nil {
 			return err
 		}
 		if err = s.quotas.UpdateLimits(ctx, q); err != nil {
@@ -227,4 +228,102 @@ func (s *EnterpriseService) ResetQuota(ctx context.Context, a EnterpriseActor, i
 		s.invalidateQuota(ctx, scope, scopeID)
 	}
 	return err
+}
+
+// parentScopes returns every configured ancestor scope, skipping the target.
+// Comparing against all ancestors preserves a non-null grandparent cap even when
+// an intermediate department intentionally leaves the same window unlimited.
+func (s *EnterpriseService) parentScopes(ctx context.Context, id int64, target EnterprisePermissionTarget) ([]EnterpriseQuotaScope, error) {
+	if target.ScopeType == EnterpriseScopeEnterprise {
+		return nil, nil
+	}
+	scopes := []EnterpriseQuotaScope{{ScopeType: EnterpriseScopeEnterprise, ScopeID: id}}
+	var path []int64
+	if target.Department != nil {
+		path = target.Department.PathIDs
+		if len(path) > 0 {
+			path = path[:len(path)-1]
+		}
+	} else if target.Member != nil && target.Member.DepartmentID != nil {
+		path = target.Member.DepartmentPathIDs
+		if len(path) == 0 {
+			d, err := s.departments.GetByID(ctx, id, *target.Member.DepartmentID)
+			if err != nil {
+				return nil, err
+			}
+			path = FrozenEnterpriseDepartmentIDs(d.PathIDs, d.ID)
+		}
+	}
+	for _, departmentID := range path {
+		scopes = append(scopes, EnterpriseQuotaScope{ScopeType: EnterpriseScopeDepartment, ScopeID: departmentID})
+	}
+	return scopes, nil
+}
+
+// Lowering a parent cannot silently invalidate an already configured child cap.
+func (s *EnterpriseService) validateQuotaDescendants(ctx context.Context, id int64, target EnterprisePermissionTarget, q *EnterpriseQuota) error {
+	if target.ScopeType == EnterpriseScopeMember {
+		return nil
+	}
+	items, err := s.quotas.List(ctx, id, "")
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		child := &items[i]
+		if child.ScopeType == EnterpriseScopeEnterprise || (child.ScopeType == q.ScopeType && child.ScopeID == q.ScopeID) {
+			continue
+		}
+		if target.ScopeType == EnterpriseScopeDepartment {
+			ct, err := s.scopeTarget(ctx, id, child.ScopeType, child.ScopeID)
+			if err != nil {
+				return err
+			}
+			var path []int64
+			if ct.Department != nil {
+				path = ct.Department.PathIDs
+			} else if ct.Member != nil {
+				path = ct.Member.DepartmentPathIDs
+				if len(path) == 0 && ct.Member.DepartmentID != nil {
+					path = []int64{*ct.Member.DepartmentID}
+				}
+			}
+			if !slices.Contains(path, target.ScopeID) {
+				continue
+			}
+		}
+		if err := enterpriseValidateQuotaParent(child, q); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *EnterpriseService) validateDepartmentSubtreeQuotaParents(ctx context.Context, id, departmentID int64) error {
+	items, err := s.quotas.List(ctx, id, "")
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		q := &items[i]
+		if q.ScopeType == EnterpriseScopeEnterprise {
+			continue
+		}
+		target, err := s.scopeTarget(ctx, id, q.ScopeType, q.ScopeID)
+		if err != nil {
+			return err
+		}
+		var path []int64
+		if target.Department != nil {
+			path = target.Department.PathIDs
+		} else if target.Member != nil {
+			path = target.Member.DepartmentPathIDs
+		}
+		if slices.Contains(path, departmentID) {
+			if err := s.validateQuotaParents(ctx, id, target, q); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

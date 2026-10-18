@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -25,6 +26,8 @@ type EnterpriseDepartmentQuery struct {
 	inters         []Interceptor
 	predicates     []predicate.EnterpriseDepartment
 	withEnterprise *EnterpriseQuery
+	withParent     *EnterpriseDepartmentQuery
+	withChildren   *EnterpriseDepartmentQuery
 	modifiers      []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -77,6 +80,50 @@ func (_q *EnterpriseDepartmentQuery) QueryEnterprise() *EnterpriseQuery {
 			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, selector),
 			sqlgraph.To(enterprise.Table, enterprise.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, enterprisedepartment.EnterpriseTable, enterprisedepartment.EnterpriseColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryParent chains the current query on the "parent" edge.
+func (_q *EnterpriseDepartmentQuery) QueryParent() *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, selector),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, enterprisedepartment.ParentTable, enterprisedepartment.ParentColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryChildren chains the current query on the "children" edge.
+func (_q *EnterpriseDepartmentQuery) QueryChildren() *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(enterprisedepartment.Table, enterprisedepartment.FieldID, selector),
+			sqlgraph.To(enterprisedepartment.Table, enterprisedepartment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, enterprisedepartment.ChildrenTable, enterprisedepartment.ChildrenColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -277,6 +324,8 @@ func (_q *EnterpriseDepartmentQuery) Clone() *EnterpriseDepartmentQuery {
 		inters:         append([]Interceptor{}, _q.inters...),
 		predicates:     append([]predicate.EnterpriseDepartment{}, _q.predicates...),
 		withEnterprise: _q.withEnterprise.Clone(),
+		withParent:     _q.withParent.Clone(),
+		withChildren:   _q.withChildren.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -291,6 +340,28 @@ func (_q *EnterpriseDepartmentQuery) WithEnterprise(opts ...func(*EnterpriseQuer
 		opt(query)
 	}
 	_q.withEnterprise = query
+	return _q
+}
+
+// WithParent tells the query-builder to eager-load the nodes that are connected to
+// the "parent" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *EnterpriseDepartmentQuery) WithParent(opts ...func(*EnterpriseDepartmentQuery)) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withParent = query
+	return _q
+}
+
+// WithChildren tells the query-builder to eager-load the nodes that are connected to
+// the "children" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *EnterpriseDepartmentQuery) WithChildren(opts ...func(*EnterpriseDepartmentQuery)) *EnterpriseDepartmentQuery {
+	query := (&EnterpriseDepartmentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withChildren = query
 	return _q
 }
 
@@ -372,8 +443,10 @@ func (_q *EnterpriseDepartmentQuery) sqlAll(ctx context.Context, hooks ...queryH
 	var (
 		nodes       = []*EnterpriseDepartment{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			_q.withEnterprise != nil,
+			_q.withParent != nil,
+			_q.withChildren != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -400,6 +473,19 @@ func (_q *EnterpriseDepartmentQuery) sqlAll(ctx context.Context, hooks ...queryH
 	if query := _q.withEnterprise; query != nil {
 		if err := _q.loadEnterprise(ctx, query, nodes, nil,
 			func(n *EnterpriseDepartment, e *Enterprise) { n.Edges.Enterprise = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withParent; query != nil {
+		if err := _q.loadParent(ctx, query, nodes, nil,
+			func(n *EnterpriseDepartment, e *EnterpriseDepartment) { n.Edges.Parent = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withChildren; query != nil {
+		if err := _q.loadChildren(ctx, query, nodes,
+			func(n *EnterpriseDepartment) { n.Edges.Children = []*EnterpriseDepartment{} },
+			func(n *EnterpriseDepartment, e *EnterpriseDepartment) { n.Edges.Children = append(n.Edges.Children, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -435,6 +521,71 @@ func (_q *EnterpriseDepartmentQuery) loadEnterprise(ctx context.Context, query *
 	}
 	return nil
 }
+func (_q *EnterpriseDepartmentQuery) loadParent(ctx context.Context, query *EnterpriseDepartmentQuery, nodes []*EnterpriseDepartment, init func(*EnterpriseDepartment), assign func(*EnterpriseDepartment, *EnterpriseDepartment)) error {
+	ids := make([]int64, 0, len(nodes))
+	nodeids := make(map[int64][]*EnterpriseDepartment)
+	for i := range nodes {
+		if nodes[i].ParentID == nil {
+			continue
+		}
+		fk := *nodes[i].ParentID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(enterprisedepartment.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "parent_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *EnterpriseDepartmentQuery) loadChildren(ctx context.Context, query *EnterpriseDepartmentQuery, nodes []*EnterpriseDepartment, init func(*EnterpriseDepartment), assign func(*EnterpriseDepartment, *EnterpriseDepartment)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*EnterpriseDepartment)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(enterprisedepartment.FieldParentID)
+	}
+	query.Where(predicate.EnterpriseDepartment(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(enterprisedepartment.ChildrenColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ParentID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "parent_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "parent_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 
 func (_q *EnterpriseDepartmentQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -466,6 +617,9 @@ func (_q *EnterpriseDepartmentQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withEnterprise != nil {
 			_spec.Node.AddColumnOnce(enterprisedepartment.FieldEnterpriseID)
+		}
+		if _q.withParent != nil {
+			_spec.Node.AddColumnOnce(enterprisedepartment.FieldParentID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

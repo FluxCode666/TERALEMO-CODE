@@ -291,15 +291,17 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	holdID := BatchImageHoldRequestID(batchID)
 	holdAmount := pricingSnapshot.HoldAmount
 	var enterpriseID, departmentID, memberID *int64
+	departmentPathIDs := []int64{}
 	if owner.Enterprise != nil {
 		enterpriseID = &owner.Enterprise.EnterpriseID
 		departmentID = owner.Enterprise.DepartmentID
+		departmentPathIDs = FrozenEnterpriseDepartmentIDs(owner.Enterprise.DepartmentPathIDs, valueOrZero(departmentID))
 		memberID = &owner.Enterprise.MemberID
 	}
 	job, err := s.Repo.CreateBatchImageJob(ctx, CreateBatchImageJobParams{
 		BatchID:      batchID,
 		UserID:       owner.UserID,
-		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID,
+		EnterpriseID: enterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: memberID, EnterpriseDepartmentPathIDs: departmentPathIDs,
 		APIKeyID:                &apiKeyID,
 		AccountID:               &accountID,
 		Provider:                provider.Name(),

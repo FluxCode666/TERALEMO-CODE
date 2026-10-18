@@ -175,11 +175,11 @@ func TestEnterpriseAPIKeyRequiresExplicitGroupOnCreateAndUpdate(t *testing.T) {
 
 func TestEnterpriseAPIKeyAuthSnapshotRoundTrip(t *testing.T) {
 	departmentID := int64(77)
-	membership := &EnterpriseMemberContext{EnterpriseID: 42, EnterpriseName: "Test", EnterpriseStatus: EnterpriseStatusDisabled, MemberID: 5, MemberStatus: EnterpriseMemberStatusDisabled, Role: EnterpriseRoleManager, DepartmentID: &departmentID, GroupPoolConfigured: true, GroupPoolIDs: []int64{1, 2}, GroupWhitelistConfigured: true, GroupWhitelistIDs: []int64{2}}
+	membership := &EnterpriseMemberContext{EnterpriseID: 42, EnterpriseName: "Test", EnterpriseStatus: EnterpriseStatusDisabled, MemberID: 5, MemberStatus: EnterpriseMemberStatusDisabled, Role: EnterpriseRoleManager, DepartmentID: &departmentID, DepartmentPathIDs: []int64{3, 7, 77}, DepartmentSubtreeIDs: []int64{77, 79}, GroupPoolConfigured: true, GroupPoolIDs: []int64{1, 2}, GroupWhitelistConfigured: true, GroupWhitelistIDs: []int64{2}}
 	key := &APIKey{ID: 1, UserID: 8, User: &User{ID: 8, Enterprise: membership}}
 	svc := &APIKeyService{}
 	snapshot := svc.snapshotFromAPIKey(context.Background(), key)
-	require.Equal(t, 25, snapshot.Version)
+	require.Equal(t, 26, snapshot.Version)
 	require.Equal(t, membership, snapshot.User.Enterprise)
 	encoded, err := json.Marshal(snapshot)
 	require.NoError(t, err)
@@ -188,12 +188,16 @@ func TestEnterpriseAPIKeyAuthSnapshotRoundTrip(t *testing.T) {
 	roundTrip := svc.snapshotToAPIKey("key", &decoded)
 	require.Equal(t, membership, roundTrip.User.Enterprise)
 	roundTrip.User.Enterprise.GroupPoolIDs[0] = 99
+	roundTrip.User.Enterprise.DepartmentPathIDs[0] = 99
+	roundTrip.User.Enterprise.DepartmentSubtreeIDs[0] = 99
 	*roundTrip.User.Enterprise.DepartmentID = 99
 	require.Equal(t, int64(1), snapshot.User.Enterprise.GroupPoolIDs[0])
+	require.Equal(t, []int64{3, 7, 77}, snapshot.User.Enterprise.DepartmentPathIDs)
+	require.Equal(t, []int64{77, 79}, snapshot.User.Enterprise.DepartmentSubtreeIDs)
 	require.Equal(t, int64(77), *snapshot.User.Enterprise.DepartmentID)
-	_, accepted, err := svc.applyAuthCacheEntry("old", &APIKeyAuthCacheEntry{Snapshot: &APIKeyAuthSnapshot{Version: 24}})
+	_, accepted, err := svc.applyAuthCacheEntry("old", &APIKeyAuthCacheEntry{Snapshot: &APIKeyAuthSnapshot{Version: 25}})
 	require.NoError(t, err)
-	require.False(t, accepted, "pre-enterprise snapshots must be reloaded before authentication")
+	require.False(t, accepted, "pre-tree snapshots must be reloaded before authentication")
 	key.User.Enterprise = nil
 	require.Nil(t, svc.snapshotToAPIKey("personal", svc.snapshotFromAPIKey(context.Background(), key)).User.Enterprise)
 }

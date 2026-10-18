@@ -11333,6 +11333,7 @@ type BatchImageJobMutation struct {
 	adduser_id                  *int64
 	enterprise_id               *int64
 	addenterprise_id            *int64
+	enterprise_department_path  *string
 	enterprise_department_id    *int64
 	addenterprise_department_id *int64
 	enterprise_member_id        *int64
@@ -11650,6 +11651,42 @@ func (m *BatchImageJobMutation) ResetEnterpriseID() {
 	m.enterprise_id = nil
 	m.addenterprise_id = nil
 	delete(m.clearedFields, batchimagejob.FieldEnterpriseID)
+}
+
+// SetEnterpriseDepartmentPath sets the "enterprise_department_path" field.
+func (m *BatchImageJobMutation) SetEnterpriseDepartmentPath(s string) {
+	m.enterprise_department_path = &s
+}
+
+// EnterpriseDepartmentPath returns the value of the "enterprise_department_path" field in the mutation.
+func (m *BatchImageJobMutation) EnterpriseDepartmentPath() (r string, exists bool) {
+	v := m.enterprise_department_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseDepartmentPath returns the old "enterprise_department_path" field's value of the BatchImageJob entity.
+// If the BatchImageJob object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BatchImageJobMutation) OldEnterpriseDepartmentPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseDepartmentPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseDepartmentPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseDepartmentPath: %w", err)
+	}
+	return oldValue.EnterpriseDepartmentPath, nil
+}
+
+// ResetEnterpriseDepartmentPath resets all changes to the "enterprise_department_path" field.
+func (m *BatchImageJobMutation) ResetEnterpriseDepartmentPath() {
+	m.enterprise_department_path = nil
 }
 
 // SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
@@ -13730,7 +13767,7 @@ func (m *BatchImageJobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BatchImageJobMutation) Fields() []string {
-	fields := make([]string, 0, 43)
+	fields := make([]string, 0, 44)
 	if m.batch_id != nil {
 		fields = append(fields, batchimagejob.FieldBatchID)
 	}
@@ -13739,6 +13776,9 @@ func (m *BatchImageJobMutation) Fields() []string {
 	}
 	if m.enterprise_id != nil {
 		fields = append(fields, batchimagejob.FieldEnterpriseID)
+	}
+	if m.enterprise_department_path != nil {
+		fields = append(fields, batchimagejob.FieldEnterpriseDepartmentPath)
 	}
 	if m.enterprise_department_id != nil {
 		fields = append(fields, batchimagejob.FieldEnterpriseDepartmentID)
@@ -13874,6 +13914,8 @@ func (m *BatchImageJobMutation) Field(name string) (ent.Value, bool) {
 		return m.UserID()
 	case batchimagejob.FieldEnterpriseID:
 		return m.EnterpriseID()
+	case batchimagejob.FieldEnterpriseDepartmentPath:
+		return m.EnterpriseDepartmentPath()
 	case batchimagejob.FieldEnterpriseDepartmentID:
 		return m.EnterpriseDepartmentID()
 	case batchimagejob.FieldEnterpriseMemberID:
@@ -13969,6 +14011,8 @@ func (m *BatchImageJobMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldUserID(ctx)
 	case batchimagejob.FieldEnterpriseID:
 		return m.OldEnterpriseID(ctx)
+	case batchimagejob.FieldEnterpriseDepartmentPath:
+		return m.OldEnterpriseDepartmentPath(ctx)
 	case batchimagejob.FieldEnterpriseDepartmentID:
 		return m.OldEnterpriseDepartmentID(ctx)
 	case batchimagejob.FieldEnterpriseMemberID:
@@ -14078,6 +14122,13 @@ func (m *BatchImageJobMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEnterpriseID(v)
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseDepartmentPath(v)
 		return nil
 	case batchimagejob.FieldEnterpriseDepartmentID:
 		v, ok := value.(int64)
@@ -14764,6 +14815,9 @@ func (m *BatchImageJobMutation) ResetField(name string) error {
 		return nil
 	case batchimagejob.FieldEnterpriseID:
 		m.ResetEnterpriseID()
+		return nil
+	case batchimagejob.FieldEnterpriseDepartmentPath:
+		m.ResetEnterpriseDepartmentPath()
 		return nil
 	case batchimagejob.FieldEnterpriseDepartmentID:
 		m.ResetEnterpriseDepartmentID()
@@ -24596,12 +24650,20 @@ type EnterpriseDepartmentMutation struct {
 	created_at        *time.Time
 	updated_at        *time.Time
 	deleted_at        *time.Time
+	_path             *string
+	depth             *int
+	adddepth          *int
 	name              *string
 	sort_order        *int
 	addsort_order     *int
 	clearedFields     map[string]struct{}
 	enterprise        *int64
 	clearedenterprise bool
+	parent            *int64
+	clearedparent     bool
+	children          map[int64]struct{}
+	removedchildren   map[int64]struct{}
+	clearedchildren   bool
 	done              bool
 	oldValue          func(context.Context) (*EnterpriseDepartment, error)
 	predicates        []predicate.EnterpriseDepartment
@@ -24862,6 +24924,147 @@ func (m *EnterpriseDepartmentMutation) ResetEnterpriseID() {
 	m.enterprise = nil
 }
 
+// SetParentID sets the "parent_id" field.
+func (m *EnterpriseDepartmentMutation) SetParentID(i int64) {
+	m.parent = &i
+}
+
+// ParentID returns the value of the "parent_id" field in the mutation.
+func (m *EnterpriseDepartmentMutation) ParentID() (r int64, exists bool) {
+	v := m.parent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParentID returns the old "parent_id" field's value of the EnterpriseDepartment entity.
+// If the EnterpriseDepartment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseDepartmentMutation) OldParentID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParentID: %w", err)
+	}
+	return oldValue.ParentID, nil
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (m *EnterpriseDepartmentMutation) ClearParentID() {
+	m.parent = nil
+	m.clearedFields[enterprisedepartment.FieldParentID] = struct{}{}
+}
+
+// ParentIDCleared returns if the "parent_id" field was cleared in this mutation.
+func (m *EnterpriseDepartmentMutation) ParentIDCleared() bool {
+	_, ok := m.clearedFields[enterprisedepartment.FieldParentID]
+	return ok
+}
+
+// ResetParentID resets all changes to the "parent_id" field.
+func (m *EnterpriseDepartmentMutation) ResetParentID() {
+	m.parent = nil
+	delete(m.clearedFields, enterprisedepartment.FieldParentID)
+}
+
+// SetPath sets the "path" field.
+func (m *EnterpriseDepartmentMutation) SetPath(s string) {
+	m._path = &s
+}
+
+// Path returns the value of the "path" field in the mutation.
+func (m *EnterpriseDepartmentMutation) Path() (r string, exists bool) {
+	v := m._path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPath returns the old "path" field's value of the EnterpriseDepartment entity.
+// If the EnterpriseDepartment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseDepartmentMutation) OldPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPath: %w", err)
+	}
+	return oldValue.Path, nil
+}
+
+// ResetPath resets all changes to the "path" field.
+func (m *EnterpriseDepartmentMutation) ResetPath() {
+	m._path = nil
+}
+
+// SetDepth sets the "depth" field.
+func (m *EnterpriseDepartmentMutation) SetDepth(i int) {
+	m.depth = &i
+	m.adddepth = nil
+}
+
+// Depth returns the value of the "depth" field in the mutation.
+func (m *EnterpriseDepartmentMutation) Depth() (r int, exists bool) {
+	v := m.depth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDepth returns the old "depth" field's value of the EnterpriseDepartment entity.
+// If the EnterpriseDepartment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseDepartmentMutation) OldDepth(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDepth is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDepth requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDepth: %w", err)
+	}
+	return oldValue.Depth, nil
+}
+
+// AddDepth adds i to the "depth" field.
+func (m *EnterpriseDepartmentMutation) AddDepth(i int) {
+	if m.adddepth != nil {
+		*m.adddepth += i
+	} else {
+		m.adddepth = &i
+	}
+}
+
+// AddedDepth returns the value that was added to the "depth" field in this mutation.
+func (m *EnterpriseDepartmentMutation) AddedDepth() (r int, exists bool) {
+	v := m.adddepth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDepth resets all changes to the "depth" field.
+func (m *EnterpriseDepartmentMutation) ResetDepth() {
+	m.depth = nil
+	m.adddepth = nil
+}
+
 // SetName sets the "name" field.
 func (m *EnterpriseDepartmentMutation) SetName(s string) {
 	m.name = &s
@@ -24981,6 +25184,87 @@ func (m *EnterpriseDepartmentMutation) ResetEnterprise() {
 	m.clearedenterprise = false
 }
 
+// ClearParent clears the "parent" edge to the EnterpriseDepartment entity.
+func (m *EnterpriseDepartmentMutation) ClearParent() {
+	m.clearedparent = true
+	m.clearedFields[enterprisedepartment.FieldParentID] = struct{}{}
+}
+
+// ParentCleared reports if the "parent" edge to the EnterpriseDepartment entity was cleared.
+func (m *EnterpriseDepartmentMutation) ParentCleared() bool {
+	return m.ParentIDCleared() || m.clearedparent
+}
+
+// ParentIDs returns the "parent" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ParentID instead. It exists only for internal usage by the builders.
+func (m *EnterpriseDepartmentMutation) ParentIDs() (ids []int64) {
+	if id := m.parent; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetParent resets all changes to the "parent" edge.
+func (m *EnterpriseDepartmentMutation) ResetParent() {
+	m.parent = nil
+	m.clearedparent = false
+}
+
+// AddChildIDs adds the "children" edge to the EnterpriseDepartment entity by ids.
+func (m *EnterpriseDepartmentMutation) AddChildIDs(ids ...int64) {
+	if m.children == nil {
+		m.children = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.children[ids[i]] = struct{}{}
+	}
+}
+
+// ClearChildren clears the "children" edge to the EnterpriseDepartment entity.
+func (m *EnterpriseDepartmentMutation) ClearChildren() {
+	m.clearedchildren = true
+}
+
+// ChildrenCleared reports if the "children" edge to the EnterpriseDepartment entity was cleared.
+func (m *EnterpriseDepartmentMutation) ChildrenCleared() bool {
+	return m.clearedchildren
+}
+
+// RemoveChildIDs removes the "children" edge to the EnterpriseDepartment entity by IDs.
+func (m *EnterpriseDepartmentMutation) RemoveChildIDs(ids ...int64) {
+	if m.removedchildren == nil {
+		m.removedchildren = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.children, ids[i])
+		m.removedchildren[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedChildren returns the removed IDs of the "children" edge to the EnterpriseDepartment entity.
+func (m *EnterpriseDepartmentMutation) RemovedChildrenIDs() (ids []int64) {
+	for id := range m.removedchildren {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ChildrenIDs returns the "children" edge IDs in the mutation.
+func (m *EnterpriseDepartmentMutation) ChildrenIDs() (ids []int64) {
+	for id := range m.children {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetChildren resets all changes to the "children" edge.
+func (m *EnterpriseDepartmentMutation) ResetChildren() {
+	m.children = nil
+	m.clearedchildren = false
+	m.removedchildren = nil
+}
+
 // Where appends a list predicates to the EnterpriseDepartmentMutation builder.
 func (m *EnterpriseDepartmentMutation) Where(ps ...predicate.EnterpriseDepartment) {
 	m.predicates = append(m.predicates, ps...)
@@ -25015,7 +25299,7 @@ func (m *EnterpriseDepartmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseDepartmentMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, enterprisedepartment.FieldCreatedAt)
 	}
@@ -25027,6 +25311,15 @@ func (m *EnterpriseDepartmentMutation) Fields() []string {
 	}
 	if m.enterprise != nil {
 		fields = append(fields, enterprisedepartment.FieldEnterpriseID)
+	}
+	if m.parent != nil {
+		fields = append(fields, enterprisedepartment.FieldParentID)
+	}
+	if m._path != nil {
+		fields = append(fields, enterprisedepartment.FieldPath)
+	}
+	if m.depth != nil {
+		fields = append(fields, enterprisedepartment.FieldDepth)
 	}
 	if m.name != nil {
 		fields = append(fields, enterprisedepartment.FieldName)
@@ -25050,6 +25343,12 @@ func (m *EnterpriseDepartmentMutation) Field(name string) (ent.Value, bool) {
 		return m.DeletedAt()
 	case enterprisedepartment.FieldEnterpriseID:
 		return m.EnterpriseID()
+	case enterprisedepartment.FieldParentID:
+		return m.ParentID()
+	case enterprisedepartment.FieldPath:
+		return m.Path()
+	case enterprisedepartment.FieldDepth:
+		return m.Depth()
 	case enterprisedepartment.FieldName:
 		return m.Name()
 	case enterprisedepartment.FieldSortOrder:
@@ -25071,6 +25370,12 @@ func (m *EnterpriseDepartmentMutation) OldField(ctx context.Context, name string
 		return m.OldDeletedAt(ctx)
 	case enterprisedepartment.FieldEnterpriseID:
 		return m.OldEnterpriseID(ctx)
+	case enterprisedepartment.FieldParentID:
+		return m.OldParentID(ctx)
+	case enterprisedepartment.FieldPath:
+		return m.OldPath(ctx)
+	case enterprisedepartment.FieldDepth:
+		return m.OldDepth(ctx)
 	case enterprisedepartment.FieldName:
 		return m.OldName(ctx)
 	case enterprisedepartment.FieldSortOrder:
@@ -25112,6 +25417,27 @@ func (m *EnterpriseDepartmentMutation) SetField(name string, value ent.Value) er
 		}
 		m.SetEnterpriseID(v)
 		return nil
+	case enterprisedepartment.FieldParentID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParentID(v)
+		return nil
+	case enterprisedepartment.FieldPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPath(v)
+		return nil
+	case enterprisedepartment.FieldDepth:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDepth(v)
+		return nil
 	case enterprisedepartment.FieldName:
 		v, ok := value.(string)
 		if !ok {
@@ -25134,6 +25460,9 @@ func (m *EnterpriseDepartmentMutation) SetField(name string, value ent.Value) er
 // this mutation.
 func (m *EnterpriseDepartmentMutation) AddedFields() []string {
 	var fields []string
+	if m.adddepth != nil {
+		fields = append(fields, enterprisedepartment.FieldDepth)
+	}
 	if m.addsort_order != nil {
 		fields = append(fields, enterprisedepartment.FieldSortOrder)
 	}
@@ -25145,6 +25474,8 @@ func (m *EnterpriseDepartmentMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *EnterpriseDepartmentMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case enterprisedepartment.FieldDepth:
+		return m.AddedDepth()
 	case enterprisedepartment.FieldSortOrder:
 		return m.AddedSortOrder()
 	}
@@ -25156,6 +25487,13 @@ func (m *EnterpriseDepartmentMutation) AddedField(name string) (ent.Value, bool)
 // type.
 func (m *EnterpriseDepartmentMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case enterprisedepartment.FieldDepth:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDepth(v)
+		return nil
 	case enterprisedepartment.FieldSortOrder:
 		v, ok := value.(int)
 		if !ok {
@@ -25174,6 +25512,9 @@ func (m *EnterpriseDepartmentMutation) ClearedFields() []string {
 	if m.FieldCleared(enterprisedepartment.FieldDeletedAt) {
 		fields = append(fields, enterprisedepartment.FieldDeletedAt)
 	}
+	if m.FieldCleared(enterprisedepartment.FieldParentID) {
+		fields = append(fields, enterprisedepartment.FieldParentID)
+	}
 	return fields
 }
 
@@ -25190,6 +25531,9 @@ func (m *EnterpriseDepartmentMutation) ClearField(name string) error {
 	switch name {
 	case enterprisedepartment.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case enterprisedepartment.FieldParentID:
+		m.ClearParentID()
 		return nil
 	}
 	return fmt.Errorf("unknown EnterpriseDepartment nullable field %s", name)
@@ -25211,6 +25555,15 @@ func (m *EnterpriseDepartmentMutation) ResetField(name string) error {
 	case enterprisedepartment.FieldEnterpriseID:
 		m.ResetEnterpriseID()
 		return nil
+	case enterprisedepartment.FieldParentID:
+		m.ResetParentID()
+		return nil
+	case enterprisedepartment.FieldPath:
+		m.ResetPath()
+		return nil
+	case enterprisedepartment.FieldDepth:
+		m.ResetDepth()
+		return nil
 	case enterprisedepartment.FieldName:
 		m.ResetName()
 		return nil
@@ -25223,9 +25576,15 @@ func (m *EnterpriseDepartmentMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *EnterpriseDepartmentMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.enterprise != nil {
 		edges = append(edges, enterprisedepartment.EdgeEnterprise)
+	}
+	if m.parent != nil {
+		edges = append(edges, enterprisedepartment.EdgeParent)
+	}
+	if m.children != nil {
+		edges = append(edges, enterprisedepartment.EdgeChildren)
 	}
 	return edges
 }
@@ -25238,27 +25597,54 @@ func (m *EnterpriseDepartmentMutation) AddedIDs(name string) []ent.Value {
 		if id := m.enterprise; id != nil {
 			return []ent.Value{*id}
 		}
+	case enterprisedepartment.EdgeParent:
+		if id := m.parent; id != nil {
+			return []ent.Value{*id}
+		}
+	case enterprisedepartment.EdgeChildren:
+		ids := make([]ent.Value, 0, len(m.children))
+		for id := range m.children {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *EnterpriseDepartmentMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
+	if m.removedchildren != nil {
+		edges = append(edges, enterprisedepartment.EdgeChildren)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *EnterpriseDepartmentMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case enterprisedepartment.EdgeChildren:
+		ids := make([]ent.Value, 0, len(m.removedchildren))
+		for id := range m.removedchildren {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *EnterpriseDepartmentMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.clearedenterprise {
 		edges = append(edges, enterprisedepartment.EdgeEnterprise)
+	}
+	if m.clearedparent {
+		edges = append(edges, enterprisedepartment.EdgeParent)
+	}
+	if m.clearedchildren {
+		edges = append(edges, enterprisedepartment.EdgeChildren)
 	}
 	return edges
 }
@@ -25269,6 +25655,10 @@ func (m *EnterpriseDepartmentMutation) EdgeCleared(name string) bool {
 	switch name {
 	case enterprisedepartment.EdgeEnterprise:
 		return m.clearedenterprise
+	case enterprisedepartment.EdgeParent:
+		return m.clearedparent
+	case enterprisedepartment.EdgeChildren:
+		return m.clearedchildren
 	}
 	return false
 }
@@ -25280,6 +25670,9 @@ func (m *EnterpriseDepartmentMutation) ClearEdge(name string) error {
 	case enterprisedepartment.EdgeEnterprise:
 		m.ClearEnterprise()
 		return nil
+	case enterprisedepartment.EdgeParent:
+		m.ClearParent()
+		return nil
 	}
 	return fmt.Errorf("unknown EnterpriseDepartment unique edge %s", name)
 }
@@ -25290,6 +25683,12 @@ func (m *EnterpriseDepartmentMutation) ResetEdge(name string) error {
 	switch name {
 	case enterprisedepartment.EdgeEnterprise:
 		m.ResetEnterprise()
+		return nil
+	case enterprisedepartment.EdgeParent:
+		m.ResetParent()
+		return nil
+	case enterprisedepartment.EdgeChildren:
+		m.ResetChildren()
 		return nil
 	}
 	return fmt.Errorf("unknown EnterpriseDepartment edge %s", name)

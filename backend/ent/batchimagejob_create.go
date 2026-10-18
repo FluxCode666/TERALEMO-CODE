@@ -48,6 +48,20 @@ func (_c *BatchImageJobCreate) SetNillableEnterpriseID(v *int64) *BatchImageJobC
 	return _c
 }
 
+// SetEnterpriseDepartmentPath sets the "enterprise_department_path" field.
+func (_c *BatchImageJobCreate) SetEnterpriseDepartmentPath(v string) *BatchImageJobCreate {
+	_c.mutation.SetEnterpriseDepartmentPath(v)
+	return _c
+}
+
+// SetNillableEnterpriseDepartmentPath sets the "enterprise_department_path" field if the given value is not nil.
+func (_c *BatchImageJobCreate) SetNillableEnterpriseDepartmentPath(v *string) *BatchImageJobCreate {
+	if v != nil {
+		_c.SetEnterpriseDepartmentPath(*v)
+	}
+	return _c
+}
+
 // SetEnterpriseDepartmentID sets the "enterprise_department_id" field.
 func (_c *BatchImageJobCreate) SetEnterpriseDepartmentID(v int64) *BatchImageJobCreate {
 	_c.mutation.SetEnterpriseDepartmentID(v)
@@ -619,6 +633,10 @@ func (_c *BatchImageJobCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *BatchImageJobCreate) defaults() {
+	if _, ok := _c.mutation.EnterpriseDepartmentPath(); !ok {
+		v := batchimagejob.DefaultEnterpriseDepartmentPath
+		_c.mutation.SetEnterpriseDepartmentPath(v)
+	}
 	if _, ok := _c.mutation.TaskName(); !ok {
 		v := batchimagejob.DefaultTaskName
 		_c.mutation.SetTaskName(v)
@@ -677,6 +695,9 @@ func (_c *BatchImageJobCreate) check() error {
 	}
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "BatchImageJob.user_id"`)}
+	}
+	if _, ok := _c.mutation.EnterpriseDepartmentPath(); !ok {
+		return &ValidationError{Name: "enterprise_department_path", err: errors.New(`ent: missing required field "BatchImageJob.enterprise_department_path"`)}
 	}
 	if _, ok := _c.mutation.Provider(); !ok {
 		return &ValidationError{Name: "provider", err: errors.New(`ent: missing required field "BatchImageJob.provider"`)}
@@ -833,6 +854,10 @@ func (_c *BatchImageJobCreate) createSpec() (*BatchImageJob, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.EnterpriseID(); ok {
 		_spec.SetField(batchimagejob.FieldEnterpriseID, field.TypeInt64, value)
 		_node.EnterpriseID = &value
+	}
+	if value, ok := _c.mutation.EnterpriseDepartmentPath(); ok {
+		_spec.SetField(batchimagejob.FieldEnterpriseDepartmentPath, field.TypeString, value)
+		_node.EnterpriseDepartmentPath = value
 	}
 	if value, ok := _c.mutation.EnterpriseDepartmentID(); ok {
 		_spec.SetField(batchimagejob.FieldEnterpriseDepartmentID, field.TypeInt64, value)
@@ -1734,6 +1759,9 @@ func (u *BatchImageJobUpsertOne) UpdateNewValues() *BatchImageJobUpsertOne {
 		}
 		if _, exists := u.create.mutation.EnterpriseID(); exists {
 			s.SetIgnore(batchimagejob.FieldEnterpriseID)
+		}
+		if _, exists := u.create.mutation.EnterpriseDepartmentPath(); exists {
+			s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentPath)
 		}
 		if _, exists := u.create.mutation.EnterpriseDepartmentID(); exists {
 			s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentID)
@@ -2740,6 +2768,9 @@ func (u *BatchImageJobUpsertBulk) UpdateNewValues() *BatchImageJobUpsertBulk {
 			}
 			if _, exists := b.mutation.EnterpriseID(); exists {
 				s.SetIgnore(batchimagejob.FieldEnterpriseID)
+			}
+			if _, exists := b.mutation.EnterpriseDepartmentPath(); exists {
+				s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentPath)
 			}
 			if _, exists := b.mutation.EnterpriseDepartmentID(); exists {
 				s.SetIgnore(batchimagejob.FieldEnterpriseDepartmentID)

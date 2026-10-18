@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/lib/pq"
 	"log/slog"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
@@ -29,10 +30,8 @@ func deductUsageBillingEnterpriseBalance(ctx context.Context, tx *sql.Tx, enterp
 // Frozen scopes include soft-deleted archive rows. A missing row is an integrity
 // incident, but must not undo payment for usage already consumed upstream.
 func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) (*service.EnterpriseBillingWindowStarts, error) {
-	expected := 2
-	if cmd.EnterpriseDepartmentID != 0 {
-		expected++
-	}
+	departmentIDs := service.FrozenEnterpriseDepartmentIDs(cmd.EnterpriseDepartmentPathIDs, cmd.EnterpriseDepartmentID)
+	expected := 2 + len(departmentIDs)
 	now := timezone.Now()
 	windows := &service.EnterpriseBillingWindowStarts{
 		Daily: timezone.StartOfDay(now), Weekly: timezone.StartOfWeek(now), Monthly: timezone.StartOfMonth(now),
@@ -43,7 +42,7 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 			SELECT id FROM enterprise_quotas
 			WHERE enterprise_id = $2
 				AND ((scope_type = 'enterprise' AND scope_id = $2)
-					OR (scope_type = 'department' AND scope_id = $3 AND $3 <> 0)
+					OR (scope_type = 'department' AND scope_id = ANY($3::bigint[]))
 					OR (scope_type = 'member' AND scope_id = $4))
 			ORDER BY id FOR UPDATE
 		), updated AS (
@@ -61,7 +60,7 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 			RETURNING q.id
 		)
 		SELECT COUNT(*) FROM updated
-	`, cmd.EnterpriseBalanceCost, cmd.EnterpriseID, cmd.EnterpriseDepartmentID, cmd.EnterpriseMemberID,
+	`, cmd.EnterpriseBalanceCost, cmd.EnterpriseID, pq.Array(departmentIDs), cmd.EnterpriseMemberID,
 		windows.Daily, windows.Weekly, windows.Monthly).Scan(&updated)
 	if err != nil {
 		return nil, err
@@ -70,7 +69,7 @@ func incrementUsageBillingEnterpriseQuotas(ctx context.Context, tx *sql.Tx, cmd 
 		slog.ErrorContext(ctx, "enterprise billing quota row count mismatch; enterprise payment retained",
 			"request_id", cmd.RequestID, "api_key_id", cmd.APIKeyID,
 			"enterprise_id", cmd.EnterpriseID, "department_id", cmd.EnterpriseDepartmentID, "member_id", cmd.EnterpriseMemberID,
-			"cost", cmd.EnterpriseBalanceCost, "updated_rows", updated, "expected_rows", expected)
+			"department_path_ids", departmentIDs, "cost", cmd.EnterpriseBalanceCost, "updated_rows", updated, "expected_rows", expected)
 	}
 	return windows, nil
 }

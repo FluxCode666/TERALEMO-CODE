@@ -10,6 +10,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+// Archived department rows remain selectable so historical usage keeps its leaf attribution.
+const enterpriseDepartmentSubtreeSQL = `SELECT child.id FROM enterprise_departments child JOIN enterprise_departments root ON root.enterprise_id=child.enterprise_id WHERE root.id=$%d AND (child.id=root.id OR child.path LIKE (COALESCE(NULLIF(root.path,''),'/' || CAST(root.id AS TEXT) || '/') || '%%'))`
+
 func appendEnterpriseUsageWhereConditions(conditions []string, args []any, filters UsageLogFilters, alias string) ([]string, []any) {
 	prefix := ""
 	if alias != "" {
@@ -19,9 +22,11 @@ func appendEnterpriseUsageWhereConditions(conditions []string, args []any, filte
 		conditions = append(conditions, fmt.Sprintf("%senterprise_id = $%d", prefix, len(args)+1))
 		args = append(args, filters.EnterpriseID)
 	}
-	if filters.EnterpriseDepartmentID != 0 {
-		conditions = append(conditions, fmt.Sprintf("%senterprise_department_id = $%d", prefix, len(args)+1))
-		args = append(args, filters.EnterpriseDepartmentID)
+	for _, id := range []int64{filters.EnterpriseDepartmentID, filters.EnterpriseDepartmentScopeID} {
+		if id > 0 {
+			conditions = append(conditions, fmt.Sprintf("%senterprise_department_id IN ("+enterpriseDepartmentSubtreeSQL+")", prefix, len(args)+1))
+			args = append(args, id)
+		}
 	}
 	return conditions, args
 }
@@ -297,3 +302,9 @@ func (r *usageLogRepository) GetEnterpriseDepartmentUsage(ctx context.Context, f
 
 var _ service.EnterpriseUsageLogReader = (*usageLogRepository)(nil)
 var _ service.EnterpriseUsageRankingRepository = (*usageLogRepository)(nil)
+
+func (r *usageLogRepository) EnterpriseUsageDepartmentExists(ctx context.Context, enterpriseID, departmentID int64) (bool, error) {
+	var exists bool
+	err := scanSingleRow(ctx, r.sql, `SELECT EXISTS (SELECT 1 FROM enterprise_departments WHERE enterprise_id=$1 AND id=$2 AND deleted_at IS NULL)`, []any{enterpriseID, departmentID}, &exists)
+	return exists, err
+}

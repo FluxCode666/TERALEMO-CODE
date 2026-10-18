@@ -322,7 +322,7 @@ func (s *EnterpriseService) Identity(ctx context.Context, userID int64) (*Enterp
 	}
 	identity := &EnterpriseIdentity{ID: e.ID, Name: e.Name, Role: m.Role, DepartmentID: m.DepartmentID, MemberStatus: m.Status, EnterpriseStatus: e.Status, BalanceVisible: EnterpriseBalanceVisible(m.Role, e.Settings)}
 	if m.DepartmentID != nil {
-		name := m.DepartmentName
+		name := EnterpriseMemberDepartmentPathName(m)
 		identity.DepartmentName = &name
 	}
 	if identity.BalanceVisible {

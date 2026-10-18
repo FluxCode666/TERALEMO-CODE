@@ -1,5 +1,7 @@
 package service
 
+import "slices"
+
 // EnterprisePermission is an operation, rather than an HTTP route, so the same
 // policy guards both service calls and the workbench permission hints.
 type EnterprisePermission string
@@ -21,9 +23,10 @@ const (
 )
 
 type EnterprisePermissionTarget struct {
-	ScopeType string
-	ScopeID   int64
-	Member    *EnterpriseMember
+	ScopeType  string
+	ScopeID    int64
+	Member     *EnterpriseMember
+	Department *EnterpriseDepartment
 }
 
 func enterprisePermissionWrites(p EnterprisePermission) bool {
@@ -34,7 +37,7 @@ func enterprisePermissionWrites(p EnterprisePermission) bool {
 	return false
 }
 func enterpriseSameDepartment(c *EnterpriseMemberContext, m *EnterpriseMember) bool {
-	return c != nil && c.DepartmentID != nil && m != nil && m.DepartmentID != nil && *c.DepartmentID == *m.DepartmentID
+	return c != nil && c.DepartmentID != nil && m != nil && m.DepartmentID != nil && (*c.DepartmentID == *m.DepartmentID || slices.Contains(m.DepartmentPathIDs, *c.DepartmentID))
 }
 
 // CheckEnterprisePermission is pure. It never trusts client-provided roles or
@@ -59,14 +62,14 @@ func CheckEnterprisePermission(c *EnterpriseMemberContext, settings EnterpriseSe
 	switch p {
 	case EnterprisePermissionRead:
 		allowed = true
-	case EnterprisePermissionViewMembers, EnterprisePermissionViewWhitelists:
+	case EnterprisePermissionViewMembers, EnterprisePermissionViewWhitelists, EnterprisePermissionDepartmentUsage:
 		allowed = c.Role == EnterpriseRoleManager && c.DepartmentID != nil
 	case EnterprisePermissionCreateMember, EnterprisePermissionManageMember:
 		allowed = c.Role == EnterpriseRoleManager && settings.ManagerCanManageMembers && enterpriseSameDepartment(c, target.Member) && target.Member.Role == EnterpriseRoleMember
 	case EnterprisePermissionViewQuota:
 		switch target.ScopeType {
 		case EnterpriseScopeDepartment:
-			allowed = c.Role == EnterpriseRoleManager && settings.DepartmentQuotaVisibleToManager && c.DepartmentID != nil && *c.DepartmentID == target.ScopeID
+			allowed = c.Role == EnterpriseRoleManager && settings.DepartmentQuotaVisibleToManager && c.DepartmentID != nil && ((target.Department == nil && enterpriseDepartmentInSubtree(c, target.ScopeID)) || (target.Department != nil && (target.Department.ID == *c.DepartmentID || slices.Contains(target.Department.PathIDs, *c.DepartmentID))))
 		case EnterpriseScopeMember:
 			allowed = (c.Role == EnterpriseRoleManager && settings.MemberQuotaVisibleToManager && enterpriseSameDepartment(c, target.Member)) || (c.Role == EnterpriseRoleMember && settings.MemberQuotaVisibleToMember && c.MemberID == target.ScopeID)
 		}
@@ -98,5 +101,5 @@ func EnterprisePermissionsFor(c *EnterpriseMemberContext, settings EnterpriseSet
 	owner := c.Role == EnterpriseRoleOwner
 	manager := c.Role == EnterpriseRoleManager && c.DepartmentID != nil
 	write := c.EnterpriseStatus == EnterpriseStatusActive
-	return EnterprisePermissions{ManageDepartments: owner && write, ManageMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), CreateMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), EditMemberQuota: write && (owner || (manager && settings.ManagerCanEditMemberQuota)), EditMemberGroups: write && (owner || (manager && settings.ManagerCanEditMemberGroups)), EditQuotas: owner && write, EditSettings: owner && write, ViewMembers: owner || manager, ViewAuditLogs: owner, ViewDepartmentUsage: owner}
+	return EnterprisePermissions{ManageDepartments: owner && write, ManageMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), CreateMembers: write && (owner || (manager && settings.ManagerCanManageMembers)), EditMemberQuota: write && (owner || (manager && settings.ManagerCanEditMemberQuota)), EditMemberGroups: write && (owner || (manager && settings.ManagerCanEditMemberGroups)), EditQuotas: owner && write, EditSettings: owner && write, ViewMembers: owner || manager, ViewAuditLogs: owner, ViewDepartmentUsage: owner || manager}
 }

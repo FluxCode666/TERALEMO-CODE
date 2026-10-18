@@ -312,6 +312,7 @@ func (h *EnterpriseHandler) departments(c *gin.Context, a service.EnterpriseActo
 }
 
 type enterpriseDepartmentRequest struct {
+	ParentID  *int64  `json:"parent_id" binding:"omitempty,gte=0"`
 	Name      *string `json:"name" binding:"omitempty,min=1,max=100"`
 	SortOrder *int    `json:"sort_order"`
 }
@@ -325,7 +326,7 @@ func (h *EnterpriseHandler) createDepartment(c *gin.Context, a service.Enterpris
 		response.BadRequest(c, "name is required")
 		return
 	}
-	in := service.EnterpriseDepartmentInput{Name: *r.Name}
+	in := service.EnterpriseDepartmentInput{Name: *r.Name, ParentID: r.ParentID}
 	if r.SortOrder != nil {
 		in.SortOrder = *r.SortOrder
 	}
@@ -341,7 +342,7 @@ func (h *EnterpriseHandler) updateDepartment(c *gin.Context, a service.Enterpris
 	if !enterpriseBody(c, &r) {
 		return
 	}
-	in := service.UpdateEnterpriseDepartmentInput{Name: r.Name, SortOrder: r.SortOrder}
+	in := service.UpdateEnterpriseDepartmentInput{Name: r.Name, SortOrder: r.SortOrder, ParentID: r.ParentID}
 	item, err := h.management.UpdateDepartment(c.Request.Context(), a, id, departmentID, in)
 	enterpriseSuccess(c, dto.EnterpriseDepartmentFromService(item), err)
 }

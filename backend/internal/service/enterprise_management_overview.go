@@ -16,6 +16,7 @@ func (s *EnterpriseService) Overview(ctx context.Context, a EnterpriseActor, id 
 	if err != nil {
 		return nil, err
 	}
+	me.DepartmentName = EnterpriseMemberDepartmentPathName(me)
 	out := &EnterpriseOverviewData{Enterprise: e, Me: me, BalanceVisible: EnterpriseBalanceVisible(c.Role, e.Settings), Permissions: EnterprisePermissionsFor(c, e.Settings)}
 	if out.BalanceVisible {
 		out.Balance = &e.Balance

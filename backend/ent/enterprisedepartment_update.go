@@ -69,6 +69,61 @@ func (_u *EnterpriseDepartmentUpdate) SetNillableEnterpriseID(v *int64) *Enterpr
 	return _u
 }
 
+// SetParentID sets the "parent_id" field.
+func (_u *EnterpriseDepartmentUpdate) SetParentID(v int64) *EnterpriseDepartmentUpdate {
+	_u.mutation.SetParentID(v)
+	return _u
+}
+
+// SetNillableParentID sets the "parent_id" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdate) SetNillableParentID(v *int64) *EnterpriseDepartmentUpdate {
+	if v != nil {
+		_u.SetParentID(*v)
+	}
+	return _u
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (_u *EnterpriseDepartmentUpdate) ClearParentID() *EnterpriseDepartmentUpdate {
+	_u.mutation.ClearParentID()
+	return _u
+}
+
+// SetPath sets the "path" field.
+func (_u *EnterpriseDepartmentUpdate) SetPath(v string) *EnterpriseDepartmentUpdate {
+	_u.mutation.SetPath(v)
+	return _u
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdate) SetNillablePath(v *string) *EnterpriseDepartmentUpdate {
+	if v != nil {
+		_u.SetPath(*v)
+	}
+	return _u
+}
+
+// SetDepth sets the "depth" field.
+func (_u *EnterpriseDepartmentUpdate) SetDepth(v int) *EnterpriseDepartmentUpdate {
+	_u.mutation.ResetDepth()
+	_u.mutation.SetDepth(v)
+	return _u
+}
+
+// SetNillableDepth sets the "depth" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdate) SetNillableDepth(v *int) *EnterpriseDepartmentUpdate {
+	if v != nil {
+		_u.SetDepth(*v)
+	}
+	return _u
+}
+
+// AddDepth adds value to the "depth" field.
+func (_u *EnterpriseDepartmentUpdate) AddDepth(v int) *EnterpriseDepartmentUpdate {
+	_u.mutation.AddDepth(v)
+	return _u
+}
+
 // SetName sets the "name" field.
 func (_u *EnterpriseDepartmentUpdate) SetName(v string) *EnterpriseDepartmentUpdate {
 	_u.mutation.SetName(v)
@@ -109,6 +164,26 @@ func (_u *EnterpriseDepartmentUpdate) SetEnterprise(v *Enterprise) *EnterpriseDe
 	return _u.SetEnterpriseID(v.ID)
 }
 
+// SetParent sets the "parent" edge to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdate) SetParent(v *EnterpriseDepartment) *EnterpriseDepartmentUpdate {
+	return _u.SetParentID(v.ID)
+}
+
+// AddChildIDs adds the "children" edge to the EnterpriseDepartment entity by IDs.
+func (_u *EnterpriseDepartmentUpdate) AddChildIDs(ids ...int64) *EnterpriseDepartmentUpdate {
+	_u.mutation.AddChildIDs(ids...)
+	return _u
+}
+
+// AddChildren adds the "children" edges to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdate) AddChildren(v ...*EnterpriseDepartment) *EnterpriseDepartmentUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddChildIDs(ids...)
+}
+
 // Mutation returns the EnterpriseDepartmentMutation object of the builder.
 func (_u *EnterpriseDepartmentUpdate) Mutation() *EnterpriseDepartmentMutation {
 	return _u.mutation
@@ -118,6 +193,33 @@ func (_u *EnterpriseDepartmentUpdate) Mutation() *EnterpriseDepartmentMutation {
 func (_u *EnterpriseDepartmentUpdate) ClearEnterprise() *EnterpriseDepartmentUpdate {
 	_u.mutation.ClearEnterprise()
 	return _u
+}
+
+// ClearParent clears the "parent" edge to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdate) ClearParent() *EnterpriseDepartmentUpdate {
+	_u.mutation.ClearParent()
+	return _u
+}
+
+// ClearChildren clears all "children" edges to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdate) ClearChildren() *EnterpriseDepartmentUpdate {
+	_u.mutation.ClearChildren()
+	return _u
+}
+
+// RemoveChildIDs removes the "children" edge to EnterpriseDepartment entities by IDs.
+func (_u *EnterpriseDepartmentUpdate) RemoveChildIDs(ids ...int64) *EnterpriseDepartmentUpdate {
+	_u.mutation.RemoveChildIDs(ids...)
+	return _u
+}
+
+// RemoveChildren removes "children" edges to EnterpriseDepartment entities.
+func (_u *EnterpriseDepartmentUpdate) RemoveChildren(v ...*EnterpriseDepartment) *EnterpriseDepartmentUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveChildIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -164,6 +266,11 @@ func (_u *EnterpriseDepartmentUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *EnterpriseDepartmentUpdate) check() error {
+	if v, ok := _u.mutation.Depth(); ok {
+		if err := enterprisedepartment.DepthValidator(v); err != nil {
+			return &ValidationError{Name: "depth", err: fmt.Errorf(`ent: validator failed for field "EnterpriseDepartment.depth": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := enterprisedepartment.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "EnterpriseDepartment.name": %w`, err)}
@@ -196,6 +303,15 @@ func (_u *EnterpriseDepartmentUpdate) sqlSave(ctx context.Context) (_node int, e
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(enterprisedepartment.FieldDeletedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.Path(); ok {
+		_spec.SetField(enterprisedepartment.FieldPath, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Depth(); ok {
+		_spec.SetField(enterprisedepartment.FieldDepth, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDepth(); ok {
+		_spec.AddField(enterprisedepartment.FieldDepth, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(enterprisedepartment.FieldName, field.TypeString, value)
 	}
@@ -227,6 +343,80 @@ func (_u *EnterpriseDepartmentUpdate) sqlSave(ctx context.Context) (_node int, e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ParentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   enterprisedepartment.ParentTable,
+			Columns: []string{enterprisedepartment.ParentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ParentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   enterprisedepartment.ParentTable,
+			Columns: []string{enterprisedepartment.ParentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ChildrenCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedChildrenIDs(); len(nodes) > 0 && !_u.mutation.ChildrenCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ChildrenIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -294,6 +484,61 @@ func (_u *EnterpriseDepartmentUpdateOne) SetNillableEnterpriseID(v *int64) *Ente
 	return _u
 }
 
+// SetParentID sets the "parent_id" field.
+func (_u *EnterpriseDepartmentUpdateOne) SetParentID(v int64) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.SetParentID(v)
+	return _u
+}
+
+// SetNillableParentID sets the "parent_id" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdateOne) SetNillableParentID(v *int64) *EnterpriseDepartmentUpdateOne {
+	if v != nil {
+		_u.SetParentID(*v)
+	}
+	return _u
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (_u *EnterpriseDepartmentUpdateOne) ClearParentID() *EnterpriseDepartmentUpdateOne {
+	_u.mutation.ClearParentID()
+	return _u
+}
+
+// SetPath sets the "path" field.
+func (_u *EnterpriseDepartmentUpdateOne) SetPath(v string) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.SetPath(v)
+	return _u
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdateOne) SetNillablePath(v *string) *EnterpriseDepartmentUpdateOne {
+	if v != nil {
+		_u.SetPath(*v)
+	}
+	return _u
+}
+
+// SetDepth sets the "depth" field.
+func (_u *EnterpriseDepartmentUpdateOne) SetDepth(v int) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.ResetDepth()
+	_u.mutation.SetDepth(v)
+	return _u
+}
+
+// SetNillableDepth sets the "depth" field if the given value is not nil.
+func (_u *EnterpriseDepartmentUpdateOne) SetNillableDepth(v *int) *EnterpriseDepartmentUpdateOne {
+	if v != nil {
+		_u.SetDepth(*v)
+	}
+	return _u
+}
+
+// AddDepth adds value to the "depth" field.
+func (_u *EnterpriseDepartmentUpdateOne) AddDepth(v int) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.AddDepth(v)
+	return _u
+}
+
 // SetName sets the "name" field.
 func (_u *EnterpriseDepartmentUpdateOne) SetName(v string) *EnterpriseDepartmentUpdateOne {
 	_u.mutation.SetName(v)
@@ -334,6 +579,26 @@ func (_u *EnterpriseDepartmentUpdateOne) SetEnterprise(v *Enterprise) *Enterpris
 	return _u.SetEnterpriseID(v.ID)
 }
 
+// SetParent sets the "parent" edge to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdateOne) SetParent(v *EnterpriseDepartment) *EnterpriseDepartmentUpdateOne {
+	return _u.SetParentID(v.ID)
+}
+
+// AddChildIDs adds the "children" edge to the EnterpriseDepartment entity by IDs.
+func (_u *EnterpriseDepartmentUpdateOne) AddChildIDs(ids ...int64) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.AddChildIDs(ids...)
+	return _u
+}
+
+// AddChildren adds the "children" edges to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdateOne) AddChildren(v ...*EnterpriseDepartment) *EnterpriseDepartmentUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddChildIDs(ids...)
+}
+
 // Mutation returns the EnterpriseDepartmentMutation object of the builder.
 func (_u *EnterpriseDepartmentUpdateOne) Mutation() *EnterpriseDepartmentMutation {
 	return _u.mutation
@@ -343,6 +608,33 @@ func (_u *EnterpriseDepartmentUpdateOne) Mutation() *EnterpriseDepartmentMutatio
 func (_u *EnterpriseDepartmentUpdateOne) ClearEnterprise() *EnterpriseDepartmentUpdateOne {
 	_u.mutation.ClearEnterprise()
 	return _u
+}
+
+// ClearParent clears the "parent" edge to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdateOne) ClearParent() *EnterpriseDepartmentUpdateOne {
+	_u.mutation.ClearParent()
+	return _u
+}
+
+// ClearChildren clears all "children" edges to the EnterpriseDepartment entity.
+func (_u *EnterpriseDepartmentUpdateOne) ClearChildren() *EnterpriseDepartmentUpdateOne {
+	_u.mutation.ClearChildren()
+	return _u
+}
+
+// RemoveChildIDs removes the "children" edge to EnterpriseDepartment entities by IDs.
+func (_u *EnterpriseDepartmentUpdateOne) RemoveChildIDs(ids ...int64) *EnterpriseDepartmentUpdateOne {
+	_u.mutation.RemoveChildIDs(ids...)
+	return _u
+}
+
+// RemoveChildren removes "children" edges to EnterpriseDepartment entities.
+func (_u *EnterpriseDepartmentUpdateOne) RemoveChildren(v ...*EnterpriseDepartment) *EnterpriseDepartmentUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveChildIDs(ids...)
 }
 
 // Where appends a list predicates to the EnterpriseDepartmentUpdate builder.
@@ -402,6 +694,11 @@ func (_u *EnterpriseDepartmentUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *EnterpriseDepartmentUpdateOne) check() error {
+	if v, ok := _u.mutation.Depth(); ok {
+		if err := enterprisedepartment.DepthValidator(v); err != nil {
+			return &ValidationError{Name: "depth", err: fmt.Errorf(`ent: validator failed for field "EnterpriseDepartment.depth": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := enterprisedepartment.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "EnterpriseDepartment.name": %w`, err)}
@@ -451,6 +748,15 @@ func (_u *EnterpriseDepartmentUpdateOne) sqlSave(ctx context.Context) (_node *En
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(enterprisedepartment.FieldDeletedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.Path(); ok {
+		_spec.SetField(enterprisedepartment.FieldPath, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Depth(); ok {
+		_spec.SetField(enterprisedepartment.FieldDepth, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDepth(); ok {
+		_spec.AddField(enterprisedepartment.FieldDepth, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(enterprisedepartment.FieldName, field.TypeString, value)
 	}
@@ -482,6 +788,80 @@ func (_u *EnterpriseDepartmentUpdateOne) sqlSave(ctx context.Context) (_node *En
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(enterprise.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ParentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   enterprisedepartment.ParentTable,
+			Columns: []string{enterprisedepartment.ParentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ParentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   enterprisedepartment.ParentTable,
+			Columns: []string{enterprisedepartment.ParentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ChildrenCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedChildrenIDs(); len(nodes) > 0 && !_u.mutation.ChildrenCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ChildrenIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

@@ -270,14 +270,15 @@ type PlatformDashboardStats struct {
 // UsageLogFilters represents filters for usage log queries
 type UsageLogFilters struct {
 	// Enterprise dimensions are immutable billing-time snapshots, independent of current membership.
-	EnterpriseID           int64
-	EnterpriseDepartmentID int64
-	UserID                 int64
-	APIKeyID               int64
-	AccountID              int64
-	GroupID                int64
-	RequestID              string
-	Model                  string
+	EnterpriseID                int64
+	EnterpriseDepartmentID      int64
+	EnterpriseDepartmentScopeID int64 // Server-only manager subtree, intersected with requested department.
+	UserID                      int64
+	APIKeyID                    int64
+	AccountID                   int64
+	GroupID                     int64
+	RequestID                   string
+	Model                       string
 	// ModelFilterSource controls how Model is matched. Empty preserves raw usage_logs.model semantics.
 	ModelFilterSource     string
 	RequestType           *int16

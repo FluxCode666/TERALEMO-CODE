@@ -4,20 +4,38 @@ import (
 	"context"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"net/mail"
+	"slices"
 	"strings"
 )
 
 func (s *EnterpriseService) ListDepartments(ctx context.Context, a EnterpriseActor, id int64) ([]EnterpriseDepartment, error) {
-	if _, _, err := s.EnterpriseAuthorize(ctx, a, id, false); err != nil {
+	_, c, err := s.EnterpriseAuthorize(ctx, a, id, false)
+	if err != nil {
 		return nil, err
 	}
-	return s.departments.List(ctx, id)
+	items, err := s.departments.List(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if a.IsAdmin || c.Role == EnterpriseRoleOwner {
+		return items, nil
+	}
+	out := []EnterpriseDepartment{}
+	for _, d := range items {
+		if c.DepartmentID != nil && (d.ID == *c.DepartmentID || slices.Contains(d.PathIDs, *c.DepartmentID)) {
+			out = append(out, d)
+		}
+	}
+	return out, nil
 }
 func (s *EnterpriseService) CreateDepartment(ctx context.Context, a EnterpriseActor, id int64, in EnterpriseDepartmentInput) (*EnterpriseDepartment, error) {
 	if strings.TrimSpace(in.Name) == "" || !enterpriseManagementTextValid(in.Name, 100) {
 		return nil, ErrEnterpriseInvalidInput
 	}
-	d := &EnterpriseDepartment{EnterpriseID: id, Name: strings.TrimSpace(in.Name), SortOrder: in.SortOrder}
+	if in.ParentID != nil && *in.ParentID < 0 {
+		return nil, ErrEnterpriseInvalidInput
+	}
+	d := &EnterpriseDepartment{ParentID: in.ParentID, EnterpriseID: id, Name: strings.TrimSpace(in.Name), SortOrder: in.SortOrder}
 	err := s.mutate(ctx, a, id, func(ctx context.Context, e *Enterprise, c *EnterpriseMemberContext) error {
 		if err := enterpriseCheck(a, c, e, EnterprisePermissionManageDepartments, EnterprisePermissionTarget{}); err != nil {
 			return err
@@ -34,6 +52,9 @@ func (s *EnterpriseService) CreateDepartment(ctx context.Context, a EnterpriseAc
 	return s.departments.GetByID(ctx, id, d.ID)
 }
 func (s *EnterpriseService) UpdateDepartment(ctx context.Context, a EnterpriseActor, id, departmentID int64, in UpdateEnterpriseDepartmentInput) (*EnterpriseDepartment, error) {
+	if in.ParentID != nil && *in.ParentID < 0 {
+		return nil, ErrEnterpriseInvalidInput
+	}
 	if in.Name != nil && (strings.TrimSpace(*in.Name) == "" || !enterpriseManagementTextValid(*in.Name, 100)) {
 		return nil, ErrEnterpriseInvalidInput
 	}
@@ -46,6 +67,12 @@ func (s *EnterpriseService) UpdateDepartment(ctx context.Context, a EnterpriseAc
 			return err
 		}
 		before := *d
+		if in.ParentID != nil {
+			d.ParentID = in.ParentID
+			if *in.ParentID == 0 {
+				d.ParentID = nil
+			}
+		}
 		if in.Name != nil {
 			d.Name = strings.TrimSpace(*in.Name)
 		}
@@ -54,6 +81,11 @@ func (s *EnterpriseService) UpdateDepartment(ctx context.Context, a EnterpriseAc
 		}
 		if err = s.departments.Update(ctx, d); err != nil {
 			return err
+		}
+		if in.ParentID != nil {
+			if err := s.validateDepartmentSubtreeQuotaParents(ctx, id, departmentID); err != nil {
+				return err
+			}
 		}
 		return s.audit(ctx, a, c, id, EnterpriseAuditActionDepartmentUpdate, EnterpriseScopeDepartment, departmentID, &before, d)
 	})
@@ -94,11 +126,15 @@ func (s *EnterpriseService) ListMembers(ctx context.Context, a EnterpriseActor, 
 	if err = enterpriseCheck(a, c, e, EnterprisePermissionViewMembers, EnterprisePermissionTarget{}); err != nil {
 		return nil, nil, err
 	}
+	f.DepartmentScopeID = 0
 	if !a.IsAdmin && c.Role == EnterpriseRoleManager {
-		if f.DepartmentID != nil && *f.DepartmentID != *c.DepartmentID {
+		f.DepartmentScopeID = *c.DepartmentID
+		if f.DepartmentID != nil && !enterpriseDepartmentInSubtree(c, *f.DepartmentID) {
 			return nil, nil, ErrEnterprisePermissionDenied
 		}
-		f.DepartmentID = c.DepartmentID
+		if f.DepartmentID == nil {
+			f.DepartmentID = c.DepartmentID
+		}
 	}
 	return s.members.List(ctx, id, p, f)
 }
@@ -116,6 +152,13 @@ func (s *EnterpriseService) createMember(ctx context.Context, a EnterpriseActor,
 		in.DepartmentID = nil
 	}
 	m := &EnterpriseMember{EnterpriseID: e.ID, DepartmentID: in.DepartmentID, Role: in.Role, Status: EnterpriseMemberStatusActive, Title: in.Title}
+	if m.DepartmentID != nil {
+		d, err := s.departments.GetByID(ctx, e.ID, *m.DepartmentID)
+		if err != nil {
+			return nil, false, err
+		}
+		m.DepartmentPathIDs = d.PathIDs
+	}
 	if err := enterpriseCheck(a, c, e, EnterprisePermissionCreateMember, EnterprisePermissionTarget{Member: m}); err != nil {
 		return nil, false, err
 	}
@@ -254,6 +297,22 @@ func (s *EnterpriseService) UpdateMember(ctx context.Context, a EnterpriseActor,
 		}
 		if err = s.members.Update(ctx, m); err != nil {
 			return err
+		}
+		if in.DepartmentID != nil {
+			target, err := s.scopeTarget(ctx, id, EnterpriseScopeMember, m.ID)
+			if err != nil {
+				return err
+			}
+			q, err := s.quotas.GetByScope(ctx, id, EnterpriseScopeMember, m.ID)
+			if err != nil {
+				return err
+			}
+			if q == nil {
+				return ErrEnterpriseInvalidScope
+			}
+			if err := s.validateQuotaParents(ctx, id, target, q); err != nil {
+				return err
+			}
 		}
 		return s.audit(ctx, a, c, id, EnterpriseAuditActionMemberUpdate, EnterpriseScopeMember, memberID, &before, m)
 	})

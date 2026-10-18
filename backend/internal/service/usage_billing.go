@@ -38,10 +38,11 @@ type UsageBillingCommand struct {
 	ImageCount          int
 	MediaType           string
 
-	EnterpriseID           int64
-	EnterpriseDepartmentID int64
-	EnterpriseMemberID     int64
-	EnterpriseBalanceCost  float64
+	EnterpriseID                int64
+	EnterpriseDepartmentPathIDs []int64
+	EnterpriseDepartmentID      int64
+	EnterpriseMemberID          int64
+	EnterpriseBalanceCost       float64
 
 	BalanceCost         float64
 	SubscriptionCost    float64
@@ -142,6 +143,9 @@ func buildUsageBillingFingerprint(c *UsageBillingCommand) string {
 	// Keep the exact legacy fingerprint for every non-enterprise command.
 	if c.EnterpriseID != 0 {
 		raw += fmt.Sprintf("|enterprise:%d|%d|%d|%0.10f", c.EnterpriseID, c.EnterpriseDepartmentID, c.EnterpriseMemberID, c.EnterpriseBalanceCost)
+		if len(c.EnterpriseDepartmentPathIDs) > 1 {
+			raw += "|path:" + EnterpriseDepartmentPath(c.EnterpriseDepartmentPathIDs)
+		}
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
@@ -203,6 +207,7 @@ type BatchImageBalanceHoldCommand struct {
 	HoldAmount                                               float64
 	ActualAmount                                             float64
 	EnterpriseID, EnterpriseDepartmentID, EnterpriseMemberID int64
+	EnterpriseDepartmentPathIDs                              []int64
 	UsageLog                                                 *UsageLog // Enterprise capture persists usage in the same transaction.
 }
 
@@ -234,6 +239,9 @@ func buildBatchImageBalanceHoldFingerprint(c *BatchImageBalanceHoldCommand) stri
 	}
 	if c.EnterpriseID != 0 {
 		raw += fmt.Sprintf("|enterprise:%d|department:%d|member:%d", c.EnterpriseID, c.EnterpriseDepartmentID, c.EnterpriseMemberID)
+		if len(c.EnterpriseDepartmentPathIDs) > 1 {
+			raw += "|path:" + EnterpriseDepartmentPath(c.EnterpriseDepartmentPathIDs)
+		}
 	}
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])

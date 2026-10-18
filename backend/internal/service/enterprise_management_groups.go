@@ -154,12 +154,9 @@ func (s *EnterpriseService) validateWhitelistParents(ctx context.Context, e *Ent
 	if e.GroupPoolConfigured && !enterpriseGroupsSubset(ids, pool) {
 		return ErrEnterpriseGroupOutOfScope
 	}
-	parents := []EnterpriseQuotaScope{}
-	if target.ScopeType != EnterpriseScopeEnterprise {
-		parents = append(parents, EnterpriseQuotaScope{ScopeType: EnterpriseScopeEnterprise, ScopeID: id})
-	}
-	if target.Member != nil && target.Member.DepartmentID != nil {
-		parents = append(parents, EnterpriseQuotaScope{ScopeType: EnterpriseScopeDepartment, ScopeID: *target.Member.DepartmentID})
+	parents, err := s.parentScopes(ctx, id, target)
+	if err != nil {
+		return err
 	}
 	for _, p := range parents {
 		w, err := s.enterpriseGroups.GetWhitelist(ctx, id, p.ScopeType, p.ScopeID)

@@ -34,9 +34,15 @@ func enterpriseBatchJobFixture(t *testing.T, f enterpriseBillingFixture, hold fl
 	if len(noDepartment) > 0 && noDepartment[0] {
 		departmentID = nil
 	}
+	membership, err := NewEnterpriseRepository(testEntClient(t)).GetMemberContextByUserID(ctx, f.member.UserID)
+	require.NoError(t, err)
+	path := membership.DepartmentPathIDs
+	if departmentID == nil {
+		path = nil
+	}
 	job, err := NewBatchImageRepository(integrationDB).CreateBatchImageJob(ctx, service.CreateBatchImageJobParams{
 		BatchID: batchID, UserID: f.member.UserID, APIKeyID: &f.key.ID, AccountID: &account.ID,
-		EnterpriseID: &f.enterprise.ID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: &f.member.ID,
+		EnterpriseID: &f.enterprise.ID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: &f.member.ID, EnterpriseDepartmentPathIDs: path,
 		Provider: service.BatchImageProviderGeminiAPI, Model: "gemini-2.5-flash-image", Status: service.BatchImageJobStatusSettling,
 		ItemCount: 2, SuccessCount: 1, FailCount: 1, HoldAmount: &hold, EstimatedCost: hold,
 		BillableUnitPrice: 2.5, PricingSnapshotVersion: 1, GroupRateMultiplier: 1, AccountRateMultiplier: 1, BatchDiscountMultiplier: 1,
@@ -59,7 +65,7 @@ func enterpriseBatchHoldCommand(job *service.BatchImageJob, operation string, ac
 	}
 	return &service.BatchImageBalanceHoldCommand{RequestID: requestID, UserID: job.UserID, APIKeyID: *job.APIKeyID,
 		BatchID: job.BatchID, HoldAmount: *job.HoldAmount, ActualAmount: actual,
-		EnterpriseID: *job.EnterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: *job.EnterpriseMemberID}
+		EnterpriseID: *job.EnterpriseID, EnterpriseDepartmentID: departmentID, EnterpriseMemberID: *job.EnterpriseMemberID, EnterpriseDepartmentPathIDs: job.EnterpriseDepartmentPathIDs}
 }
 
 func assertEnterpriseBatchWallet(t *testing.T, f enterpriseBillingFixture, balance, frozen float64) {

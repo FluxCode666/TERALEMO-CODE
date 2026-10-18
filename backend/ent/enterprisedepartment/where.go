@@ -75,6 +75,21 @@ func EnterpriseID(v int64) predicate.EnterpriseDepartment {
 	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldEnterpriseID, v))
 }
 
+// ParentID applies equality check predicate on the "parent_id" field. It's identical to ParentIDEQ.
+func ParentID(v int64) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldParentID, v))
+}
+
+// Path applies equality check predicate on the "path" field. It's identical to PathEQ.
+func Path(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldPath, v))
+}
+
+// Depth applies equality check predicate on the "depth" field. It's identical to DepthEQ.
+func Depth(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldDepth, v))
+}
+
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
 func Name(v string) predicate.EnterpriseDepartment {
 	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldName, v))
@@ -235,6 +250,141 @@ func EnterpriseIDNotIn(vs ...int64) predicate.EnterpriseDepartment {
 	return predicate.EnterpriseDepartment(sql.FieldNotIn(FieldEnterpriseID, vs...))
 }
 
+// ParentIDEQ applies the EQ predicate on the "parent_id" field.
+func ParentIDEQ(v int64) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldParentID, v))
+}
+
+// ParentIDNEQ applies the NEQ predicate on the "parent_id" field.
+func ParentIDNEQ(v int64) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNEQ(FieldParentID, v))
+}
+
+// ParentIDIn applies the In predicate on the "parent_id" field.
+func ParentIDIn(vs ...int64) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldIn(FieldParentID, vs...))
+}
+
+// ParentIDNotIn applies the NotIn predicate on the "parent_id" field.
+func ParentIDNotIn(vs ...int64) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNotIn(FieldParentID, vs...))
+}
+
+// ParentIDIsNil applies the IsNil predicate on the "parent_id" field.
+func ParentIDIsNil() predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldIsNull(FieldParentID))
+}
+
+// ParentIDNotNil applies the NotNil predicate on the "parent_id" field.
+func ParentIDNotNil() predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNotNull(FieldParentID))
+}
+
+// PathEQ applies the EQ predicate on the "path" field.
+func PathEQ(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldPath, v))
+}
+
+// PathNEQ applies the NEQ predicate on the "path" field.
+func PathNEQ(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNEQ(FieldPath, v))
+}
+
+// PathIn applies the In predicate on the "path" field.
+func PathIn(vs ...string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldIn(FieldPath, vs...))
+}
+
+// PathNotIn applies the NotIn predicate on the "path" field.
+func PathNotIn(vs ...string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNotIn(FieldPath, vs...))
+}
+
+// PathGT applies the GT predicate on the "path" field.
+func PathGT(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldGT(FieldPath, v))
+}
+
+// PathGTE applies the GTE predicate on the "path" field.
+func PathGTE(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldGTE(FieldPath, v))
+}
+
+// PathLT applies the LT predicate on the "path" field.
+func PathLT(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldLT(FieldPath, v))
+}
+
+// PathLTE applies the LTE predicate on the "path" field.
+func PathLTE(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldLTE(FieldPath, v))
+}
+
+// PathContains applies the Contains predicate on the "path" field.
+func PathContains(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldContains(FieldPath, v))
+}
+
+// PathHasPrefix applies the HasPrefix predicate on the "path" field.
+func PathHasPrefix(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldHasPrefix(FieldPath, v))
+}
+
+// PathHasSuffix applies the HasSuffix predicate on the "path" field.
+func PathHasSuffix(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldHasSuffix(FieldPath, v))
+}
+
+// PathEqualFold applies the EqualFold predicate on the "path" field.
+func PathEqualFold(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEqualFold(FieldPath, v))
+}
+
+// PathContainsFold applies the ContainsFold predicate on the "path" field.
+func PathContainsFold(v string) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldContainsFold(FieldPath, v))
+}
+
+// DepthEQ applies the EQ predicate on the "depth" field.
+func DepthEQ(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldDepth, v))
+}
+
+// DepthNEQ applies the NEQ predicate on the "depth" field.
+func DepthNEQ(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNEQ(FieldDepth, v))
+}
+
+// DepthIn applies the In predicate on the "depth" field.
+func DepthIn(vs ...int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldIn(FieldDepth, vs...))
+}
+
+// DepthNotIn applies the NotIn predicate on the "depth" field.
+func DepthNotIn(vs ...int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldNotIn(FieldDepth, vs...))
+}
+
+// DepthGT applies the GT predicate on the "depth" field.
+func DepthGT(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldGT(FieldDepth, v))
+}
+
+// DepthGTE applies the GTE predicate on the "depth" field.
+func DepthGTE(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldGTE(FieldDepth, v))
+}
+
+// DepthLT applies the LT predicate on the "depth" field.
+func DepthLT(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldLT(FieldDepth, v))
+}
+
+// DepthLTE applies the LTE predicate on the "depth" field.
+func DepthLTE(v int) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(sql.FieldLTE(FieldDepth, v))
+}
+
 // NameEQ applies the EQ predicate on the "name" field.
 func NameEQ(v string) predicate.EnterpriseDepartment {
 	return predicate.EnterpriseDepartment(sql.FieldEQ(FieldName, v))
@@ -355,6 +505,52 @@ func HasEnterprise() predicate.EnterpriseDepartment {
 func HasEnterpriseWith(preds ...predicate.Enterprise) predicate.EnterpriseDepartment {
 	return predicate.EnterpriseDepartment(func(s *sql.Selector) {
 		step := newEnterpriseStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasParent applies the HasEdge predicate on the "parent" edge.
+func HasParent() predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ParentTable, ParentColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasParentWith applies the HasEdge predicate on the "parent" edge with a given conditions (other predicates).
+func HasParentWith(preds ...predicate.EnterpriseDepartment) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(func(s *sql.Selector) {
+		step := newParentStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasChildren applies the HasEdge predicate on the "children" edge.
+func HasChildren() predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ChildrenTable, ChildrenColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasChildrenWith applies the HasEdge predicate on the "children" edge with a given conditions (other predicates).
+func HasChildrenWith(preds ...predicate.EnterpriseDepartment) predicate.EnterpriseDepartment {
+	return predicate.EnterpriseDepartment(func(s *sql.Selector) {
+		step := newChildrenStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

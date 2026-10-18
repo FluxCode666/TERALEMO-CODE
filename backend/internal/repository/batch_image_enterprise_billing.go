@@ -53,7 +53,7 @@ func captureUsageBillingBatchImageEnterpriseBalance(ctx context.Context, tx *sql
 	}
 	_, err = incrementUsageBillingEnterpriseQuotas(ctx, tx, &service.UsageBillingCommand{
 		RequestID: cmd.RequestID, APIKeyID: cmd.APIKeyID, EnterpriseID: cmd.EnterpriseID,
-		EnterpriseDepartmentID: cmd.EnterpriseDepartmentID, EnterpriseMemberID: cmd.EnterpriseMemberID,
+		EnterpriseDepartmentID: cmd.EnterpriseDepartmentID, EnterpriseMemberID: cmd.EnterpriseMemberID, EnterpriseDepartmentPathIDs: cmd.EnterpriseDepartmentPathIDs,
 		EnterpriseBalanceCost: cmd.ActualAmount,
 	})
 	if err != nil {
@@ -104,8 +104,8 @@ func (r *usageBillingRepository) invalidateBatchImageEnterpriseCache(ctx context
 		{ScopeType: service.EnterpriseScopeEnterprise, ScopeID: cmd.EnterpriseID},
 		{ScopeType: service.EnterpriseScopeMember, ScopeID: cmd.EnterpriseMemberID},
 	}
-	if cmd.EnterpriseDepartmentID > 0 {
-		scopes = append(scopes, service.EnterpriseQuotaScope{ScopeType: service.EnterpriseScopeDepartment, ScopeID: cmd.EnterpriseDepartmentID})
+	for _, id := range service.FrozenEnterpriseDepartmentIDs(cmd.EnterpriseDepartmentPathIDs, cmd.EnterpriseDepartmentID) {
+		scopes = append(scopes, service.EnterpriseQuotaScope{ScopeType: service.EnterpriseScopeDepartment, ScopeID: id})
 	}
 	for _, scope := range scopes {
 		if err := r.enterpriseCache.InvalidateEnterpriseQuota(cacheCtx, scope.ScopeType, scope.ScopeID); err != nil {

@@ -80,7 +80,7 @@ var (
 	ErrEnterpriseMemberAdminForbidden          = infraerrors.New(400, EnterpriseErrorCodeMemberAdminForbidden, "system administrators cannot join an enterprise")
 	ErrEnterpriseManagerRequiresDepartment     = infraerrors.New(400, EnterpriseErrorCodeManagerRequiresDepartment, "manager requires a department")
 	ErrEnterpriseLastOwner                     = infraerrors.New(409, EnterpriseErrorCodeLastOwner, "enterprise must retain an active owner")
-	ErrEnterpriseDepartmentNotEmpty            = infraerrors.New(409, EnterpriseErrorCodeDepartmentNotEmpty, "department still has members")
+	ErrEnterpriseDepartmentNotEmpty            = infraerrors.New(409, EnterpriseErrorCodeDepartmentNotEmpty, "department still has members or child departments")
 	ErrEnterpriseNotEmpty                      = infraerrors.New(409, EnterpriseErrorCodeNotEmpty, "enterprise still has members")
 	ErrEnterpriseNotMember                     = infraerrors.New(403, EnterpriseErrorCodeNotMember, "user is not an enterprise member")
 	ErrEnterprisePermissionDenied              = infraerrors.New(403, EnterpriseErrorCodePermissionDenied, "enterprise permission denied")

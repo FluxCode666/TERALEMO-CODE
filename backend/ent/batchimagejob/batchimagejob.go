@@ -19,6 +19,8 @@ const (
 	FieldUserID = "user_id"
 	// FieldEnterpriseID holds the string denoting the enterprise_id field in the database.
 	FieldEnterpriseID = "enterprise_id"
+	// FieldEnterpriseDepartmentPath holds the string denoting the enterprise_department_path field in the database.
+	FieldEnterpriseDepartmentPath = "enterprise_department_path"
 	// FieldEnterpriseDepartmentID holds the string denoting the enterprise_department_id field in the database.
 	FieldEnterpriseDepartmentID = "enterprise_department_id"
 	// FieldEnterpriseMemberID holds the string denoting the enterprise_member_id field in the database.
@@ -109,6 +111,7 @@ var Columns = []string{
 	FieldBatchID,
 	FieldUserID,
 	FieldEnterpriseID,
+	FieldEnterpriseDepartmentPath,
 	FieldEnterpriseDepartmentID,
 	FieldEnterpriseMemberID,
 	FieldAPIKeyID,
@@ -164,6 +167,8 @@ func ValidColumn(column string) bool {
 var (
 	// BatchIDValidator is a validator for the "batch_id" field. It is called by the builders before save.
 	BatchIDValidator func(string) error
+	// DefaultEnterpriseDepartmentPath holds the default value on creation for the "enterprise_department_path" field.
+	DefaultEnterpriseDepartmentPath string
 	// ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
 	ProviderValidator func(string) error
 	// ModelValidator is a validator for the "model" field. It is called by the builders before save.
@@ -241,6 +246,11 @@ func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByEnterpriseID orders the results by the enterprise_id field.
 func ByEnterpriseID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEnterpriseID, opts...).ToFunc()
+}
+
+// ByEnterpriseDepartmentPath orders the results by the enterprise_department_path field.
+func ByEnterpriseDepartmentPath(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnterpriseDepartmentPath, opts...).ToFunc()
 }
 
 // ByEnterpriseDepartmentID orders the results by the enterprise_department_id field.

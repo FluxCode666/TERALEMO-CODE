@@ -29,10 +29,12 @@ type UpdateEnterpriseInput struct {
 	Settings                                                     *EnterpriseSettings
 }
 type EnterpriseDepartmentInput struct {
+	ParentID  *int64
 	Name      string
 	SortOrder int
 }
 type UpdateEnterpriseDepartmentInput struct {
+	ParentID  *int64 // nil leaves unchanged; 0 moves to root.
 	Name      *string
 	SortOrder *int
 }

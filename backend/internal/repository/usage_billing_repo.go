@@ -37,6 +37,9 @@ func (r *usageBillingRepository) Apply(ctx context.Context, cmd *service.UsageBi
 		return nil, errors.New("usage billing repository db is nil")
 	}
 
+	if err := service.ValidateFrozenEnterpriseDepartmentIDs(cmd.EnterpriseDepartmentPathIDs, cmd.EnterpriseDepartmentID); err != nil {
+		return nil, service.ErrBillingServiceUnavailable.WithCause(err)
+	}
 	cmd.Normalize()
 	if cmd.RequestID == "" {
 		return nil, service.ErrUsageBillingRequestIDRequired
@@ -147,6 +150,9 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 		cmd.HoldAmount < 0 || cmd.ActualAmount < 0 || math.IsNaN(cmd.HoldAmount) || math.IsNaN(cmd.ActualAmount) || math.IsInf(cmd.HoldAmount, 0) || math.IsInf(cmd.ActualAmount, 0)) {
 		return nil, service.ErrBillingServiceUnavailable
 	}
+	if err := service.ValidateFrozenEnterpriseDepartmentIDs(cmd.EnterpriseDepartmentPathIDs, cmd.EnterpriseDepartmentID); err != nil {
+		return nil, service.ErrBillingServiceUnavailable.WithCause(err)
+	}
 	if cmd.EnterpriseID > 0 && operation == "capture" && cmd.ActualAmount-cmd.HoldAmount > 0.00000001 {
 		return nil, service.ErrBatchImageSettlementCostExceedsHold
 	}
@@ -196,6 +202,9 @@ func (r *usageBillingRepository) applyBatchImageBalanceHold(
 		// Capture and release share a terminal claim so they cannot both consume
 		// this job's hold from the enterprise's aggregate frozen pool.
 		terminalFingerprint := fmt.Sprintf("%d|%d|%d|%d|%.8f", cmd.UserID, cmd.EnterpriseID, cmd.EnterpriseDepartmentID, cmd.EnterpriseMemberID, cmd.HoldAmount)
+		if len(cmd.EnterpriseDepartmentPathIDs) > 1 {
+			terminalFingerprint += "|path:" + service.EnterpriseDepartmentPath(cmd.EnterpriseDepartmentPathIDs)
+		}
 		finalized, err := r.claimUsageBillingRequest(ctx, tx, "batch_image_finalize:"+cmd.BatchID, cmd.APIKeyID,
 			fmt.Sprintf("%x", sha256.Sum256([]byte(terminalFingerprint))))
 		if err != nil {

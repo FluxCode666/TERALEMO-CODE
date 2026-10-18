@@ -71,6 +71,48 @@ func (_c *EnterpriseDepartmentCreate) SetEnterpriseID(v int64) *EnterpriseDepart
 	return _c
 }
 
+// SetParentID sets the "parent_id" field.
+func (_c *EnterpriseDepartmentCreate) SetParentID(v int64) *EnterpriseDepartmentCreate {
+	_c.mutation.SetParentID(v)
+	return _c
+}
+
+// SetNillableParentID sets the "parent_id" field if the given value is not nil.
+func (_c *EnterpriseDepartmentCreate) SetNillableParentID(v *int64) *EnterpriseDepartmentCreate {
+	if v != nil {
+		_c.SetParentID(*v)
+	}
+	return _c
+}
+
+// SetPath sets the "path" field.
+func (_c *EnterpriseDepartmentCreate) SetPath(v string) *EnterpriseDepartmentCreate {
+	_c.mutation.SetPath(v)
+	return _c
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_c *EnterpriseDepartmentCreate) SetNillablePath(v *string) *EnterpriseDepartmentCreate {
+	if v != nil {
+		_c.SetPath(*v)
+	}
+	return _c
+}
+
+// SetDepth sets the "depth" field.
+func (_c *EnterpriseDepartmentCreate) SetDepth(v int) *EnterpriseDepartmentCreate {
+	_c.mutation.SetDepth(v)
+	return _c
+}
+
+// SetNillableDepth sets the "depth" field if the given value is not nil.
+func (_c *EnterpriseDepartmentCreate) SetNillableDepth(v *int) *EnterpriseDepartmentCreate {
+	if v != nil {
+		_c.SetDepth(*v)
+	}
+	return _c
+}
+
 // SetName sets the "name" field.
 func (_c *EnterpriseDepartmentCreate) SetName(v string) *EnterpriseDepartmentCreate {
 	_c.mutation.SetName(v)
@@ -94,6 +136,26 @@ func (_c *EnterpriseDepartmentCreate) SetNillableSortOrder(v *int) *EnterpriseDe
 // SetEnterprise sets the "enterprise" edge to the Enterprise entity.
 func (_c *EnterpriseDepartmentCreate) SetEnterprise(v *Enterprise) *EnterpriseDepartmentCreate {
 	return _c.SetEnterpriseID(v.ID)
+}
+
+// SetParent sets the "parent" edge to the EnterpriseDepartment entity.
+func (_c *EnterpriseDepartmentCreate) SetParent(v *EnterpriseDepartment) *EnterpriseDepartmentCreate {
+	return _c.SetParentID(v.ID)
+}
+
+// AddChildIDs adds the "children" edge to the EnterpriseDepartment entity by IDs.
+func (_c *EnterpriseDepartmentCreate) AddChildIDs(ids ...int64) *EnterpriseDepartmentCreate {
+	_c.mutation.AddChildIDs(ids...)
+	return _c
+}
+
+// AddChildren adds the "children" edges to the EnterpriseDepartment entity.
+func (_c *EnterpriseDepartmentCreate) AddChildren(v ...*EnterpriseDepartment) *EnterpriseDepartmentCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddChildIDs(ids...)
 }
 
 // Mutation returns the EnterpriseDepartmentMutation object of the builder.
@@ -147,6 +209,14 @@ func (_c *EnterpriseDepartmentCreate) defaults() error {
 		v := enterprisedepartment.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Path(); !ok {
+		v := enterprisedepartment.DefaultPath
+		_c.mutation.SetPath(v)
+	}
+	if _, ok := _c.mutation.Depth(); !ok {
+		v := enterprisedepartment.DefaultDepth
+		_c.mutation.SetDepth(v)
+	}
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		v := enterprisedepartment.DefaultSortOrder
 		_c.mutation.SetSortOrder(v)
@@ -164,6 +234,17 @@ func (_c *EnterpriseDepartmentCreate) check() error {
 	}
 	if _, ok := _c.mutation.EnterpriseID(); !ok {
 		return &ValidationError{Name: "enterprise_id", err: errors.New(`ent: missing required field "EnterpriseDepartment.enterprise_id"`)}
+	}
+	if _, ok := _c.mutation.Path(); !ok {
+		return &ValidationError{Name: "path", err: errors.New(`ent: missing required field "EnterpriseDepartment.path"`)}
+	}
+	if _, ok := _c.mutation.Depth(); !ok {
+		return &ValidationError{Name: "depth", err: errors.New(`ent: missing required field "EnterpriseDepartment.depth"`)}
+	}
+	if v, ok := _c.mutation.Depth(); ok {
+		if err := enterprisedepartment.DepthValidator(v); err != nil {
+			return &ValidationError{Name: "depth", err: fmt.Errorf(`ent: validator failed for field "EnterpriseDepartment.depth": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "EnterpriseDepartment.name"`)}
@@ -218,6 +299,14 @@ func (_c *EnterpriseDepartmentCreate) createSpec() (*EnterpriseDepartment, *sqlg
 		_spec.SetField(enterprisedepartment.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
 	}
+	if value, ok := _c.mutation.Path(); ok {
+		_spec.SetField(enterprisedepartment.FieldPath, field.TypeString, value)
+		_node.Path = value
+	}
+	if value, ok := _c.mutation.Depth(); ok {
+		_spec.SetField(enterprisedepartment.FieldDepth, field.TypeInt, value)
+		_node.Depth = value
+	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(enterprisedepartment.FieldName, field.TypeString, value)
 		_node.Name = value
@@ -241,6 +330,39 @@ func (_c *EnterpriseDepartmentCreate) createSpec() (*EnterpriseDepartment, *sqlg
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.EnterpriseID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ParentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   enterprisedepartment.ParentTable,
+			Columns: []string{enterprisedepartment.ParentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ParentID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ChildrenIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   enterprisedepartment.ChildrenTable,
+			Columns: []string{enterprisedepartment.ChildrenColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(enterprisedepartment.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -334,6 +456,54 @@ func (u *EnterpriseDepartmentUpsert) SetEnterpriseID(v int64) *EnterpriseDepartm
 // UpdateEnterpriseID sets the "enterprise_id" field to the value that was provided on create.
 func (u *EnterpriseDepartmentUpsert) UpdateEnterpriseID() *EnterpriseDepartmentUpsert {
 	u.SetExcluded(enterprisedepartment.FieldEnterpriseID)
+	return u
+}
+
+// SetParentID sets the "parent_id" field.
+func (u *EnterpriseDepartmentUpsert) SetParentID(v int64) *EnterpriseDepartmentUpsert {
+	u.Set(enterprisedepartment.FieldParentID, v)
+	return u
+}
+
+// UpdateParentID sets the "parent_id" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsert) UpdateParentID() *EnterpriseDepartmentUpsert {
+	u.SetExcluded(enterprisedepartment.FieldParentID)
+	return u
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (u *EnterpriseDepartmentUpsert) ClearParentID() *EnterpriseDepartmentUpsert {
+	u.SetNull(enterprisedepartment.FieldParentID)
+	return u
+}
+
+// SetPath sets the "path" field.
+func (u *EnterpriseDepartmentUpsert) SetPath(v string) *EnterpriseDepartmentUpsert {
+	u.Set(enterprisedepartment.FieldPath, v)
+	return u
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsert) UpdatePath() *EnterpriseDepartmentUpsert {
+	u.SetExcluded(enterprisedepartment.FieldPath)
+	return u
+}
+
+// SetDepth sets the "depth" field.
+func (u *EnterpriseDepartmentUpsert) SetDepth(v int) *EnterpriseDepartmentUpsert {
+	u.Set(enterprisedepartment.FieldDepth, v)
+	return u
+}
+
+// UpdateDepth sets the "depth" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsert) UpdateDepth() *EnterpriseDepartmentUpsert {
+	u.SetExcluded(enterprisedepartment.FieldDepth)
+	return u
+}
+
+// AddDepth adds v to the "depth" field.
+func (u *EnterpriseDepartmentUpsert) AddDepth(v int) *EnterpriseDepartmentUpsert {
+	u.Add(enterprisedepartment.FieldDepth, v)
 	return u
 }
 
@@ -458,6 +628,62 @@ func (u *EnterpriseDepartmentUpsertOne) SetEnterpriseID(v int64) *EnterpriseDepa
 func (u *EnterpriseDepartmentUpsertOne) UpdateEnterpriseID() *EnterpriseDepartmentUpsertOne {
 	return u.Update(func(s *EnterpriseDepartmentUpsert) {
 		s.UpdateEnterpriseID()
+	})
+}
+
+// SetParentID sets the "parent_id" field.
+func (u *EnterpriseDepartmentUpsertOne) SetParentID(v int64) *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetParentID(v)
+	})
+}
+
+// UpdateParentID sets the "parent_id" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertOne) UpdateParentID() *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdateParentID()
+	})
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (u *EnterpriseDepartmentUpsertOne) ClearParentID() *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.ClearParentID()
+	})
+}
+
+// SetPath sets the "path" field.
+func (u *EnterpriseDepartmentUpsertOne) SetPath(v string) *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetPath(v)
+	})
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertOne) UpdatePath() *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdatePath()
+	})
+}
+
+// SetDepth sets the "depth" field.
+func (u *EnterpriseDepartmentUpsertOne) SetDepth(v int) *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetDepth(v)
+	})
+}
+
+// AddDepth adds v to the "depth" field.
+func (u *EnterpriseDepartmentUpsertOne) AddDepth(v int) *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.AddDepth(v)
+	})
+}
+
+// UpdateDepth sets the "depth" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertOne) UpdateDepth() *EnterpriseDepartmentUpsertOne {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdateDepth()
 	})
 }
 
@@ -753,6 +979,62 @@ func (u *EnterpriseDepartmentUpsertBulk) SetEnterpriseID(v int64) *EnterpriseDep
 func (u *EnterpriseDepartmentUpsertBulk) UpdateEnterpriseID() *EnterpriseDepartmentUpsertBulk {
 	return u.Update(func(s *EnterpriseDepartmentUpsert) {
 		s.UpdateEnterpriseID()
+	})
+}
+
+// SetParentID sets the "parent_id" field.
+func (u *EnterpriseDepartmentUpsertBulk) SetParentID(v int64) *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetParentID(v)
+	})
+}
+
+// UpdateParentID sets the "parent_id" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertBulk) UpdateParentID() *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdateParentID()
+	})
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (u *EnterpriseDepartmentUpsertBulk) ClearParentID() *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.ClearParentID()
+	})
+}
+
+// SetPath sets the "path" field.
+func (u *EnterpriseDepartmentUpsertBulk) SetPath(v string) *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetPath(v)
+	})
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertBulk) UpdatePath() *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdatePath()
+	})
+}
+
+// SetDepth sets the "depth" field.
+func (u *EnterpriseDepartmentUpsertBulk) SetDepth(v int) *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.SetDepth(v)
+	})
+}
+
+// AddDepth adds v to the "depth" field.
+func (u *EnterpriseDepartmentUpsertBulk) AddDepth(v int) *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.AddDepth(v)
+	})
+}
+
+// UpdateDepth sets the "depth" field to the value that was provided on create.
+func (u *EnterpriseDepartmentUpsertBulk) UpdateDepth() *EnterpriseDepartmentUpsertBulk {
+	return u.Update(func(s *EnterpriseDepartmentUpsert) {
+		s.UpdateDepth()
 	})
 }
 

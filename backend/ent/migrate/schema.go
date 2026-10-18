@@ -520,6 +520,7 @@ var (
 		{Name: "batch_id", Type: field.TypeString, Size: 64},
 		{Name: "user_id", Type: field.TypeInt64},
 		{Name: "enterprise_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "enterprise_department_path", Type: field.TypeString, Size: 2147483647, Default: ""},
 		{Name: "enterprise_department_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "enterprise_member_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "api_key_id", Type: field.TypeInt64, Nullable: true},
@@ -575,22 +576,22 @@ var (
 			{
 				Name:    "batchimagejob_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[2], BatchImageJobsColumns[38]},
+				Columns: []*schema.Column{BatchImageJobsColumns[2], BatchImageJobsColumns[39]},
 			},
 			{
 				Name:    "batchimagejob_status",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[11]},
+				Columns: []*schema.Column{BatchImageJobsColumns[12]},
 			},
 			{
 				Name:    "batchimagejob_provider_status",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[8], BatchImageJobsColumns[11]},
+				Columns: []*schema.Column{BatchImageJobsColumns[9], BatchImageJobsColumns[12]},
 			},
 			{
 				Name:    "batchimagejob_idempotency_key",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[26]},
+				Columns: []*schema.Column{BatchImageJobsColumns[27]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "idempotency_key IS NOT NULL AND idempotency_key <> ''",
 				},
@@ -598,7 +599,7 @@ var (
 			{
 				Name:    "batchimagejob_manifest_hash",
 				Unique:  true,
-				Columns: []*schema.Column{BatchImageJobsColumns[28]},
+				Columns: []*schema.Column{BatchImageJobsColumns[29]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "manifest_hash IS NOT NULL AND manifest_hash <> ''",
 				},
@@ -606,17 +607,17 @@ var (
 			{
 				Name:    "batchimagejob_output_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[31]},
+				Columns: []*schema.Column{BatchImageJobsColumns[32]},
 			},
 			{
 				Name:    "batchimagejob_downloaded_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[34]},
+				Columns: []*schema.Column{BatchImageJobsColumns[35]},
 			},
 			{
 				Name:    "batchimagejob_user_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{BatchImageJobsColumns[35]},
+				Columns: []*schema.Column{BatchImageJobsColumns[36]},
 			},
 		},
 	}
@@ -993,9 +994,12 @@ var (
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "path", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "depth", Type: field.TypeInt, Default: 1},
 		{Name: "name", Type: field.TypeString, Size: 100},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "enterprise_id", Type: field.TypeInt64},
+		{Name: "parent_id", Type: field.TypeInt64, Nullable: true},
 	}
 	// EnterpriseDepartmentsTable holds the schema information for the "enterprise_departments" table.
 	EnterpriseDepartmentsTable = &schema.Table{
@@ -1005,19 +1009,46 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "enterprise_departments_enterprises_enterprise",
-				Columns:    []*schema.Column{EnterpriseDepartmentsColumns[6]},
+				Columns:    []*schema.Column{EnterpriseDepartmentsColumns[8]},
 				RefColumns: []*schema.Column{EnterprisesColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "enterprise_departments_enterprise_departments_children",
+				Columns:    []*schema.Column{EnterpriseDepartmentsColumns[9]},
+				RefColumns: []*schema.Column{EnterpriseDepartmentsColumns[0]},
+				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "idx_enterprise_departments_name_active",
+				Name:    "idx_enterprise_departments_sibling_name_active",
 				Unique:  true,
-				Columns: []*schema.Column{EnterpriseDepartmentsColumns[6], EnterpriseDepartmentsColumns[4]},
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[9], EnterpriseDepartmentsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL AND parent_id IS NOT NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_departments_root_name_active",
+				Unique:  true,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL AND parent_id IS NULL",
+				},
+			},
+			{
+				Name:    "idx_enterprise_departments_parent",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[9]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "deleted_at IS NULL",
 				},
+			},
+			{
+				Name:    "idx_enterprise_departments_tree_path",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseDepartmentsColumns[8], EnterpriseDepartmentsColumns[4]},
 			},
 		},
 	}
@@ -2555,6 +2586,7 @@ func init() {
 		Table: "enterprise_balance_logs",
 	}
 	EnterpriseDepartmentsTable.ForeignKeys[0].RefTable = EnterprisesTable
+	EnterpriseDepartmentsTable.ForeignKeys[1].RefTable = EnterpriseDepartmentsTable
 	EnterpriseDepartmentsTable.Annotation = &entsql.Annotation{
 		Table: "enterprise_departments",
 	}

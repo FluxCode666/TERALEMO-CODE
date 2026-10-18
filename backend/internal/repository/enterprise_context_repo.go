@@ -18,7 +18,7 @@ func (r *enterpriseRepository) GetMemberContextByUserID(ctx context.Context, use
 	return items[userID], nil
 }
 
-// GetMemberContextsByUserIDs performs three queries regardless of batch size:
+// GetMemberContextsByUserIDs performs four bounded queries regardless of batch size:
 // memberships, pools, then the applicable whitelist scopes. Disabled records
 // remain in the snapshot so authentication can explicitly deny their requests.
 func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]*service.EnterpriseMemberContext, error) {
@@ -29,8 +29,9 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	client := clientFromContext(ctx, r.client)
 	args := make([]any, 0, len(userIDs))
 	userPlaceholders := enterpriseContextPlaceholders(userIDs, &args)
-	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id, e.group_pool_configured
+	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id, e.group_pool_configured, COALESCE(d.path,'')
  FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
+ LEFT JOIN enterprise_departments d ON d.id=m.department_id AND d.enterprise_id=m.enterprise_id AND d.deleted_at IS NULL
  WHERE m.user_id IN (`+userPlaceholders+`) AND m.deleted_at IS NULL ORDER BY m.user_id`, args...)
 	if err != nil {
 		return nil, translatePersistenceError(err, nil, nil)
@@ -40,7 +41,8 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	for rows.Next() {
 		c := &service.EnterpriseMemberContext{GroupPoolIDs: []int64{}, GroupWhitelistIDs: []int64{}}
 		var userID int64
-		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID, &c.GroupPoolConfigured); err != nil {
+		var path string
+		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID, &c.GroupPoolConfigured, &path); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -50,7 +52,13 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 			enterpriseIDs = append(enterpriseIDs, c.EnterpriseID)
 		}
 		if c.DepartmentID != nil {
-			departmentIDs = append(departmentIDs, *c.DepartmentID)
+			c.DepartmentPathIDs, err = service.ParseEnterpriseDepartmentPath(path)
+			if err != nil {
+				_ = rows.Close()
+				return nil, err
+			}
+			c.DepartmentPathIDs = service.FrozenEnterpriseDepartmentIDs(c.DepartmentPathIDs, *c.DepartmentID)
+			departmentIDs = append(departmentIDs, c.DepartmentPathIDs...)
 		}
 		memberIDs = append(memberIDs, c.MemberID)
 	}
@@ -61,6 +69,47 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	}
 	if len(out) == 0 {
 		return out, nil
+	}
+	// Load current descendants once per enterprise batch. Scope IDs are never
+	// derived from a client-supplied department or from current member placement.
+	treeArgs := []any{}
+	treePlaceholders := enterpriseContextPlaceholders(enterpriseIDs, &treeArgs)
+	treeRows, err := client.QueryContext(ctx, `SELECT id, enterprise_id, path FROM enterprise_departments WHERE deleted_at IS NULL AND enterprise_id IN (`+treePlaceholders+`) ORDER BY enterprise_id,id`, treeArgs...)
+	if err != nil {
+		return nil, err
+	}
+	type treeNode struct {
+		id, enterpriseID int64
+		path             string
+	}
+	nodes := []treeNode{}
+	for treeRows.Next() {
+		var n treeNode
+		if err := treeRows.Scan(&n.id, &n.enterpriseID, &n.path); err != nil {
+			_ = treeRows.Close()
+			return nil, err
+		}
+		if n.path == "" {
+			n.path = fmt.Sprintf("/%d/", n.id)
+		}
+		nodes = append(nodes, n)
+	}
+	treeErr := treeRows.Err()
+	_ = treeRows.Close()
+	if treeErr != nil {
+		return nil, treeErr
+	}
+	for _, c := range out {
+		c.DepartmentSubtreeIDs = []int64{}
+		if c.DepartmentID == nil {
+			continue
+		}
+		prefix := service.EnterpriseDepartmentPath(c.DepartmentPathIDs)
+		for _, n := range nodes {
+			if n.enterpriseID == c.EnterpriseID && strings.HasPrefix(n.path, prefix) {
+				c.DepartmentSubtreeIDs = append(c.DepartmentSubtreeIDs, n.id)
+			}
+		}
 	}
 	args = make([]any, 0, len(enterpriseIDs))
 	enterprisePlaceholders := enterpriseContextPlaceholders(enterpriseIDs, &args)
@@ -124,8 +173,8 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 			c.GroupPoolIDs = slices.Clone(ids)
 		}
 		keys := []scopeKey{{c.EnterpriseID, service.EnterpriseScopeEnterprise, c.EnterpriseID}, {c.EnterpriseID, service.EnterpriseScopeMember, c.MemberID}}
-		if c.DepartmentID != nil {
-			keys = append(keys, scopeKey{c.EnterpriseID, service.EnterpriseScopeDepartment, *c.DepartmentID})
+		for _, departmentID := range c.DepartmentPathIDs {
+			keys = append(keys, scopeKey{c.EnterpriseID, service.EnterpriseScopeDepartment, departmentID})
 		}
 		for _, key := range keys {
 			ids, configured := whitelists[key]

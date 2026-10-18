@@ -78,7 +78,7 @@ func TestEnterprisePermissionsVisibilityAndOwnerOperations(t *testing.T) {
 				}
 				for _, op := range []EnterprisePermission{EnterprisePermissionManageDepartments, EnterprisePermissionSettings, EnterprisePermissionAudit, EnterprisePermissionDepartmentUsage, EnterprisePermissionResetQuota} {
 					err := CheckEnterprisePermission(c, settings, op, EnterprisePermissionTarget{})
-					if (err == nil) != (role == EnterpriseRoleOwner) {
+					if (err == nil) != (role == EnterpriseRoleOwner || (role == EnterpriseRoleManager && op == EnterprisePermissionDepartmentUsage)) {
 						t.Errorf("%s unexpectedly allowed=%t", op, err == nil)
 					}
 				}

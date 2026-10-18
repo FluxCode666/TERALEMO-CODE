@@ -272,6 +272,7 @@ func ConstrainEnterpriseUsageFilters(scope EnterpriseUsageScope, filters usagest
 		return filters, ErrEnterprisePermissionDenied
 	}
 	filters.EnterpriseID = scope.EnterpriseID
+	filters.EnterpriseDepartmentScopeID = 0
 	if member := scope.Member; member != nil {
 		if member.EnterpriseID != scope.EnterpriseID {
 			return filters, ErrEnterprisePermissionDenied
@@ -285,10 +286,13 @@ func ConstrainEnterpriseUsageFilters(scope EnterpriseUsageScope, filters usagest
 			if member.DepartmentID == nil || *member.DepartmentID <= 0 {
 				return filters, ErrEnterprisePermissionDenied
 			}
-			if filters.EnterpriseDepartmentID != 0 && filters.EnterpriseDepartmentID != *member.DepartmentID {
+			if filters.EnterpriseDepartmentID != 0 && !enterpriseDepartmentInSubtree(member, filters.EnterpriseDepartmentID) {
 				return filters, ErrEnterprisePermissionDenied
 			}
-			filters.EnterpriseDepartmentID = *member.DepartmentID
+			filters.EnterpriseDepartmentScopeID = *member.DepartmentID
+			if filters.EnterpriseDepartmentID == 0 {
+				filters.EnterpriseDepartmentID = *member.DepartmentID
+			}
 		case EnterpriseRoleMember:
 			if scope.UserID <= 0 || (filters.UserID != 0 && filters.UserID != scope.UserID) {
 				return filters, ErrEnterprisePermissionDenied
@@ -319,7 +323,7 @@ func ConstrainEnterpriseUsageFilters(scope EnterpriseUsageScope, filters usagest
 	return filters, nil
 }
 func (s *EnterpriseUsageService) List(ctx context.Context, scope EnterpriseUsageScope, params pagination.PaginationParams, filters usagestats.UsageLogFilters) ([]EnterpriseUsageLog, *pagination.PaginationResult, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -330,7 +334,7 @@ func (s *EnterpriseUsageService) List(ctx context.Context, scope EnterpriseUsage
 	return r.ListEnterpriseUsageLogs(ctx, NormalizeEnterpriseUsageSort(params), f)
 }
 func (s *EnterpriseUsageService) Stats(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) (*EnterpriseUsageStats, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +345,7 @@ func (s *EnterpriseUsageService) Stats(ctx context.Context, scope EnterpriseUsag
 	return &EnterpriseUsageStats{TotalRequests: row.TotalRequests, TotalTokens: row.TotalTokens, TotalActualCost: row.TotalActualCost}, nil
 }
 func (s *EnterpriseUsageService) Trend(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters, granularity string) ([]EnterpriseUsageTrend, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +374,7 @@ func (s *EnterpriseUsageService) Trend(ctx context.Context, scope EnterpriseUsag
 	return out, nil
 }
 func (s *EnterpriseUsageService) Models(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) ([]EnterpriseUsageModel, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +397,7 @@ func (s *EnterpriseUsageService) Models(ctx context.Context, scope EnterpriseUsa
 	return out, nil
 }
 func (s *EnterpriseUsageService) APIKeyOptions(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters, search string, limit int) ([]EnterpriseUsageAPIKeyOption, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +416,7 @@ func (s *EnterpriseUsageService) ModelOptions(ctx context.Context, scope Enterpr
 		start := end.AddDate(0, 0, -90)
 		filters.StartTime = &start
 	}
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +427,7 @@ func (s *EnterpriseUsageService) ModelOptions(ctx context.Context, scope Enterpr
 	return r.GetEnterpriseUsageModelOptions(ctx, f, strings.TrimSpace(search), NormalizeEnterpriseUsageOptionsLimit(limit))
 }
 func (s *EnterpriseUsageService) Members(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) ([]EnterpriseMemberUsage, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -434,11 +438,11 @@ func (s *EnterpriseUsageService) Members(ctx context.Context, scope EnterpriseUs
 	return r.GetEnterpriseMemberUsage(ctx, f)
 }
 func (s *EnterpriseUsageService) Departments(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters) ([]EnterpriseDepartmentUsage, error) {
-	f, err := ConstrainEnterpriseUsageFilters(scope, filters, time.Now())
+	f, err := s.constrainFilters(ctx, scope, filters, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	if scope.Member != nil && scope.Member.Role != EnterpriseRoleOwner {
+	if scope.Member != nil && scope.Member.Role != EnterpriseRoleOwner && scope.Member.Role != EnterpriseRoleManager {
 		return nil, ErrEnterprisePermissionDenied
 	}
 	r, ok := s.repo.(EnterpriseUsageRankingRepository)
@@ -460,4 +464,28 @@ func (s *EnterpriseUsageService) OverviewStats(ctx context.Context, scope Enterp
 		return 0, 0, e
 	}
 	return a.TotalActualCost, b.TotalActualCost, nil
+}
+
+// The repository validates tenant ownership; its SQL also intersects a manager's
+// mandatory subtree in the same statement as the requested subtree. A concurrent
+// move therefore cannot turn a previously valid filter into access outside it.
+func (s *EnterpriseUsageService) constrainFilters(ctx context.Context, scope EnterpriseUsageScope, filters usagestats.UsageLogFilters, now time.Time) (usagestats.UsageLogFilters, error) {
+	f, err := ConstrainEnterpriseUsageFilters(scope, filters, now)
+	if err != nil {
+		return f, err
+	}
+	if f.EnterpriseDepartmentID > 0 {
+		if reader, ok := s.repo.(interface {
+			EnterpriseUsageDepartmentExists(context.Context, int64, int64) (bool, error)
+		}); ok {
+			exists, err := reader.EnterpriseUsageDepartmentExists(ctx, f.EnterpriseID, f.EnterpriseDepartmentID)
+			if err != nil {
+				return f, err
+			}
+			if !exists {
+				return f, ErrEnterprisePermissionDenied
+			}
+		}
+	}
+	return f, nil
 }

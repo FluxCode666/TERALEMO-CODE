@@ -125,8 +125,8 @@ func (s *BillingCacheService) GetEnterpriseBalance(ctx context.Context, enterpri
 
 func enterpriseBillingScopes(member *EnterpriseMemberContext) []EnterpriseQuotaScope {
 	scopes := []EnterpriseQuotaScope{{ScopeType: EnterpriseScopeMember, ScopeID: member.MemberID}}
-	if member.DepartmentID != nil {
-		scopes = append(scopes, EnterpriseQuotaScope{ScopeType: EnterpriseScopeDepartment, ScopeID: *member.DepartmentID})
+	for _, id := range FrozenEnterpriseDepartmentIDs(member.DepartmentPathIDs, valueOrZero(member.DepartmentID)) {
+		scopes = append(scopes, EnterpriseQuotaScope{ScopeType: EnterpriseScopeDepartment, ScopeID: id})
 	}
 	return append(scopes, EnterpriseQuotaScope{ScopeType: EnterpriseScopeEnterprise, ScopeID: member.EnterpriseID})
 }
@@ -163,6 +163,9 @@ func validateEnterpriseBillingQuotas(enterpriseID int64, scopes []EnterpriseQuot
 }
 
 func (s *BillingCacheService) getEnterpriseBillingQuotas(ctx context.Context, member *EnterpriseMemberContext) (map[EnterpriseQuotaScope]*EnterpriseQuota, error) {
+	if err := ValidateFrozenEnterpriseDepartmentIDs(member.DepartmentPathIDs, valueOrZero(member.DepartmentID)); err != nil {
+		return nil, err
+	}
 	scopes := enterpriseBillingScopes(member)
 	if s.enterpriseCache != nil {
 		if quotas, err := s.enterpriseCache.GetEnterpriseQuotas(ctx, member.EnterpriseID, scopes); err == nil {

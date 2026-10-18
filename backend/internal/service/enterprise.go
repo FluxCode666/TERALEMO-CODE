@@ -93,6 +93,12 @@ type Enterprise struct {
 }
 type EnterpriseDepartment struct {
 	ID, EnterpriseID     int64
+	ParentID             *int64
+	Path                 string
+	PathIDs              []int64
+	PathNames            []string
+	Depth                int
+	TotalMemberCount     int64
 	Name                 string
 	SortOrder            int
 	MemberCount          int64
@@ -101,6 +107,9 @@ type EnterpriseDepartment struct {
 }
 type EnterpriseMember struct {
 	ID, EnterpriseID, UserID                    int64
+	DepartmentPathIDs                           []int64
+	DepartmentPathNames                         []string
+	LastLoginAt                                 *time.Time
 	DepartmentID                                *int64
 	Role, Status, Title                         string
 	Email, Username, UserStatus, DepartmentName string
@@ -159,6 +168,8 @@ type EnterpriseMemberContext struct {
 	MemberID                         int64
 	MemberStatus, Role               string
 	DepartmentID                     *int64
+	DepartmentPathIDs                []int64 // Frozen root-to-leaf billing scopes.
+	DepartmentSubtreeIDs             []int64 // Current management/usage access scope.
 	GroupPoolConfigured              bool
 	GroupPoolIDs                     []int64
 	GroupWhitelistConfigured         bool
@@ -189,6 +200,7 @@ func (c *EnterpriseMemberContext) ApplyGroupWhitelist(ids []int64) {
 type EnterpriseListFilters struct{ Search, Status string }
 type EnterpriseMemberListFilters struct {
 	Search, Role, Status string
+	DepartmentScopeID    int64  // Server-only mandatory manager subtree.
 	DepartmentID         *int64 // nil: all departments; pointer to 0: no department
 }
 

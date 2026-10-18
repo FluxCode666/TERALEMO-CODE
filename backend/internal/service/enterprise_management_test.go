@@ -118,6 +118,15 @@ func (r *enterpriseManagementTestQuotas) GetByScopes(ctx context.Context, eid in
 	}
 	return out, nil
 }
+func (r *enterpriseManagementTestQuotas) List(_ context.Context, eid int64, scope string) ([]EnterpriseQuota, error) {
+	out := []EnterpriseQuota{}
+	for _, q := range r.items {
+		if q.EnterpriseID == eid && (scope == "" || q.ScopeType == scope) {
+			out = append(out, q)
+		}
+	}
+	return out, nil
+}
 func (r *enterpriseManagementTestQuotas) UpdateLimits(_ context.Context, q *EnterpriseQuota) error {
 	r.updated++
 	r.items[EnterpriseQuotaScope{q.ScopeType, q.ScopeID}] = *q
