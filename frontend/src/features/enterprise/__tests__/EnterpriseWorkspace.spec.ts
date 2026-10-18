@@ -12,7 +12,7 @@ const { api, getEnterprise, showError } = vi.hoisted(() => ({
     members: vi.fn(), createMember: vi.fn(), updateMember: vi.fn(), deleteMember: vi.fn(),
     quotas: vi.fn(), updateQuota: vi.fn(), resetQuota: vi.fn(),
     groups: vi.fn(), allowedGroups: vi.fn(), updateAllowedGroups: vi.fn(),
-    groupWhitelists: vi.fn(), updateGroupWhitelist: vi.fn(), effectiveGroups: vi.fn(),
+    groupWhitelists: vi.fn(), updateGroupWhitelist: vi.fn(),
     settings: vi.fn(), updateSettings: vi.fn(),
     usage: vi.fn(), usageStats: vi.fn(), usageTrend: vi.fn(), usageModels: vi.fn(), usageMembers: vi.fn(), usageDepartments: vi.fn(),
     auditLogs: vi.fn(), balanceLogs: vi.fn()
@@ -43,7 +43,7 @@ vi.mock('@/stores/app', () => ({
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
-  return { ...actual, useI18n: () => ({ t: (key: string) => key, locale: { value: 'zh' } }) }
+  return { ...actual, useI18n: () => ({ t: (key: string, params?: { amount: string }) => params ? `${key} ${params.amount}` : key, locale: { value: 'zh' } }) }
 })
 
 const allPermissions: EnterprisePermissions = {
@@ -68,6 +68,7 @@ function overview(role: EnterpriseRole, overrides: Partial<EnterpriseOverview> =
     me: { member_id: 7, user_id: 42, role, status: 'active', department_id: 3, department_name: '研发部', title: '' },
     balance_visible: isOwner,
     balance: isOwner ? 120.5 : null,
+    frozen_balance: isOwner ? 7.25 : null,
     enterprise_quota: isOwner ? quota('enterprise', 1) : null,
     department_quota_visible: role !== 'member',
     department_quota: role !== 'member' ? quota('department', 3) : null,
@@ -127,7 +128,6 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     api.auditLogs.mockResolvedValue(page)
     api.balanceLogs.mockResolvedValue(page)
     api.usageStats.mockResolvedValue({ total_requests: 0, total_tokens: 0, total_actual_cost: 0 })
-    api.effectiveGroups.mockResolvedValue({ member_id: 7, pool: { configured: false, group_ids: [] }, levels: { enterprise: { configured: false }, department: null, member: { configured: false } }, restricted: false, effective_group_ids: null, groups: [] })
     api.settings.mockResolvedValue({ ...defaultEnterpriseSettings })
   })
 
@@ -161,6 +161,40 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="enterprise-balance"]').exists()).toBe(true)
+  })
+
+  it.each([7.25, 0])('shows the visible enterprise frozen balance %s below the balance card', async frozen_balance => {
+    const wrapper = mountWorkspace(overview('member', { balance_visible: true, balance: 120.5, frozen_balance }))
+    await flushPromises()
+    const frozen = wrapper.get('[data-test="enterprise-frozen-balance"]')
+    expect(frozen.text()).toBe(`enterprise.frozenAmount $${frozen_balance.toFixed(4)}`)
+    expect(frozen.attributes('title')).toBe('enterprise.frozenBalanceHint')
+    expect(wrapper.get('[data-test="enterprise-balance"]').text()).toContain('$120.5000')
+  })
+
+  it.each([
+    { balance_visible: true, balance: 120.5, frozen_balance: null },
+    { balance_visible: false, balance: null, frozen_balance: 7.25 },
+    { balance_visible: true, balance: null, frozen_balance: null }
+  ])('hides unavailable frozen balances in overview (%j)', async balances => {
+    const wrapper = mountWorkspace(overview('member', balances))
+    await flushPromises()
+    expect(wrapper.find('[data-test="enterprise-frozen-balance"]').exists()).toBe(false)
+  })
+
+  it('shows the administrator frozen balance card separately with its explanation', async () => {
+    getEnterprise.mockResolvedValue({
+      id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 7.25,
+      total_recharged: 150, member_count: 2, department_count: 1
+    })
+    const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 1 } })
+    wrappers.push(wrapper)
+    await flushPromises()
+    const frozen = wrapper.get('[data-test="enterprise-frozen-balance"]')
+    expect(frozen.text()).toContain('enterprise.frozenBalance')
+    expect(frozen.text()).toContain('$7.2500')
+    expect(frozen.text()).toContain('enterprise.frozenBalanceHint')
+    expect(wrapper.get('[data-test="enterprise-balance"]').text()).toContain('$100.0000')
   })
 
   it('keeps the quota tab available when only member quota editing is permitted', async () => {
@@ -199,7 +233,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
 
   it('reloads the current administrator tab after refreshing enterprise details', async () => {
     const enterprise: Enterprise = {
-      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 7.25, total_recharged: 100,
       low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '',
       settings: { ...defaultEnterpriseSettings }, member_count: 0, department_count: 0,
       created_at: '', updated_at: ''
@@ -243,7 +277,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
 
   it.each([0, 1, undefined])('shows the administrator owner warning only for an explicit zero count (%s)', async activeOwnerCount => {
     const enterprise: Enterprise = {
-      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 7.25, total_recharged: 100,
       low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '',
       settings: { ...defaultEnterpriseSettings }, member_count: 2, department_count: 1,
       active_owner_count: activeOwnerCount, created_at: '', updated_at: ''
@@ -272,7 +306,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
 
   it('places detail deletion beside refresh and opens the existing confirmation dialog', async () => {
     getEnterprise.mockResolvedValue({
-      id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 100,
+      id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 7.25, total_recharged: 100,
       member_count: 2, department_count: 1
     })
     const wrapper = mount(EnterpriseDetailView, {
@@ -404,14 +438,15 @@ describe('EnterpriseQuotaDisplay four quota windows', () => {
     }
   })
 
-  it('keeps zero limits distinct from unlimited and renders the recorded usage', () => {
+  it('keeps zero limits distinct from unlimited without rendering recorded usage', () => {
     const value = quota('member', 7)
     value.daily_limit_usd = 0
     const wrapper = mount(EnterpriseQuotaDisplay, { props: { title: 'Quota', quota: value } })
     wrappers.push(wrapper)
 
     const daily = wrapper.findAll('dl > div')[0]
-    expect(daily.text()).toContain('$1.0000 / enterprise.quotaSections.disabled')
+    expect(daily.text()).toContain('enterprise.quotaSections.disabled')
+    expect(daily.text()).not.toContain('$1.0000')
     expect(daily.text()).not.toContain('enterprise.unlimited')
   })
 })

@@ -17,8 +17,15 @@
       </nav>
       <section v-if="activeTab === 'overview'" class="space-y-5">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="money(balance)" :icon="BalanceIcon" icon-variant="success" />
+          <StatCard v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="money(balance)" :icon="BalanceIcon" icon-variant="success">
+            <template v-if="!admin && frozenBalance !== null" #footer>
+              <p data-test="enterprise-frozen-balance" :title="t('enterprise.frozenBalanceHint')" class="mt-2 break-words text-xs" :class="frozenBalance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">{{ t('enterprise.frozenAmount', { amount: money(frozenBalance) }) }}</p>
+            </template>
+          </StatCard>
           <template v-if="adminEnterprise">
+            <StatCard v-if="frozenBalance !== null" data-test="enterprise-frozen-balance" :title="t('enterprise.frozenBalance')" :value="money(frozenBalance)" :icon="FrozenBalanceIcon" icon-variant="warning">
+              <template #footer><p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.frozenBalanceHint') }}</p></template>
+            </StatCard>
             <StatCard :title="t('enterprise.totalRecharged')" :value="money(adminEnterprise.total_recharged)" :icon="RechargeIcon" icon-variant="success" />
             <StatCard :title="t('enterprise.memberCount')" :value="adminEnterprise.member_count" :icon="MembersIcon" />
             <StatCard :title="t('enterprise.departmentCount')" :value="adminEnterprise.department_count" :icon="DepartmentsIcon" icon-variant="warning" />
@@ -73,6 +80,7 @@ const props = defineProps<{ admin?: boolean; enterpriseId?: number; overview?: E
 const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
 const BalanceIcon = () => h(Icon, { name: 'dollar', size: 'lg' })
+const FrozenBalanceIcon = () => h(Icon, { name: 'lock', size: 'lg' })
 const RechargeIcon = () => h(Icon, { name: 'creditCard', size: 'lg' })
 const MembersIcon = () => h(Icon, { name: 'users', size: 'lg' })
 const DepartmentsIcon = () => h(Icon, { name: 'grid', size: 'lg' })
@@ -85,6 +93,7 @@ const api = computed(() => props.admin ? enterprisesAPI.forEnterprise(props.ente
 const readonly = computed(() => !props.admin && (enterprise.value?.status !== 'active' || props.overview?.me.status !== 'active'))
 const balanceVisible = computed(() => props.admin || props.overview?.balance_visible)
 const balance = computed(() => props.admin ? adminEnterprise.value?.balance ?? null : props.overview?.balance ?? null)
+const frozenBalance = computed(() => props.admin ? adminEnterprise.value?.frozen_balance ?? null : props.overview?.frozen_balance ?? null)
 const enterpriseQuota = computed(() => props.admin ? adminEnterprise.value?.quota : props.overview?.enterprise_quota)
 const tabs = computed(() => {
   const permissions = props.overview?.permissions

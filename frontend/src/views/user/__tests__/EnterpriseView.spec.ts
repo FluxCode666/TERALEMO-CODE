@@ -39,7 +39,7 @@ const memberOverview: EnterpriseOverview = {
   enterprise: { id: 1, name: 'Acme', status: 'active' },
   me: { member_id: 7, user_id: 42, role: 'member', status: 'active', department_id: 3, department_name: '研发部', title: '' },
   balance_visible: false,
-  balance: null,
+  balance: null, frozen_balance: null,
   enterprise_quota: null,
   department_quota_visible: false,
   department_quota: null,

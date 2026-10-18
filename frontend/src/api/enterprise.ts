@@ -2,7 +2,7 @@ import { apiClient } from './client'
 import type { FetchOptions } from '@/types'
 import type {
   EnterpriseOverview, EnterpriseDepartment, EnterpriseMember, EnterpriseQuota, EnterpriseSettings,
-  EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseEffectiveGroups, EnterpriseUsageLog, EnterpriseUsageStats,
+  EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseUsageLog, EnterpriseUsageStats,
   EnterpriseUsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage,
   EnterpriseAuditLog, EnterpriseBalanceLog, EnterprisePage, EnterpriseQuery, EnterpriseScope,
   QuotaLimits, QuotaWindow, CreateEnterpriseMemberRequest, CreateEnterpriseAccountMemberRequest, UpdateEnterpriseMemberRequest
@@ -28,7 +28,6 @@ function createEnterpriseResourceAPI(base: string) {
     resetQuota: (scope: EnterpriseScope, id: number, windows: QuotaWindow[]) => post<EnterpriseQuota>(`/quotas/${scope}/${id}/reset`, { windows }),
     groups: (options?: FetchOptions) => get<EnterpriseGroup[]>('/groups', undefined, options),
     groupWhitelists: (options?: FetchOptions) => get<EnterpriseGroupWhitelist[]>('/group-whitelists', undefined, options),
-    effectiveGroups: (member_id?: number, options?: FetchOptions) => get<EnterpriseEffectiveGroups>('/group-whitelists/effective', member_id === undefined ? undefined : { member_id }, options),
     updateGroupWhitelist: (scope: EnterpriseScope, id: number, group_ids: number[]) => put<EnterpriseGroupWhitelist>(`/group-whitelists/${scope}/${id}`, { group_ids }),
     settings: (options?: FetchOptions) => get<EnterpriseSettings>('/settings', undefined, options),
     updateSettings: (body: EnterpriseSettings) => put<EnterpriseSettings>('/settings', body),

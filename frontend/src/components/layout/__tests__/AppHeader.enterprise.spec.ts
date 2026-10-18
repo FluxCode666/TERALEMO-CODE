@@ -41,6 +41,7 @@ const identity = (overrides: Partial<EnterpriseIdentity> = {}): EnterpriseIdenti
   enterprise_status: 'active',
   balance_visible: false,
   balance: null,
+  frozen_balance: null,
   ...overrides,
 })
 function render() {
@@ -54,8 +55,8 @@ beforeEach(() => {
 })
 
 describe('AppHeader 企业余额可见性', () => {
-  it('隐藏企业余额时桌面和手机均不显示个人余额或冻结金额', async () => {
-    mocks.auth.user!.enterprise = identity()
+  it.each([null, 9.25])('隐藏企业余额时桌面和手机均不显示个人或企业金额（冻结 %s）', async frozen_balance => {
+    mocks.auth.user!.enterprise = identity({ frozen_balance })
     const wrapper = render()
     await wrapper.get('button[aria-label="common.userMenu"]').trigger('click')
     expect(wrapper.find('[data-testid="header-balance"]').exists()).toBe(false)
@@ -69,9 +70,35 @@ describe('AppHeader 企业余额可见性', () => {
     mocks.auth.user!.enterprise = identity({ balance_visible: true, balance: 56.78 })
     const wrapper = render()
     await wrapper.get('button[aria-label="common.userMenu"]').trigger('click')
-    expect(wrapper.get('[data-testid="header-balance"]').text()).toContain('enterprise.balance')
+    expect(wrapper.get('[data-testid="header-balance"]').text()).toContain('enterprise.availableBalance')
     expect(wrapper.get('[data-testid="header-mobile-balance"]').text()).toContain('$56.78')
     expect(wrapper.text()).not.toContain('987.65')
+    expect(wrapper.text()).not.toContain('12.34')
+    wrapper.unmount()
+  })
+
+  it('shows enterprise frozen funds and explanation on desktop and mobile using only enterprise amounts', async () => {
+    mocks.auth.user!.enterprise = identity({ balance_visible: true, balance: 56.78, frozen_balance: 9.25 })
+    const wrapper = render()
+    await wrapper.get('button[aria-label="common.userMenu"]').trigger('click')
+    expect(wrapper.get('[data-testid="header-frozen-balance"]').text()).toContain('$9.25')
+    const details = wrapper.get('[data-testid="header-balance-details"]')
+    expect(details.text()).toContain('$66.03')
+    expect(details.text()).toContain('enterprise.frozenBalanceHint')
+    expect(wrapper.get('[data-testid="header-mobile-frozen-balance"]').text()).toContain('$9.25')
+    expect(wrapper.get('[data-testid="header-mobile-frozen-balance"]').text()).toContain('enterprise.frozenBalanceHint')
+    expect(wrapper.text()).not.toContain('987.65')
+    expect(wrapper.text()).not.toContain('12.34')
+    wrapper.unmount()
+  })
+
+  it.each([null, 0])('does not show a frozen badge or details for enterprise frozen balance %s', async frozen_balance => {
+    mocks.auth.user!.enterprise = identity({ balance_visible: true, balance: 56.78, frozen_balance })
+    const wrapper = render()
+    await wrapper.get('button[aria-label="common.userMenu"]').trigger('click')
+    expect(wrapper.find('[data-testid="header-frozen-balance"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="header-mobile-frozen-balance"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="header-balance-details"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('12.34')
     wrapper.unmount()
   })

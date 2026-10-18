@@ -19,7 +19,7 @@ const stubs = {
   AppLayout: { template: '<div><slot /></div>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
   BaseDialog: dialog,
-  ConfirmDialog: { props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-reset" @click="$emit(\'confirm\')">Confirm</button></div>' },
+  ConfirmDialog: { name: 'ConfirmDialog', props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-reset" @click="$emit(\'confirm\')">Confirm</button></div>' },
   DataTable: { props: ['data'], template: '<div><div v-for="row in data" :key="row.scope_id"><slot name="cell-actions" :row="row" /></div></div>' },
   Pagination: true,
   RouterLink: true
@@ -86,7 +86,7 @@ describe('Enterprise administrator creation', () => {
   })
 
   it('edits, disables, and adjusts an enterprise balance directly from the list', async () => {
-    const enterprise = { id: 1, name: 'Acme', status: 'active', balance: 100, total_recharged: 200, low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '', settings: { ...defaultEnterpriseSettings }, member_count: 2, department_count: 1, created_at: '', updated_at: '' }
+    const enterprise = { id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 9.25, total_recharged: 200, low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '', settings: { ...defaultEnterpriseSettings }, member_count: 2, department_count: 1, created_at: '', updated_at: '' }
     listEnterprises.mockResolvedValue({ items: [enterprise], total: 1 })
     updateEnterprise.mockResolvedValue(enterprise)
     adjustBalance.mockResolvedValue(enterprise)
@@ -104,6 +104,7 @@ describe('Enterprise administrator creation', () => {
     expect(updateEnterprise).toHaveBeenCalledWith(1, { status: 'disabled' })
     await wrapper.get('[data-test="enterprise-balance-1"]').trigger('click')
     const balanceForm = wrapper.findComponent({ name: 'EnterpriseBalanceForm' })
+    expect(balanceForm.text()).toContain('enterprise.balanceAdjustmentHint')
     await balanceForm.get('[data-test="enterprise-balance-amount"]').setValue('0')
     await balanceForm.get('form').trigger('submit')
     expect(adjustBalance).not.toHaveBeenCalled()
@@ -148,6 +149,9 @@ describe('Enterprise quota forms', () => {
     expect(wrapper.text()).toContain('enterprise.validationQuota')
     await wrapper.get('[data-test="quota-reset-member-7"]').trigger('click')
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+    const dialog = wrapper.getComponent({ name: 'ConfirmDialog' })
+    expect(dialog.attributes('title')).toBe('enterprise.resetUsage')
+    expect(dialog.attributes('message')).toBe('enterprise.resetConfirm')
     await wrapper.get('[data-test="quota-reset-window-total"]').trigger('click')
     await wrapper.get('[data-test="quota-reset-window-daily"]').trigger('click')
     await wrapper.get('[data-test="confirm-reset"]').trigger('click')

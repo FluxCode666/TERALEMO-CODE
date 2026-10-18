@@ -37,6 +37,11 @@ export default {
     "active": "启用",
     "disabled": "停用",
     "balance": "企业余额",
+    "availableBalance": "企业可用余额",
+    "frozenBalance": "冻结余额",
+    "frozenAmount": "冻结 {amount}",
+    "frozenBalanceHint": "冻结余额是为进行中的批量图片任务预先冻结的金额，任务完成后按实际费用结算，失败自动解冻。",
+    "balanceAdjustmentHint": "扣减仅作用于可用余额，冻结余额不可扣减。",
     "totalRecharged": "累计充值",
     "memberCount": "成员数",
     "departmentCount": "部门数",
@@ -85,11 +90,9 @@ export default {
     "monthly": "每月",
     "total": "累计",
     "unlimited": "不限",
-    "quotaHint": "金额单位为 USD。留空表示不限，0 表示禁用；日按自然日、周从周一开始、月按自然月，累计用量不自动重置。",
-    "usageAmount": "已用",
-    "limitAmount": "上限",
-    "resetUsage": "重置用量",
-    "resetConfirm": "确定重置选中的用量窗口？已产生的费用不会退还。",
+    "quotaHint": "金额单位为 USD。留空表示不限，0 表示已禁用；每日上限按自然日、每周上限从周一开始、每月上限按自然月生效，累计上限不自动重置。",
+    "resetUsage": "重置已用额度",
+    "resetConfirm": "清零当前窗口已累计的消费，用于解除因达到上限造成的拦截。已产生的费用不会退还。",
     "groupPool": "企业可用分组",
     "groupPoolHint": "以下分组由系统管理员为企业开放。未限定时，成员按个人分组权限调用。",
     "whitelist": "允许调用的分组",
@@ -163,7 +166,7 @@ export default {
         "description": "按部门查看员工的个人消费上限；人数较多的部门默认折叠。"
       },
       "disabled": "已禁用",
-      "empty": "当前没有可查看的限额。限额与用量可见性由企业权限控制。"
+      "empty": "当前没有可查看的限额。限额可见性由企业权限控制。"
     },
     "groupAccess": {
       "rateUnknown": "倍率未提供",
@@ -186,28 +189,18 @@ export default {
         "enterprise": "企业允许调用的分组",
         "department": "部门允许调用的分组",
         "member": "员工允许调用的分组"
-      },
-      "effectiveTitle": "查看员工最终可调用分组",
-      "myGroups": "我可调用的分组",
-      "selectMember": "请选择员工",
-      "noEffective": "当前没有可调用的分组",
-      "restrictions": {
-        "available": "受企业可用分组限制",
-        "enterprise": "受企业规则限制",
-        "department": "受部门规则限制",
-        "member": "受员工规则限制"
       }
     },
     "settingsUi": {
       "balance": "余额可见性",
-      "visibility": "限额与用量可见性",
+      "visibility": "限额可见性",
       "management": "部门管理权限",
       "hints": {
         "balance_visible_to_manager": "向部门负责人展示企业共享余额。",
         "balance_visible_to_member": "向普通员工展示企业共享余额。",
-        "member_quota_visible_to_member": "允许员工查看自己的限额及已用金额。",
-        "member_quota_visible_to_manager": "允许部门负责人查看本部门员工的限额及已用金额。",
-        "department_quota_visible_to_manager": "允许部门负责人查看本部门共享限额及已用金额。",
+        "member_quota_visible_to_member": "允许员工查看自己的限额。",
+        "member_quota_visible_to_manager": "允许部门负责人查看本部门员工的限额。",
+        "department_quota_visible_to_manager": "允许部门负责人查看本部门共享限额。",
         "manager_can_manage_members": "允许部门负责人在本部门新增、编辑和移出普通员工。",
         "manager_can_edit_member_quota": "允许部门负责人修改本部门普通员工的消费上限。",
         "manager_can_edit_member_groups": "允许部门负责人修改本部门普通员工允许调用的分组。"
@@ -229,7 +222,7 @@ export default {
         "member_remove": "移出成员",
         "member_disabled_by_moderation": "系统停用成员",
         "quota_update": "调整限额",
-        "quota_reset": "重置用量",
+        "quota_reset": "重置已用额度",
         "settings_update": "更新设置",
         "group_pool_update": "更新企业可用分组",
         "group_whitelist_update": "更新允许调用的分组",
@@ -244,9 +237,9 @@ export default {
     "settingLabels": {
       "balance_visible_to_manager": "部门负责人可见企业余额",
       "balance_visible_to_member": "员工可见企业余额",
-      "member_quota_visible_to_member": "员工可见本人限额与用量",
-      "member_quota_visible_to_manager": "部门负责人可见本部门成员限额与用量",
-      "department_quota_visible_to_manager": "部门负责人可见本部门限额与用量",
+      "member_quota_visible_to_member": "员工可见本人限额",
+      "member_quota_visible_to_manager": "部门负责人可见本部门成员限额",
+      "department_quota_visible_to_manager": "部门负责人可见本部门限额",
       "manager_can_manage_members": "部门负责人可管理本部门员工",
       "manager_can_edit_member_quota": "部门负责人可调整本部门员工限额",
       "manager_can_edit_member_groups": "部门负责人可调整本部门员工可调用分组"
@@ -283,7 +276,6 @@ export default {
     "description": "查看企业组织、限额与消费记录",
     "inactiveWhitelistGroups": "以下分组已不在上级允许范围，保存时会移除：{groups}",
     "validationDateRange": "日期范围必须按时间顺序，含首尾最多 366 天。",
-    "hidden": "隐藏",
     "settingsRefreshedWithEdits": "设置已刷新，已保留你的未保存修改，其他设置已同步。请确认后保存。"
   }
 }

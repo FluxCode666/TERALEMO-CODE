@@ -36,12 +36,12 @@ export interface EnterpriseIdentity extends EnterpriseSummary {
   enterprise_status: EnterpriseStatus
   balance_visible: boolean
   balance: number | null
+  frozen_balance: number | null
 }
 export type QuotaLimits = Record<`${QuotaWindow}_limit_usd`, number | null>
 export interface EnterpriseQuota extends QuotaLimits {
   scope_type: EnterpriseScope
   scope_id: number
-  usage_visible?: boolean
   daily_usage_usd: number | null
   weekly_usage_usd: number | null
   monthly_usage_usd: number | null
@@ -55,6 +55,7 @@ export interface Enterprise {
   name: string
   status: EnterpriseStatus
   balance: number
+  frozen_balance: number
   total_recharged: number
   low_balance_threshold: number | null
   contact_name: string
@@ -108,6 +109,7 @@ export interface EnterpriseOverview {
   me: { member_id: number; user_id: number; role: EnterpriseRole; status: EnterpriseStatus; department_id: number | null; department_name: string | null; title: string }
   balance_visible: boolean
   balance: number | null
+  frozen_balance: number | null
   enterprise_quota: EnterpriseQuota | null
   department_quota_visible: boolean
   department_quota: EnterpriseQuota | null
@@ -127,17 +129,6 @@ export interface EnterpriseGroup {
   rate_multiplier?: number
 }
 export interface EnterpriseGroupWhitelist { scope_type: EnterpriseScope; scope_id: number; group_ids: number[] }
-export interface EnterpriseGroupLevel { configured: boolean; group_ids: number[] }
-export interface EnterpriseEffectiveGroups {
-  member_id: number
-  user_id: number
-  department_id: number | null
-  pool: EnterpriseGroupLevel
-  levels: { enterprise: EnterpriseGroupLevel; department: EnterpriseGroupLevel | null; member: EnterpriseGroupLevel }
-  restricted: boolean
-  effective_group_ids: number[] | null
-  groups: EnterpriseGroup[]
-}
 export interface EnterpriseBalanceLog {
   id: number; type: 'add' | 'subtract'; amount: number; balance_before: number; balance_after: number
   operator_user_id: number | null; operator_email: string; notes: string; created_at: string

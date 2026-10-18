@@ -1,5 +1,6 @@
 <template>
   <form class="space-y-4" @submit.prevent="save">
+    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('enterprise.balanceAdjustmentHint') }}</p>
     <label class="block"><span class="input-label">{{ t('enterprise.operation') }}</span><Select v-model="form.operation" :options="operationOptions" :aria-label="t('enterprise.operation')" data-test="balance-operation" /></label>
     <label class="block"><span class="input-label">{{ t('enterprise.amount') }}</span><input v-model="form.amount" class="input" type="number" min="0" step="any" data-test="enterprise-balance-amount" /></label>
     <label class="block"><span class="input-label">{{ t('enterprise.notes') }}</span><textarea v-model.trim="form.notes" class="input" rows="3"></textarea></label>

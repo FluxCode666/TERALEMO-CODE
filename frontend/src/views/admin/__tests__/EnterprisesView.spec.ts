@@ -33,7 +33,7 @@ const stubs = {
 
 function enterprise(id: number): Enterprise {
   return {
-    id, name: `Enterprise ${id}`, status: 'active', balance: 0, total_recharged: 0,
+    id, name: `Enterprise ${id}`, status: 'active', balance: 0, frozen_balance: 0, total_recharged: 0,
     low_balance_threshold: null, contact_name: '', contact_email: '', contact_phone: '', notes: '',
     settings: { ...defaultEnterpriseSettings }, member_count: 0, department_count: 0, created_at: '', updated_at: ''
   }
@@ -232,6 +232,20 @@ describe('administrator enterprise display', () => {
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0].text()).toContain('admin.enterprises.noActiveOwner')
     for (const row of rows.slice(1)) expect(row.find('[data-test="enterprise-owner-warning"]').exists()).toBe(false)
+  })
+
+  it('adds a frozen balance column and formats zero and nonzero holds independently from available funds', async () => {
+    listEnterprises.mockResolvedValue({ ...page(1), items: [
+      { ...enterprise(1), balance: 100, frozen_balance: 9.25 }, enterprise(2)
+    ] })
+    const wrapper = mount(EnterprisesView, { global: { stubs: { ...stubs, DataTable: false } } })
+    wrappers.push(wrapper)
+    await flushPromises()
+    expect(wrapper.get('thead').text()).toContain('enterprise.frozenBalance')
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].text()).toContain('$100.0000')
+    expect(rows[0].get('[title="enterprise.frozenBalanceHint"]').text()).toBe('$9.2500')
+    expect(rows[1].get('[title="enterprise.frozenBalanceHint"]').text()).toBe('$0.0000')
   })
 
   it('formats enterprise creation timestamps with the shared date formatter', async () => {

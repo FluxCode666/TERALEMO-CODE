@@ -10,9 +10,9 @@ vi.mock('@/api/enterprise', () => ({ enterpriseErrorMessage: () => 'enterprise.e
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: vi.fn(), showError }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
-function hiddenQuota(): EnterpriseQuota {
+function quotaWithoutUsage(): EnterpriseQuota {
   return {
-    scope_type: 'member', scope_id: 7, usage_visible: false,
+    scope_type: 'member', scope_id: 7,
     daily_limit_usd: 5, weekly_limit_usd: null, monthly_limit_usd: 20, total_limit_usd: null,
     daily_usage_usd: null, weekly_usage_usd: null, monthly_usage_usd: null, total_usage_usd: null,
     daily_resets_at: null, weekly_resets_at: null, monthly_resets_at: null
@@ -28,32 +28,33 @@ const stubs = {
   ConfirmDialog: true
 }
 
-describe('enterprise quotas with hidden usage', () => {
+describe('enterprise quota limits and editing permissions', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('renders hidden usage in all four windows while retaining limits', () => {
-    const wrapper = mount(EnterpriseQuotaDisplay, { props: { title: 'Quota', quota: hiddenQuota() } })
+  it('renders only limits in all four windows when usage is unavailable', () => {
+    const wrapper = mount(EnterpriseQuotaDisplay, { props: { title: 'Quota', quota: quotaWithoutUsage() } })
     expect(wrapper.findAll('dd').map(cell => cell.text())).toEqual([
-      'enterprise.hidden / $5', 'enterprise.hidden / enterprise.unlimited',
-      'enterprise.hidden / $20', 'enterprise.hidden / enterprise.unlimited'
+      '$5', 'enterprise.unlimited', '$20', 'enterprise.unlimited'
     ])
     expect(wrapper.text()).not.toContain('$0.0000')
     expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('honors null usage without the flag and the explicit visibility flag even if a value is present', async () => {
-    const quota = { ...hiddenQuota(), usage_visible: undefined, daily_usage_usd: 0 }
+  it('never renders recorded spending even when usage values are provided', async () => {
+    const quota = { ...quotaWithoutUsage(), daily_usage_usd: 1.2345, weekly_usage_usd: 9.8765 }
     const wrapper = mount(EnterpriseQuotaDisplay, { props: { title: 'Quota', quota } })
-    expect(wrapper.findAll('dd')[0]?.text()).toBe('$0.0000 / $5')
-    expect(wrapper.findAll('dd')[1]?.text()).toBe('enterprise.hidden / enterprise.unlimited')
-    await wrapper.setProps({ quota: { ...quota, usage_visible: false } })
-    expect(wrapper.findAll('dd')[0]?.text()).toBe('enterprise.hidden / $5')
+    expect(wrapper.findAll('dd').map(cell => cell.text())).toEqual(['$5', 'enterprise.unlimited', '$20', 'enterprise.unlimited'])
+    expect(wrapper.text()).not.toContain('1.2345')
+    expect(wrapper.text()).not.toContain('9.8765')
+    await wrapper.setProps({ quota: { ...quota, daily_usage_usd: 0 } })
+    expect(wrapper.findAll('dd')[0]?.text()).toBe('$5')
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
   it('lets an authorized department manager edit a member quota while its usage is hidden', async () => {
-    const row = hiddenQuota()
+    const row = quotaWithoutUsage()
     const updateQuota = vi.fn().mockResolvedValue(row)
     const members = vi.fn().mockResolvedValue({ items: [{ id: 7, department_id: 3, role: 'member', username: 'Alice' }], total: 1 })
     const api = {
@@ -66,7 +67,7 @@ describe('enterprise quotas with hidden usage', () => {
     const wrapper = mount(EnterpriseQuotaPanel, { props: { api, overview }, global: { stubs } })
     await flushPromises()
     expect(members).toHaveBeenCalled()
-    expect(wrapper.text().match(/enterprise\.hidden/g)).toHaveLength(4)
+    expect(wrapper.findAll('dd').map(cell => cell.text())).toEqual(['$5', 'enterprise.unlimited', '$20', 'enterprise.unlimited'])
     expect(wrapper.find('[data-test="quota-reset-member-7"]').exists()).toBe(false)
     await wrapper.get('[data-test="quota-edit-member-7"]').trigger('click')
     await wrapper.get('[data-test="quota-daily"]').setValue('8')
@@ -74,13 +75,13 @@ describe('enterprise quotas with hidden usage', () => {
     await flushPromises()
     expect(updateQuota).toHaveBeenCalledWith('member', 7, { daily_limit_usd: 8, weekly_limit_usd: null, monthly_limit_usd: 20, total_limit_usd: null })
     expect(wrapper.emitted('updated')).toHaveLength(1)
-    expect(wrapper.text().match(/enterprise\.hidden/g)).toHaveLength(4)
+    expect(wrapper.findAll('dd').map(cell => cell.text())).toEqual(['$5', 'enterprise.unlimited', '$20', 'enterprise.unlimited'])
     expect(showError).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
   it('keeps quotas read-only when the manager has no editing permission', async () => {
-    const api = { quotas: vi.fn().mockResolvedValue([hiddenQuota()]), departments: vi.fn().mockResolvedValue([]) } as unknown as EnterpriseResourceAPI
+    const api = { quotas: vi.fn().mockResolvedValue([quotaWithoutUsage()]), departments: vi.fn().mockResolvedValue([]) } as unknown as EnterpriseResourceAPI
     const overview = { me: { role: 'manager', department_id: 3 }, permissions: { edit_member_quota: false, edit_quotas: false, view_members: false } } as EnterpriseOverview
     const wrapper = mount(EnterpriseQuotaPanel, { props: { api, overview }, global: { stubs } })
     await flushPromises()
@@ -90,15 +91,15 @@ describe('enterprise quotas with hidden usage', () => {
   })
 
   it('reloads quota rows when the workspace refreshes the current tab', async () => {
-    const quotas = vi.fn().mockResolvedValueOnce([hiddenQuota()]).mockResolvedValueOnce([{ ...hiddenQuota(), daily_limit_usd: 9 }])
+    const quotas = vi.fn().mockResolvedValueOnce([quotaWithoutUsage()]).mockResolvedValueOnce([{ ...quotaWithoutUsage(), daily_limit_usd: 9 }])
     const api = { quotas, departments: vi.fn().mockResolvedValue([]) } as unknown as EnterpriseResourceAPI
     const wrapper = mount(EnterpriseQuotaPanel, { props: { api, refreshKey: 0 }, global: { stubs } })
     await flushPromises()
-    expect(wrapper.text()).toContain('enterprise.hidden / $5')
+    expect(wrapper.text()).toContain('$5')
     await wrapper.setProps({ refreshKey: 1 })
     await flushPromises()
     expect(quotas).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('enterprise.hidden / $9')
+    expect(wrapper.text()).toContain('$9')
     wrapper.unmount()
   })
 })

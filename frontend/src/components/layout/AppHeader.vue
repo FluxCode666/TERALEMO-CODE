@@ -61,6 +61,7 @@
           v-if="user && balanceVisible"
           data-testid="header-balance"
           :aria-label="balanceLabel"
+          tabindex="0"
           class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
         >
           <svg
@@ -77,17 +78,19 @@
             />
           </svg>
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-            <span v-if="enterprise" class="mr-1 font-normal">{{ t('enterprise.balance') }}</span>{{ formatHeaderMoney(availableBalance) }}
+            <span v-if="enterprise" class="mr-1 font-normal">{{ balanceLabel }}</span>{{ formatHeaderMoney(availableBalance) }}
           </span>
           <span
-            v-if="!enterprise && frozenBalance > 0"
+            v-if="frozenBalanceVisible && frozenBalance > 0"
+            data-testid="header-frozen-balance"
             class="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
           >
             {{ balanceFrozenLabel }}
           </span>
           <div
-            v-if="!enterprise"
-            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block dark:border-dark-700 dark:bg-dark-800"
+            v-if="!enterprise || (frozenBalanceVisible && frozenBalance > 0)"
+            data-testid="header-balance-details"
+            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block group-focus-visible:block dark:border-dark-700 dark:bg-dark-800"
           >
             <div class="flex items-center justify-between">
               <span class="text-gray-500 dark:text-dark-400">{{ balanceAvailableText }}</span>
@@ -103,6 +106,7 @@
                 <span class="font-semibold text-gray-900 dark:text-white">{{ formatHeaderMoney(totalBalance) }}</span>
               </div>
             </div>
+            <p v-if="enterprise" class="mt-2 text-gray-500 dark:text-gray-400">{{ t('enterprise.frozenBalanceHint') }}</p>
           </div>
         </div>
 
@@ -152,8 +156,9 @@
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
                   {{ formatHeaderMoney(availableBalance) }}
                 </div>
-                <div v-if="!enterprise && frozenBalance > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                <div v-if="frozenBalanceVisible && frozenBalance > 0" data-testid="header-mobile-frozen-balance" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
                   {{ balanceFrozenText }} {{ formatHeaderMoney(frozenBalance) }}
+                  <p v-if="enterprise" class="mt-1 text-gray-500 dark:text-gray-400">{{ t('enterprise.frozenBalanceHint') }}</p>
                 </div>
               </div>
 
@@ -286,12 +291,13 @@ const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.model
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const enterprise = computed(() => user.value?.enterprise)
 const balanceVisible = computed(() => !enterprise.value || (enterprise.value.balance_visible && enterprise.value.balance != null))
-const balanceLabel = computed(() => enterprise.value ? t('enterprise.balance') : t('common.balance'))
+const balanceLabel = computed(() => enterprise.value ? t('enterprise.availableBalance') : t('common.balance'))
 const availableBalance = computed(() => Number(enterprise.value ? enterprise.value.balance ?? 0 : user.value?.balance || 0))
-const frozenBalance = computed(() => Number(user.value?.frozen_balance || 0))
+const frozenBalanceVisible = computed(() => !enterprise.value || (balanceVisible.value && enterprise.value.frozen_balance != null))
+const frozenBalance = computed(() => Number(enterprise.value ? enterprise.value.frozen_balance ?? 0 : user.value?.frozen_balance || 0))
 const totalBalance = computed(() => availableBalance.value + frozenBalance.value)
-const balanceAvailableText = computed(() => t('common.availableBalance') === 'common.availableBalance' ? '可用余额' : t('common.availableBalance'))
-const balanceFrozenText = computed(() => t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
+const balanceAvailableText = computed(() => enterprise.value ? balanceLabel.value : t('common.availableBalance') === 'common.availableBalance' ? '可用余额' : t('common.availableBalance'))
+const balanceFrozenText = computed(() => enterprise.value ? t('enterprise.frozenBalance') : t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
 const balanceTotalText = computed(() => t('common.totalBalance') === 'common.totalBalance' ? '总余额' : t('common.totalBalance'))
 const balanceFrozenLabel = computed(() => `${balanceFrozenText.value} ${formatHeaderMoney(frozenBalance.value)}`)
 

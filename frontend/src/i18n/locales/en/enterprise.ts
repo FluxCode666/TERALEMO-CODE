@@ -37,6 +37,11 @@ export default {
     "active": "Active",
     "disabled": "Disabled",
     "balance": "Enterprise balance",
+    "availableBalance": "Enterprise available balance",
+    "frozenBalance": "Frozen balance",
+    "frozenAmount": "Frozen {amount}",
+    "frozenBalanceHint": "Frozen balance is reserved for batch image tasks in progress. Tasks settle at their actual cost on completion; failed tasks release the hold automatically.",
+    "balanceAdjustmentHint": "Deductions apply only to available balance. Frozen balance cannot be deducted.",
     "totalRecharged": "Total recharged",
     "memberCount": "Members",
     "departmentCount": "Departments",
@@ -85,11 +90,9 @@ export default {
     "monthly": "Monthly",
     "total": "Total",
     "unlimited": "Unlimited",
-    "quotaHint": "Amounts are in USD. Leave blank for unlimited; 0 disables usage. Daily quotas use calendar days, weekly quotas start on Monday, and monthly quotas use calendar months. Total usage never resets automatically.",
-    "usageAmount": "Used",
-    "limitAmount": "Limit",
-    "resetUsage": "Reset usage",
-    "resetConfirm": "Reset usage for the selected windows? Existing charges will not be refunded.",
+    "quotaHint": "Amounts are in USD. Leave blank for unlimited; 0 disables usage. Daily limits use calendar days, weekly limits start on Monday, and monthly limits use calendar months. The total limit never resets automatically.",
+    "resetUsage": "Reset used quota",
+    "resetConfirm": "Clear spending accumulated in the current windows to unblock requests stopped by a reached limit. Existing charges will not be refunded.",
     "groupPool": "Enterprise group pool",
     "groupPoolHint": "Only system administrators can configure the group pool. A nonempty pool replaces personal group permissions during membership. An empty pool uses personal group rules.",
     "whitelist": "Group whitelist",
@@ -163,7 +166,7 @@ export default {
         "description": "Individual spending limits grouped by department. Larger departments start collapsed."
       },
       "disabled": "Disabled",
-      "empty": "No quotas are visible here. Quota and usage visibility depends on enterprise permissions."
+      "empty": "No quotas are visible here. Quota visibility depends on enterprise permissions."
     },
     "groupAccess": {
       "rateUnknown": "Rate unavailable",
@@ -186,28 +189,18 @@ export default {
         "enterprise": "Groups allowed for the enterprise",
         "department": "Groups allowed for departments",
         "member": "Groups allowed for employees"
-      },
-      "effectiveTitle": "View an employee’s final allowed groups",
-      "myGroups": "Groups I can call",
-      "selectMember": "Select an employee",
-      "noEffective": "No groups are currently allowed",
-      "restrictions": {
-        "available": "Limited by enterprise availability",
-        "enterprise": "Limited by enterprise rules",
-        "department": "Limited by department rules",
-        "member": "Limited by employee rules"
       }
     },
     "settingsUi": {
       "balance": "Balance visibility",
-      "visibility": "Quota and usage visibility",
+      "visibility": "Quota visibility",
       "management": "Department management permissions",
       "hints": {
         "balance_visible_to_manager": "Show the shared enterprise balance to department managers.",
         "balance_visible_to_member": "Show the shared enterprise balance to employees.",
-        "member_quota_visible_to_member": "Let employees view their own limits and recorded usage.",
-        "member_quota_visible_to_manager": "Let managers view limits and usage for their department’s employees.",
-        "department_quota_visible_to_manager": "Let managers view their department’s shared limits and usage.",
+        "member_quota_visible_to_member": "Let employees view their own limits.",
+        "member_quota_visible_to_manager": "Let managers view limits for their department’s employees.",
+        "department_quota_visible_to_manager": "Let managers view their department’s shared limits.",
         "manager_can_manage_members": "Let managers add, edit, and remove employees in their own department.",
         "manager_can_edit_member_quota": "Let managers adjust spending limits for employees in their department.",
         "manager_can_edit_member_groups": "Let managers adjust allowed groups for employees in their department."
@@ -229,7 +222,7 @@ export default {
         "member_remove": "Remove member",
         "member_disabled_by_moderation": "Disable member by moderation",
         "quota_update": "Update quota",
-        "quota_reset": "Reset usage",
+        "quota_reset": "Reset used quota",
         "settings_update": "Update settings",
         "group_pool_update": "Update available groups",
         "group_whitelist_update": "Update allowed groups",
@@ -244,9 +237,9 @@ export default {
     "settingLabels": {
       "balance_visible_to_manager": "Managers can view enterprise balance",
       "balance_visible_to_member": "Members can view enterprise balance",
-      "member_quota_visible_to_member": "Members can view their own quotas and usage",
-      "member_quota_visible_to_manager": "Managers can view their department members' quotas and usage",
-      "department_quota_visible_to_manager": "Managers can view their department quotas and usage",
+      "member_quota_visible_to_member": "Members can view their own quotas",
+      "member_quota_visible_to_manager": "Managers can view their department members' quotas",
+      "department_quota_visible_to_manager": "Managers can view their department quotas",
       "manager_can_manage_members": "Managers can manage members in their department",
       "manager_can_edit_member_quota": "Managers can edit member quotas in their department",
       "manager_can_edit_member_groups": "Managers can edit member group whitelists in their department"
@@ -283,7 +276,6 @@ export default {
     "description": "View your enterprise organization, quotas, and usage",
     "inactiveWhitelistGroups": "These groups are no longer allowed by the parent scope and will be removed when saving: {groups}",
     "validationDateRange": "Select dates in chronological order, with at most 366 days including both dates.",
-    "hidden": "Hidden",
     "settingsRefreshedWithEdits": "Settings refreshed. Your unsaved edits were kept and other settings were updated. Review before saving."
   }
 }

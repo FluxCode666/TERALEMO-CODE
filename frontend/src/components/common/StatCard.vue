@@ -17,6 +17,7 @@
           {{ formattedChange }}
         </span>
       </div>
+      <slot name="footer" />
     </div>
   </div>
 </template>
