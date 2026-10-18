@@ -28,6 +28,8 @@ const (
 	FieldStatus = "status"
 	// FieldGroupPoolConfigured holds the string denoting the group_pool_configured field in the database.
 	FieldGroupPoolConfigured = "group_pool_configured"
+	// FieldMemberConcurrency holds the string denoting the member_concurrency field in the database.
+	FieldMemberConcurrency = "member_concurrency"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldFrozenBalance holds the string denoting the frozen_balance field in the database.
@@ -75,6 +77,7 @@ var Columns = []string{
 	FieldName,
 	FieldStatus,
 	FieldGroupPoolConfigured,
+	FieldMemberConcurrency,
 	FieldBalance,
 	FieldFrozenBalance,
 	FieldTotalRecharged,
@@ -124,6 +127,8 @@ var (
 	StatusValidator func(string) error
 	// DefaultGroupPoolConfigured holds the default value on creation for the "group_pool_configured" field.
 	DefaultGroupPoolConfigured bool
+	// MemberConcurrencyValidator is a validator for the "member_concurrency" field. It is called by the builders before save.
+	MemberConcurrencyValidator func(int) error
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
 	// DefaultFrozenBalance holds the default value on creation for the "frozen_balance" field.
@@ -184,6 +189,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupPoolConfigured orders the results by the group_pool_configured field.
 func ByGroupPoolConfigured(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupPoolConfigured, opts...).ToFunc()
+}
+
+// ByMemberConcurrency orders the results by the member_concurrency field.
+func ByMemberConcurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMemberConcurrency, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

@@ -14,7 +14,7 @@ import (
 )
 
 func enterpriseDissolveService(client *dbent.Client, audit service.EnterpriseAuditLogRepository) *service.EnterpriseService {
-	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), audit, NewEnterpriseGroupRepository(client), nil, nil, nil, nil, service.NewNoopEnterpriseBillingCache())
+	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), audit, NewEnterpriseGroupRepository(client), nil, nil, nil, nil, service.NewNoopEnterpriseBillingCache(), nil)
 }
 
 func TestEnterpriseDissolveArchivesMembersQuotasAndBalance(t *testing.T) {

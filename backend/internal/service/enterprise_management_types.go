@@ -88,6 +88,10 @@ type EnterpriseIdentity struct {
 
 type enterpriseManagementUserReader interface {
 	GetByID(context.Context, int64) (*User, error)
+	BatchSetConcurrency(context.Context, []int64, int) (int, error)
+}
+type enterpriseManagementConcurrencyDefaults interface {
+	GetDefaultConcurrency(context.Context) int
 }
 type enterpriseManagementUserCreator interface {
 	CreateUser(context.Context, *CreateUserInput) (*User, error)
@@ -110,6 +114,7 @@ type EnterpriseService struct {
 	users            enterpriseManagementUserReader
 	groups           enterpriseManagementGroupReader
 	admin            enterpriseManagementUserCreator
+	settings         enterpriseManagementConcurrencyDefaults
 	sessions         enterpriseSessionRevoker
 	authCache        enterpriseManagementAuthInvalidator
 	billingCache     EnterpriseBillingCache
@@ -117,6 +122,10 @@ type EnterpriseService struct {
 	transact func(context.Context, func(context.Context) error) error
 }
 
-func NewEnterpriseService(client *dbent.Client, enterprises EnterpriseRepository, departments EnterpriseDepartmentRepository, members EnterpriseMemberRepository, quotas EnterpriseQuotaRepository, balanceLogs EnterpriseBalanceLogRepository, auditLogs EnterpriseAuditLogRepository, enterpriseGroups EnterpriseGroupRepository, users UserRepository, groups GroupRepository, admin AdminService, authCache APIKeyAuthCacheInvalidator, billingCache EnterpriseBillingCache) *EnterpriseService {
-	return &EnterpriseService{client: client, enterprises: enterprises, departments: departments, members: members, quotas: quotas, balanceLogs: balanceLogs, auditLogs: auditLogs, enterpriseGroups: enterpriseGroups, users: users, groups: groups, admin: admin, authCache: authCache, billingCache: billingCache}
+func NewEnterpriseService(client *dbent.Client, enterprises EnterpriseRepository, departments EnterpriseDepartmentRepository, members EnterpriseMemberRepository, quotas EnterpriseQuotaRepository, balanceLogs EnterpriseBalanceLogRepository, auditLogs EnterpriseAuditLogRepository, enterpriseGroups EnterpriseGroupRepository, users UserRepository, groups GroupRepository, admin AdminService, authCache APIKeyAuthCacheInvalidator, billingCache EnterpriseBillingCache, settings *SettingService) *EnterpriseService {
+	s := &EnterpriseService{client: client, enterprises: enterprises, departments: departments, members: members, quotas: quotas, balanceLogs: balanceLogs, auditLogs: auditLogs, enterpriseGroups: enterpriseGroups, users: users, groups: groups, admin: admin, authCache: authCache, billingCache: billingCache}
+	if settings != nil {
+		s.settings = settings
+	}
+	return s
 }

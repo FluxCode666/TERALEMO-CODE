@@ -41,6 +41,7 @@ const (
 	EnterpriseAuditActionMemberCreate               = domain.EnterpriseAuditActionMemberCreate
 	EnterpriseAuditActionMemberUpdate               = domain.EnterpriseAuditActionMemberUpdate
 	EnterpriseAuditActionMemberRemove               = domain.EnterpriseAuditActionMemberRemove
+	EnterpriseAuditActionMembersConcurrencyUpdate   = domain.EnterpriseAuditActionMembersConcurrencyUpdate
 	EnterpriseAuditActionMemberDisabledByModeration = domain.EnterpriseAuditActionMemberDisabledByModeration
 	EnterpriseAuditActionQuotaUpdate                = domain.EnterpriseAuditActionQuotaUpdate
 	EnterpriseAuditActionQuotaReset                 = domain.EnterpriseAuditActionQuotaReset
@@ -82,6 +83,7 @@ type Enterprise struct {
 	ID                                             int64
 	Name, Status                                   string
 	GroupPoolConfigured                            bool
+	MemberConcurrency                              *int
 	Balance, FrozenBalance, TotalRecharged         float64
 	LowBalanceThreshold                            *float64
 	ContactName, ContactEmail, ContactPhone, Notes string
@@ -107,6 +109,7 @@ type EnterpriseDepartment struct {
 }
 type EnterpriseMember struct {
 	AccountCreatedByEnterprise                  bool
+	Concurrency                                 int
 	ID, EnterpriseID, UserID                    int64
 	DepartmentPathIDs                           []int64
 	DepartmentPathNames                         []string

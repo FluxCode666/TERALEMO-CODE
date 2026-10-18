@@ -25,7 +25,7 @@ func treeDepartment(t *testing.T, ctx context.Context, client *dbent.Client, eid
 }
 
 func treeManagementService(client *dbent.Client) *service.EnterpriseService {
-	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache())
+	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache(), nil)
 }
 
 func treeBillingFixture(t *testing.T) (enterpriseBillingFixture, []*service.EnterpriseDepartment) {

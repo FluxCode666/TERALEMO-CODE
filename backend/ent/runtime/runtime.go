@@ -1001,42 +1001,46 @@ func init() {
 	enterpriseDescGroupPoolConfigured := enterpriseFields[2].Descriptor()
 	// enterprise.DefaultGroupPoolConfigured holds the default value on creation for the group_pool_configured field.
 	enterprise.DefaultGroupPoolConfigured = enterpriseDescGroupPoolConfigured.Default.(bool)
+	// enterpriseDescMemberConcurrency is the schema descriptor for member_concurrency field.
+	enterpriseDescMemberConcurrency := enterpriseFields[3].Descriptor()
+	// enterprise.MemberConcurrencyValidator is a validator for the "member_concurrency" field. It is called by the builders before save.
+	enterprise.MemberConcurrencyValidator = enterpriseDescMemberConcurrency.Validators[0].(func(int) error)
 	// enterpriseDescBalance is the schema descriptor for balance field.
-	enterpriseDescBalance := enterpriseFields[3].Descriptor()
+	enterpriseDescBalance := enterpriseFields[4].Descriptor()
 	// enterprise.DefaultBalance holds the default value on creation for the balance field.
 	enterprise.DefaultBalance = enterpriseDescBalance.Default.(float64)
 	// enterpriseDescFrozenBalance is the schema descriptor for frozen_balance field.
-	enterpriseDescFrozenBalance := enterpriseFields[4].Descriptor()
+	enterpriseDescFrozenBalance := enterpriseFields[5].Descriptor()
 	// enterprise.DefaultFrozenBalance holds the default value on creation for the frozen_balance field.
 	enterprise.DefaultFrozenBalance = enterpriseDescFrozenBalance.Default.(float64)
 	// enterpriseDescTotalRecharged is the schema descriptor for total_recharged field.
-	enterpriseDescTotalRecharged := enterpriseFields[5].Descriptor()
+	enterpriseDescTotalRecharged := enterpriseFields[6].Descriptor()
 	// enterprise.DefaultTotalRecharged holds the default value on creation for the total_recharged field.
 	enterprise.DefaultTotalRecharged = enterpriseDescTotalRecharged.Default.(float64)
 	// enterpriseDescContactName is the schema descriptor for contact_name field.
-	enterpriseDescContactName := enterpriseFields[7].Descriptor()
+	enterpriseDescContactName := enterpriseFields[8].Descriptor()
 	// enterprise.DefaultContactName holds the default value on creation for the contact_name field.
 	enterprise.DefaultContactName = enterpriseDescContactName.Default.(string)
 	// enterprise.ContactNameValidator is a validator for the "contact_name" field. It is called by the builders before save.
 	enterprise.ContactNameValidator = enterpriseDescContactName.Validators[0].(func(string) error)
 	// enterpriseDescContactEmail is the schema descriptor for contact_email field.
-	enterpriseDescContactEmail := enterpriseFields[8].Descriptor()
+	enterpriseDescContactEmail := enterpriseFields[9].Descriptor()
 	// enterprise.DefaultContactEmail holds the default value on creation for the contact_email field.
 	enterprise.DefaultContactEmail = enterpriseDescContactEmail.Default.(string)
 	// enterprise.ContactEmailValidator is a validator for the "contact_email" field. It is called by the builders before save.
 	enterprise.ContactEmailValidator = enterpriseDescContactEmail.Validators[0].(func(string) error)
 	// enterpriseDescContactPhone is the schema descriptor for contact_phone field.
-	enterpriseDescContactPhone := enterpriseFields[9].Descriptor()
+	enterpriseDescContactPhone := enterpriseFields[10].Descriptor()
 	// enterprise.DefaultContactPhone holds the default value on creation for the contact_phone field.
 	enterprise.DefaultContactPhone = enterpriseDescContactPhone.Default.(string)
 	// enterprise.ContactPhoneValidator is a validator for the "contact_phone" field. It is called by the builders before save.
 	enterprise.ContactPhoneValidator = enterpriseDescContactPhone.Validators[0].(func(string) error)
 	// enterpriseDescNotes is the schema descriptor for notes field.
-	enterpriseDescNotes := enterpriseFields[10].Descriptor()
+	enterpriseDescNotes := enterpriseFields[11].Descriptor()
 	// enterprise.DefaultNotes holds the default value on creation for the notes field.
 	enterprise.DefaultNotes = enterpriseDescNotes.Default.(string)
 	// enterpriseDescSettings is the schema descriptor for settings field.
-	enterpriseDescSettings := enterpriseFields[11].Descriptor()
+	enterpriseDescSettings := enterpriseFields[12].Descriptor()
 	// enterprise.DefaultSettings holds the default value on creation for the settings field.
 	enterprise.DefaultSettings = enterpriseDescSettings.Default.(func() domain.EnterpriseSettings)
 	enterpriseallowedgroupFields := schema.EnterpriseAllowedGroup{}.Fields()

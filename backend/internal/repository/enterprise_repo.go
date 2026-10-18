@@ -18,14 +18,14 @@ func NewEnterpriseRepository(client *dbent.Client) service.EnterpriseRepository 
 }
 
 const enterpriseSelectColumns = `e.id, e.name, e.status, e.balance, e.frozen_balance, e.total_recharged, e.low_balance_threshold,
- e.contact_name, e.contact_email, e.contact_phone, e.notes, e.settings, e.group_pool_configured, e.created_at, e.updated_at, e.deleted_at,
+ e.contact_name, e.contact_email, e.contact_phone, e.notes, e.settings, e.group_pool_configured, e.member_concurrency, e.created_at, e.updated_at, e.deleted_at,
  (SELECT COUNT(*) FROM enterprise_members m WHERE m.enterprise_id = e.id AND m.deleted_at IS NULL),
  (SELECT COUNT(*) FROM enterprise_departments d WHERE d.enterprise_id = e.id AND d.deleted_at IS NULL)`
 
 func enterpriseScan(s enterpriseScanner, e *service.Enterprise) error {
 	var settings []byte
 	if err := s.Scan(&e.ID, &e.Name, &e.Status, &e.Balance, &e.FrozenBalance, &e.TotalRecharged, &e.LowBalanceThreshold,
-		&e.ContactName, &e.ContactEmail, &e.ContactPhone, &e.Notes, &settings, &e.GroupPoolConfigured, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+		&e.ContactName, &e.ContactEmail, &e.ContactPhone, &e.Notes, &settings, &e.GroupPoolConfigured, &e.MemberConcurrency, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
 		&e.MemberCount, &e.DepartmentCount); err != nil {
 		return err
 	}
@@ -75,8 +75,8 @@ func (r *enterpriseRepository) Update(ctx context.Context, e *service.Enterprise
 		return err
 	}
 	err = enterpriseQueryOne(ctx, clientFromContext(ctx, r.client), `UPDATE enterprises SET name = $2, status = $3, low_balance_threshold = $4,
- contact_name = $5, contact_email = $6, contact_phone = $7, notes = $8, settings = $9, updated_at = NOW()
- WHERE id = $1 AND deleted_at IS NULL RETURNING updated_at`, []any{e.ID, e.Name, e.Status, e.LowBalanceThreshold, e.ContactName, e.ContactEmail, e.ContactPhone, e.Notes, string(settings)}, func(s enterpriseScanner) error { return s.Scan(&e.UpdatedAt) })
+ contact_name = $5, contact_email = $6, contact_phone = $7, notes = $8, settings = $9, member_concurrency = $10, updated_at = NOW()
+ WHERE id = $1 AND deleted_at IS NULL RETURNING updated_at`, []any{e.ID, e.Name, e.Status, e.LowBalanceThreshold, e.ContactName, e.ContactEmail, e.ContactPhone, e.Notes, string(settings), e.MemberConcurrency}, func(s enterpriseScanner) error { return s.Scan(&e.UpdatedAt) })
 	return translatePersistenceError(err, service.ErrEnterpriseNotFound, service.ErrEnterpriseNameExists)
 }
 

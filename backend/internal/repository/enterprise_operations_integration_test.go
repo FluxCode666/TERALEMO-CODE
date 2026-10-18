@@ -26,7 +26,7 @@ type enterpriseImportIntegrationAdmin struct {
 }
 
 func (a *enterpriseImportIntegrationAdmin) CreateUser(ctx context.Context, in *service.CreateUserInput) (*service.User, error) {
-	user := &service.User{Email: in.Email, Username: in.Username, Role: service.RoleUser, Status: service.StatusActive, Balance: *in.Balance, Concurrency: 1}
+	user := &service.User{Email: in.Email, Username: in.Username, Role: service.RoleUser, Status: service.StatusActive, Balance: *in.Balance, Concurrency: in.Concurrency}
 	if err := user.SetPassword(in.Password); err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func enterpriseOperationsIntegrationService(t *testing.T) *service.EnterpriseSer
 	client := testEntClient(t)
 	users := NewUserRepository(client, integrationDB)
 	auth := service.NewAuthService(client, users, nil, NewRefreshTokenCache(integrationRedis), nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	return service.ProvideEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache(), auth)
+	return service.ProvideEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache(), auth, nil)
 }
 
 func TestEnterpriseImportTransactionsOriginAndPasswordSessions(t *testing.T) {
@@ -350,7 +350,7 @@ func TestEnterpriseImportDepartmentPhaseRollsBackAtomically(t *testing.T) {
 	client := testEntClient(t)
 	users := NewUserRepository(client, integrationDB)
 	departments := &enterpriseImportFailDepartments{EnterpriseDepartmentRepository: NewEnterpriseDepartmentRepository(client)}
-	svc := service.NewEnterpriseService(client, NewEnterpriseRepository(client), departments, NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache())
+	svc := service.NewEnterpriseService(client, NewEnterpriseRepository(client), departments, NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache(), nil)
 	email := "atomic-" + uuid.NewString() + "@example.com"
 	_, err := svc.CommitImport(ctx, service.EnterpriseActor{IsAdmin: true}, f.enterprise.ID, []service.EnterpriseImportRow{{Row: 1, Email: email, DepartmentPath: "Atomic/New", Role: "member"}})
 	require.Equal(t, "DEPARTMENT_CREATE_FAILED", infraerrors.Reason(err))

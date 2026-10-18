@@ -66,7 +66,7 @@ func (r *enterpriseImportTestCreator) CreateUser(ctx context.Context, in *Create
 		return nil, infraerrors.BadRequest("CREATE_FAILED", "模拟建号失败")
 	}
 	r.next++
-	u := &User{ID: r.next, Email: in.Email, Username: in.Username, Role: RoleUser, Status: StatusActive, Balance: *in.Balance}
+	u := &User{ID: r.next, Email: in.Email, Username: in.Username, Role: RoleUser, Status: StatusActive, Balance: *in.Balance, Concurrency: in.Concurrency}
 	if err := u.SetPassword(in.Password); err != nil {
 		return nil, err
 	}

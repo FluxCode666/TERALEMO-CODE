@@ -189,7 +189,7 @@ func (s *EnterpriseService) createMember(ctx context.Context, a EnterpriseActor,
 		if emailErr != nil || address.Address != strings.TrimSpace(in.Email) || !enterprisePasswordValid(in.Password) {
 			return nil, false, ErrEnterpriseInvalidInput
 		}
-		u, err = s.createUser(ctx, a, in)
+		u, err = s.createUser(ctx, a, e, in)
 	}
 	if err != nil {
 		return nil, false, err
@@ -208,6 +208,15 @@ func (s *EnterpriseService) createMember(ctx context.Context, a EnterpriseActor,
 	m.AccountCreatedByEnterprise = created
 	if err = s.members.Create(ctx, m); err != nil {
 		return nil, false, err
+	}
+	if !created && e.MemberConcurrency != nil {
+		count, err := s.users.BatchSetConcurrency(ctx, []int64{u.ID}, *e.MemberConcurrency)
+		if err != nil {
+			return nil, false, err
+		}
+		if count != 1 {
+			return nil, false, ErrUserNotFound
+		}
 	}
 	action := EnterpriseAuditActionMemberAdd
 	if created {

@@ -1088,13 +1088,24 @@ func (r *userRepository) BatchSetConcurrency(ctx context.Context, userIDs []int6
 	if value < 0 {
 		value = 0
 	}
-	res, err := r.sql.ExecContext(ctx,
+	// Join an outer Ent transaction (enterprise settings + members + audit).
+	// The regular administrator batch path continues using its SQL executor.
+	var executor interface {
+		ExecContext(context.Context, string, ...any) (sql.Result, error)
+	} = r.sql
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		executor = tx.Client()
+	}
+	res, err := executor.ExecContext(ctx,
 		"UPDATE users SET concurrency = $1, updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
 		value, pq.Array(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch set concurrency: %w", err)
 	}
-	affected, _ := res.RowsAffected()
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("batch set concurrency affected rows: %w", err)
+	}
 	return int(affected), nil
 }
 

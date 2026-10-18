@@ -17,7 +17,7 @@ func NewEnterpriseMemberRepository(client *dbent.Client) service.EnterpriseMembe
 }
 
 const enterpriseMemberSelectColumns = `m.id, m.enterprise_id, m.user_id, m.department_id, m.role, m.status, m.title, m.joined_at,
- m.created_at, m.updated_at, m.deleted_at, COALESCE(u.email, ''), COALESCE(u.username, ''), COALESCE(u.status, ''), COALESCE(d.name, ''), COALESCE(d.path,''), u.last_login_at, m.account_created_by_enterprise`
+ m.created_at, m.updated_at, m.deleted_at, COALESCE(u.email, ''), COALESCE(u.username, ''), COALESCE(u.status, ''), COALESCE(d.name, ''), COALESCE(d.path,''), u.last_login_at, m.account_created_by_enterprise, COALESCE(u.concurrency, 0)`
 const enterpriseMemberJoins = ` FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
  LEFT JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL
  LEFT JOIN enterprise_departments d ON d.id = m.department_id AND d.enterprise_id = m.enterprise_id AND d.deleted_at IS NULL`
@@ -25,7 +25,7 @@ const enterpriseMemberJoins = ` FROM enterprise_members m JOIN enterprises e ON 
 func enterpriseMemberScan(s enterpriseScanner, m *service.EnterpriseMember) error {
 	var path string
 	err := s.Scan(&m.ID, &m.EnterpriseID, &m.UserID, &m.DepartmentID, &m.Role, &m.Status, &m.Title, &m.JoinedAt,
-		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.Email, &m.Username, &m.UserStatus, &m.DepartmentName, &path, &m.LastLoginAt, &m.AccountCreatedByEnterprise)
+		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.Email, &m.Username, &m.UserStatus, &m.DepartmentName, &path, &m.LastLoginAt, &m.AccountCreatedByEnterprise, &m.Concurrency)
 	if err != nil {
 		return err
 	}

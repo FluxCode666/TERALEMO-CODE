@@ -98,6 +98,33 @@ func (_u *EnterpriseUpdate) SetNillableGroupPoolConfigured(v *bool) *EnterpriseU
 	return _u
 }
 
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (_u *EnterpriseUpdate) SetMemberConcurrency(v int) *EnterpriseUpdate {
+	_u.mutation.ResetMemberConcurrency()
+	_u.mutation.SetMemberConcurrency(v)
+	return _u
+}
+
+// SetNillableMemberConcurrency sets the "member_concurrency" field if the given value is not nil.
+func (_u *EnterpriseUpdate) SetNillableMemberConcurrency(v *int) *EnterpriseUpdate {
+	if v != nil {
+		_u.SetMemberConcurrency(*v)
+	}
+	return _u
+}
+
+// AddMemberConcurrency adds value to the "member_concurrency" field.
+func (_u *EnterpriseUpdate) AddMemberConcurrency(v int) *EnterpriseUpdate {
+	_u.mutation.AddMemberConcurrency(v)
+	return _u
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (_u *EnterpriseUpdate) ClearMemberConcurrency() *EnterpriseUpdate {
+	_u.mutation.ClearMemberConcurrency()
+	return _u
+}
+
 // SetBalance sets the "balance" field.
 func (_u *EnterpriseUpdate) SetBalance(v float64) *EnterpriseUpdate {
 	_u.mutation.ResetBalance()
@@ -353,6 +380,11 @@ func (_u *EnterpriseUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Enterprise.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MemberConcurrency(); ok {
+		if err := enterprise.MemberConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "member_concurrency", err: fmt.Errorf(`ent: validator failed for field "Enterprise.member_concurrency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ContactName(); ok {
 		if err := enterprise.ContactNameValidator(v); err != nil {
 			return &ValidationError{Name: "contact_name", err: fmt.Errorf(`ent: validator failed for field "Enterprise.contact_name": %w`, err)}
@@ -400,6 +432,15 @@ func (_u *EnterpriseUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.GroupPoolConfigured(); ok {
 		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.MemberConcurrency(); ok {
+		_spec.SetField(enterprise.FieldMemberConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMemberConcurrency(); ok {
+		_spec.AddField(enterprise.FieldMemberConcurrency, field.TypeInt, value)
+	}
+	if _u.mutation.MemberConcurrencyCleared() {
+		_spec.ClearField(enterprise.FieldMemberConcurrency, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)
@@ -585,6 +626,33 @@ func (_u *EnterpriseUpdateOne) SetNillableGroupPoolConfigured(v *bool) *Enterpri
 	if v != nil {
 		_u.SetGroupPoolConfigured(*v)
 	}
+	return _u
+}
+
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (_u *EnterpriseUpdateOne) SetMemberConcurrency(v int) *EnterpriseUpdateOne {
+	_u.mutation.ResetMemberConcurrency()
+	_u.mutation.SetMemberConcurrency(v)
+	return _u
+}
+
+// SetNillableMemberConcurrency sets the "member_concurrency" field if the given value is not nil.
+func (_u *EnterpriseUpdateOne) SetNillableMemberConcurrency(v *int) *EnterpriseUpdateOne {
+	if v != nil {
+		_u.SetMemberConcurrency(*v)
+	}
+	return _u
+}
+
+// AddMemberConcurrency adds value to the "member_concurrency" field.
+func (_u *EnterpriseUpdateOne) AddMemberConcurrency(v int) *EnterpriseUpdateOne {
+	_u.mutation.AddMemberConcurrency(v)
+	return _u
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (_u *EnterpriseUpdateOne) ClearMemberConcurrency() *EnterpriseUpdateOne {
+	_u.mutation.ClearMemberConcurrency()
 	return _u
 }
 
@@ -856,6 +924,11 @@ func (_u *EnterpriseUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Enterprise.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MemberConcurrency(); ok {
+		if err := enterprise.MemberConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "member_concurrency", err: fmt.Errorf(`ent: validator failed for field "Enterprise.member_concurrency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ContactName(); ok {
 		if err := enterprise.ContactNameValidator(v); err != nil {
 			return &ValidationError{Name: "contact_name", err: fmt.Errorf(`ent: validator failed for field "Enterprise.contact_name": %w`, err)}
@@ -920,6 +993,15 @@ func (_u *EnterpriseUpdateOne) sqlSave(ctx context.Context) (_node *Enterprise, 
 	}
 	if value, ok := _u.mutation.GroupPoolConfigured(); ok {
 		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.MemberConcurrency(); ok {
+		_spec.SetField(enterprise.FieldMemberConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMemberConcurrency(); ok {
+		_spec.AddField(enterprise.FieldMemberConcurrency, field.TypeInt, value)
+	}
+	if _u.mutation.MemberConcurrencyCleared() {
+		_spec.ClearField(enterprise.FieldMemberConcurrency, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)

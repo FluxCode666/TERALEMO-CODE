@@ -17,6 +17,7 @@ import (
 // enterpriseManagementAPI is deliberately local: test doubles need only the
 // management surface, without extending the application's existing interfaces.
 type enterpriseManagementAPI interface {
+	UpdateMemberConcurrency(context.Context, service.EnterpriseActor, int64, *int) (*service.EnterpriseMemberConcurrencyResult, error)
 	PreviewImport(context.Context, service.EnterpriseActor, int64, []service.EnterpriseImportRow) (*service.EnterpriseImportPreview, error)
 	CommitImport(context.Context, service.EnterpriseActor, int64, []service.EnterpriseImportRow) (*service.EnterpriseImportCommit, error)
 	ResetMemberPassword(context.Context, service.EnterpriseActor, int64, int64, *string) (*service.EnterprisePasswordResetResult, error)
@@ -68,6 +69,7 @@ func (h *EnterpriseHandler) RegisterAdminRoutes(g *gin.RouterGroup) {
 	g.POST("", h.bind(true, h.createEnterprise))
 	g.GET("/:id", h.bind(true, h.getEnterprise))
 	g.PUT("/:id", h.bind(true, h.updateEnterprise))
+	g.PUT("/:id/member-concurrency", h.bind(true, h.updateMemberConcurrency))
 	g.DELETE("/:id", h.bind(true, h.deleteEnterprise))
 	g.POST("/:id/balance", h.bind(true, h.adjustBalance))
 	g.GET("/:id/balance-logs", h.bind(true, h.balanceLogs))

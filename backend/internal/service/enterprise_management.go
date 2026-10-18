@@ -331,7 +331,7 @@ func (s *EnterpriseService) Identity(ctx context.Context, userID int64) (*Enterp
 	}
 	return identity, nil
 }
-func (s *EnterpriseService) createUser(ctx context.Context, a EnterpriseActor, in CreateEnterpriseMemberInput) (*User, error) {
+func (s *EnterpriseService) createUser(ctx context.Context, a EnterpriseActor, e *Enterprise, in CreateEnterpriseMemberInput) (*User, error) {
 	if s.admin == nil {
 		return nil, fmt.Errorf("enterprise user creator is unavailable")
 	}
@@ -345,7 +345,13 @@ func (s *EnterpriseService) createUser(ctx context.Context, a EnterpriseActor, i
 	// Enterprise-created accounts start with a frozen personal wallet at zero;
 	// the global signup gift must not be issued. Subscription side effects run only after commit.
 	zeroBalance := 0.0
-	return creator.CreateUser(ctx, &CreateUserInput{Balance: &zeroBalance, Email: strings.TrimSpace(in.Email), Password: in.Password, Username: in.Username, Role: RoleUser, Concurrency: 1, ActorAdminID: a.UserID})
+	concurrency := 5
+	if e.MemberConcurrency != nil {
+		concurrency = *e.MemberConcurrency
+	} else if s.settings != nil {
+		concurrency = s.settings.GetDefaultConcurrency(ctx)
+	}
+	return creator.CreateUser(ctx, &CreateUserInput{Balance: &zeroBalance, Email: strings.TrimSpace(in.Email), Password: in.Password, Username: in.Username, Role: RoleUser, Concurrency: concurrency, ActorAdminID: a.UserID})
 }
 func (s *EnterpriseService) afterUserCreated(ctx context.Context, userID int64) {
 	if userID > 0 {

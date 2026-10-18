@@ -196,6 +196,7 @@ func TestEnterpriseHTTPRoutesMatchW4Contract(t *testing.T) {
 		"GET ", "POST ", "GET /:id", "PUT /:id", "DELETE /:id", "POST /:id/balance", "GET /:id/balance-logs",
 		"GET /:id/departments", "POST /:id/departments", "PUT /:id/departments/:departmentId", "DELETE /:id/departments/:departmentId",
 		"GET /:id/members", "POST /:id/members", "PUT /:id/members/:memberId", "DELETE /:id/members/:memberId",
+		"PUT /:id/member-concurrency",
 		"GET /:id/quotas", "PUT /:id/quotas/:scopeType/:scopeId", "POST /:id/quotas/:scopeType/:scopeId/reset",
 		"GET /:id/allowed-groups", "PUT /:id/allowed-groups", "GET /:id/group-whitelists", "PUT /:id/group-whitelists/:scopeType/:scopeId",
 		"GET /:id/usage", "GET /:id/usage/stats", "GET /:id/usage/trend", "GET /:id/usage/models", "GET /:id/usage/members", "GET /:id/usage/departments", "GET /:id/audit-logs",
@@ -213,8 +214,8 @@ func TestEnterpriseHTTPRoutesMatchW4Contract(t *testing.T) {
 		"POST /import/preview", "POST /import/commit", "POST /members/:memberId/reset-password", "PUT /quotas/members/batch",
 		"GET /usage/models/trend", "GET /usage/members/trend", "GET /usage/departments/trend",
 	})
-	require.Len(t, expected, 71)
-	require.Len(t, r.Routes(), 71)
+	require.Len(t, expected, 72)
+	require.Len(t, r.Routes(), 72)
 	for _, route := range r.Routes() {
 		key := route.Method + " " + route.Path
 		require.True(t, expected[key], "unexpected route: %s", key)

@@ -15,7 +15,7 @@ import (
 )
 
 func enterpriseOwnerAvailabilityService(client *dbent.Client) *service.EnterpriseService {
-	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache())
+	return service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache(), nil)
 }
 
 func enterpriseOwnerAvailabilityMutation(ctx context.Context, svc *service.EnterpriseService, actor service.EnterpriseActor, enterpriseID, memberID int64, operation string) error {

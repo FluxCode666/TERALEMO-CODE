@@ -8,6 +8,7 @@ import (
 )
 
 type Enterprise struct {
+	MemberConcurrency   *int                       `json:"member_concurrency"`
 	ID                  int64                      `json:"id"`
 	Name                string                     `json:"name"`
 	Status              string                     `json:"status"`
@@ -32,7 +33,7 @@ func EnterpriseFromService(e *service.Enterprise) *Enterprise {
 	if e == nil {
 		return nil
 	}
-	return &Enterprise{ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, FrozenBalance: e.FrozenBalance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, ActiveOwnerCount: e.ActiveOwnerCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
+	return &Enterprise{MemberConcurrency: e.MemberConcurrency, ID: e.ID, Name: e.Name, Status: e.Status, Balance: e.Balance, FrozenBalance: e.FrozenBalance, TotalRecharged: e.TotalRecharged, LowBalanceThreshold: e.LowBalanceThreshold, ContactName: e.ContactName, ContactEmail: e.ContactEmail, ContactPhone: e.ContactPhone, Notes: e.Notes, Settings: e.Settings, MemberCount: e.MemberCount, DepartmentCount: e.DepartmentCount, ActiveOwnerCount: e.ActiveOwnerCount, CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
 }
 
 type EnterpriseDepartment struct {
@@ -57,6 +58,7 @@ func EnterpriseDepartmentFromService(d *service.EnterpriseDepartment) *Enterpris
 }
 
 type EnterpriseMember struct {
+	Concurrency         int        `json:"concurrency"`
 	PasswordResettable  bool       `json:"password_resettable"`
 	DepartmentPathNames []string   `json:"department_path_names"`
 	LastLoginAt         *time.Time `json:"last_login_at"`
@@ -83,7 +85,7 @@ func EnterpriseMemberFromService(m *service.EnterpriseMember) *EnterpriseMember 
 		n := m.DepartmentName
 		departmentName = &n
 	}
-	return &EnterpriseMember{PasswordResettable: m.AccountCreatedByEnterprise, DepartmentPathNames: append([]string{}, m.DepartmentPathNames...), LastLoginAt: m.LastLoginAt, ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
+	return &EnterpriseMember{Concurrency: m.Concurrency, PasswordResettable: m.AccountCreatedByEnterprise, DepartmentPathNames: append([]string{}, m.DepartmentPathNames...), LastLoginAt: m.LastLoginAt, ID: m.ID, EnterpriseID: m.EnterpriseID, UserID: m.UserID, Email: m.Email, Username: m.Username, DepartmentID: m.DepartmentID, DepartmentName: departmentName, Role: m.Role, Status: m.Status, Title: m.Title, JoinedAt: m.JoinedAt, UserStatus: m.UserStatus}
 }
 
 type EnterpriseQuota struct {

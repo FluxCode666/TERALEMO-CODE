@@ -20,7 +20,7 @@ func TestEnterpriseManagementConcurrentLastOwnerProtection(t *testing.T) {
 	a.Role, b.Role = service.EnterpriseRoleOwner, service.EnterpriseRoleOwner
 	require.NoError(t, members.Update(ctx, a))
 	require.NoError(t, members.Update(ctx, b))
-	svc := service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), members, NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache())
+	svc := service.NewEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), members, NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), NewUserRepository(client, integrationDB), NewGroupRepository(client, integrationDB), nil, nil, service.NewNoopEnterpriseBillingCache(), nil)
 	start := make(chan struct{})
 	results := make(chan error, 2)
 	var ready sync.WaitGroup

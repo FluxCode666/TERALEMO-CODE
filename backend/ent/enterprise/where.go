@@ -85,6 +85,11 @@ func GroupPoolConfigured(v bool) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldGroupPoolConfigured, v))
 }
 
+// MemberConcurrency applies equality check predicate on the "member_concurrency" field. It's identical to MemberConcurrencyEQ.
+func MemberConcurrency(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldMemberConcurrency, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v float64) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldEQ(FieldBalance, v))
@@ -393,6 +398,56 @@ func GroupPoolConfiguredEQ(v bool) predicate.Enterprise {
 // GroupPoolConfiguredNEQ applies the NEQ predicate on the "group_pool_configured" field.
 func GroupPoolConfiguredNEQ(v bool) predicate.Enterprise {
 	return predicate.Enterprise(sql.FieldNEQ(FieldGroupPoolConfigured, v))
+}
+
+// MemberConcurrencyEQ applies the EQ predicate on the "member_concurrency" field.
+func MemberConcurrencyEQ(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldEQ(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyNEQ applies the NEQ predicate on the "member_concurrency" field.
+func MemberConcurrencyNEQ(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNEQ(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyIn applies the In predicate on the "member_concurrency" field.
+func MemberConcurrencyIn(vs ...int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldIn(FieldMemberConcurrency, vs...))
+}
+
+// MemberConcurrencyNotIn applies the NotIn predicate on the "member_concurrency" field.
+func MemberConcurrencyNotIn(vs ...int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNotIn(FieldMemberConcurrency, vs...))
+}
+
+// MemberConcurrencyGT applies the GT predicate on the "member_concurrency" field.
+func MemberConcurrencyGT(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldGT(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyGTE applies the GTE predicate on the "member_concurrency" field.
+func MemberConcurrencyGTE(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldGTE(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyLT applies the LT predicate on the "member_concurrency" field.
+func MemberConcurrencyLT(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldLT(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyLTE applies the LTE predicate on the "member_concurrency" field.
+func MemberConcurrencyLTE(v int) predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldLTE(FieldMemberConcurrency, v))
+}
+
+// MemberConcurrencyIsNil applies the IsNil predicate on the "member_concurrency" field.
+func MemberConcurrencyIsNil() predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldIsNull(FieldMemberConcurrency))
+}
+
+// MemberConcurrencyNotNil applies the NotNil predicate on the "member_concurrency" field.
+func MemberConcurrencyNotNil() predicate.Enterprise {
+	return predicate.Enterprise(sql.FieldNotNull(FieldMemberConcurrency))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.

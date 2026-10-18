@@ -100,6 +100,20 @@ func (_c *EnterpriseCreate) SetNillableGroupPoolConfigured(v *bool) *EnterpriseC
 	return _c
 }
 
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (_c *EnterpriseCreate) SetMemberConcurrency(v int) *EnterpriseCreate {
+	_c.mutation.SetMemberConcurrency(v)
+	return _c
+}
+
+// SetNillableMemberConcurrency sets the "member_concurrency" field if the given value is not nil.
+func (_c *EnterpriseCreate) SetNillableMemberConcurrency(v *int) *EnterpriseCreate {
+	if v != nil {
+		_c.SetMemberConcurrency(*v)
+	}
+	return _c
+}
+
 // SetBalance sets the "balance" field.
 func (_c *EnterpriseCreate) SetBalance(v float64) *EnterpriseCreate {
 	_c.mutation.SetBalance(v)
@@ -365,6 +379,11 @@ func (_c *EnterpriseCreate) check() error {
 	if _, ok := _c.mutation.GroupPoolConfigured(); !ok {
 		return &ValidationError{Name: "group_pool_configured", err: errors.New(`ent: missing required field "Enterprise.group_pool_configured"`)}
 	}
+	if v, ok := _c.mutation.MemberConcurrency(); ok {
+		if err := enterprise.MemberConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "member_concurrency", err: fmt.Errorf(`ent: validator failed for field "Enterprise.member_concurrency": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "Enterprise.balance"`)}
 	}
@@ -454,6 +473,10 @@ func (_c *EnterpriseCreate) createSpec() (*Enterprise, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.GroupPoolConfigured(); ok {
 		_spec.SetField(enterprise.FieldGroupPoolConfigured, field.TypeBool, value)
 		_node.GroupPoolConfigured = value
+	}
+	if value, ok := _c.mutation.MemberConcurrency(); ok {
+		_spec.SetField(enterprise.FieldMemberConcurrency, field.TypeInt, value)
+		_node.MemberConcurrency = &value
 	}
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(enterprise.FieldBalance, field.TypeFloat64, value)
@@ -626,6 +649,30 @@ func (u *EnterpriseUpsert) SetGroupPoolConfigured(v bool) *EnterpriseUpsert {
 // UpdateGroupPoolConfigured sets the "group_pool_configured" field to the value that was provided on create.
 func (u *EnterpriseUpsert) UpdateGroupPoolConfigured() *EnterpriseUpsert {
 	u.SetExcluded(enterprise.FieldGroupPoolConfigured)
+	return u
+}
+
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (u *EnterpriseUpsert) SetMemberConcurrency(v int) *EnterpriseUpsert {
+	u.Set(enterprise.FieldMemberConcurrency, v)
+	return u
+}
+
+// UpdateMemberConcurrency sets the "member_concurrency" field to the value that was provided on create.
+func (u *EnterpriseUpsert) UpdateMemberConcurrency() *EnterpriseUpsert {
+	u.SetExcluded(enterprise.FieldMemberConcurrency)
+	return u
+}
+
+// AddMemberConcurrency adds v to the "member_concurrency" field.
+func (u *EnterpriseUpsert) AddMemberConcurrency(v int) *EnterpriseUpsert {
+	u.Add(enterprise.FieldMemberConcurrency, v)
+	return u
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (u *EnterpriseUpsert) ClearMemberConcurrency() *EnterpriseUpsert {
+	u.SetNull(enterprise.FieldMemberConcurrency)
 	return u
 }
 
@@ -886,6 +933,34 @@ func (u *EnterpriseUpsertOne) SetGroupPoolConfigured(v bool) *EnterpriseUpsertOn
 func (u *EnterpriseUpsertOne) UpdateGroupPoolConfigured() *EnterpriseUpsertOne {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateGroupPoolConfigured()
+	})
+}
+
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (u *EnterpriseUpsertOne) SetMemberConcurrency(v int) *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetMemberConcurrency(v)
+	})
+}
+
+// AddMemberConcurrency adds v to the "member_concurrency" field.
+func (u *EnterpriseUpsertOne) AddMemberConcurrency(v int) *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.AddMemberConcurrency(v)
+	})
+}
+
+// UpdateMemberConcurrency sets the "member_concurrency" field to the value that was provided on create.
+func (u *EnterpriseUpsertOne) UpdateMemberConcurrency() *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateMemberConcurrency()
+	})
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (u *EnterpriseUpsertOne) ClearMemberConcurrency() *EnterpriseUpsertOne {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.ClearMemberConcurrency()
 	})
 }
 
@@ -1335,6 +1410,34 @@ func (u *EnterpriseUpsertBulk) SetGroupPoolConfigured(v bool) *EnterpriseUpsertB
 func (u *EnterpriseUpsertBulk) UpdateGroupPoolConfigured() *EnterpriseUpsertBulk {
 	return u.Update(func(s *EnterpriseUpsert) {
 		s.UpdateGroupPoolConfigured()
+	})
+}
+
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (u *EnterpriseUpsertBulk) SetMemberConcurrency(v int) *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.SetMemberConcurrency(v)
+	})
+}
+
+// AddMemberConcurrency adds v to the "member_concurrency" field.
+func (u *EnterpriseUpsertBulk) AddMemberConcurrency(v int) *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.AddMemberConcurrency(v)
+	})
+}
+
+// UpdateMemberConcurrency sets the "member_concurrency" field to the value that was provided on create.
+func (u *EnterpriseUpsertBulk) UpdateMemberConcurrency() *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.UpdateMemberConcurrency()
+	})
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (u *EnterpriseUpsertBulk) ClearMemberConcurrency() *EnterpriseUpsertBulk {
+	return u.Update(func(s *EnterpriseUpsert) {
+		s.ClearMemberConcurrency()
 	})
 }
 

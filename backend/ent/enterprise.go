@@ -31,6 +31,8 @@ type Enterprise struct {
 	Status string `json:"status,omitempty"`
 	// GroupPoolConfigured holds the value of the "group_pool_configured" field.
 	GroupPoolConfigured bool `json:"group_pool_configured,omitempty"`
+	// MemberConcurrency holds the value of the "member_concurrency" field.
+	MemberConcurrency *int `json:"member_concurrency,omitempty"`
 	// Balance holds the value of the "balance" field.
 	Balance float64 `json:"balance,omitempty"`
 	// FrozenBalance holds the value of the "frozen_balance" field.
@@ -95,7 +97,7 @@ func (*Enterprise) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case enterprise.FieldBalance, enterprise.FieldFrozenBalance, enterprise.FieldTotalRecharged, enterprise.FieldLowBalanceThreshold:
 			values[i] = new(sql.NullFloat64)
-		case enterprise.FieldID:
+		case enterprise.FieldID, enterprise.FieldMemberConcurrency:
 			values[i] = new(sql.NullInt64)
 		case enterprise.FieldName, enterprise.FieldStatus, enterprise.FieldContactName, enterprise.FieldContactEmail, enterprise.FieldContactPhone, enterprise.FieldNotes:
 			values[i] = new(sql.NullString)
@@ -158,6 +160,13 @@ func (_m *Enterprise) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field group_pool_configured", values[i])
 			} else if value.Valid {
 				_m.GroupPoolConfigured = value.Bool
+			}
+		case enterprise.FieldMemberConcurrency:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field member_concurrency", values[i])
+			} else if value.Valid {
+				_m.MemberConcurrency = new(int)
+				*_m.MemberConcurrency = int(value.Int64)
 			}
 		case enterprise.FieldBalance:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
@@ -281,6 +290,11 @@ func (_m *Enterprise) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_pool_configured=")
 	builder.WriteString(fmt.Sprintf("%v", _m.GroupPoolConfigured))
+	builder.WriteString(", ")
+	if v := _m.MemberConcurrency; v != nil {
+		builder.WriteString("member_concurrency=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("balance=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Balance))

@@ -21160,6 +21160,8 @@ type EnterpriseMutation struct {
 	name                     *string
 	status                   *string
 	group_pool_configured    *bool
+	member_concurrency       *int
+	addmember_concurrency    *int
 	balance                  *float64
 	addbalance               *float64
 	frozen_balance           *float64
@@ -21507,6 +21509,76 @@ func (m *EnterpriseMutation) OldGroupPoolConfigured(ctx context.Context) (v bool
 // ResetGroupPoolConfigured resets all changes to the "group_pool_configured" field.
 func (m *EnterpriseMutation) ResetGroupPoolConfigured() {
 	m.group_pool_configured = nil
+}
+
+// SetMemberConcurrency sets the "member_concurrency" field.
+func (m *EnterpriseMutation) SetMemberConcurrency(i int) {
+	m.member_concurrency = &i
+	m.addmember_concurrency = nil
+}
+
+// MemberConcurrency returns the value of the "member_concurrency" field in the mutation.
+func (m *EnterpriseMutation) MemberConcurrency() (r int, exists bool) {
+	v := m.member_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMemberConcurrency returns the old "member_concurrency" field's value of the Enterprise entity.
+// If the Enterprise object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseMutation) OldMemberConcurrency(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMemberConcurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMemberConcurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMemberConcurrency: %w", err)
+	}
+	return oldValue.MemberConcurrency, nil
+}
+
+// AddMemberConcurrency adds i to the "member_concurrency" field.
+func (m *EnterpriseMutation) AddMemberConcurrency(i int) {
+	if m.addmember_concurrency != nil {
+		*m.addmember_concurrency += i
+	} else {
+		m.addmember_concurrency = &i
+	}
+}
+
+// AddedMemberConcurrency returns the value that was added to the "member_concurrency" field in this mutation.
+func (m *EnterpriseMutation) AddedMemberConcurrency() (r int, exists bool) {
+	v := m.addmember_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMemberConcurrency clears the value of the "member_concurrency" field.
+func (m *EnterpriseMutation) ClearMemberConcurrency() {
+	m.member_concurrency = nil
+	m.addmember_concurrency = nil
+	m.clearedFields[enterprise.FieldMemberConcurrency] = struct{}{}
+}
+
+// MemberConcurrencyCleared returns if the "member_concurrency" field was cleared in this mutation.
+func (m *EnterpriseMutation) MemberConcurrencyCleared() bool {
+	_, ok := m.clearedFields[enterprise.FieldMemberConcurrency]
+	return ok
+}
+
+// ResetMemberConcurrency resets all changes to the "member_concurrency" field.
+func (m *EnterpriseMutation) ResetMemberConcurrency() {
+	m.member_concurrency = nil
+	m.addmember_concurrency = nil
+	delete(m.clearedFields, enterprise.FieldMemberConcurrency)
 }
 
 // SetBalance sets the "balance" field.
@@ -22015,7 +22087,7 @@ func (m *EnterpriseMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.created_at != nil {
 		fields = append(fields, enterprise.FieldCreatedAt)
 	}
@@ -22033,6 +22105,9 @@ func (m *EnterpriseMutation) Fields() []string {
 	}
 	if m.group_pool_configured != nil {
 		fields = append(fields, enterprise.FieldGroupPoolConfigured)
+	}
+	if m.member_concurrency != nil {
+		fields = append(fields, enterprise.FieldMemberConcurrency)
 	}
 	if m.balance != nil {
 		fields = append(fields, enterprise.FieldBalance)
@@ -22081,6 +22156,8 @@ func (m *EnterpriseMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case enterprise.FieldGroupPoolConfigured:
 		return m.GroupPoolConfigured()
+	case enterprise.FieldMemberConcurrency:
+		return m.MemberConcurrency()
 	case enterprise.FieldBalance:
 		return m.Balance()
 	case enterprise.FieldFrozenBalance:
@@ -22120,6 +22197,8 @@ func (m *EnterpriseMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldStatus(ctx)
 	case enterprise.FieldGroupPoolConfigured:
 		return m.OldGroupPoolConfigured(ctx)
+	case enterprise.FieldMemberConcurrency:
+		return m.OldMemberConcurrency(ctx)
 	case enterprise.FieldBalance:
 		return m.OldBalance(ctx)
 	case enterprise.FieldFrozenBalance:
@@ -22188,6 +22267,13 @@ func (m *EnterpriseMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupPoolConfigured(v)
+		return nil
+	case enterprise.FieldMemberConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMemberConcurrency(v)
 		return nil
 	case enterprise.FieldBalance:
 		v, ok := value.(float64)
@@ -22260,6 +22346,9 @@ func (m *EnterpriseMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *EnterpriseMutation) AddedFields() []string {
 	var fields []string
+	if m.addmember_concurrency != nil {
+		fields = append(fields, enterprise.FieldMemberConcurrency)
+	}
 	if m.addbalance != nil {
 		fields = append(fields, enterprise.FieldBalance)
 	}
@@ -22280,6 +22369,8 @@ func (m *EnterpriseMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *EnterpriseMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case enterprise.FieldMemberConcurrency:
+		return m.AddedMemberConcurrency()
 	case enterprise.FieldBalance:
 		return m.AddedBalance()
 	case enterprise.FieldFrozenBalance:
@@ -22297,6 +22388,13 @@ func (m *EnterpriseMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *EnterpriseMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case enterprise.FieldMemberConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMemberConcurrency(v)
+		return nil
 	case enterprise.FieldBalance:
 		v, ok := value.(float64)
 		if !ok {
@@ -22336,6 +22434,9 @@ func (m *EnterpriseMutation) ClearedFields() []string {
 	if m.FieldCleared(enterprise.FieldDeletedAt) {
 		fields = append(fields, enterprise.FieldDeletedAt)
 	}
+	if m.FieldCleared(enterprise.FieldMemberConcurrency) {
+		fields = append(fields, enterprise.FieldMemberConcurrency)
+	}
 	if m.FieldCleared(enterprise.FieldLowBalanceThreshold) {
 		fields = append(fields, enterprise.FieldLowBalanceThreshold)
 	}
@@ -22355,6 +22456,9 @@ func (m *EnterpriseMutation) ClearField(name string) error {
 	switch name {
 	case enterprise.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case enterprise.FieldMemberConcurrency:
+		m.ClearMemberConcurrency()
 		return nil
 	case enterprise.FieldLowBalanceThreshold:
 		m.ClearLowBalanceThreshold()
@@ -22384,6 +22488,9 @@ func (m *EnterpriseMutation) ResetField(name string) error {
 		return nil
 	case enterprise.FieldGroupPoolConfigured:
 		m.ResetGroupPoolConfigured()
+		return nil
+	case enterprise.FieldMemberConcurrency:
+		m.ResetMemberConcurrency()
 		return nil
 	case enterprise.FieldBalance:
 		m.ResetBalance()

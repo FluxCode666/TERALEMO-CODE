@@ -181,6 +181,18 @@ func (r *enterpriseManagementTestUsers) GetByID(_ context.Context, id int64) (*U
 	return &v, nil
 }
 
+func (r *enterpriseManagementTestUsers) BatchSetConcurrency(_ context.Context, ids []int64, value int) (int, error) {
+	count := 0
+	for _, id := range ids {
+		if user, ok := r.users[id]; ok {
+			user.Concurrency = value
+			r.users[id] = user
+			count++
+		}
+	}
+	return count, nil
+}
+
 type enterpriseManagementTestUserCreator struct {
 	user   User
 	inputs []*CreateUserInput

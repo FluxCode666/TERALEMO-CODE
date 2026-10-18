@@ -28,6 +28,7 @@ func (Enterprise) Fields() []ent.Field {
 		field.String("name").MaxLen(100).NotEmpty(),
 		field.String("status").MaxLen(20).Default("active"),
 		field.Bool("group_pool_configured").Default(false),
+		field.Int("member_concurrency").Optional().Nillable().Positive().SchemaType(map[string]string{dialect.Postgres: "integer"}),
 		field.Float("balance").Default(0).SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("frozen_balance").Default(0).SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("total_recharged").Default(0).SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),

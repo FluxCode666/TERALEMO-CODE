@@ -34,6 +34,7 @@ const (
 	EnterpriseAuditActionMemberCreate               = "member.create"
 	EnterpriseAuditActionMemberUpdate               = "member.update"
 	EnterpriseAuditActionMemberRemove               = "member.remove"
+	EnterpriseAuditActionMembersConcurrencyUpdate   = "members.concurrency.update"
 	EnterpriseAuditActionMemberDisabledByModeration = "member.disabled_by_moderation"
 	EnterpriseAuditActionQuotaUpdate                = "quota.update"
 	EnterpriseAuditActionQuotaReset                 = "quota.reset"
