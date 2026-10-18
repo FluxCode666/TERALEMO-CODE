@@ -13,7 +13,7 @@ declare module 'vue-router' {
      */
     requiresAuth?: boolean
 
-    /** Requires membership in an enterprise. */
+    /** Requires an enterprise owner/manager, or a system admin with enterprise membership. */
     requiresEnterprise?: boolean
 
     /** Personal payments, balance redemption and unsupported wallet flows. */

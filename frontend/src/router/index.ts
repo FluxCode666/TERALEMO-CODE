@@ -843,9 +843,14 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
+  const enterprise = authStore.user?.enterprise
+  const canManageEnterprise = !!enterprise && (
+    authStore.isAdmin || enterprise.role === 'owner' || enterprise.role === 'manager'
+  )
+
   // This check also covers public payment callbacks that can open a payment form.
   if (authStore.isAuthenticated && authStore.user?.enterprise && to.meta.requiresPersonalWallet) {
-    next('/enterprise')
+    next(canManageEnterprise ? '/enterprise' : '/dashboard')
     return
   }
 
@@ -916,7 +921,7 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  if (to.meta.requiresEnterprise && !authStore.user?.enterprise) {
+  if (to.meta.requiresEnterprise && !canManageEnterprise) {
     next('/dashboard')
     return
   }

@@ -52,16 +52,16 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     expect(listUsers).toHaveBeenCalledWith(1, 50, { search: 'alice', role: 'user' })
     expect(wrapper.find('[data-test="member-user"] option[value="43"]').exists()).toBe(false)
     await selectOption(wrapper, '[data-test="member-user"]', 'Alice · alice@example.com')
-    await selectOption(wrapper, '[data-test="member-department"]', '研发部')
+    await wrapper.get('[data-test="member-department"] [data-test="org-node-3"]').trigger('click')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ user_id: 42, department_id: 3, role: 'member', title: '' })
     expect(wrapper.find('[data-test="member-email"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('fixes a department manager creation to their own department and member role', async () => {
+  it('defaults manager creation to their department and restricts the role to member', async () => {
     const wrapper = mount(EnterpriseMemberForm, { props: { departments, limitedManager: true, departmentId: 3 } })
-    expect(wrapper.find('[data-test="member-department"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="member-department"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="member-role"]').exists()).toBe(false)
     await wrapper.get('[data-test="member-email"]').setValue('employee@example.com')
     await wrapper.get('[data-test="member-password"]').setValue('password123')
@@ -70,18 +70,18 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     wrapper.unmount()
   })
 
-  it('allows a department manager to update only status and title', async () => {
+  it('allows a department manager to update status, title and department within the permitted tree', async () => {
     const member = { id: 7, enterprise_id: 1, user_id: 42, email: 'alice@example.com', username: 'Alice', department_id: 3, department_name: '研发部', role: 'member' as const, status: 'active' as const, title: 'Engineer', joined_at: '', user_status: 'active' as const }
     const wrapper = mount(EnterpriseMemberForm, { props: { member, departments, limitedManager: true, departmentId: 3 } })
     await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ status: 'active', title: 'Engineer' })
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ department_id: 3, status: 'active', title: 'Engineer' })
     wrapper.unmount()
   })
 
   it('preserves an existing member without a department when the operator has a department', async () => {
     const member = { id: 7, enterprise_id: 1, user_id: 42, email: 'alice@example.com', username: 'Alice', department_id: null, department_name: null, role: 'member' as const, status: 'active' as const, title: 'Engineer', joined_at: '', user_status: 'active' as const }
     const wrapper = mount(EnterpriseMemberForm, { props: { member, departments, departmentId: 3 } })
-    expect(wrapper.get('[data-test="member-department"]').text()).toContain('enterprise.noDepartment')
+    expect(wrapper.get('[data-test="member-department"]').text()).toContain('enterprise.orgTree.unassigned')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual({ department_id: 0, role: 'member', status: 'active', title: 'Engineer' })
     wrapper.unmount()

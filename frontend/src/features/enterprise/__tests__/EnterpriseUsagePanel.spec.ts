@@ -5,7 +5,6 @@ import { Line } from 'vue-chartjs'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseUsageTrend } from '@/types/enterprise'
 import { formatDateTime } from '@/utils/format'
-import EnterpriseUsageTrendView from '../components/EnterpriseUsageTrend.vue'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
@@ -120,9 +119,11 @@ describe('enterprise usage display', () => {
   it('switches day/hour while keeping the submitted filter snapshot', async () => {
     const { wrapper, api } = await mountUsage([singleDay])
     wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'submitted')
+    const picker = wrapper.getComponent({ name: 'EnterpriseDateRangePicker' })
+    picker.vm.$emit('update:startDate', '2026-10-01'); picker.vm.$emit('update:endDate', '2026-10-18')
     await wrapper.get('form').trigger('submit'); await flushPromises()
     wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'draft')
-    wrapper.getComponent(EnterpriseUsageTrendView).vm.$emit('update:granularity', 'hour'); await flushPromises()
+    await wrapper.get('[data-test="usage-granularity-hour"]').trigger('click'); await flushPromises()
     expect(api.usageTrend).toHaveBeenLastCalledWith(expect.objectContaining({ granularity: 'hour', model: 'submitted' }), expect.anything())
     expect(api.usageStats).toHaveBeenCalledTimes(2)
   })

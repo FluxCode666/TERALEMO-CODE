@@ -32,6 +32,7 @@ export interface EnterpriseSummary {
 export interface EnterpriseIdentity extends EnterpriseSummary {
   department_id: number | null
   department_name: string | null
+  department_path_names?: string[]
   member_status: EnterpriseStatus
   enterprise_status: EnterpriseStatus
   balance_visible: boolean
@@ -74,6 +75,11 @@ export interface EnterpriseDepartment {
   id: number
   enterprise_id: number
   name: string
+  parent_id?: number | null
+  path_ids?: number[]
+  path_names?: string[]
+  depth?: number
+  total_member_count?: number
   sort_order: number
   member_count: number
   created_at: string
@@ -90,6 +96,8 @@ export interface EnterpriseMember {
   status: EnterpriseStatus
   title: string
   joined_at: string
+  department_path_names?: string[]
+  last_login_at?: string | null
   user_status: EnterpriseStatus
 }
 export interface EnterprisePermissions {
@@ -106,7 +114,7 @@ export interface EnterprisePermissions {
 }
 export interface EnterpriseOverview {
   enterprise: Pick<Enterprise, 'id' | 'name' | 'status'>
-  me: { member_id: number; user_id: number; role: EnterpriseRole; status: EnterpriseStatus; department_id: number | null; department_name: string | null; title: string }
+  me: { member_id: number; user_id: number; role: EnterpriseRole; status: EnterpriseStatus; department_id: number | null; department_name: string | null; department_path_names?: string[]; title: string }
   balance_visible: boolean
   balance: number | null
   frozen_balance: number | null
@@ -156,10 +164,14 @@ export interface EnterpriseUsageStats {
 }
 export interface EnterpriseUsageTokens { input_tokens?: number; output_tokens?: number; cache_creation_tokens?: number; cache_read_tokens?: number; cost?: number }
 export interface EnterpriseUsageTrend extends EnterpriseUsageTokens { date: string; requests: number; actual_cost: number; total_tokens: number }
+export type EnterpriseUsageGranularity = 'day' | 'hour'
+export interface EnterpriseUsageModelTrend extends EnterpriseUsageTrend { model: string }
+export interface EnterpriseUsageMemberTrend extends EnterpriseUsageTrend { user_id: number; username: string }
+export interface EnterpriseUsageDepartmentTrend extends EnterpriseUsageTrend { department_id: number; department_name: string }
 export interface EnterpriseUsageModel extends EnterpriseUsageTokens { model: string; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseMemberUsage { user_id: number; username: string; email: string; department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
 export interface EnterpriseDepartmentUsage { department_id: number | null; department_name: string | null; requests: number; total_tokens: number; actual_cost: number }
-export interface EnterpriseQuery { member_id?: number; page?: number; page_size?: number; search?: string; status?: string; role?: EnterpriseRole; department_id?: number; user_id?: number; api_key_id?: number; model?: string; start_date?: string; end_date?: string; granularity?: 'day' | 'hour'; action?: string; scope_type?: EnterpriseScope; sort_by?: 'created_at' | 'model'; sort_order?: 'asc' | 'desc' }
+export interface EnterpriseQuery { member_id?: number; page?: number; page_size?: number; search?: string; status?: string; role?: EnterpriseRole; department_id?: number; user_id?: number; api_key_id?: number; model?: string; start_date?: string; end_date?: string; granularity?: 'day' | 'hour'; top?: number; action?: string; scope_type?: EnterpriseScope; sort_by?: 'created_at' | 'model'; sort_order?: 'asc' | 'desc' }
 export type EnterpriseOwnerInput = { user_id: number; email?: never; password?: never; username?: never } | { user_id?: never; email: string; password: string; username?: string }
 export type CreateEnterpriseRequest = Pick<Enterprise, 'name'> & Partial<Pick<Enterprise, 'status' | 'notes' | 'contact_name' | 'contact_email' | 'contact_phone' | 'low_balance_threshold' | 'settings'>> & { owner?: EnterpriseOwnerInput }
 export type UpdateEnterpriseRequest = Omit<Partial<CreateEnterpriseRequest>, 'owner'>
@@ -167,3 +179,14 @@ export type CreateEnterpriseMemberRequest = EnterpriseOwnerInput & { department_
 export type CreateEnterpriseAccountMemberRequest = { user_id?: never; email: string; password: string; username?: string; department_id?: number | null; role: EnterpriseRole; title?: string }
 export interface UpdateEnterpriseMemberRequest { department_id?: number; role?: EnterpriseRole; status?: EnterpriseStatus; title?: string }
 export type EnterprisePage<T> = BasePaginationResponse<T>
+
+export interface EnterpriseImportRow { row: number; email: string; username: string; department_path: string; role: EnterpriseRole; title: string; password?: string }
+export interface EnterpriseImportPreview {
+  summary: { total: number; create: number; update: number; skip: number; error: number }
+  departments_to_create: string[]
+  rows: { row: number; status: 'create' | 'update' | 'skip' | 'error'; email: string; department_path: string; role: EnterpriseRole; messages: string[] }[]
+}
+export interface EnterpriseImportResult {
+  summary: { total: number; created: number; updated: number; skipped: number; failed: number }
+  rows: { row: number; status: 'created' | 'updated' | 'skipped' | 'failed'; member_id?: number; user_id?: number; generated_password?: string; message?: string }[]
+}

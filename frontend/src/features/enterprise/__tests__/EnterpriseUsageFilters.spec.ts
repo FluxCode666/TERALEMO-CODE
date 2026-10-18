@@ -4,7 +4,7 @@ import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import EnterpriseUsagePanel from '../components/EnterpriseUsagePanel.vue'
 import DateRangePicker from '../components/EnterpriseDateRangePicker.vue'
 import UsageCombobox from '../components/EnterpriseUsageCombobox.vue'
-import { Select } from '@/components/ui/select'
+import DepartmentTree from '../components/EnterpriseUsageDepartmentTree.vue'
 
 vi.mock('vue-i18n', async original => {
   const { default: messages } = await import('@/i18n/locales/zh/enterprise')
@@ -92,7 +92,7 @@ describe('enterprise usage sticky filters', () => {
     await intersect(false, 900)
     expect(wrapper.find('[data-test="usage-filter-summary"]').exists()).toBe(false)
     await intersect(false, 50)
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间 · 按天')
     expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
     expect(wrapper.get('form').classes()).toContain('z-20')
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
@@ -121,14 +121,14 @@ describe('enterprise usage sticky filters', () => {
     combos[1].vm.$emit('update:modelValue', 'gpt-5.4')
     combos[2].vm.$emit('update:modelValue', '8')
     combos[2].vm.$emit('select', { value: '8', label: 'Production · Alice' })
-    wrapper.getComponent(Select).vm.$emit('update:modelValue', '3')
+    wrapper.getComponent(DepartmentTree).vm.$emit('update:modelValue', '3')
     expect(api.usageStats).toHaveBeenCalledOnce()
     await wrapper.get('form').trigger('submit'); await flushPromises()
     for (const request of [api.usage, api.usageStats, api.usageTrend, api.usageModels, api.usageMembers, api.usageDepartments]) {
       expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: '2026-10-01', end_date: '2026-10-10', user_id: 42, department_id: 3, model: 'gpt-5.4', api_key_id: 8 }), expect.anything())
     }
     await intersect(false, 0)
-    const snapshot = '2026-10-01 – 2026-10-10 · Alice · 研发 · gpt-5.4 · Production · Alice'
+    const snapshot = '2026-10-01 – 2026-10-10 · 按天 · Alice · 研发 · gpt-5.4 · Production · Alice'
     expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
     await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
     wrapper.getComponent('[data-test="usage-model"]').vm.$emit('update:modelValue', 'draft-model')
@@ -137,9 +137,37 @@ describe('enterprise usage sticky filters', () => {
     expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe(snapshot)
     expect(api.usageStats).toHaveBeenCalledTimes(2)
     await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
-    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间')
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('全部时间 · 按天')
     expect(wrapper.find('#enterprise-usage-filters').exists()).toBe(false)
     expect(wrapper.get('[data-test="usage-average-cost"]').text()).toContain('$0.0000')
+  })
+
+  it('includes the active hourly granularity in the collapsed summary', async () => {
+    const { wrapper } = await setup()
+    const picker = wrapper.getComponent(DateRangePicker)
+    picker.vm.$emit('update:startDate', '2026-10-01'); picker.vm.$emit('update:endDate', '2026-10-10')
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+    await wrapper.get('[data-test="usage-granularity-hour"]').trigger('click'); await flushPromises()
+    await intersect(false, 0)
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-01 – 2026-10-10 · 按小时')
+  })
+
+  it('preserves shortcut names across sticky collapse and clears them on reset', async () => {
+    const { wrapper, api } = await setup()
+    const picker = wrapper.getComponent(DateRangePicker)
+    picker.vm.$emit('update:startDate', '2026-10-12'); picker.vm.$emit('update:endDate', '2026-10-18')
+    picker.vm.$emit('update:period', 'last7')
+    await flushPromises()
+    expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('近 7 天')
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+    expect(api.usageStats).toHaveBeenLastCalledWith(expect.objectContaining({ start_date: '2026-10-12', end_date: '2026-10-18' }), expect.anything())
+    await intersect(false, 0)
+    expect(wrapper.get('[data-test="usage-filter-summary"]').text()).toBe('2026-10-12 – 2026-10-18 · 按天')
+    await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
+    expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('近 7 天')
+    await wrapper.get('[data-test="usage-reset"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="usage-expand-filters"]').trigger('click')
+    expect(wrapper.get('[data-test="usage-date-range"]').text()).toBe('全部时间')
   })
 
   it('validates reversed or excessive ranges before issuing requests', async () => {

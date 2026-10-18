@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import type { EnterpriseRole } from '@/types/enterprise'
 
 const mocks = vi.hoisted(() => ({
-  auth: { user: { enterprise: null as null | { id: number } }, isAdmin: false, isSimpleMode: false },
+  auth: { user: { enterprise: null as null | { id: number; role: EnterpriseRole } }, isAdmin: false, isSimpleMode: false },
   app: { sidebarCollapsed: false, mobileOpen: false, sidebarScrollTop: 0, siteName: 'Test', siteLogo: '', siteVersion: '', publicSettingsLoaded: true, cachedPublicSettings: { custom_menu_items: [] }, toggleSidebar: vi.fn(), setMobileOpen: vi.fn() },
   admin: { customMenuItems: [], fetch: vi.fn(), paymentEnabled: true, opsMonitoringEnabled: true }
 }))
@@ -25,10 +26,10 @@ beforeEach(() => {
 })
 
 describe('AppSidebar 企业菜单与钱包入口', () => {
-  it('企业成员显示我的企业并隐藏个人钱包及批量图片入口', () => {
-    mocks.auth.user.enterprise = { id: 1 }
+  it.each(['owner', 'manager', 'member'] as const)('企业角色 %s 的管理入口按权限显示，个人钱包及批量图片入口隐藏', role => {
+    mocks.auth.user.enterprise = { id: 1, role }
     const wrapper = render()
-    expect(wrapper.find('a[href="/enterprise"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/enterprise"]').exists()).toBe(role !== 'member')
     for (const path of ['/purchase', '/orders', '/redeem', '/batch-image']) expect(wrapper.find(`a[href="${path}"]`).exists(), path).toBe(false)
     expect(wrapper.find('a[href="/subscriptions"]').exists()).toBe(true)
     wrapper.unmount()
@@ -41,18 +42,20 @@ describe('AppSidebar 企业菜单与钱包入口', () => {
     wrapper.unmount()
   })
 
-  it('管理员显示企业管理菜单', () => {
+  it.each([null, 'owner', 'manager', 'member'] as const)('管理员的企业角色为 %s 时保留原有导航', role => {
     mocks.auth.isAdmin = true
+    mocks.auth.user.enterprise = role ? { id: 1, role } : null
     const wrapper = render()
     expect(wrapper.find('a[href="/admin/enterprises"]').text()).toBe('nav.enterprises')
+    expect(wrapper.find('a[href="/enterprise"]').exists()).toBe(role !== null)
     wrapper.unmount()
   })
 
-  it('简易模式下企业成员仍可进入我的企业', () => {
-    mocks.auth.user.enterprise = { id: 1 }
+  it.each(['owner', 'manager', 'member'] as const)('简易模式下企业角色 %s 仍遵循管理入口权限', role => {
+    mocks.auth.user.enterprise = { id: 1, role }
     mocks.auth.isSimpleMode = true
     const wrapper = render()
-    expect(wrapper.find('a[href="/enterprise"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/enterprise"]').exists()).toBe(role !== 'member')
     wrapper.unmount()
   })
 })

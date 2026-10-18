@@ -12,13 +12,26 @@ import { usageDateRange, type UsagePeriod } from '../useEnterpriseUsage'
 
 const props = defineProps<{ startDate: string; endDate: string }>()
 const emit = defineEmits<{ 'update:startDate': [value: string]; 'update:endDate': [value: string] }>()
+const selectedPeriod = defineModel<UsagePeriod | null>('period', { default: null })
 const { t, locale } = useI18n()
 const open = ref(false)
 const wide = useMediaQuery('(min-width: 768px)')
 const range = shallowRef<DateRange>({ start: undefined, end: undefined })
 const periods: UsagePeriod[] = ['today', 'last7', 'last30', 'month', 'lastMonth']
 const calendarLocale = computed(() => locale.value === 'zh' ? 'zh-CN' : locale.value)
-const label = computed(() => props.startDate || props.endDate ? `${props.startDate || '…'} – ${props.endDate || '…'}` : t('enterprise.usageAnalysis.allTime'))
+const fullLabel = computed(() => props.startDate || props.endDate ? `${props.startDate || '…'} – ${props.endDate || '…'}` : t('enterprise.usageAnalysis.allTime'))
+const label = computed(() => {
+  if (selectedPeriod.value) return t(`enterprise.usageAnalysis.${selectedPeriod.value}`)
+  if (props.startDate && props.endDate && props.startDate.slice(0, 4) === props.endDate.slice(0, 4)) {
+    return `${props.startDate.slice(5)} – ${props.endDate.slice(5)}`
+  }
+  return fullLabel.value
+})
+watch([() => props.startDate, () => props.endDate], () => {
+  if (!selectedPeriod.value) return
+  const value = usageDateRange(selectedPeriod.value)
+  if (props.startDate !== value.start_date || props.endDate !== value.end_date) selectedPeriod.value = null
+})
 watch([() => props.startDate, () => props.endDate, open], () => {
   range.value = { start: props.startDate ? parseDate(props.startDate) : undefined, end: props.endDate ? parseDate(props.endDate) : undefined }
 }, { immediate: true })
@@ -26,23 +39,24 @@ function update(value: DateRange | undefined) {
   range.value = value ?? { start: undefined, end: undefined }
   if (value?.start && value.end) commit(value.start.toString(), value.end.toString())
 }
-function commit(start: string, end: string) {
+function commit(start: string, end: string, period: UsagePeriod | null = null) {
+  selectedPeriod.value = period
   emit('update:startDate', start)
   emit('update:endDate', end)
   open.value = false
 }
 function preset(period: UsagePeriod) {
   const value = usageDateRange(period)
-  commit(value.start_date, value.end_date)
+  commit(value.start_date, value.end_date, period)
 }
 </script>
 
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button type="button" variant="outline" class="w-full min-w-0 justify-start gap-2 text-left font-normal" data-test="usage-date-range" :aria-label="`${t('enterprise.usageAnalysis.dateRange')}: ${label}`">
+      <Button type="button" variant="outline" class="w-auto min-w-[10rem] max-w-[min(100%,20rem)] justify-start gap-1.5 px-2 text-left font-normal sm:gap-2 sm:px-3" data-test="usage-date-range" :title="fullLabel" :aria-label="`${t('enterprise.usageAnalysis.dateRange')}: ${fullLabel}`">
         <CalendarDays class="size-4 shrink-0 text-muted-foreground" />
-        <span class="min-w-0 flex-1 truncate">{{ label }}</span>
+        <span class="flex-1 whitespace-nowrap">{{ label }}</span>
         <ChevronDown class="size-4 shrink-0 text-muted-foreground" />
       </Button>
     </PopoverTrigger>

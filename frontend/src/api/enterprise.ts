@@ -4,7 +4,9 @@ import type {
   EnterpriseOverview, EnterpriseDepartment, EnterpriseMember, EnterpriseQuota, EnterpriseSettings,
   EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseUsageLog, EnterpriseUsageStats,
   EnterpriseUsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage,
+  EnterpriseUsageModelTrend, EnterpriseUsageMemberTrend, EnterpriseUsageDepartmentTrend,
   EnterpriseAuditLog, EnterpriseBalanceLog, EnterprisePage, EnterpriseQuery, EnterpriseScope,
+  EnterpriseImportRow, EnterpriseImportPreview, EnterpriseImportResult,
   QuotaLimits, QuotaWindow, CreateEnterpriseMemberRequest, CreateEnterpriseAccountMemberRequest, UpdateEnterpriseMemberRequest
 } from '@/types/enterprise'
 
@@ -15,9 +17,11 @@ function createEnterpriseResourceAPI(base: string) {
   const put = async <T>(path: string, body: unknown): Promise<T> => (await apiClient.put<T>(`${base}${path}`, body)).data
   const remove = async (path: string): Promise<void> => { await apiClient.delete(`${base}${path}`) }
   return {
+    previewImport: (body: { rows: EnterpriseImportRow[] }) => post<EnterpriseImportPreview>('/import/preview', body),
+    commitImport: (body: { rows: EnterpriseImportRow[] }) => post<EnterpriseImportResult>('/import/commit', body),
     departments: (options?: FetchOptions) => get<EnterpriseDepartment[]>('/departments', undefined, options),
-    createDepartment: (body: { name: string; sort_order?: number }) => post<EnterpriseDepartment>('/departments', body),
-    updateDepartment: (id: number, body: { name?: string; sort_order?: number }) => put<EnterpriseDepartment>(`/departments/${id}`, body),
+    createDepartment: (body: { name: string; parent_id?: number | null; sort_order?: number }) => post<EnterpriseDepartment>('/departments', body),
+    updateDepartment: (id: number, body: { name?: string; parent_id?: number; sort_order?: number }) => put<EnterpriseDepartment>(`/departments/${id}`, body),
     deleteDepartment: (id: number) => remove(`/departments/${id}`),
     members: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterprisePage<EnterpriseMember>>('/members', params, options),
     createMember: (body: CreateEnterpriseMemberRequest) => post<EnterpriseMember>('/members', body),
@@ -35,6 +39,9 @@ function createEnterpriseResourceAPI(base: string) {
     usageStats: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageStats>('/usage/stats', params, options),
     usageTrend: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageTrend[]>('/usage/trend', params, options),
     usageModels: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageModel[]>('/usage/models', params, options),
+    usageModelsTrend: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageModelTrend[]>('/usage/models/trend', params, options),
+    usageMembersTrend: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageMemberTrend[]>('/usage/members/trend', params, options),
+    usageDepartmentsTrend: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseUsageDepartmentTrend[]>('/usage/departments/trend', params, options),
     usageMembers: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseMemberUsage[]>('/usage/members', params, options),
     usageDepartments: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterpriseDepartmentUsage[]>('/usage/departments', params, options),
     auditLogs: (params?: EnterpriseQuery, options?: FetchOptions) => get<EnterprisePage<EnterpriseAuditLog>>('/audit-logs', params, options)
@@ -66,6 +73,7 @@ export type EnterpriseAdminResourceAPI = ReturnType<typeof createEnterpriseAPI>
 export type EnterpriseResourceAPI = EnterpriseAdminResourceAPI | typeof enterpriseAPI
 
 const enterpriseErrorCodes = new Set([
+  'ENTERPRISE_DEPARTMENT_CYCLE', 'ENTERPRISE_DEPARTMENT_DEPTH_EXCEEDED',
   'ENTERPRISE_NOT_FOUND', 'ENTERPRISE_DEPARTMENT_NOT_FOUND', 'ENTERPRISE_MEMBER_NOT_FOUND',
   'ENTERPRISE_NAME_EXISTS', 'ENTERPRISE_DEPARTMENT_NAME_EXISTS', 'ENTERPRISE_MEMBER_EXISTS',
   'ENTERPRISE_MEMBER_ADMIN_FORBIDDEN', 'ENTERPRISE_MANAGER_REQUIRES_DEPARTMENT', 'ENTERPRISE_LAST_OWNER',

@@ -9,8 +9,9 @@
     </Card>
     <template v-if="showWhitelists">
       <section v-for="kind in scopeKinds" :key="kind" class="space-y-3" :data-test="`group-section-${kind}`">
-        <div><h2 class="text-lg font-semibold text-foreground">{{ t(`enterprise.groupAccess.sections.${kind}`) }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t('enterprise.groupAccess.configureHint') }}</p></div>
-        <EnterpriseSelect v-if="kind !== 'enterprise' && scopeOptions(kind).length" v-model="selectedTargets[kind]" :options="scopeOptions(kind)" :aria-label="t(`enterprise.groupAccess.sections.${kind}`)" :data-test="`group-target-${kind}`" class="sm:max-w-md" />
+        <div><h2 class="text-lg font-semibold text-foreground">{{ t(`enterprise.groupAccess.sections.${kind}`) }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ t(kind === 'department' ? 'enterprise.orgTree.groupInheritance' : 'enterprise.groupAccess.configureHint') }}</p></div>
+        <EnterpriseSelect v-if="kind === 'member' && scopeOptions(kind).length" v-model="selectedTargets[kind]" :options="scopeOptions(kind)" :aria-label="t(`enterprise.groupAccess.sections.${kind}`)" :data-test="`group-target-${kind}`" class="sm:max-w-md" />
+        <EnterpriseDepartmentPicker v-if="kind === 'department' && departments.length" v-model="selectedTargets.department" :departments="departments" :allow-root="false" :label="t('enterprise.groupAccess.sections.department')" data-test="group-target-department" />
         <EnterpriseGroupEditor v-if="currentScope(kind)" :key="currentScope(kind)!.key" :title="currentScope(kind)!.label" :group-ids="whitelistIds(kind, currentScope(kind)!.id)" :groups="candidates(currentScope(kind)!)" :editable="canEdit(currentScope(kind)!)" :busy="busy" @save="saveWhitelist(currentScope(kind)!, $event)" />
         <Card v-else class="rounded-ui-lg border bg-card text-card-foreground shadow-sm"><EnterpriseEmpty :title="t('enterprise.empty')" /></Card>
       </section>
@@ -37,6 +38,8 @@ import EnterpriseGroupCards from './EnterpriseGroupCards.vue'
 import EnterpriseGroupEditor from './EnterpriseGroupEditor.vue'
 import { useEnterpriseAction } from '../useEnterpriseAction'
 import { loadMemberOptions } from '../memberOptions'
+import { departmentAncestors, departmentPath, departmentSubtreeIds } from '../departmentTree'
+import EnterpriseDepartmentPicker from './EnterpriseDepartmentPicker.vue'
 type Scope = { key: string; label: string; type: EnterpriseScope; id: number }
 const props = defineProps<{ api: EnterpriseResourceAPI; enterpriseId: number; admin?: boolean; readonly?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
 const emit = defineEmits<{ updated: [] }>()
@@ -49,9 +52,9 @@ const selectedTargets = reactive<Record<EnterpriseScope, number | null>>({ enter
 const owner = computed(() => props.admin || props.overview?.me.role === 'owner')
 const showWhitelists = computed(() => owner.value || props.overview?.me.role === 'manager')
 const scopeKinds = computed<EnterpriseScope[]>(() => owner.value ? ['enterprise', 'department', 'member'] : ['member'])
-const eligibleMembers = computed(() => members.value.filter(item => owner.value || item.department_id === props.overview?.me.department_id))
+const eligibleMembers = computed(() => members.value.filter(item => owner.value || departmentSubtreeIds(departments.value, props.overview?.me.department_id).has(item.department_id ?? 0)))
 const scopes = computed<Scope[]>(() => [
-  ...(owner.value ? [{ key: `enterprise:${props.enterpriseId}`, type: 'enterprise' as const, id: props.enterpriseId, label: props.overview?.enterprise.name || t('enterprise.enterpriseScope') }, ...departments.value.map(item => ({ key: `department:${item.id}`, type: 'department' as const, id: item.id, label: item.name }))] : []),
+  ...(owner.value ? [{ key: `enterprise:${props.enterpriseId}`, type: 'enterprise' as const, id: props.enterpriseId, label: props.overview?.enterprise.name || t('enterprise.enterpriseScope') }, ...departments.value.map(item => ({ key: `department:${item.id}`, type: 'department' as const, id: item.id, label: departmentPath(departments.value, item.id) }))] : []),
   ...eligibleMembers.value.filter(item => owner.value || item.role === 'member').map(item => ({ key: `member:${item.id}`, type: 'member' as const, id: item.id, label: `${item.username || item.email} · ${item.department_name || t('enterprise.noDepartment')}` }))
 ])
 const poolConfigured = computed(() => props.admin ? pool.value.length > 0 : undefined)
@@ -66,12 +69,12 @@ function candidates(target: Scope) {
   if (poolConfigured.value) result = result.filter(group => pool.value.map(item => item.id).includes(group.id))
   const ancestors: { type: EnterpriseScope; id: number }[] = []
   if (target.type !== 'enterprise') ancestors.push({ type: 'enterprise', id: props.enterpriseId })
-  const departmentId = members.value.find(item => item.id === target.id)?.department_id
-  if (target.type === 'member' && departmentId) ancestors.push({ type: 'department', id: departmentId })
+  const departmentId = target.type === 'department' ? target.id : target.type === 'member' ? members.value.find(item => item.id === target.id)?.department_id : null
+  if (departmentId) ancestors.push(...departmentAncestors(departments.value, departmentId).filter(row => target.type !== 'department' || row.id !== target.id).map(row => ({ type: 'department' as const, id: row.id })))
   for (const ancestor of ancestors) {
     const configured = whitelists.value.find(item => item.scope_type === ancestor.type && item.scope_id === ancestor.id)
     const ids = configured?.group_ids
-    if (ids) result = result.filter(group => ids.includes(group.id))
+    if (ids?.length) result = result.filter(group => ids.includes(group.id))
   }
   return result
 }

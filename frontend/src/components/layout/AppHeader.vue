@@ -15,7 +15,7 @@
           <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
             {{ pageTitle }}
           </h1>
-          <p v-if="pageDescription" class="text-xs text-gray-500 dark:text-dark-400">
+          <p v-if="pageDescription" class="hidden text-xs text-gray-500 dark:text-dark-400 xl:block">
             {{ pageDescription }}
           </p>
         </div>
@@ -30,24 +30,26 @@
         <a
           v-if="docUrl"
           :href="docUrl"
+          :title="t('nav.docs')"
+          :aria-label="t('nav.docs')"
           target="_blank"
           rel="noopener noreferrer"
-          class="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
+          class="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
         >
           <Icon name="book" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
+          <span class="hidden xl:inline">{{ t('nav.docs') }}</span>
         </a>
 
-        <!-- Model Plaza Entry (icon only below sm) -->
+        <!-- Model Plaza Entry (icon only below xl to leave room for user identity) -->
         <router-link
           v-if="user && modelPlazaEnabled"
           :to="{ path: '/model-plaza', query: { embedded: '1' } }"
           :title="t('nav.modelPlaza')"
           :aria-label="t('nav.modelPlaza')"
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+          class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
         >
           <Icon name="grid" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
+          <span class="hidden xl:inline">{{ t('nav.modelPlaza') }}</span>
         </router-link>
 
         <!-- Language Switcher -->
@@ -62,7 +64,7 @@
           data-testid="header-balance"
           :aria-label="balanceLabel"
           tabindex="0"
-          class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
+          class="group relative hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
         >
           <svg
             class="h-4 w-4 text-primary-600 dark:text-primary-400"
@@ -90,7 +92,7 @@
           <div
             v-if="!enterprise || (frozenBalanceVisible && frozenBalance > 0)"
             data-testid="header-balance-details"
-            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block group-focus-visible:block dark:border-dark-700 dark:bg-dark-800"
+            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-64 max-w-[calc(100vw-2rem)] whitespace-normal rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block group-focus-visible:block dark:border-dark-700 dark:bg-dark-800"
           >
             <div class="flex items-center justify-between">
               <span class="text-gray-500 dark:text-dark-400">{{ balanceAvailableText }}</span>
@@ -111,13 +113,13 @@
         </div>
 
         <!-- User Dropdown -->
-        <div v-if="user" class="relative" ref="dropdownRef">
+        <div v-if="user" class="relative min-w-0" ref="dropdownRef">
           <button
             @click="toggleDropdown"
-            class="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
+            class="flex max-w-full items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
             :aria-label="t('common.userMenu')"
           >
-            <div class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
               <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
@@ -126,26 +128,38 @@
               >
               <span v-else>{{ userInitials }}</span>
             </div>
-            <div class="hidden text-left md:block">
-              <div class="text-sm font-medium text-gray-900 dark:text-white">
+            <div class="hidden min-w-0 max-w-40 text-left md:block xl:max-w-48">
+              <div class="truncate text-sm font-medium text-gray-900 dark:text-white" :title="displayName">
                 {{ displayName }}
               </div>
-              <div class="text-xs text-gray-500 dark:text-dark-400">
-                {{ t('admin.users.roles.' + user.role) }}
+              <div
+                data-testid="header-user-identity"
+                class="truncate text-xs text-gray-500 dark:text-dark-400"
+                :title="enterpriseIdentity?.title"
+              >
+                {{ enterpriseIdentity?.shortLabel ?? t('admin.users.roles.' + user.role) }}
               </div>
             </div>
-            <Icon name="chevronDown" size="sm" class="hidden text-gray-400 md:block" />
+            <Icon name="chevronDown" size="sm" class="hidden shrink-0 text-gray-400 md:block" />
           </button>
 
           <!-- Dropdown Menu -->
           <transition name="dropdown">
-            <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56">
+            <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56 max-w-[calc(100vw-1rem)]">
               <!-- User Info -->
               <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700">
-                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                <div class="truncate text-sm font-medium text-gray-900 dark:text-white" :title="displayName">
                   {{ displayName }}
                 </div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ user.email }}</div>
+                <div class="truncate text-xs text-gray-500 dark:text-dark-400" :title="user.email">{{ user.email }}</div>
+                <div
+                  v-if="enterpriseIdentity"
+                  data-testid="header-menu-identity"
+                  class="mt-1 break-words text-xs text-gray-500 [overflow-wrap:anywhere] dark:text-dark-400"
+                  :title="enterpriseIdentity.fullLabel"
+                >
+                  {{ enterpriseIdentity.fullLabel }}
+                </div>
               </div>
 
               <!-- Balance (mobile only) -->
@@ -290,6 +304,29 @@ const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const enterprise = computed(() => user.value?.enterprise)
+const enterpriseIdentity = computed(() => {
+  const identity = enterprise.value
+  if (!identity || user.value?.role === 'admin') return null
+
+  // New responses may supply path segments; department_name also supports legacy single names.
+  const pathNames = 'department_path_names' in identity && Array.isArray(identity.department_path_names)
+    ? identity.department_path_names
+        .filter((name): name is string => typeof name === 'string')
+        .map(name => name.trim())
+        .filter(Boolean)
+    : []
+  const departments = pathNames.length
+    ? pathNames
+    : identity.department_name?.split('/').map(name => name.trim()).filter(Boolean) ?? []
+  const departmentPath = departments.join('/')
+  const role = t('header.enterpriseRoles.' + identity.role)
+
+  return {
+    shortLabel: `${departments[departments.length - 1] || identity.name} · ${role}`,
+    title: `${departmentPath || identity.name} · ${role}`,
+    fullLabel: `${identity.name}${departmentPath ? ` / ${departmentPath}` : ''} · ${role}`,
+  }
+})
 const balanceVisible = computed(() => !enterprise.value || (enterprise.value.balance_visible && enterprise.value.balance != null))
 const balanceLabel = computed(() => enterprise.value ? t('enterprise.availableBalance') : t('common.balance'))
 const availableBalance = computed(() => Number(enterprise.value ? enterprise.value.balance ?? 0 : user.value?.balance || 0))

@@ -56,3 +56,19 @@ it('uses the same compact quota display for all three administrator overview lev
   }
   expect(wrapper.text()).toContain('研发部'); expect(wrapper.text()).toContain('Alice')
 })
+
+it('renders nested department and employee limits and collapses descendants together', async () => {
+  const { departments, members } = await import('./organizationFixtures')
+  const api = { quotas: vi.fn().mockResolvedValue([quota('department', 3), quota('department', 4), quota('department', 5), quota('member', 10)]), departments: vi.fn().mockResolvedValue(departments), members: vi.fn().mockResolvedValue({ items: members, total: members.length }) } as unknown as EnterpriseResourceAPI
+  const wrapper = mount(EnterpriseQuotaPanel, { props: { api, admin: true }, global: { stubs: { EnterpriseDialog: true, EnterpriseConfirm: true } } }); wrappers.push(wrapper)
+  await flushPromises()
+  expect(wrapper.get('[data-test="quota-department-5"]').attributes('aria-level')).toBe('3')
+  await wrapper.get('[data-test="quota-department-3"] button[aria-expanded]').trigger('click')
+  expect(wrapper.find('[data-test="quota-department-4"]').exists()).toBe(false)
+  expect(wrapper.get('[data-test="quota-member-department-5"]').text()).toContain('Carol')
+  await wrapper.get('[data-test="quota-member-department-3"] [data-test="quota-member-toggle"]').trigger('click')
+  expect(wrapper.find('[data-test="quota-member-department-5"]').exists()).toBe(false)
+  await wrapper.get('input[type="search"]').setValue('carol')
+  expect(wrapper.find('[data-test="quota-member-department-5"]').exists()).toBe(true)
+  expect(wrapper.get('[data-test="quota-section-member"]').find('[role="progressbar"]').exists()).toBe(false)
+})

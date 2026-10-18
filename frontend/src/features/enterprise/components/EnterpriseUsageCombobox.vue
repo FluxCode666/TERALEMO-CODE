@@ -62,7 +62,7 @@ function select(item?: EnterpriseUsageOption) {
     <Popover v-model:open="open">
       <PopoverTrigger as-child>
         <Button type="button" variant="outline" role="combobox" :aria-expanded="open" :aria-label="label" class="w-full min-w-0 justify-between gap-2 font-normal">
-          <span class="min-w-0 truncate">{{ selectedLabel || modelValue || t('enterprise.all') }}</span>
+          <span class="min-w-0 truncate"><span class="text-xs text-muted-foreground">{{ label }} · </span>{{ selectedLabel || modelValue || t('enterprise.all') }}</span>
           <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
         </Button>
       </PopoverTrigger>

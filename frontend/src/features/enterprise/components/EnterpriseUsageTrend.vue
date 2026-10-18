@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
@@ -11,7 +10,6 @@ import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import type { EnterpriseUsageTrend } from '@/types/enterprise'
 import { usageMoney, normalizeEnterpriseUsageTrend, useEnterpriseUsageTheme } from '../useEnterpriseUsage'
 const props = defineProps<{ items: EnterpriseUsageTrend[]; loading: boolean; granularity?: 'day' | 'hour' }>()
-const emit = defineEmits<{ 'update:granularity': [value: 'day' | 'hour'] }>()
 const { t } = useI18n()
 const theme = useEnterpriseUsageTheme()
 const data = computed(() => props.items.map(normalizeEnterpriseUsageTrend))
@@ -21,10 +19,7 @@ const data = computed(() => props.items.map(normalizeEnterpriseUsageTrend))
   <Card class="usage-chart-card min-w-0" :aria-busy="loading">
     <CardHeader class="flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
       <CardTitle class="text-base">{{ t('admin.dashboard.tokenUsageTrend') }}</CardTitle>
-      <Select :model-value="granularity ?? 'day'" @update:model-value="value => emit('update:granularity', value as 'day' | 'hour')">
-        <SelectTrigger class="h-8 w-28" data-test="usage-granularity" :aria-label="t('admin.dashboard.granularity')"><SelectValue /></SelectTrigger>
-        <SelectContent><SelectItem value="day">{{ t('admin.dashboard.day') }}</SelectItem><SelectItem value="hour">{{ t('admin.dashboard.hour') }}</SelectItem></SelectContent>
-      </Select>
+      <span class="text-xs text-muted-foreground">{{ t(granularity === 'hour' ? 'enterprise.usageAnalysis.byHour' : 'enterprise.usageAnalysis.byDay') }}</span>
     </CardHeader>
     <CardContent class="min-w-0 pt-0">
       <Skeleton v-if="loading" class="h-64 w-full" />

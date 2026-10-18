@@ -57,6 +57,7 @@ describe.each([true, false])('enterprise dates with desktop viewport %s', deskto
     }))
     await flushPromises()
 
+    await wrapper.get('[data-test="org-node-member-7"]').trigger('click')
     expect(wrapper.text()).toContain(formatDateTime(timestamp))
     expect(wrapper.text()).not.toContain(timestamp)
   })

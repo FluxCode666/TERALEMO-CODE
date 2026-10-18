@@ -14,9 +14,9 @@
       <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.username') }}</span><Input v-model.trim="form.username"  autocomplete="off" /></Label>
       <Label class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.password') }}</span><Input v-model="form.password"  type="password" autocomplete="new-password" data-test="member-password" /></Label>
     </template>
-    <Label v-if="!limitedManager" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.department') }}</span>
-      <EnterpriseSelect v-model="form.department_id" :options="departmentOptions" :aria-label="t('enterprise.department')" data-test="member-department" />
-    </Label>
+    <div class="block"><Label class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.department') }}</Label>
+      <EnterpriseDepartmentPicker v-model="form.department_id" :departments="departments" :allow-root="!limitedManager" data-test="member-department" />
+    </div>
     <Label v-if="!limitedManager" class="block"><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.role') }}</span>
       <EnterpriseSelect v-model="form.role" :options="roleOptions" :aria-label="t('enterprise.role')" data-test="member-role" />
     </Label>
@@ -35,6 +35,7 @@ import { Label } from '@/components/ui/label'
 
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import EnterpriseDepartmentPicker from './EnterpriseDepartmentPicker.vue'
 import EnterpriseSelect from '@/features/enterprise/components/EnterpriseSelect.vue'
 import { adminAPI } from '@/api/admin'
 import { enterpriseErrorMessage } from '@/api/enterprise'
@@ -52,11 +53,10 @@ const userId = ref(0)
 const validation = ref('')
 const initialDepartment = props.member
   ? props.member.department_id ?? 0
-  : props.limitedManager ? props.departmentId ?? 0 : props.defaultDepartmentId ?? 0
+  : props.defaultDepartmentId ?? (props.limitedManager ? props.departmentId ?? 0 : 0)
 const form = reactive({ email: '', username: '', password: '', department_id: initialDepartment, role: props.member?.role ?? 'member', title: props.member?.title ?? '', status: props.member?.status ?? 'active' })
 
 const userOptions = computed(() => [{ value: 0, label: t('enterprise.selectUser') }, ...users.value.map(user => ({ value: user.id, label: `${user.username || user.email} · ${user.email}` }))])
-const departmentOptions = computed(() => [{ value: 0, label: t('enterprise.noDepartment') }, ...props.departments.map(item => ({ value: item.id, label: item.name }))])
 const roleOptions = computed(() => roles.map(value => ({ value, label: t(`enterprise.roles.${value}`) })))
 const statusOptions = computed(() => ['active', 'disabled'].map(value => ({ value, label: t(`enterprise.${value}`) })))
 
@@ -74,11 +74,10 @@ function submit() {
   validation.value = ''
   if (props.limitedManager && !props.member) {
     form.role = 'member'
-    form.department_id = props.departmentId ?? 0
   }
   if (form.role === 'manager' && !form.department_id) { validation.value = t('enterprise.validationManagerDepartment'); return }
   if (props.member) {
-    emit('submit', props.limitedManager ? { status: form.status, title: form.title } : { department_id: form.department_id, role: form.role, status: form.status, title: form.title })
+    emit('submit', props.limitedManager ? { department_id: form.department_id, status: form.status, title: form.title } : { department_id: form.department_id, role: form.role, status: form.status, title: form.title })
     return
   }
   let identity: Record<string, unknown>

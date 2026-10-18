@@ -52,22 +52,17 @@ afterEach(() => { for (const wrapper of wrappers.splice(0)) wrapper.unmount() })
 beforeEach(() => vi.clearAllMocks())
 
 describe('enterprise paginated reads', () => {
-  it('keeps the latest member page when page 2 responds after page 3', async () => {
-    const requests = api(), second = deferred<ReturnType<typeof page>>(), third = deferred<ReturnType<typeof page>>()
-    const wrapper = track(mount(EnterpriseOrganizationPanel, { props: { api: resource(requests), mode: 'members', admin: true }, global: { stubs } }))
+  it('keeps the latest organization refresh when the earlier member request resolves last', async () => {
+    const requests = api(), first = deferred<ReturnType<typeof page>>(), latest = deferred<ReturnType<typeof page>>()
+    requests.members.mockReturnValueOnce(first.promise).mockReturnValueOnce(latest.promise)
+    const wrapper = track(mount(EnterpriseOrganizationPanel, { props: { api: resource(requests), admin: true }, global: { stubs } }))
+    await wrapper.setProps({ refreshKey: 1 })
+    latest.resolve({ ...page([{ id: 3, username: 'latest', email: 'latest@example.com' }]), total: 1 })
     await flushPromises()
-    requests.members.mockImplementation((params: EnterpriseQuery) => params.page === 2 ? second.promise : third.promise)
-    await changePage(wrapper, 2)
-    const signal = requests.members.mock.calls[1][1].signal
-    await changePage(wrapper, 3)
-    expect(signal.aborted).toBe(true)
-    third.resolve(page([{ id: 3, username: 'page-three' }], 3))
+    first.resolve({ ...page([{ id: 2, username: 'stale', email: 'stale@example.com' }]), total: 1 })
     await flushPromises()
-    second.resolve(page([{ id: 2, username: 'page-two' }], 2))
-    await flushPromises()
-    expect(wrapper.get('[data-test="rows"]').text()).toContain('page-three')
-    expect(wrapper.get('[data-test="rows"]').text()).not.toContain('page-two')
-    expect((wrapper.findComponent({ name: 'EnterprisePagination' }).exists() ? wrapper.findComponent({ name: 'EnterprisePagination' }) : wrapper.findComponent({ name: 'Pagination' })).props('page')).toBe(3)
+    expect(wrapper.find('[data-test="org-node-member-3"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="org-node-member-2"]').exists()).toBe(false)
   })
 
   it.each(['audit', 'balanceLogs'] as const)('keeps the latest %s page and reloads it on refresh', async kind => {

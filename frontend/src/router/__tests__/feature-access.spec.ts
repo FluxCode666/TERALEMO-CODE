@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EnterpriseRole } from '@/types/enterprise'
 
 type NavigationGuard = (
   to: Record<string, any>,
@@ -13,7 +14,7 @@ const routerHarness = vi.hoisted(() => ({
 
 const authStore = vi.hoisted(() => ({
   checkAuth: vi.fn(),
-  user: null as null | { enterprise?: { id: number } | null },
+  user: null as null | { enterprise?: { id: number; role: EnterpriseRole } | null },
   isAuthenticated: true,
   isAdmin: false,
   isSimpleMode: false,
@@ -222,22 +223,57 @@ describe('enterprise route access', () => {
     authStore.isAuthenticated = true
     authStore.isAdmin = false
     authStore.isSimpleMode = false
-    authStore.user = { enterprise: { id: 1 } }
+    authStore.user = { enterprise: { id: 1, role: 'owner' } }
     appStore.publicSettingsLoaded = true
     appStore.cachedPublicSettings = { payment_enabled: true }
     appStore.fetchPublicSettings.mockReset()
   })
 
-  it.each([
+  const personalWalletRoutes = [
     'Redeem', 'PurchaseSubscription', 'OrderList', 'PaymentQRCode', 'PaymentResult',
     'StripePayment', 'AirwallexPayment', 'StripePopup', 'BatchImageGuide',
-  ])('blocks enterprise direct navigation to actual route %s', async (name) => {
-    const route = routerHarness.routes.find(item => item.name === name)!
-    expect(route).toBeDefined()
+  ]
+  it.each((['owner', 'manager', 'member'] as const).flatMap(role => personalWalletRoutes.map(name => ({ role, name }))))(
+    'redirects enterprise $role away from personal-wallet route $name', async ({ role, name }) => {
+      authStore.user = { enterprise: { id: 1, role } }
+      const route = routerHarness.routes.find(item => item.name === name)!
+      expect(route).toBeDefined()
+      const { navigation, next } = runGuard(route.meta!, route.path)
+      await navigation
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith(role === 'member' ? '/dashboard' : '/enterprise')
+    }
+  )
+
+  it.each(['owner', 'manager', 'member'] as const)('checks enterprise management permission for %s before navigation', async role => {
+    authStore.user = { enterprise: { id: 1, role } }
+    const route = routerHarness.routes.find(item => item.name === 'Enterprise')!
     const { navigation, next } = runGuard(route.meta!, route.path)
     await navigation
     expect(next).toHaveBeenCalledOnce()
-    expect(next).toHaveBeenCalledWith('/enterprise')
+    if (role === 'member') expect(next).toHaveBeenCalledWith('/dashboard')
+    else expect(next).toHaveBeenCalledWith()
+  })
+
+  it.each([null, 'owner', 'manager', 'member'] as const)('preserves enterprise access for a system admin with enterprise role %s', async role => {
+    authStore.isAdmin = true
+    authStore.user = { enterprise: role ? { id: 1, role } : null }
+    const route = routerHarness.routes.find(item => item.name === 'Enterprise')!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledOnce()
+    if (role === null) expect(next).toHaveBeenCalledWith('/dashboard')
+    else expect(next).toHaveBeenCalledWith()
+  })
+
+  it('still sends unauthenticated enterprise visitors to login', async () => {
+    authStore.isAuthenticated = false
+    authStore.user = null
+    const route = routerHarness.routes.find(item => item.name === 'Enterprise')!
+    const { navigation, next } = runGuard(route.meta!, route.path)
+    await navigation
+    expect(next).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith({ path: '/login', query: { redirect: '/enterprise' } })
   })
 
   it('redirects non-members from the enterprise route', async () => {

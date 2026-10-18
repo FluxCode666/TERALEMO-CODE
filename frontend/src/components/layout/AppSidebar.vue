@@ -713,6 +713,10 @@ const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 const flagBatchImageAccess = () => !authStore.user?.enterprise && canUseBatchImage.value
 const flagPersonalPayment = () => !authStore.user?.enterprise && flagPayment()
 const flagPersonalWallet = () => !authStore.user?.enterprise
+const flagEnterpriseManagement = () => {
+  const enterprise = authStore.user?.enterprise
+  return !!enterprise && (authStore.isAdmin || enterprise.role === 'owner' || enterprise.role === 'manager')
+}
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
@@ -725,7 +729,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
-    { path: '/enterprise', label: t('nav.enterprise'), icon: UsersIcon, featureFlag: () => !!authStore.user?.enterprise },
+    { path: '/enterprise', label: t('nav.enterprise'), icon: UsersIcon, featureFlag: flagEnterpriseManagement },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },

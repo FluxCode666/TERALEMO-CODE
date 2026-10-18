@@ -129,6 +129,20 @@ describe('enterprise API contract', () => {
     expect(remove).toHaveBeenCalledWith('/admin/enterprises/12/members/7')
   })
 
+  it('sends hierarchy parent IDs and identical import bodies on enterprise and admin routes', async () => {
+    const rows = [{ row: 2, email: 'a@example.com', username: 'A', department_path: '研发/后端', role: 'member' as const, title: '' }]
+    for (const [api, base] of [[enterpriseAPI, '/enterprise'], [enterprises.forEnterprise(12), '/admin/enterprises/12']] as const) {
+      await api.createDepartment({ name: '后端', parent_id: 3 })
+      expect(post).toHaveBeenLastCalledWith(`${base}/departments`, { name: '后端', parent_id: 3 })
+      await api.updateDepartment(4, { parent_id: 0 })
+      expect(put).toHaveBeenLastCalledWith(`${base}/departments/4`, { parent_id: 0 })
+      await api.previewImport({ rows })
+      expect(post).toHaveBeenLastCalledWith(`${base}/import/preview`, { rows })
+      await api.commitImport({ rows })
+      expect(post).toHaveBeenLastCalledWith(`${base}/import/commit`, { rows })
+    }
+  })
+
   it('propagates enterprise errors with their code and metadata intact', async () => {
     const error = {
       status: 429,

@@ -1,128 +1,111 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import EnterpriseOrganizationPanel from '../components/EnterpriseOrganizationPanel.vue'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
-import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview } from '@/types/enterprise'
-import { clickMenuItem } from './selectOption'
-import { selectOption } from './selectOption'
+import type { EnterpriseOverview } from '@/types/enterprise'
+import { departments, members } from './organizationFixtures'
 vi.mock('@/api/client', () => ({ apiClient: {} }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock('@/api/admin', () => ({ adminAPI: { users: { list: vi.fn() } } }))
-vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
-const departments: EnterpriseDepartment[] = [
-  { id: 3, enterprise_id: 1, name: '研发部', sort_order: 2, member_count: 1, created_at: '' },
-  { id: 4, enterprise_id: 1, name: '设计部', sort_order: 1, member_count: 1, created_at: '' }
-]
-const members = [
-  { id: 7, username: 'Alice', email: 'alice@example.com', department_id: 3, department_name: '研发部', role: 'member', status: 'active', title: '', joined_at: '' },
-  { id: 8, username: 'Bob', email: 'bob@example.com', department_id: 4, department_name: '设计部', role: 'member', status: 'active', title: '', joined_at: '' },
-  { id: 9, username: 'Owner', email: 'owner@example.com', department_id: null, role: 'owner', status: 'active', title: '', joined_at: '' }
-] as EnterpriseMember[]
+vi.mock('vue-i18n', async original => ({ ...await original<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string, args?: Record<string, string>) => key + (args?.path ? ` ${args.path}` : '') }) }))
 const wrappers: VueWrapper[] = []
-const stubs = {
-  EnterpriseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
-  EnterpriseConfirm: { props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-remove" @click="$emit(\'confirm\')">Confirm</button></div>' },
-  EnterprisePagination: true
-}
-function api() {
-  return {
-    departments: vi.fn().mockResolvedValue(departments),
-    members: vi.fn().mockImplementation((query = {}) => Promise.resolve({ items: members.filter(item => query.department_id === undefined || (item.department_id ?? 0) === query.department_id), total: query.department_id === undefined ? 3 : 1 })),
-    deleteDepartment: vi.fn().mockResolvedValue(undefined), updateDepartment: vi.fn().mockResolvedValue({}), createMember: vi.fn().mockResolvedValue({}), deleteMember: vi.fn().mockResolvedValue(undefined)
-  }
-}
-function render(requests: ReturnType<typeof api>, overview?: EnterpriseOverview) {
-  const wrapper = mount(EnterpriseOrganizationPanel, { props: { api: requests as unknown as EnterpriseResourceAPI, admin: !overview, enterpriseName: 'Acme', overview }, global: { stubs } })
-  wrappers.push(wrapper); return wrapper
-}
-beforeEach(() => vi.clearAllMocks())
 afterEach(() => wrappers.splice(0).forEach(wrapper => wrapper.unmount()))
-describe('enterprise organization tree', () => {
-  it('uses one member action menu and retains edit and confirmed removal', async () => {
-    const requests = api(), wrapper = render(requests)
-    await flushPromises()
-    expect(wrapper.findAll('[data-test^="member-menu-"]')).toHaveLength(3)
-    expect(wrapper.find('[data-test="member-edit-7"]').exists()).toBe(false)
-    await clickMenuItem(wrapper, '[data-test="member-menu-7"]', '[data-test="member-edit-7"]')
-    expect(wrapper.getComponent({ name: 'EnterpriseMemberForm' }).props('member')).toEqual(members[0])
-    await clickMenuItem(wrapper, '[data-test="member-menu-7"]', '[data-test="member-remove-7"]')
+function api() {
+  return { departments: vi.fn().mockResolvedValue(departments), members: vi.fn().mockResolvedValue({ items: members, total: 4 }), createDepartment: vi.fn().mockResolvedValue({}), updateDepartment: vi.fn().mockResolvedValue({}), createMember: vi.fn().mockResolvedValue({}), updateMember: vi.fn().mockResolvedValue({}), deleteMember: vi.fn().mockResolvedValue(undefined), deleteDepartment: vi.fn().mockResolvedValue(undefined) }
+}
+function render(requests = api(), overview?: EnterpriseOverview) {
+  const wrapper = mount(EnterpriseOrganizationPanel, { props: { api: requests as unknown as EnterpriseResourceAPI, admin: !overview, enterpriseName: 'Acme', overview }, global: { stubs: {
+    EnterpriseDialog: { name: 'EnterpriseDialog', props: ['show'], template: '<div v-if="show"><slot /></div>' },
+    EnterpriseConfirm: { props: ['show', 'disabled', 'message'], emits: ['confirm'], template: '<div v-if="show">{{ message }}<button data-test="confirm-remove" :disabled="disabled" @click="$emit(\'confirm\')">Confirm</button></div>' }
+  } } }); wrappers.push(wrapper); return wrapper
+}
+function manager(manage = true): EnterpriseOverview { return { enterprise: { name: 'Acme' }, me: { role: 'manager', department_id: 3 }, settings: { manager_can_manage_members: manage }, permissions: { view_members: true, manage_members: manage, create_members: manage, manage_departments: false } } as EnterpriseOverview }
+describe('organization tree and details', () => {
+  it('shows root, department, and member details and direct action buttons', async () => {
+    const requests = api(), wrapper = render(requests); await flushPromises()
+    const detail = () => wrapper.get('[data-test="organization-detail"]')
+    expect(detail().text()).toContain('Acme'); expect(detail().text()).toContain('Owner')
+    await wrapper.get('[data-test="org-node-4"]').trigger('click')
+    expect(detail().text()).toContain('研发中心 / 后端组'); expect(detail().text()).toContain('平台组')
+    expect(detail().find('[data-test="department-move"]').exists()).toBe(true)
+    await wrapper.get('[data-test="org-node-member-8"]').trigger('click')
+    expect(detail().text()).toContain('bob@example.com'); expect(detail().text()).toContain('enterprise.orgTree.neverLoggedIn')
+    expect(detail().find('[data-test="member-edit-8"]').exists()).toBe(true)
+    await detail().get('[data-test="member-toggle"]').trigger('click'); await flushPromises()
+    expect(requests.updateMember).toHaveBeenCalledWith(8, { status: 'disabled' })
+    await detail().get('[data-test="member-remove-8"]').trigger('click')
     expect(requests.deleteMember).not.toHaveBeenCalled()
     await wrapper.get('[data-test="confirm-remove"]').trigger('click'); await flushPromises()
-    expect(requests.deleteMember).toHaveBeenCalledWith(7)
+    expect(requests.deleteMember).toHaveBeenCalledWith(8)
   })
-  it('restricts menus to managers’ own department employees and hides all menus without manage permission or in readonly mode', async () => {
-    const requests = api()
-    requests.members.mockResolvedValue({ items: [...members, { ...members[0], id: 10, role: 'manager' }], total: 4 })
-    const overview = { enterprise: { name: 'Acme' }, me: { role: 'manager', department_id: 3 }, permissions: { view_members: true, manage_members: true } } as EnterpriseOverview
-    const wrapper = render(requests, overview); await flushPromises()
-    expect(wrapper.findAll('[data-test^="member-menu-"]').map(item => item.attributes('data-test'))).toEqual(['member-menu-7'])
-    await wrapper.get('[data-test="member-menu-7"]').trigger('keydown', { key: 'Enter' }); await flushPromises()
-    expect(document.querySelector('[data-test="member-edit-7"]')).not.toBeNull()
-    expect(document.querySelector('[data-test="member-remove-7"]')).not.toBeNull()
-    await wrapper.get('[data-test="member-menu-7"]').trigger('keydown', { key: 'Escape' }); await flushPromises()
-    await wrapper.setProps({ readonly: true })
-    expect(wrapper.find('[data-test^="member-menu-"]').exists()).toBe(false)
-    await wrapper.setProps({ readonly: false, overview: { ...overview, permissions: { ...overview.permissions, manage_members: false } } })
-    expect(wrapper.find('[data-test^="member-menu-"]').exists()).toBe(false)
+  it('filters live, highlights names and expands collapsed ancestors, with keyboard navigation', async () => {
+    const wrapper = render(); await flushPromises()
+    await wrapper.get('[data-test="org-node-3"]').trigger('keydown', { key: 'ArrowLeft' })
+    expect(wrapper.find('[data-test="org-node-member-10"]').exists()).toBe(false)
+    await wrapper.get('input[type="search"]').setValue('Carol')
+    expect(wrapper.get('mark').text()).toBe('Carol')
+    expect(wrapper.get('[data-test="org-node-5"]').attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('[data-test="org-node-6"]').exists()).toBe(false)
+    await wrapper.get('[data-test="org-node-member-10"]').trigger('keydown', { key: 'Enter' })
+    expect(wrapper.get('[data-test="organization-detail"]').text()).toContain('carol@example.com')
   })
-  it('shows counts, sorts departments, and filters members using department IDs including zero', async () => {
-    const requests = api(), wrapper = render(requests)
-    await flushPromises()
-    expect(wrapper.get('[data-test="org-node-all"]').text()).toBe('Acme3')
-    expect(wrapper.get('[aria-label="enterprise.role"]').text()).toContain('enterprise.organizationUi.allRoles')
-    expect(wrapper.get('[aria-label="enterprise.status"]').text()).toContain('enterprise.organizationUi.allStatuses')
-    expect(wrapper.get('[data-test="enterprise-status-badge"]').text()).toBe('enterprise.active')
-    expect(wrapper.get('[data-test="org-node-0"]').text()).toContain('1')
-    expect(wrapper.findAll('nav [data-test^="org-node-"]').map(node => node.attributes('data-test'))).toEqual(['org-node-all', 'org-node-0', 'org-node-4', 'org-node-3'])
-    await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
-    expect(requests.members).toHaveBeenLastCalledWith(expect.objectContaining({ department_id: 3, page: 1 }), expect.anything())
-    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[0]])
-    await wrapper.get('[data-test="org-node-0"]').trigger('click'); await flushPromises()
-    expect(requests.members).toHaveBeenLastCalledWith(expect.objectContaining({ department_id: 0 }), expect.anything())
-    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[2]])
-    await wrapper.get('[data-test="org-node-all"]').trigger('click'); await flushPromises()
-    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toHaveLength(3)
-  })
-  it('only shows a manager’s department and its members even if a response contains other departments', async () => {
-    const requests = api(); requests.members.mockResolvedValue({ items: members, total: 1 })
-    const overview = { enterprise: { name: 'Acme' }, me: { role: 'manager', department_id: 3 }, permissions: { view_members: true, manage_members: true, create_members: true, manage_departments: false } } as EnterpriseOverview
-    const wrapper = render(requests, overview); await flushPromises()
-    expect(wrapper.findAll('nav [data-test^="org-node-"]').map(node => node.text())).toEqual(['研发部1'])
-    expect(wrapper.findComponent({ name: 'EnterpriseTable' }).props('data')).toEqual([members[0]])
+  it('limits managers to all descendants and permits only employee operations when enabled', async () => {
+    const wrapper = render(api(), manager()); await flushPromises()
+    expect(wrapper.find('[data-test="org-node-6"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="org-node-0"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="org-node-member-10"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="department-create"]').exists()).toBe(false)
-    expect(requests.members).toHaveBeenCalledWith(expect.objectContaining({ department_id: 3 }), expect.anything())
+    expect(wrapper.find('[data-test="organization-import"]').exists()).toBe(true)
+    await wrapper.get('[data-test="org-node-member-7"]').trigger('click')
+    expect(wrapper.find('[data-test="member-actions"]').exists()).toBe(false)
+    await wrapper.get('[data-test="org-node-member-10"]').trigger('click')
+    expect(wrapper.find('[data-test="member-actions"]').exists()).toBe(true)
+    await wrapper.setProps({ overview: manager(false) })
+    expect(wrapper.find('[data-test="member-actions"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="organization-import"]').exists()).toBe(false)
   })
-  it('preserves the directory without requesting members when member visibility is denied', async () => {
-    const requests = api(), wrapper = render(requests, { enterprise: { name: 'Acme' }, me: { role: 'member' }, permissions: { view_members: false } } as EnterpriseOverview)
-    await flushPromises()
-    expect(wrapper.text()).toContain('研发部'); expect(requests.members).not.toHaveBeenCalled()
-    expect(wrapper.find('form').exists()).toBe(false)
+  it('preserves member visibility and readonly restrictions', async () => {
+    const requests = api(), wrapper = render(requests, { me: { role: 'member' }, permissions: { view_members: false } } as EnterpriseOverview); await flushPromises()
+    expect(requests.members).not.toHaveBeenCalled(); expect(wrapper.text()).toContain('后端组')
+    expect(wrapper.find('[data-test="organization-create"]').exists()).toBe(false)
+    const admin = render(); await flushPromises(); await admin.setProps({ readonly: true })
+    await admin.get('[data-test="org-node-member-8"]').trigger('click')
+    expect(admin.find('[data-test="member-actions"]').exists()).toBe(false)
+    expect(admin.find('[data-test="department-create"]').exists()).toBe(false)
   })
-  it('shows a friendly backend error and preserves the department after a nonempty deletion', async () => {
-    const requests = api(); requests.deleteDepartment.mockRejectedValue({ reason: 'ENTERPRISE_DEPARTMENT_NOT_EMPTY', code: 'CONFLICT' })
-    const wrapper = render(requests); await flushPromises()
-    await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
-    await clickMenuItem(wrapper, '[data-test="org-menu-3"]', '[data-test="org-delete-3"]')
-    await wrapper.get('[data-test="confirm-remove"]').trigger('click'); await flushPromises()
-    expect(requests.deleteDepartment).toHaveBeenCalledWith(3)
-    expect(wrapper.text()).toContain('enterprise.errors.ENTERPRISE_DEPARTMENT_NOT_EMPTY')
-    expect(wrapper.find('[data-test="org-node-3"]').exists()).toBe(true)
-  })
-  it('submits department name and sort order, and defaults a new member to the selected department', async () => {
+  it('disables self and descendant move targets, and sends parent_id zero to move to root', async () => {
     const requests = api(), wrapper = render(requests); await flushPromises()
-    await wrapper.get('[data-test="org-node-3"]').trigger('click'); await flushPromises()
-    await clickMenuItem(wrapper, '[data-test="org-menu-3"]', '[data-test="org-edit-3"]')
-    await wrapper.get('[data-test="department-name"]').setValue('工程部'); await wrapper.get('[data-test="department-sort"]').setValue('5')
+    await wrapper.get('[data-test="org-node-3"]').trigger('click'); await wrapper.get('[data-test="department-move"]').trigger('click')
+    const picker = wrapper.getComponent({ name: 'EnterpriseDepartmentPicker' })
+    expect([...picker.props('disabledKeys')]).toEqual(['3', '4', '5'])
+    await picker.get('[data-test="org-node-5"]').trigger('click')
+    expect(picker.emitted('update:modelValue')).toBeUndefined()
     await wrapper.get('form.space-y-4').trigger('submit'); await flushPromises()
-    expect(requests.updateDepartment).toHaveBeenCalledWith(3, { name: '工程部', sort_order: 5 })
+    expect(requests.updateDepartment).toHaveBeenCalledWith(3, { name: '研发中心', sort_order: 2, parent_id: 0 })
+  })
+  it('creates a child department with the selected parent and prevents nonempty deletion', async () => {
+    const requests = api(), wrapper = render(requests); await flushPromises()
+    await wrapper.get('[data-test="org-node-4"]').trigger('click'); await wrapper.get('[data-test="department-child"]').trigger('click')
+    await wrapper.get('[data-test="department-name"]').setValue('新团队'); await wrapper.get('form.space-y-4').trigger('submit'); await flushPromises()
+    expect(requests.createDepartment).toHaveBeenCalledWith({ name: '新团队', sort_order: 0, parent_id: 4 })
+    await wrapper.get('[data-test="department-delete"]').trigger('click')
+    expect(wrapper.get('[data-test="confirm-remove"]').attributes('disabled')).toBeDefined()
+    expect(requests.deleteDepartment).not.toHaveBeenCalled()
+  })
+  it('defaults root creation to unassigned and department creation to the selected node', async () => {
+    const wrapper = render(api(), { enterprise: { name: 'Acme' }, me: { role: 'owner', department_id: 3 }, permissions: { view_members: true, create_members: true, manage_members: true } } as EnterpriseOverview)
+    await flushPromises()
     await wrapper.get('[data-test="organization-create"]').trigger('click')
-    expect(wrapper.get('[data-test="member-department"]').text()).toContain('研发部')
-    expect(wrapper.find('select').exists()).toBe(false)
-    await selectOption(wrapper, '[data-test="member-role"]', 'enterprise.roles.manager')
-    await wrapper.get('button[role="radio"][value="new"]').trigger('click')
-    await wrapper.get('[data-test="member-email"]').setValue('new@example.com')
-    await wrapper.get('[data-test="member-password"]').setValue('password123')
-    await wrapper.get('#enterprise-member-form').trigger('submit'); await flushPromises()
-    expect(requests.createMember).toHaveBeenCalledWith(expect.objectContaining({ department_id: 3, role: 'manager' }))
+    expect(wrapper.getComponent({ name: 'EnterpriseMemberForm' }).props('defaultDepartmentId')).toBe(0)
+    const departmentWrapper = render(); await flushPromises()
+    await departmentWrapper.get('[data-test="org-node-4"]').trigger('click')
+    await departmentWrapper.get('[data-test="department-create-member"]').trigger('click')
+    expect(departmentWrapper.getComponent({ name: 'EnterpriseMemberForm' }).props('defaultDepartmentId')).toBe(4)
+  })
+  it('loads members beyond the first page to populate the tree', async () => {
+    const requests = api(); requests.members.mockResolvedValueOnce({ items: members.slice(0, 2), total: 4 }).mockResolvedValueOnce({ items: members.slice(2), total: 4 })
+    const wrapper = render(requests); await flushPromises()
+    expect(requests.members).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-test="org-node-member-10"]').exists()).toBe(true)
   })
 })
