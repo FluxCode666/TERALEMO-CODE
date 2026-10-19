@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import EnterpriseDialog from './EnterpriseDialog.vue'
 import EnterpriseAuditValue from './EnterpriseAuditValue.vue'
-import { auditObject as object, type AuditReferenceCatalog } from '../auditReferences'
+import { auditObject as object, auditValuesEqual, type AuditReferenceCatalog } from '../auditReferences'
 import type { EnterpriseAuditLog } from '@/types/enterprise'
 import { formatDateTime } from '@/utils/format'
 const props = defineProps<{ log: EnterpriseAuditLog | null; actionLabel: string; targetLabel: string; catalog?: AuditReferenceCatalog }>()
@@ -14,22 +14,25 @@ defineEmits<{ close: [] }>()
 const { t, te } = useI18n()
 const copied = ref(false), copyError = ref(false)
 const json = computed(() => JSON.stringify(props.log?.detail ?? null, null, 2))
-type Entry = { key: string; value?: unknown; before?: unknown; after?: unknown; comparison?: boolean }
+type Entry = { key: string; value?: unknown; before?: unknown; after?: unknown; comparison?: boolean; changed?: boolean }
 function pair(value: Record<string, unknown>) {
-  for (const [before, after] of [['before', 'after'], ['old', 'new'], ['from', 'to'], ['old_value', 'new_value']]) if (before in value && after in value) return { before: value[before], after: value[after], keys: [before, after] }
+  for (const [before, after] of [['before', 'after'], ['old', 'new'], ['from', 'to'], ['old_value', 'new_value']]) if (before in value || after in value) return { before: value[before], after: value[after], keys: [before, after] }
   return null
 }
 function flatten(value: Record<string, unknown>, prefix = '', depth = 0): Entry[] {
   const comparison = pair(value)
   if (comparison) {
     const rows: Entry[] = []
-    const compare = (before: unknown, after: unknown, path: string, level: number) => {
-      if ((object(before) || object(after)) && level < 5) {
+    const compare = (before: unknown, after: unknown, path: string, level: number, leftPresent = true, rightPresent = true) => {
+      if ((object(before) || object(after)) && level < 5 && new Set([...Object.keys(object(before) ? before : {}), ...Object.keys(object(after) ? after : {})]).size) {
         const left = object(before) ? before : {}, right = object(after) ? after : {}
-        for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) compare(left[key], right[key], path ? `${path}.${key}` : key, level + 1)
-      } else rows.push({ key: path || (['group_pool.update', 'group_whitelist.update'].includes(props.log?.action ?? '') ? 'group_ids' : t('enterprise.detail')), comparison: true, before, after })
+        for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) compare(left[key], right[key], path ? `${path}.${key}` : key, level + 1, key in left, key in right)
+      } else {
+        const key = path || (['group_pool.update', 'group_whitelist.update'].includes(props.log?.action ?? '') ? 'group_ids' : t('enterprise.detail'))
+        rows.push({ key, comparison: true, before, after, changed: leftPresent !== rightPresent || !auditValuesEqual(key, before, after) })
+      }
     }
-    compare(comparison.before, comparison.after, prefix, depth)
+    compare(comparison.before, comparison.after, prefix, depth, comparison.keys[0]! in value, comparison.keys[1]! in value)
     const extra = Object.fromEntries(Object.entries(value).filter(([key]) => !comparison.keys.includes(key)))
     return [...rows, ...flatten(extra, prefix, depth + 1)]
   }
@@ -57,8 +60,8 @@ async function copy() {
         <div class="sm:col-span-2"><dt class="text-muted-foreground">{{ t('enterprise.createdAt') }}</dt><dd class="mt-1">{{ formatDateTime(log.created_at) }}</dd></div>
       </dl>
       <dl v-if="entries.length" class="divide-y rounded-ui-lg border" data-test="audit-detail-fields">
-        <div v-for="entry in entries" :key="entry.key" class="grid min-w-0 gap-2 p-4 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
-          <dt class="break-words font-medium text-muted-foreground">{{ fieldLabel(entry.key) }}</dt>
+        <div v-for="entry in entries" :key="entry.key" class="grid min-w-0 gap-2 border-l-4 p-4 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]" :class="entry.changed ? 'border-l-amber-500 bg-amber-50 dark:border-l-amber-400 dark:bg-amber-950/40' : 'border-l-transparent'" :data-changed="entry.comparison ? !!entry.changed : undefined" :data-field="entry.key">
+          <dt class="break-words font-medium text-muted-foreground">{{ fieldLabel(entry.key) }}<Badge v-if="entry.changed" variant="outline" class="mt-1 block w-fit border-amber-400/60 text-amber-900 dark:text-amber-200">{{ t('enterprise.auditDetails.changed') }}</Badge></dt>
           <dd v-if="entry.comparison" class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2" data-test="audit-detail-comparison"><div class="min-w-0"><span class="mb-1 block text-xs text-muted-foreground">{{ t('enterprise.auditDetails.before') }}</span><EnterpriseAuditValue :field="entry.key" :value="entry.before" :other="entry.after" change="removed" :catalog="catalog ?? {}" :log="log" /></div><ArrowRight class="mt-7 size-4 text-muted-foreground" :aria-label="t('enterprise.auditDetails.changedTo')" /><div class="min-w-0"><span class="mb-1 block text-xs text-muted-foreground">{{ t('enterprise.auditDetails.after') }}</span><EnterpriseAuditValue :field="entry.key" :value="entry.after" :other="entry.before" change="added" :catalog="catalog ?? {}" :log="log" /></div></dd>
           <dd v-else class="min-w-0"><EnterpriseAuditValue :field="entry.key" :value="entry.value" :catalog="catalog ?? {}" :log="log" /></dd>
         </div>

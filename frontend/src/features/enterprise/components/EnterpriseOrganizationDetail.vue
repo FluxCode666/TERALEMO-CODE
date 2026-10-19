@@ -33,11 +33,11 @@ const memberFields = computed(() => member.value ? [
 </script>
 <template>
   <Card class="shadcn-scope min-w-0 lg:sticky lg:top-4" data-test="organization-detail">
-    <CardHeader class="border-b">
+    <CardHeader class="border-b p-4">
       <CardTitle class="flex flex-wrap items-center gap-2 break-words"><Crown v-if="member?.role === 'owner'" class="size-5 text-amber-600" /><UserRound v-else-if="member" class="size-5" /><FolderTree v-else-if="department" class="size-5" /><Building2 v-else class="size-5" />{{ member ? member.username || member.email : department?.name || (selected === '0' ? t('enterprise.orgTree.unassigned') : enterpriseName) }}<Badge v-if="member" variant="secondary">{{ t(`enterprise.roles.${member.role}`) }}</Badge></CardTitle>
       <CardDescription class="break-words">{{ member ? t('enterprise.orgTree.memberNode', { path }) : department ? path : t('enterprise.orgTree.overview') }}</CardDescription>
     </CardHeader>
-    <CardContent class="space-y-6 pt-6">
+    <CardContent class="space-y-6 p-4">
       <template v-if="member">
         <dl class="grid gap-5 sm:grid-cols-2"><div v-for="[label, value] in memberFields" :key="label" class="min-w-0"><dt class="text-sm text-muted-foreground">{{ label }}</dt><dd class="mt-1 break-words text-sm font-medium">{{ value }}</dd></div></dl>
         <div v-if="canEditMember || canResetPassword" class="flex flex-wrap gap-2 border-t pt-5" data-test="member-actions"><template v-if="canEditMember"><Button variant="outline" :data-test="`member-edit-${member.id}`" @click="emit('editMember', member)">{{ t('enterprise.orgTree.editTransfer') }}</Button><Button variant="outline" :disabled="busy" data-test="member-toggle" @click="emit('toggleMember', member)">{{ t(member.status === 'active' ? 'enterprise.disabled' : 'enterprise.active') }}</Button><Button variant="destructive" :data-test="`member-remove-${member.id}`" @click="emit('removeMember', member)">{{ t('enterprise.removeMember') }}</Button></template><Button v-if="canResetPassword" variant="outline" :disabled="busy" data-test="member-reset-password" @click="emit('resetPassword', member)">{{ t('enterprise.passwordReset.title') }}</Button></div>

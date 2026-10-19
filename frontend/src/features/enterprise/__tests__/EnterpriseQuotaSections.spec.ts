@@ -27,6 +27,7 @@ it('uses the same compact quota display for all three administrator overview lev
   const api = { quotas: vi.fn().mockResolvedValue(rows), departments: vi.fn().mockResolvedValue([{ id: 3, name: '研发部' }]), members: vi.fn().mockResolvedValue({ items: [{ id: 7, username: 'Alice' }], total: 1 }) } as unknown as EnterpriseResourceAPI
   const wrapper = mount(EnterpriseAdminQuotaSummary, { props: { api } }); wrappers.push(wrapper)
   await flushPromises()
+  expect(wrapper.get('.grid').classes()).toEqual(expect.arrayContaining(['max-w-screen-2xl', 'xl:grid-cols-3']))
   expect(wrapper.findAllComponents(EnterpriseQuotaDisplay)).toHaveLength(3)
   for (const card of wrapper.findAllComponents(EnterpriseQuotaDisplay)) {
     expect(card.props('compact')).toBe(true)

@@ -145,6 +145,7 @@ export default {
 
     paginationUi: { total: '{count} records', pageSize: 'Rows per page' },
     auditDetails: {
+      changed: 'Modified',
       title: 'Audit details', view: 'View details', before: 'Before', after: 'After', changedTo: 'Changed to',
       copyJson: 'Copy JSON', copied: 'Copied', copyError: 'Copy failed. Select the text to copy manually.',
       added: 'Added', removed: 'Removed',
@@ -160,6 +161,14 @@ export default {
     "quotas": "Quota management",
     "groups": "Member callable groups",
     "usageAnalysis": {
+      "exportCsv": "Export CSV",
+      "exportLimit": "Export supports up to {count} rows. Narrow the query range and try again.",
+      "exportEmpty": "No details to export.",
+      "exportIncomplete": "Details changed during export. Search again and retry.",
+      "exportFailed": "Export failed",
+      "exportSuccess": "Exported {count} rows",
+      "csv": {"cache5m": "Cache creation tokens (5m)", "cache1h": "Cache creation tokens (1h)", "imageInputTokens": "Image input tokens", "imageOutputTokens": "Image output tokens", "imageInputCost": "Image input cost", "imageOutputCost": "Image output cost", "rateMultiplier": "Rate multiplier", "firstTokenMs": "First token (ms)", "durationMs": "Duration (ms)"},
+
       "byDay": "Daily",
       "byHour": "Hourly",
       "hourLimit": "Hourly statistics require a complete range of up to 31 days. Apply dates with Search before switching.",

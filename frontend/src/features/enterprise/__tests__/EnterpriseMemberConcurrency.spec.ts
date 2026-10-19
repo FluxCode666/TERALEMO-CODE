@@ -35,6 +35,8 @@ afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); docu
 describe('administrator member concurrency card', () => {
   it('shows configured and platform default states and follows refreshed data', async () => {
     const wrapper = render()
+    expect(wrapper.getComponent({ name: 'CardDescription' }).classes()).toContain('max-w-3xl')
+    expect(wrapper.get('input').element.parentElement!.classList.contains('max-w-sm')).toBe(true)
     expect(wrapper.get('[data-test="member-concurrency-current"]').text()).toBe('未统一设置，新成员使用平台默认并发')
     expect(wrapper.get('[data-test="member-concurrency-clear"]').attributes('disabled')).toBeDefined()
     await wrapper.setProps({ enterprise: { ...wrapper.props('enterprise'), member_concurrency: 30 } })

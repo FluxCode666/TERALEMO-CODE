@@ -24,6 +24,26 @@ export function auditReferenceType(key: string): AuditReferenceType | null {
   return (key.split('.').at(-1)?.match(/(?:^|_)(enterprise|department|member|user|group)_ids?$/)?.[1] as AuditReferenceType) ?? null
 }
 
+/** Audit payloads are JSON: object key order is irrelevant; ordinary arrays keep order. */
+export function auditValuesEqual(field: string, before: unknown, after: unknown): boolean {
+  if (Object.is(before, after)) return true
+  if (Array.isArray(before) && Array.isArray(after)) {
+    if (auditReferenceType(field)) {
+      const left = auditReferenceIds(before), right = auditReferenceIds(after)
+      if (left && right) {
+        const ids = new Set(left), others = new Set(right)
+        return ids.size === others.size && [...ids].every(id => others.has(id))
+      }
+    }
+    return before.length === after.length && before.every((value, index) => auditValuesEqual('', value, after[index]))
+  }
+  if (auditObject(before) && auditObject(after)) {
+    const keys = Object.keys(before)
+    return keys.length === Object.keys(after).length && keys.every(key => Object.prototype.hasOwnProperty.call(after, key) && auditValuesEqual(key, before[key], after[key]))
+  }
+  return false
+}
+
 // Historical names remain useful for deleted entities. Only use a descriptive
 // field when its object identifies the same entity (or is the target snapshot).
 function historicalName(value: unknown, type: AuditReferenceType, id: number, implicit = false, depth = 0): string | undefined {

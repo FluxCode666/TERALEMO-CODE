@@ -1,5 +1,5 @@
 <template>
-  <AppLayout><div class="shadcn-scope min-w-0">
+  <AppLayout compact-padding><div class="shadcn-scope min-w-0">
     <EnterpriseWorkspace :key="enterpriseId" admin :enterprise-id="enterpriseId">
       <template #header-actions><Button variant="destructive"  data-test="enterprise-delete-detail" @click="deleting = true">{{ t('admin.enterprises.delete') }}</Button></template>
     </EnterpriseWorkspace>

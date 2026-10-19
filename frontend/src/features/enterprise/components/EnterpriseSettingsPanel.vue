@@ -1,5 +1,5 @@
 <template>
-  <Card><section class="shadcn-scope space-y-4 p-4 sm:p-6" :aria-busy="busy">
+  <Card><section class="shadcn-scope w-full max-w-4xl space-y-4 p-4 sm:p-6" :aria-busy="busy">
     <h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.settings') }}</h2>
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
     <p v-if="preservedEdits" role="status" class="rounded-lg bg-blue-50 p-3 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">{{ t('enterprise.settingsRefreshedWithEdits') }}</p>

@@ -24,6 +24,9 @@ describe('organization tree and details', () => {
   it('shows root, department, and member details and direct action buttons', async () => {
     const requests = api(), wrapper = render(requests); await flushPromises()
     const detail = () => wrapper.get('[data-test="organization-detail"]')
+    const card = wrapper.getComponent({ name: 'EnterpriseOrganizationDetail' })
+    expect(card.getComponent({ name: 'CardHeader' }).classes()).toContain('p-4')
+    expect(card.getComponent({ name: 'CardContent' }).classes()).toContain('p-4')
     expect(detail().text()).toContain('Acme'); expect(detail().text()).toContain('Owner')
     await wrapper.get('[data-test="org-node-4"]').trigger('click')
     expect(detail().text()).toContain('研发中心 / 后端组'); expect(detail().text()).toContain('平台组')

@@ -145,6 +145,7 @@ export default {
 
     paginationUi: { total: '共 {count} 条', pageSize: '每页条数' },
     auditDetails: {
+      changed: '已修改',
       title: '审计详情', view: '查看详情', before: '修改前', after: '修改后', changedTo: '变更为',
       copyJson: '复制 JSON', copied: '已复制', copyError: '复制失败，请手动选择复制',
       added: '新增', removed: '移除',
@@ -160,6 +161,14 @@ export default {
     "quotas": "限额管理",
     "groups": "成员可调用分组",
     "usageAnalysis": {
+      "exportCsv": "导出 CSV",
+      "exportLimit": "最多支持导出 {count} 条，请缩小查询范围后重试。",
+      "exportEmpty": "没有可导出的明细。",
+      "exportIncomplete": "明细在导出期间发生变化，请重新查询后重试。",
+      "exportFailed": "导出失败",
+      "exportSuccess": "已导出 {count} 条明细",
+      "csv": {"cache5m": "缓存创建 Token（5m）", "cache1h": "缓存创建 Token（1h）", "imageInputTokens": "图片输入 Token", "imageOutputTokens": "图片输出 Token", "imageInputCost": "图片输入费用", "imageOutputCost": "图片输出费用", "rateMultiplier": "计费倍率", "firstTokenMs": "首字延迟（ms）", "durationMs": "总耗时（ms）"},
+
       "byDay": "按天",
       "byHour": "按小时",
       "hourLimit": "小时统计仅支持不超过 31 天的完整日期范围，请搜索应用日期后切换。",

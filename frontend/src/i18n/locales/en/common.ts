@@ -23,6 +23,7 @@ export default {
     reset: 'Reset',
     search: 'Search',
     filter: 'Filter',
+    exporting: 'Exporting…',
     export: 'Export',
     import: 'Import',
     actions: 'Actions',

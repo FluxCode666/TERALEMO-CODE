@@ -5,6 +5,7 @@ import { useEnterpriseStore } from '@/stores/enterprise'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { EnterpriseOverview } from '@/types/enterprise'
 import EnterpriseView from '../EnterpriseView.vue'
+import AppLayout from '@/components/layout/AppLayout.vue'
 
 const { overview, refreshUser, auth, route, router } = vi.hoisted(() => ({
   overview: vi.fn(), refreshUser: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('vue-router', () => ({ useRoute: () => reactive(route), useRouter: () =>
 vi.mock('@/api/client', () => ({ apiClient: {} }))
 
 vi.mock('@/components/layout/AppLayout.vue', () => ({
-  default: { template: '<main><slot /></main>' }
+  default: { props: { compactPadding: Boolean }, template: '<main><slot /></main>' }
 }))
 
 vi.mock('@/api/enterprise', async () => {
@@ -68,7 +69,6 @@ function mountView() {
   return mount(EnterpriseView, {
     global: {
       stubs: {
-        AppLayout: { template: '<main><slot /></main>' },
         LoadingSpinner: true
       }
     }
@@ -102,6 +102,7 @@ describe('EnterpriseView overview lifecycle', () => {
 
   it('loads the dedicated overview endpoint and passes server permissions and nulls to the workspace', async () => {
     const wrapper = mountView()
+    expect(wrapper.getComponent(AppLayout).props('compactPadding')).toBe(true)
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true)
     await flushPromises()
@@ -111,6 +112,7 @@ describe('EnterpriseView overview lifecycle', () => {
     expect(wrapper.find('[data-test="workspace"]').text()).toContain('Acme')
     expect(wrapper.findComponent({ name: 'EnterpriseWorkspace' }).props('overview')).toEqual(memberOverview)
     expect(wrapper.find('[aria-busy="true"]').exists()).toBe(false)
+    expect(wrapper.getComponent(AppLayout).props('compactPadding')).toBe(true)
     wrapper.unmount()
   })
 
@@ -121,6 +123,7 @@ describe('EnterpriseView overview lifecycle', () => {
 
     expect(wrapper.find('[role="alert"]').text()).toContain('enterprise.errors.ENTERPRISE_NOT_MEMBER')
     expect(wrapper.find('[data-test="workspace"]').exists()).toBe(false)
+    expect(wrapper.getComponent(AppLayout).props('compactPadding')).toBe(true)
     await wrapper.find('[role="alert"] button').trigger('click')
     await flushPromises()
 

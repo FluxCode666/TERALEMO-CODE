@@ -17,7 +17,7 @@ vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError, showSuccess })
 vi.mock('vue-i18n', async importOriginal => ({ ...await importOriginal<typeof import('vue-i18n')>(), useI18n: () => ({ t: (key: string) => key }) }))
 
 const stubs = {
-  AppLayout: { template: '<main><slot /></main>' },
+  AppLayout: { props: { compactPadding: Boolean }, template: '<main><slot /></main>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
   EnterpriseTable: {
     name: 'EnterpriseTable', props: ['data', 'loading'],
@@ -74,6 +74,13 @@ beforeEach(() => {
 afterEach(() => { for (const wrapper of wrappers.splice(0)) wrapper.unmount() })
 
 describe('administrator enterprise latest reads', () => {
+  it('uses full width and the same compact padding as enterprise details', async () => {
+    const wrapper = mountList()
+    await flushPromises()
+    expect(wrapper.getComponent(stubs.AppLayout).props('compactPadding')).toBe(true)
+    expect(wrapper.get('[data-layout="wide"]').classes()).toContain('max-w-full')
+  })
+
   it('keeps page 3 rows and total when page 2 responds last', async () => {
     const wrapper = mountList()
     await flushPromises()

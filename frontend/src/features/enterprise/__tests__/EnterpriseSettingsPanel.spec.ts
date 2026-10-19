@@ -37,6 +37,12 @@ beforeEach(() => {
 })
 
 describe('Enterprise settings refresh', () => {
+  it('bounds the settings controls inside a full-width card', () => {
+    const wrapper = mountSettings()
+    expect(wrapper.get('section').classes()).toEqual(expect.arrayContaining(['w-full', 'max-w-4xl']))
+    expect(wrapper.classes()).not.toContain('max-w-4xl')
+  })
+
   it('synchronizes a clean settings form when the server snapshot changes', async () => {
     const wrapper = mountSettings()
     await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, balance_visible_to_member: true } })

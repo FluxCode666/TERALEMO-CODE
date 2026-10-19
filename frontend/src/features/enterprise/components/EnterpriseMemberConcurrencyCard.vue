@@ -51,7 +51,7 @@ async function apply() {
   <Card class="shadcn-scope" data-test="member-concurrency-card" :aria-busy="busy">
     <CardHeader>
       <CardTitle class="text-lg">{{ t('admin.enterprises.memberConcurrency.title') }}</CardTitle>
-      <CardDescription>{{ t('admin.enterprises.memberConcurrency.description') }}</CardDescription>
+      <CardDescription class="max-w-3xl">{{ t('admin.enterprises.memberConcurrency.description') }}</CardDescription>
     </CardHeader>
     <CardContent class="space-y-4">
       <p class="text-sm" data-test="member-concurrency-current">{{ configured ? t('admin.enterprises.memberConcurrency.current', { value: enterprise.member_concurrency! }) : t('admin.enterprises.memberConcurrency.unset') }}</p>

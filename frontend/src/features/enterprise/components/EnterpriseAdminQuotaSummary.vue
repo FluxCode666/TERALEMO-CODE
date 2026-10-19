@@ -2,7 +2,7 @@
   <section class="shadcn-scope space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold text-foreground">{{ t('enterprise.quotas') }}</h2><Button variant="ghost" class="text-sm text-primary" @click="$emit('manage')">{{ t('enterprise.view') }}</Button></div>
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" @click="load">{{ t('enterprise.retry') }}</Button></p>
-    <div class="grid gap-4 xl:grid-cols-3" :aria-busy="busy">
+    <div class="grid max-w-screen-2xl gap-4 xl:grid-cols-3" :aria-busy="busy">
       <div v-for="kind in kinds" :key="kind" class="min-w-0 space-y-3">
         <EnterpriseSelect v-if="kind !== 'enterprise' && options(kind).length" v-model="selected[kind]" :options="options(kind)" :aria-label="t(`enterprise.quotaSections.${kind}.title`)" />
         <EnterpriseQuotaDisplay v-if="current(kind)" :quota="current(kind)!" :title="t(`enterprise.quotaSections.${kind}.title`)" compact :data-test="`${kind}-quota`" />

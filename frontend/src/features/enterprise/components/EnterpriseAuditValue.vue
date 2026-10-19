@@ -11,11 +11,11 @@ const type = computed(() => auditReferenceType(props.field))
 const ids = computed(() => type.value ? auditReferenceIds(props.value) : null)
 const otherIds = computed(() => auditReferenceIds(props.other))
 const text = computed(() => props.value === undefined ? '—' : typeof props.value === 'string' ? props.value : JSON.stringify(props.value, null, 2))
-function changed(id: number) { return props.change && otherIds.value !== null && !otherIds.value.includes(id) }
+function changed(id: number) { return props.change && !(otherIds.value ?? []).includes(id) }
 </script>
 <template>
   <div v-if="type && ids !== null" class="flex flex-wrap gap-1.5" data-test="audit-reference-values">
-    <Badge v-for="id in ids" :key="id" variant="outline" class="max-w-full gap-1 whitespace-normal break-all text-left" :class="changed(id) ? change === 'added' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-destructive/40 bg-destructive/5 text-destructive' : ''" :data-change="changed(id) ? change : undefined">
+    <Badge v-for="id in new Set(ids)" :key="id" variant="outline" class="max-w-full gap-1 whitespace-normal break-all text-left" :class="changed(id) ? change === 'added' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-destructive/40 bg-destructive/5 text-destructive' : ''" :data-change="changed(id) ? change : undefined">
       <span v-if="changed(id)">{{ t(`enterprise.auditDetails.${change}`) }} ·</span>{{ auditReferenceLabel(type, id, catalog, t, log) }}
     </Badge>
     <span v-if="!ids.length" class="text-muted-foreground">—</span>

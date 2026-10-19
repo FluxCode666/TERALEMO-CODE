@@ -2,12 +2,12 @@
   <Card class="min-w-0 overflow-hidden" data-test="usage-details">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-4 dark:border-dark-700">
       <div><h3 class="font-semibold text-gray-900 dark:text-white">{{ t('enterprise.usageAnalysis.details') }}</h3><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('enterprise.usageAnalysis.recordCount', { count: total.toLocaleString() }) }}</p></div>
-      <DropdownMenu>
+      <div class="flex flex-wrap items-center gap-2"><slot name="actions" :columns="visible" /><DropdownMenu>
         <DropdownMenuTrigger as-child><Button type="button" variant="outline" size="sm" data-test="usage-column-settings"><Columns3 class="mr-2 size-4" />{{ t('admin.users.columnSettings') }}</Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="max-h-80 w-60 overflow-y-auto">
           <DropdownMenuCheckboxItem v-for="column in columns" :key="column.key" :model-value="column.key === 'created_at' || !hidden.includes(column.key)" :disabled="column.key === 'created_at'" :data-test="`usage-column-toggle-${column.key}`" @select.prevent @update:model-value="toggle(column.key)">{{ column.label }}</DropdownMenuCheckboxItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu></div>
     </div>
     <UsageTable :data="normalized" :columns="visible" :loading="loading" mobile-layout="table" :sticky-first-column="false" :server-side-sort="true" :show-account-billing="false" :show-upstream-endpoint="false" default-sort-key="created_at" default-sort-order="desc" flat @sort="(key, order) => emit('sort', key, order)">
       <template #cell-member="{ row }">

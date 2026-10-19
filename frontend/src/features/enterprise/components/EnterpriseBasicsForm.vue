@@ -1,5 +1,5 @@
 <template>
-  <Card><form class="shadcn-scope space-y-4 p-4 sm:p-6" @submit.prevent="save">
+  <Card><form class="shadcn-scope w-full max-w-4xl space-y-4 p-4 sm:p-6" @submit.prevent="save">
     <h2 class="text-lg font-semibold text-foreground">{{ t('enterprise.basicInfo') }}</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <Label><span class="mb-2 block text-sm font-medium text-foreground">{{ t('enterprise.name') }}</span><Input v-model.trim="form.name"  maxlength="100" required data-test="enterprise-basic-name" /></Label>

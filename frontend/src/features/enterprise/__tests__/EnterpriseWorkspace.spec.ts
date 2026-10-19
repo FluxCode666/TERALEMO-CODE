@@ -364,6 +364,7 @@ describe('EnterpriseWorkspace server permissions and visibility', () => {
     expect(wrapper.text()).toContain('work-key')
     expect(wrapper.text()).toContain('claude-x')
     expect(wrapper.text()).toContain('$0.0100')
+    expect(wrapper.getComponent({ name: 'EnterpriseUsagePanel' }).props('enterpriseName')).toBe('Acme')
     expect(showError).not.toHaveBeenCalled()
   })
 
@@ -453,27 +454,35 @@ describe('EnterpriseQuotaDisplay four quota windows', () => {
   })
 })
 
-it('declares narrow and wide tab layouts with a reduced-motion-safe width transition', async () => {
+it('keeps every user section full width without a max-width transition', async () => {
   const wrapper = mountWorkspace(overview('owner'))
   await flushPromises()
   for (const name of ['overview', 'quotas', 'groups', 'settings', 'audit', 'organization', 'usage']) {
     await openTab(wrapper, name)
-    const wide = ['organization', 'usage'].includes(name)
-    expect(wrapper.attributes('data-layout')).toBe(wide ? 'wide' : 'narrow')
-    expect(wrapper.classes()).toContain(wide ? 'max-w-full' : 'max-w-6xl')
+    expect(wrapper.attributes('data-layout')).toBe('wide')
+    expect(wrapper.classes()).toContain('max-w-full')
+    expect(wrapper.classes()).not.toContain('max-w-6xl')
   }
-  expect(wrapper.classes()).toContain('motion-safe:transition-[max-width]')
-  expect(wrapper.classes()).toContain('motion-reduce:transition-none')
+  expect(wrapper.classes().some(value => value.includes('transition'))).toBe(false)
 })
 
-it('applies the same layout declarations to administrator enterprise details including balance logs', async () => {
+it('keeps administrator details compact and all Tabs full width without remounting or reloading details', async () => {
   getEnterprise.mockResolvedValue({ id: 1, name: 'Acme', status: 'active', balance: 100, frozen_balance: 0, total_recharged: 100, member_count: 0, department_count: 0, settings: { ...defaultEnterpriseSettings } })
-  const wrapper = mount(EnterpriseWorkspace, { props: { admin: true, enterpriseId: 1 }, global: { stubs: { EnterpriseOrganizationPanel: true, EnterpriseUsagePanel: true, EnterpriseQuotaPanel: true, EnterpriseGroupsPanel: true, EnterpriseSettingsPanel: true, EnterpriseLogsPanel: true, EnterpriseBasicsForm: true, EnterpriseAdminQuotaSummary: true } } })
-  wrappers.push(wrapper); await flushPromises()
+  const Layout = { props: { compactPadding: Boolean }, template: '<main><slot /></main>' }
+  const view = mount(EnterpriseDetailView, { global: { stubs: { AppLayout: Layout, EnterpriseOrganizationPanel: true, EnterpriseUsagePanel: true, EnterpriseQuotaPanel: true, EnterpriseGroupsPanel: true, EnterpriseSettingsPanel: true, EnterpriseLogsPanel: true, EnterpriseBasicsForm: true, EnterpriseAdminQuotaSummary: true } } })
+  wrappers.push(view)
+  expect(view.getComponent(Layout).props('compactPadding')).toBe(true)
+  await flushPromises()
+  const wrapper = view.getComponent(EnterpriseWorkspace), instance = wrapper.vm.$, reads = getEnterprise.mock.calls.length
   for (const name of ['overview', 'quotas', 'groups', 'settings', 'audit', 'balanceLogs', 'organization', 'usage']) {
     await openTab(wrapper, name)
-    expect(wrapper.attributes('data-layout')).toBe(['organization', 'usage'].includes(name) ? 'wide' : 'narrow')
+    expect(wrapper.attributes('data-layout')).toBe('wide')
+    expect(wrapper.classes()).toContain('max-w-full')
+    expect(view.getComponent(Layout).props('compactPadding')).toBe(true)
+    expect(view.getComponent(EnterpriseWorkspace).vm.$).toBe(instance)
+    expect(getEnterprise).toHaveBeenCalledTimes(reads)
   }
+  expect(wrapper.emitted('navigate')).toBeUndefined()
 })
 
 it('refreshes administrator data after unified concurrency changes and offers no enterprise-side entry', async () => {
@@ -494,4 +503,16 @@ it('refreshes administrator data after unified concurrency changes and offers no
   const user = mountWorkspace(overview('owner'))
   await openTab(user, 'settings')
   expect(user.find('[data-test="member-concurrency-card"]').exists()).toBe(false)
+})
+
+it('bounds overview metrics and quota cards locally while keeping the workspace full width', async () => {
+  const wrapper = mountWorkspace(overview('owner'))
+  await flushPromises()
+  const metrics = wrapper.get('[data-test="enterprise-balance"]').element.parentElement!
+  expect(metrics.classList.contains('max-w-screen-2xl')).toBe(true)
+  expect(metrics.classList.contains('lg:grid-cols-4')).toBe(true)
+  const quotas = wrapper.get('[data-test="enterprise-quota"]').element.parentElement!
+  expect(quotas.classList.contains('max-w-screen-2xl')).toBe(true)
+  expect(quotas.classList.contains('xl:grid-cols-3')).toBe(true)
+  expect(wrapper.classes()).toContain('max-w-full')
 })

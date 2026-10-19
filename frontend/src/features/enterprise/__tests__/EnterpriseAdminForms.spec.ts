@@ -17,7 +17,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({ ...await importOriginal<typeof 
 
 const dialog = { name: 'EnterpriseDialog', props: ['show'], template: '<div v-if="show"><slot /></div>' }
 const stubs = {
-  AppLayout: { template: '<div><slot /></div>' },
+  AppLayout: { props: { compactPadding: Boolean }, template: '<div><slot /></div>' },
   TablePageLayout: { template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
   EnterpriseDialog: dialog,
   EnterpriseConfirm: { name: 'EnterpriseConfirm', props: ['show'], emits: ['confirm'], template: '<div v-if="show"><slot /><button data-test="confirm-reset" @click="$emit(\'confirm\')">Confirm</button></div>' },
@@ -37,6 +37,7 @@ describe('Enterprise administrator creation', () => {
     const wrapper = mount(EnterprisesView, { global: { stubs } })
     await flushPromises()
     expect(wrapper.get('[data-layout="wide"]').classes()).toContain('max-w-full')
+    expect(wrapper.getComponent(stubs.AppLayout).props('compactPadding')).toBe(true)
     await wrapper.get('[data-test="enterprise-create-open"]').trigger('click')
     await wrapper.get('[data-test="enterprise-name"]').setValue('Acme')
     await wrapper.get('[data-test="enterprise-create-form"]').trigger('submit')
@@ -95,6 +96,9 @@ describe('Enterprise administrator creation', () => {
     const wrapper = mount(EnterprisesView, { global: { stubs } })
     await flushPromises()
     await clickMenuItem(wrapper, '[data-test="enterprise-menu-1"]', '[data-test="enterprise-edit-1"]')
+    const basics = wrapper.getComponent({ name: 'EnterpriseBasicsForm' })
+    expect(basics.get('form').classes()).toContain('max-w-4xl')
+    expect(basics.get('.grid').classes()).toContain('sm:grid-cols-2')
     await wrapper.get('[data-test="enterprise-basic-name"]').setValue('Acme II')
     await wrapper.get('[data-test="enterprise-basic-threshold"]').setValue('25')
     await wrapper.findComponent({ name: 'EnterpriseBasicsForm' }).get('form').trigger('submit')

@@ -23,6 +23,7 @@ export default {
     reset: '重置',
     search: '搜索',
     filter: '筛选',
+    exporting: '导出中…',
     export: '导出',
     import: '导入',
     actions: '操作',

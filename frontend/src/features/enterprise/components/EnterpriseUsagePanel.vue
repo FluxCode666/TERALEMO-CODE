@@ -46,20 +46,26 @@
         <EnterpriseUsageRanking v-if="canFilterMembers" v-model:view="memberView" :trend-items="memberTrend" :trend-loading="breakdownAction.busy.value" data-test="usage-member-ranking" :title="t('enterprise.memberRanking')" :items="memberChartItems" :loading="summaryAction.busy.value" />
         <EnterpriseUsageRanking v-if="canFilterDepartments" v-model:view="departmentView" :trend-items="departmentTrend" :trend-loading="breakdownAction.busy.value" data-test="usage-department-ranking" :title="t('enterprise.departmentRanking')" :items="departmentChartItems" :loading="summaryAction.busy.value" />
       </div>
-      <EnterpriseUsageDetails :rows="rows" :departments="departments" :total="total" :loading="rowAction.busy.value" :admin="admin" @sort="sortRows" />
+      <EnterpriseUsageDetails :rows="rows" :departments="departments" :total="total" :loading="rowAction.busy.value" :admin="admin" @sort="sortRows">
+        <template #actions="{ columns }"><Button type="button" variant="outline" size="sm" data-test="usage-export" :disabled="exporting" :aria-busy="exporting" @click="exportCsv(columns)"><Download class="mr-2 size-4" />{{ t(exporting ? 'common.exporting' : 'enterprise.usageAnalysis.exportCsv') }}</Button></template>
+      </EnterpriseUsageDetails>
       <Pagination :page="page" :page-size="pageSize" :total="total" @update:page="page = $event; loadRows()" @update:page-size="pageSize = $event; page = 1; loadRows()" />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { Column } from '@/components/common/types'
+import { useAppStore } from '@/stores/app'
+import { enterpriseErrorMessage } from '@/api/enterprise'
+import { buildEnterpriseUsageCsv, enterpriseUsageCsvFilename, enterpriseUsageExportLimit, enterpriseUsageExportPageSize } from '../usageCsv'
 import type { EnterpriseResourceAPI } from '@/api/enterprise'
 import type { EnterpriseDepartment, EnterpriseMember, EnterpriseOverview, EnterpriseUsageLog, EnterpriseUsageStats, EnterpriseUsageTrend as UsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage, EnterpriseQuery } from '@/types/enterprise'
 import Pagination from '@/components/common/Pagination.vue'
 import { routeLocationKey } from 'vue-router'
-import { Activity, Coins, Calculator, Zap, Search, RotateCcw, SlidersHorizontal } from '@lucide/vue'
+import { Activity, Coins, Calculator, Zap, Search, RotateCcw, SlidersHorizontal, Download } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -80,8 +86,49 @@ import { useEnterpriseStickyFilters } from '../useEnterpriseStickyFilters'
 import { usageTimeRange, type UsagePeriod } from '../useEnterpriseUsage'
 import { loadMemberOptions } from '../memberOptions'
 import { useEnterpriseAction } from '../useEnterpriseAction'
-const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; refreshKey?: number }>()
+const props = defineProps<{ api: EnterpriseResourceAPI; admin?: boolean; overview?: EnterpriseOverview; enterpriseName?: string; refreshKey?: number }>()
 const { t } = useI18n()
+const app = useAppStore()
+const exporting = ref(false)
+let exportController: AbortController | undefined
+function cancelExport() { exportController?.abort(); exportController = undefined; exporting.value = false }
+onBeforeUnmount(cancelExport)
+watch(() => props.api, cancelExport)
+async function exportCsv(columns: Column[]) {
+  if (exporting.value) return
+  const request = new AbortController()
+  exportController = request
+  exporting.value = true
+  const params = { ...appliedQuery.value, ...sort }
+  const api = props.api, name = props.enterpriseName || props.overview?.enterprise?.name || 'enterprise'
+  const snapshotColumns = columns.map(column => ({ ...column })), snapshotDepartments = [...departments.value]
+  try {
+    const records: EnterpriseUsageLog[] = []
+    let expected = 0
+    for (let page = 1; ; page++) {
+      const result = await api.usage({ ...params, page, page_size: enterpriseUsageExportPageSize }, { signal: request.signal })
+      if (request.signal.aborted) return
+      if (result.total > enterpriseUsageExportLimit) { app.showWarning(t('enterprise.usageAnalysis.exportLimit', { count: enterpriseUsageExportLimit.toLocaleString() })); return }
+      if (page === 1) expected = result.total
+      if (!expected) { app.showWarning(t('enterprise.usageAnalysis.exportEmpty')); return }
+      if (!result.items.length || result.total !== expected) { app.showWarning(t('enterprise.usageAnalysis.exportIncomplete')); return }
+      records.push(...result.items.slice(0, expected - records.length))
+      if (records.length >= expected) break
+    }
+    const blob = new Blob([buildEnterpriseUsageCsv(records, snapshotColumns, snapshotDepartments, t)], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    try {
+      const link = document.createElement('a')
+      link.href = url; link.download = enterpriseUsageCsvFilename(name, params)
+      link.click()
+    } finally { URL.revokeObjectURL(url) }
+    app.showSuccess(t('enterprise.usageAnalysis.exportSuccess', { count: records.length.toLocaleString() }))
+  } catch (cause) {
+    if (!request.signal.aborted) app.showError(`${t('enterprise.usageAnalysis.exportFailed')}: ${enterpriseErrorMessage(cause, t)}`)
+  } finally {
+    if (exportController === request) { exporting.value = false; exportController = undefined }
+  }
+}
 const route = inject(routeLocationKey, undefined)
 const root = ref<HTMLElement>()
 const motion = useMotion(root)
@@ -160,6 +207,7 @@ async function loadRows() {
 }
 function sortRows(key: string, order: 'asc' | 'desc') {
   if (key !== 'model' && key !== 'created_at') return
+  cancelExport()
   sort.sort_by = key; sort.sort_order = order; page.value = 1
   void loadRows()
 }
@@ -177,6 +225,7 @@ async function load() {
 }
 function searchUsage() {
   if (!validate()) return
+  cancelExport()
   if (isRollingRange.value) rollingRange.value = usageTimeRange()
   appliedRollingRange.value = isRollingRange.value
   appliedQuery.value = query(); page.value = 1
@@ -192,6 +241,7 @@ function searchUsage() {
 }
 function resetFilters() { selectedKey.value = undefined; datePeriod.value = 'last24'; granularity.value = 'hour'; Object.assign(filters, { start_date: '', end_date: '', user_id: '', department_id: '', model: '', api_key_id: '' }); searchUsage() }
 async function reload() {
+  cancelExport()
   // Refresh the applied rolling window without applying any staged filter edits.
   if (appliedRollingRange.value) {
     const times = usageTimeRange()

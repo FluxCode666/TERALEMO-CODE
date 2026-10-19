@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="shadcn-scope mx-auto w-full min-w-0 space-y-6 text-foreground motion-safe:transition-[max-width] motion-safe:duration-300 motion-reduce:transition-none" :class="wideLayout ? 'max-w-full' : 'max-w-6xl'" :data-layout="wideLayout ? 'wide' : 'narrow'">
+  <div ref="root" class="shadcn-scope w-full max-w-full min-w-0 space-y-6 text-foreground" data-layout="wide">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0 flex-1"><h1 class="max-w-full break-words text-2xl font-bold text-foreground">{{ enterprise?.name || t('enterprise.title') }}</h1><p v-if="overview" class="mt-1 break-words text-sm text-muted-foreground">{{ t(`enterprise.roles.${overview.me.role}`) }} · {{ overview.me.department_name || t('enterprise.noDepartment') }}</p></div>
       <div class="flex flex-wrap items-center gap-3" data-test="enterprise-header-actions">
@@ -10,13 +10,13 @@
     <EnterpriseOwnerWarning v-if="adminEnterprise" :active-owner-count="adminEnterprise.active_owner_count" />
     <p v-if="readonly" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300" data-test="enterprise-readonly">{{ t('enterprise.readonly') }}</p>
     <p v-if="error" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ error }} <Button variant="ghost" class="underline" data-test="enterprise-refresh" @click="refresh">{{ t('enterprise.retry') }}</Button></p>
-    <div v-if="busy && !enterprise" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true"><Skeleton v-for="n in 4" :key="n" class="h-36" /></div>
+    <div v-if="busy && !enterprise" class="grid max-w-screen-2xl gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true"><Skeleton v-for="n in 4" :key="n" class="h-36" /></div>
     <template v-if="enterprise">
       <component :is="admin ? Tabs : 'div'" :model-value="admin ? activeTab : undefined" :unmount-on-hide="admin ? true : undefined" class="min-w-0" @update:model-value="selectTab">
         <div v-if="admin" class="overflow-x-auto pb-1"><TabsList class="h-auto min-w-max justify-start" :aria-label="t('enterprise.title')"><TabsTrigger v-for="tab in tabs" :key="tab" :value="tab" :data-test="`tab-${tab}`" :aria-current="activeTab === tab ? 'page' : undefined" @click="activeTab = tab">{{ t(`enterprise.${tab}`) }}</TabsTrigger></TabsList></div>
         <component :is="admin ? TabsContent : 'div'" :value="admin ? activeTab : undefined" :class="admin ? 'mt-5' : undefined" data-tab-content>
       <section v-if="activeTab === 'overview'" class="space-y-5">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid max-w-screen-2xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <EnterpriseMetric v-if="balanceVisible && balance !== null" data-test="enterprise-balance" :title="t('enterprise.balance')" :value="balance" currency />
           <template v-if="adminEnterprise">
             <EnterpriseMetric :title="t('enterprise.totalRecharged')" :value="adminEnterprise.total_recharged" currency />
@@ -27,7 +27,7 @@
         </div>
         <Card class="rounded-ui-lg border bg-card text-card-foreground shadow-sm flex flex-wrap items-center justify-between gap-4 p-5"><div class="flex flex-wrap items-center gap-6"><div><span class="text-sm text-muted-foreground">{{ t('enterprise.status') }}</span><p class="mt-1 font-medium text-foreground"><Badge variant="secondary">{{ t(enterprise.status === 'active' ? 'enterprise.active' : 'enterprise.disabled') }}</Badge></p></div><div v-if="overview"><span class="text-sm text-muted-foreground">{{ t('enterprise.organizationUi.myIdentity') }}</span><p class="mt-1 font-medium text-foreground">{{ t(`enterprise.roles.${overview.me.role}`) }} · {{ overview.me.department_name || t('enterprise.noDepartment') }}</p></div></div><Button variant="default" v-if="admin"  @click="balanceOpen = true">{{ t('enterprise.adjustBalance') }}</Button></Card>
         <EnterpriseAdminQuotaSummary v-if="admin" :api="api" :quota="enterpriseQuota" :refresh-key="refreshKey" @manage="activeTab = 'quotas'" />
-        <div v-else class="grid gap-4 xl:grid-cols-3"><EnterpriseQuotaDisplay v-if="enterpriseQuota" data-test="enterprise-quota" :quota="enterpriseQuota" :title="t('enterprise.quotaSections.enterprise.title')" compact />
+        <div v-else class="grid max-w-screen-2xl gap-4 xl:grid-cols-3"><EnterpriseQuotaDisplay v-if="enterpriseQuota" data-test="enterprise-quota" :quota="enterpriseQuota" :title="t('enterprise.quotaSections.enterprise.title')" compact />
         <EnterpriseQuotaDisplay v-if="overview?.department_quota_visible && overview.department_quota" data-test="department-quota" :quota="overview.department_quota" :title="t('enterprise.quotaSections.department.title')" compact />
         <EnterpriseQuotaDisplay v-if="overview?.member_quota_visible && overview.member_quota" data-test="member-quota" :quota="overview.member_quota" :title="t('enterprise.myQuota')" compact />
         </div><p v-if="enterpriseQuota || overview?.member_quota || overview?.department_quota" class="text-sm text-muted-foreground">{{ t('enterprise.quotaHint') }}</p>
@@ -35,7 +35,7 @@
       <EnterpriseOrganizationPanel v-else-if="activeTab === 'organization'" :enterprise-name="enterprise.name" :member-count="adminEnterprise?.member_count" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseQuotaPanel v-else-if="activeTab === 'quotas'" :enterprise-name="enterprise.name" :api="api" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
       <EnterpriseGroupsPanel v-else-if="activeTab === 'groups'" :api="api" :enterprise-id="enterprise.id" :admin="admin" :readonly="readonly" :overview="overview" :refresh-key="refreshKey" @updated="updated" />
-      <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
+      <EnterpriseUsagePanel v-else-if="activeTab === 'usage'" :api="api" :admin="admin" :enterprise-name="enterprise.name" :overview="overview" :refresh-key="refreshKey" />
       <EnterpriseLogsPanel v-else-if="activeTab === 'audit' || activeTab === 'balanceLogs'" :key="activeTab" :api="api" :kind="activeTab" :enterprise="enterprise" :admin="admin" :overview="overview" :refresh-key="refreshKey" />
       <div v-else-if="activeTab === 'settings'" class="space-y-5"><EnterpriseBasicsForm v-if="adminEnterprise" :key="adminEnterprise.updated_at" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseMemberConcurrencyCard v-if="adminEnterprise" :key="adminEnterprise.id" :enterprise="adminEnterprise" @updated="updated" /><EnterpriseSettingsPanel :api="api" :admin="admin" :enterprise-id="enterprise.id" :settings="adminEnterprise?.settings ?? overview?.settings" :readonly="readonly" :refresh-key="refreshKey" @updated="updated" /></div>
         </component>
@@ -101,7 +101,6 @@ const activeTab = computed<EnterpriseTab>({
 function selectTab(value: string | number) {
   if (tabs.value.includes(value as EnterpriseTab)) activeTab.value = value as EnterpriseTab
 }
-const wideLayout = computed(() => ['organization', 'usage'].includes(activeTab.value))
 const root = ref<HTMLElement | null>(null)
 const motion = useMotion(root)
 async function animateTab() { await nextTick(); motion.stop(); motion.fadeIn('[data-tab-content]'); motion.stagger('[data-metric]') }

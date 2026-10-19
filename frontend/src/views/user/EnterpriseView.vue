@@ -1,5 +1,5 @@
 <template>
-  <AppLayout><div class="shadcn-scope min-w-0 space-y-6">
+  <AppLayout compact-padding><div class="shadcn-scope min-w-0 space-y-6">
     <div v-if="loading && !overview" class="shadcn-scope flex justify-center py-12" :aria-label="t('common.loading')" aria-busy="true">
       <Skeleton v-for="n in 3" :key="n" class="h-32 flex-1" />
     </div>
