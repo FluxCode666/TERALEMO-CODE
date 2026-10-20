@@ -30,7 +30,8 @@ func (s *EnterpriseService) Overview(ctx context.Context, a EnterpriseActor, id 
 		}
 	}
 	out.DepartmentQuotaVisible = c.Role == EnterpriseRoleOwner || (c.Role == EnterpriseRoleManager && e.Settings.DepartmentQuotaVisibleToManager)
-	out.MemberQuotaVisible = c.Role == EnterpriseRoleOwner || (c.Role == EnterpriseRoleManager && e.Settings.MemberQuotaVisibleToManager) || (c.Role == EnterpriseRoleMember && e.Settings.MemberQuotaVisibleToMember)
+	// Every member always sees their own quota card in the workbench overview.
+	out.MemberQuotaVisible = true
 	if out.DepartmentQuotaVisible && c.DepartmentID != nil {
 		out.DepartmentQuota, err = s.quotas.GetByScope(ctx, id, EnterpriseScopeDepartment, *c.DepartmentID)
 		if err != nil {

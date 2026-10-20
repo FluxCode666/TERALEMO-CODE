@@ -2,7 +2,7 @@
   <header data-app-header class="glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50">
     <div class="flex h-16 items-center justify-between gap-2 px-2 sm:px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
-      <div class="flex shrink-0 items-center gap-2 sm:gap-4">
+      <div class="flex items-center gap-2 sm:gap-4" :class="enterprise ? 'min-w-0' : 'shrink-0'">
         <button
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
@@ -11,18 +11,18 @@
           <Icon name="menu" size="md" />
         </button>
 
-        <div class="hidden lg:block">
-          <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+        <div class="hidden lg:block" :class="{ 'min-w-0': enterprise }">
+          <h1 class="text-lg font-semibold text-gray-900 dark:text-white" :class="{ truncate: enterprise }">
             {{ pageTitle }}
           </h1>
-          <p v-if="pageDescription" class="hidden text-xs text-gray-500 dark:text-dark-400 xl:block">
+          <p v-if="pageDescription" class="hidden text-xs text-gray-500 dark:text-dark-400 xl:block" :class="{ truncate: enterprise }">
             {{ pageDescription }}
           </p>
         </div>
       </div>
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
-      <div class="flex min-w-0 items-center gap-1 sm:gap-3">
+      <div class="flex min-w-0 items-center gap-1" :class="enterprise ? 'shrink-0 sm:gap-1 lg:gap-2 2xl:gap-3' : 'sm:gap-3'">
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 
@@ -37,10 +37,10 @@
           class="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white sm:flex"
         >
           <Icon name="book" size="sm" />
-          <span class="hidden xl:inline">{{ t('nav.docs') }}</span>
+          <span class="hidden" :class="enterprise ? '2xl:inline' : 'xl:inline'">{{ t('nav.docs') }}</span>
         </a>
 
-        <!-- Model Plaza Entry (icon only below xl to leave room for user identity) -->
+        <!-- Enterprise quota entry needs extra room before 2xl. -->
         <router-link
           v-if="user && modelPlazaEnabled"
           :to="{ path: '/model-plaza', query: { embedded: '1' } }"
@@ -49,7 +49,7 @@
           class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
         >
           <Icon name="grid" size="sm" />
-          <span class="hidden xl:inline">{{ t('nav.modelPlaza') }}</span>
+          <span class="hidden" :class="enterprise ? '2xl:inline' : 'xl:inline'">{{ t('nav.modelPlaza') }}</span>
         </router-link>
 
         <!-- Language Switcher -->
@@ -109,6 +109,39 @@
               </div>
             </div>
             <p v-if="enterprise" class="mt-2 text-gray-500 dark:text-gray-400">{{ t('enterprise.frozenBalanceHint') }}</p>
+          </div>
+        </div>
+
+        <!-- My Quota (enterprise members only; shown even when the company balance is hidden) -->
+        <div
+          v-if="user && enterprise"
+          data-testid="header-quota"
+          :aria-label="t('enterprise.myQuota')"
+          tabindex="0"
+          class="group relative hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-gray-100 px-2.5 py-1.5 dark:bg-dark-800 sm:flex"
+          @mouseenter="maybeRefreshQuota"
+          @focus="maybeRefreshQuota"
+        >
+          <Icon name="chart" size="sm" class="text-gray-500 dark:text-dark-300" />
+          <span class="hidden text-sm font-medium text-gray-700 dark:text-dark-200 2xl:inline">{{ t('enterprise.myQuota') }}</span>
+          <div
+            data-testid="header-quota-details"
+            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-64 max-w-[calc(100vw-2rem)] whitespace-normal rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block group-focus-visible:block dark:border-dark-700 dark:bg-dark-800"
+          >
+            <div v-for="row in quotaRows" :key="row.key" :data-testid="`header-quota-${row.key}`" class="mb-2 last:mb-0">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500 dark:text-dark-400">{{ t(`enterprise.quotaUsage.${row.key}`) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">
+                  {{ formatHeaderMoney(row.usage) }}<template v-if="row.limit != null"> / {{ formatHeaderMoney(row.limit) }}</template><span v-else class="text-gray-400 dark:text-dark-500"> / {{ t('enterprise.unlimited') }}</span>
+                </span>
+              </div>
+              <p v-if="row.limit === 0" class="mt-0.5 text-red-600 dark:text-red-400">{{ t('enterprise.quotaDisabled') }}</p>
+              <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
+                <div v-if="row.limit != null" class="h-full rounded-full transition-all" :class="quotaBarClass(quotaPercent(row.usage, row.limit))" :style="{ width: quotaPercent(row.usage, row.limit) + '%' }" />
+                <div v-else class="h-full w-full rounded-full bg-green-500/30" />
+              </div>
+              <p v-if="row.resetsAt" class="mt-0.5 text-[10px] text-gray-400 dark:text-dark-500">{{ t('enterprise.quotaResetsAt', { time: formatResetTime(row.resetsAt) }) }}</p>
+            </div>
           </div>
         </div>
 
@@ -328,7 +361,7 @@ const enterpriseIdentity = computed(() => {
   }
 })
 const balanceVisible = computed(() => !enterprise.value || (enterprise.value.balance_visible && enterprise.value.balance != null))
-const balanceLabel = computed(() => enterprise.value ? t('enterprise.availableBalance') : t('common.balance'))
+const balanceLabel = computed(() => enterprise.value ? t('enterprise.companyBalance') : t('common.balance'))
 const availableBalance = computed(() => Number(enterprise.value ? enterprise.value.balance ?? 0 : user.value?.balance || 0))
 const frozenBalanceVisible = computed(() => !enterprise.value || (balanceVisible.value && enterprise.value.frozen_balance != null))
 const frozenBalance = computed(() => Number(enterprise.value ? enterprise.value.frozen_balance ?? 0 : user.value?.frozen_balance || 0))
@@ -337,6 +370,57 @@ const balanceAvailableText = computed(() => enterprise.value ? balanceLabel.valu
 const balanceFrozenText = computed(() => enterprise.value ? t('enterprise.frozenBalance') : t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
 const balanceTotalText = computed(() => t('common.totalBalance') === 'common.totalBalance' ? '总余额' : t('common.totalBalance'))
 const balanceFrozenLabel = computed(() => `${balanceFrozenText.value} ${formatHeaderMoney(frozenBalance.value)}`)
+
+// Every enterprise member can open their own four quota windows from the header.
+const memberQuota = computed(() => enterprise.value?.member_quota ?? null)
+const quotaRows = computed(() => {
+  const q = memberQuota.value
+  return [
+    { key: 'daily', usage: Number(q?.daily_usage_usd ?? 0), limit: q?.daily_limit_usd ?? null, resetsAt: q?.daily_resets_at ?? null },
+    { key: 'weekly', usage: Number(q?.weekly_usage_usd ?? 0), limit: q?.weekly_limit_usd ?? null, resetsAt: q?.weekly_resets_at ?? null },
+    { key: 'monthly', usage: Number(q?.monthly_usage_usd ?? 0), limit: q?.monthly_limit_usd ?? null, resetsAt: q?.monthly_resets_at ?? null },
+    { key: 'total', usage: Number(q?.total_usage_usd ?? 0), limit: q?.total_limit_usd ?? null, resetsAt: null },
+  ]
+})
+const QUOTA_REFRESH_INTERVAL = 60 * 1000
+let quotaRefreshing = false
+// Hover reuses data loaded within the last minute; returning to the page always
+// pulls the latest usage because limits may have changed elsewhere meanwhile.
+async function refreshQuota(force: boolean) {
+  if (!enterprise.value || quotaRefreshing || (!force && Date.now() - authStore.userLoadedAt < QUOTA_REFRESH_INTERVAL)) return
+  quotaRefreshing = true
+  try {
+    await authStore.refreshUser({ fresh: force })
+  } catch {
+    // Keep the last loaded quota when a background refresh fails.
+  } finally {
+    quotaRefreshing = false
+  }
+}
+function maybeRefreshQuota() {
+  void refreshQuota(false)
+}
+// Switching tabs fires visibilitychange, while returning from another application
+// only focuses the window; both pull fresh usage. When the two fire together, the
+// in-flight guard in refreshQuota collapses them into one request.
+function handleReturn() {
+  if (document.visibilityState === 'visible') void refreshQuota(true)
+}
+function quotaPercent(usage: number, limit: number): number {
+  if (limit <= 0) return 100
+  return Math.min(100, Math.max(0, Math.round((usage / limit) * 100)))
+}
+function quotaBarClass(p: number): string {
+  if (p >= 95) return 'bg-red-500'
+  if (p >= 75) return 'bg-amber-500'
+  return 'bg-green-500'
+}
+function formatResetTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+}
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
@@ -435,10 +519,14 @@ function handleClickOutside(event: MouseEvent) {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('visibilitychange', handleReturn)
+  window.addEventListener('focus', handleReturn)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('visibilitychange', handleReturn)
+  window.removeEventListener('focus', handleReturn)
 })
 </script>
 

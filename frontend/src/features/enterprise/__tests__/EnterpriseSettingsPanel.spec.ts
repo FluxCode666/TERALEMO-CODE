@@ -92,3 +92,13 @@ it('hides the retired member-group switch and always sends false for its legacy 
   await wrapper.get('form').trigger('submit'); await flushPromises()
   expect(updateEnterprise).toHaveBeenCalledWith(1, { settings: { ...defaultEnterpriseSettings, manager_can_edit_member_groups: false } })
 })
+
+it('hides the retired self-quota visibility switch because every member always sees their own quota', async () => {
+  const wrapper = mountSettings()
+  await wrapper.setProps({ settings: { ...defaultEnterpriseSettings, member_quota_visible_to_member: false } })
+  expect(wrapper.find('[data-test="setting-member_quota_visible_to_member"]').exists()).toBe(false)
+  // Manager-side visibility stays configurable.
+  expect(wrapper.find('[data-test="setting-member_quota_visible_to_manager"]').exists()).toBe(true)
+  await wrapper.get('form').trigger('submit'); await flushPromises()
+  expect(updateEnterprise).toHaveBeenCalledWith(1, { settings: { ...defaultEnterpriseSettings, member_quota_visible_to_member: false } })
+})

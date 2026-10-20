@@ -103,8 +103,10 @@ var (
 // EnterpriseSettings must be initialized with DefaultEnterpriseSettings for a new enterprise.
 // UnmarshalJSON fills absent or null keys from the documented defaults.
 type EnterpriseSettings struct {
-	BalanceVisibleToManager         bool `json:"balance_visible_to_manager"`
-	BalanceVisibleToMember          bool `json:"balance_visible_to_member"`
+	BalanceVisibleToManager bool `json:"balance_visible_to_manager"`
+	BalanceVisibleToMember  bool `json:"balance_visible_to_member"`
+	// MemberQuotaVisibleToMember is ignored: every member can always view their
+	// own quota. Kept so stored settings and legacy clients keep parsing.
 	MemberQuotaVisibleToMember      bool `json:"member_quota_visible_to_member"`
 	MemberQuotaVisibleToManager     bool `json:"member_quota_visible_to_manager"`
 	DepartmentQuotaVisibleToManager bool `json:"department_quota_visible_to_manager"`

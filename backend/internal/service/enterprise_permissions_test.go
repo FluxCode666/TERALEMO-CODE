@@ -44,8 +44,9 @@ func TestEnterprisePermissionsMatrix(t *testing.T) {
 								if role == EnterpriseRoleManager {
 									allowed = enabled && m.DepartmentID != nil && *m.DepartmentID == 3 && (op == EnterprisePermissionViewQuota || m.Role == EnterpriseRoleMember)
 								}
-								if role == EnterpriseRoleMember {
-									allowed = op == EnterprisePermissionViewQuota && enabled && m.ID == 10
+								if role != EnterpriseRoleOwner && op == EnterprisePermissionViewQuota && m.ID == 10 {
+									// Own quota is always visible regardless of the legacy visibility setting.
+									allowed = true
 								}
 								err := CheckEnterprisePermission(c, settings, op, EnterprisePermissionTarget{ScopeType: EnterpriseScopeMember, ScopeID: m.ID, Member: &m})
 								expected := error(nil)

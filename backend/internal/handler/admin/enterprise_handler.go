@@ -41,8 +41,9 @@ type enterpriseManagementAPI interface {
 	ListQuotas(context.Context, service.EnterpriseActor, int64, string) ([]service.EnterpriseQuota, error)
 	UpdateQuota(context.Context, service.EnterpriseActor, int64, string, int64, service.EnterpriseQuotaLimitsInput) (*service.EnterpriseQuota, error)
 	ResetQuota(context.Context, service.EnterpriseActor, int64, string, int64, []string) error
-	GetAllowedGroups(context.Context, service.EnterpriseActor, int64) ([]service.Group, error)
+	GetAllowedGroups(context.Context, service.EnterpriseActor, int64) ([]service.EnterpriseAllowedGroupView, error)
 	SetAllowedGroups(context.Context, service.EnterpriseActor, int64, []int64) error
+	SetAllowedGroupRates(context.Context, service.EnterpriseActor, int64, []service.EnterpriseAllowedGroup) error
 	ListGroupWhitelists(context.Context, service.EnterpriseActor, int64) ([]service.EnterpriseGroupWhitelist, error)
 	SetGroupWhitelist(context.Context, service.EnterpriseActor, int64, string, int64, []int64) error
 	GetSettings(context.Context, service.EnterpriseActor, int64) (service.EnterpriseSettings, error)
@@ -489,19 +490,49 @@ func (h *EnterpriseHandler) resetQuota(c *gin.Context, a service.EnterpriseActor
 
 func (h *EnterpriseHandler) groups(c *gin.Context, a service.EnterpriseActor, id int64) {
 	items, err := h.management.GetAllowedGroups(c.Request.Context(), a, id)
-	enterpriseSuccess(c, enterpriseMap(items, dto.EnterpriseGroupFromService), err)
+	enterpriseSuccess(c, enterpriseMap(items, func(g *service.EnterpriseAllowedGroupView) *dto.EnterpriseGroup {
+		group := dto.EnterpriseGroupFromService(g)
+		if a.IsAdmin {
+			group.RateMultiplier = g.EnterpriseRateMultiplier
+		}
+		return group
+	}), err)
 }
 
 type enterpriseGroupsRequest struct {
 	GroupIDs []int64 `json:"group_ids" binding:"required,dive,gt=0"`
 }
 
+type enterpriseAllowedGroupRequest struct {
+	GroupID        int64    `json:"group_id" binding:"required,gt=0"`
+	RateMultiplier *float64 `json:"rate_multiplier" binding:"omitempty,gt=0"`
+}
+
+type enterpriseAllowedGroupsRequest struct {
+	GroupIDs []int64                         `json:"group_ids" binding:"omitempty,dive,gt=0"`
+	Groups   []enterpriseAllowedGroupRequest `json:"groups" binding:"omitempty,dive"`
+}
+
 func (h *EnterpriseHandler) setAllowedGroups(c *gin.Context, a service.EnterpriseActor, id int64) {
-	var r enterpriseGroupsRequest
+	var r enterpriseAllowedGroupsRequest
 	if !enterpriseBody(c, &r) {
 		return
 	}
-	if response.ErrorFrom(c, h.management.SetAllowedGroups(c.Request.Context(), a, id, r.GroupIDs)) {
+	if (r.Groups == nil) == (r.GroupIDs == nil) {
+		response.ErrorFrom(c, service.ErrEnterpriseInvalidInput)
+		return
+	}
+	var err error
+	if r.Groups != nil {
+		groups := make([]service.EnterpriseAllowedGroup, 0, len(r.Groups))
+		for _, group := range r.Groups {
+			groups = append(groups, service.EnterpriseAllowedGroup{GroupID: group.GroupID, RateMultiplier: group.RateMultiplier})
+		}
+		err = h.management.SetAllowedGroupRates(c.Request.Context(), a, id, groups)
+	} else {
+		err = h.management.SetAllowedGroups(c.Request.Context(), a, id, r.GroupIDs)
+	}
+	if response.ErrorFrom(c, err) {
 		return
 	}
 	h.groups(c, a, id)

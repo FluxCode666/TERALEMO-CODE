@@ -101,3 +101,13 @@ func TestEnterpriseGroupConfigurationMigration(t *testing.T) {
 	require.NotContains(t, strings.ToUpper(sql), "DELETE FROM")
 	require.NotContains(t, sql, "PRIMARY KEY (scope_type, scope_id)")
 }
+
+func TestEnterpriseGroupRateMultiplierMigration(t *testing.T) {
+	content, err := FS.ReadFile("254_enterprise_group_rate_multiplier.sql")
+	require.NoError(t, err)
+	sql := strings.Join(strings.Fields(string(content)), " ")
+	require.Contains(t, sql, "ALTER TABLE enterprise_allowed_groups ADD COLUMN IF NOT EXISTS rate_multiplier DECIMAL(10,4) NULL")
+	require.Contains(t, sql, "COMMENT ON COLUMN enterprise_allowed_groups.rate_multiplier IS '")
+	require.NotContains(t, sql, "NOT NULL")
+	require.NotContains(t, sql, "DEFAULT")
+}

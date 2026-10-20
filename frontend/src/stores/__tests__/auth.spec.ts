@@ -74,6 +74,7 @@ describe('useAuthStore', () => {
 
       expect(store.token).toBe('test-token-123')
       expect(store.user).toEqual(fakeUser)
+      expect(store.userLoadedAt).toBe(Date.now())
       expect(store.isAuthenticated).toBe(true)
       expect(localStorage.getItem('auth_token')).toBe('test-token-123')
       expect(localStorage.getItem('auth_user')).toBe(JSON.stringify(fakeUser))
@@ -352,17 +353,75 @@ describe('useAuthStore', () => {
 
       const updatedUser = { ...fakeUser, username: 'updated-name' }
       mockGetCurrentUser.mockResolvedValue({ data: updatedUser })
+      vi.setSystemTime(Date.now() + 30_000)
 
       const result = await store.refreshUser()
 
       expect(result).toEqual(updatedUser)
       expect(store.user).toEqual(updatedUser)
+      expect(store.userLoadedAt).toBe(Date.now())
       expect(JSON.parse(localStorage.getItem('auth_user')!)).toEqual(updatedUser)
     })
 
     it('未认证时抛出错误', async () => {
       const store = useAuthStore()
       await expect(store.refreshUser()).rejects.toThrow('Not authenticated')
+    })
+
+    it('并发刷新复用请求，失败不更新加载时间，退出后重置时间', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      const loadedAt = store.userLoadedAt
+      let rejectRequest!: (error: Error) => void
+      mockGetCurrentUser.mockReturnValue(new Promise((_resolve, reject) => { rejectRequest = reject }))
+      const first = store.refreshUser()
+      const second = store.refreshUser()
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      rejectRequest(new Error('offline'))
+      const results = await Promise.allSettled([first, second])
+      expect(results).toEqual([
+        { status: 'rejected', reason: new Error('offline') },
+        { status: 'rejected', reason: new Error('offline') }
+      ])
+      expect(store.userLoadedAt).toBe(loadedAt)
+      mockLogout.mockResolvedValue(undefined)
+      await store.logout()
+      expect(store.userLoadedAt).toBe(0)
+    })
+
+    it('fresh 刷新不复用变更前已发出的请求，而是等它结束后重新请求', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      let resolveStale!: (value: { data: typeof fakeUser }) => void
+      mockGetCurrentUser.mockReset()
+      mockGetCurrentUser.mockReturnValueOnce(new Promise(resolve => { resolveStale = resolve }))
+      const updatedUser = { ...fakeUser, username: 'after-mutation' }
+      mockGetCurrentUser.mockResolvedValueOnce({ data: updatedUser })
+      const stale = store.refreshUser()
+      const fresh = store.refreshUser({ fresh: true })
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      resolveStale({ data: fakeUser })
+      await expect(stale).resolves.toEqual(fakeUser)
+      await expect(fresh).resolves.toEqual(updatedUser)
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(2)
+      expect(store.user).toEqual(updatedUser)
+    })
+
+    it('退出后完成的旧刷新不会恢复上一会话的用户信息', async () => {
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      let resolveRequest!: (value: { data: typeof fakeUser }) => void
+      mockGetCurrentUser.mockReturnValue(new Promise(resolve => { resolveRequest = resolve }))
+      const pending = store.refreshUser()
+      mockLogout.mockResolvedValue(undefined)
+      await store.logout()
+      resolveRequest({ data: fakeUser })
+      await expect(pending).rejects.toThrow('Authentication changed')
+      expect(store.user).toBeNull()
+      expect(store.userLoadedAt).toBe(0)
     })
   })
 

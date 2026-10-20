@@ -22610,17 +22610,19 @@ func (m *EnterpriseMutation) ResetEdge(name string) error {
 // EnterpriseAllowedGroupMutation represents an operation that mutates the EnterpriseAllowedGroup nodes in the graph.
 type EnterpriseAllowedGroupMutation struct {
 	config
-	op                Op
-	typ               string
-	created_at        *time.Time
-	clearedFields     map[string]struct{}
-	enterprise        *int64
-	clearedenterprise bool
-	group             *int64
-	clearedgroup      bool
-	done              bool
-	oldValue          func(context.Context) (*EnterpriseAllowedGroup, error)
-	predicates        []predicate.EnterpriseAllowedGroup
+	op                 Op
+	typ                string
+	rate_multiplier    *float64
+	addrate_multiplier *float64
+	created_at         *time.Time
+	clearedFields      map[string]struct{}
+	enterprise         *int64
+	clearedenterprise  bool
+	group              *int64
+	clearedgroup       bool
+	done               bool
+	oldValue           func(context.Context) (*EnterpriseAllowedGroup, error)
+	predicates         []predicate.EnterpriseAllowedGroup
 }
 
 var _ ent.Mutation = (*EnterpriseAllowedGroupMutation)(nil)
@@ -22697,6 +22699,59 @@ func (m *EnterpriseAllowedGroupMutation) GroupID() (r int64, exists bool) {
 // ResetGroupID resets all changes to the "group_id" field.
 func (m *EnterpriseAllowedGroupMutation) ResetGroupID() {
 	m.group = nil
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (m *EnterpriseAllowedGroupMutation) SetRateMultiplier(f float64) {
+	m.rate_multiplier = &f
+	m.addrate_multiplier = nil
+}
+
+// RateMultiplier returns the value of the "rate_multiplier" field in the mutation.
+func (m *EnterpriseAllowedGroupMutation) RateMultiplier() (r float64, exists bool) {
+	v := m.rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// AddRateMultiplier adds f to the "rate_multiplier" field.
+func (m *EnterpriseAllowedGroupMutation) AddRateMultiplier(f float64) {
+	if m.addrate_multiplier != nil {
+		*m.addrate_multiplier += f
+	} else {
+		m.addrate_multiplier = &f
+	}
+}
+
+// AddedRateMultiplier returns the value that was added to the "rate_multiplier" field in this mutation.
+func (m *EnterpriseAllowedGroupMutation) AddedRateMultiplier() (r float64, exists bool) {
+	v := m.addrate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRateMultiplier clears the value of the "rate_multiplier" field.
+func (m *EnterpriseAllowedGroupMutation) ClearRateMultiplier() {
+	m.rate_multiplier = nil
+	m.addrate_multiplier = nil
+	m.clearedFields[enterpriseallowedgroup.FieldRateMultiplier] = struct{}{}
+}
+
+// RateMultiplierCleared returns if the "rate_multiplier" field was cleared in this mutation.
+func (m *EnterpriseAllowedGroupMutation) RateMultiplierCleared() bool {
+	_, ok := m.clearedFields[enterpriseallowedgroup.FieldRateMultiplier]
+	return ok
+}
+
+// ResetRateMultiplier resets all changes to the "rate_multiplier" field.
+func (m *EnterpriseAllowedGroupMutation) ResetRateMultiplier() {
+	m.rate_multiplier = nil
+	m.addrate_multiplier = nil
+	delete(m.clearedFields, enterpriseallowedgroup.FieldRateMultiplier)
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -22806,12 +22861,15 @@ func (m *EnterpriseAllowedGroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseAllowedGroupMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.enterprise != nil {
 		fields = append(fields, enterpriseallowedgroup.FieldEnterpriseID)
 	}
 	if m.group != nil {
 		fields = append(fields, enterpriseallowedgroup.FieldGroupID)
+	}
+	if m.rate_multiplier != nil {
+		fields = append(fields, enterpriseallowedgroup.FieldRateMultiplier)
 	}
 	if m.created_at != nil {
 		fields = append(fields, enterpriseallowedgroup.FieldCreatedAt)
@@ -22828,6 +22886,8 @@ func (m *EnterpriseAllowedGroupMutation) Field(name string) (ent.Value, bool) {
 		return m.EnterpriseID()
 	case enterpriseallowedgroup.FieldGroupID:
 		return m.GroupID()
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		return m.RateMultiplier()
 	case enterpriseallowedgroup.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -22860,6 +22920,13 @@ func (m *EnterpriseAllowedGroupMutation) SetField(name string, value ent.Value) 
 		}
 		m.SetGroupID(v)
 		return nil
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplier(v)
+		return nil
 	case enterpriseallowedgroup.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -22875,6 +22942,9 @@ func (m *EnterpriseAllowedGroupMutation) SetField(name string, value ent.Value) 
 // this mutation.
 func (m *EnterpriseAllowedGroupMutation) AddedFields() []string {
 	var fields []string
+	if m.addrate_multiplier != nil {
+		fields = append(fields, enterpriseallowedgroup.FieldRateMultiplier)
+	}
 	return fields
 }
 
@@ -22883,6 +22953,8 @@ func (m *EnterpriseAllowedGroupMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *EnterpriseAllowedGroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		return m.AddedRateMultiplier()
 	}
 	return nil, false
 }
@@ -22892,6 +22964,13 @@ func (m *EnterpriseAllowedGroupMutation) AddedField(name string) (ent.Value, boo
 // type.
 func (m *EnterpriseAllowedGroupMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplier(v)
+		return nil
 	}
 	return fmt.Errorf("unknown EnterpriseAllowedGroup numeric field %s", name)
 }
@@ -22899,7 +22978,11 @@ func (m *EnterpriseAllowedGroupMutation) AddField(name string, value ent.Value) 
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *EnterpriseAllowedGroupMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(enterpriseallowedgroup.FieldRateMultiplier) {
+		fields = append(fields, enterpriseallowedgroup.FieldRateMultiplier)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -22912,6 +22995,11 @@ func (m *EnterpriseAllowedGroupMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *EnterpriseAllowedGroupMutation) ClearField(name string) error {
+	switch name {
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		m.ClearRateMultiplier()
+		return nil
+	}
 	return fmt.Errorf("unknown EnterpriseAllowedGroup nullable field %s", name)
 }
 
@@ -22924,6 +23012,9 @@ func (m *EnterpriseAllowedGroupMutation) ResetField(name string) error {
 		return nil
 	case enterpriseallowedgroup.FieldGroupID:
 		m.ResetGroupID()
+		return nil
+	case enterpriseallowedgroup.FieldRateMultiplier:
+		m.ResetRateMultiplier()
 		return nil
 	case enterpriseallowedgroup.FieldCreatedAt:
 		m.ResetCreatedAt()

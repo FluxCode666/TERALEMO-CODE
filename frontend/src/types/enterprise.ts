@@ -7,6 +7,8 @@ export type QuotaWindow = 'daily' | 'weekly' | 'monthly' | 'total'
 export interface EnterpriseSettings {
   balance_visible_to_manager: boolean
   balance_visible_to_member: boolean
+  // Legacy field kept for payload compatibility with older backends; the
+  // backend now lets every member view their own quota regardless of it.
   member_quota_visible_to_member: boolean
   member_quota_visible_to_manager: boolean
   department_quota_visible_to_manager: boolean
@@ -38,6 +40,8 @@ export interface EnterpriseIdentity extends EnterpriseSummary {
   balance_visible: boolean
   balance: number | null
   frozen_balance: number | null
+  // Caller’s own member quota, always returned (null only when no quota row exists yet).
+  member_quota?: EnterpriseQuota | null
 }
 export type QuotaLimits = Record<`${QuotaWindow}_limit_usd`, number | null>
 export interface BatchMemberQuotaRequest extends Partial<QuotaLimits> { member_ids: number[]; fields: QuotaWindow[] }
@@ -140,8 +144,12 @@ export interface EnterpriseGroup {
   is_exclusive: boolean
   subscription_type: string
   status: string
-  rate_multiplier?: number
+  rate_multiplier?: number | null
+  enterprise_rate_multiplier?: number | null
+  default_rate_multiplier?: number
+  effective_rate_multiplier?: number
 }
+export interface EnterpriseAllowedGroupInput { group_id: number; rate_multiplier: number | null }
 export interface EnterpriseGroupWhitelist { scope_type: EnterpriseScope; scope_id: number; group_ids: number[] }
 export interface EnterpriseBalanceLog {
   id: number; type: 'add' | 'subtract'; amount: number; balance_before: number; balance_after: number

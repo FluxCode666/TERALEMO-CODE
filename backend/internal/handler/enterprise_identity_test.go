@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -52,7 +53,7 @@ func TestEnterpriseIdentityOnCurrentUserAndProfile(t *testing.T) {
 				}
 				expected = &copy
 			}
-			want, err := json.Marshal(expected)
+			want, err := json.Marshal(dto.EnterpriseIdentityFromService(expected))
 			require.NoError(t, err)
 			require.JSONEq(t, string(want), string(result.Data["enterprise"]))
 		}

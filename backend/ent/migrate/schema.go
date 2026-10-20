@@ -905,6 +905,7 @@ var (
 	}
 	// EnterpriseAllowedGroupsColumns holds the columns for the "enterprise_allowed_groups" table.
 	EnterpriseAllowedGroupsColumns = []*schema.Column{
+		{Name: "rate_multiplier", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(10,4)"}},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "enterprise_id", Type: field.TypeInt64},
 		{Name: "group_id", Type: field.TypeInt64},
@@ -913,17 +914,17 @@ var (
 	EnterpriseAllowedGroupsTable = &schema.Table{
 		Name:       "enterprise_allowed_groups",
 		Columns:    EnterpriseAllowedGroupsColumns,
-		PrimaryKey: []*schema.Column{EnterpriseAllowedGroupsColumns[1], EnterpriseAllowedGroupsColumns[2]},
+		PrimaryKey: []*schema.Column{EnterpriseAllowedGroupsColumns[2], EnterpriseAllowedGroupsColumns[3]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "enterprise_allowed_groups_enterprises_enterprise",
-				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[1]},
+				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[2]},
 				RefColumns: []*schema.Column{EnterprisesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "enterprise_allowed_groups_groups_group",
-				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[2]},
+				Columns:    []*schema.Column{EnterpriseAllowedGroupsColumns[3]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},

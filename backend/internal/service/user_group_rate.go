@@ -2,6 +2,13 @@ package service
 
 import "context"
 
+// EffectiveUserGroupRateRepository resolves enterprise overrides before personal rates.
+// Nil or missing entries leave the caller's group default unchanged.
+type EffectiveUserGroupRateRepository interface {
+	GetEffectiveByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error)
+	GetEffectiveByUserID(ctx context.Context, userID int64) (map[int64]float64, error)
+}
+
 // UserGroupRateEntry 分组下用户专属倍率/RPM 条目。
 // RateMultiplier 与 RPMOverride 均为指针以支持"未设置"语义（NULL）。
 type UserGroupRateEntry struct {

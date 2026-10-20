@@ -87,6 +87,7 @@ func (s *EnterpriseService) audit(ctx context.Context, a EnterpriseActor, c *Ent
 	return s.auditLogs.Create(ctx, &EnterpriseAuditLog{EnterpriseID: id, ActorUserID: a.UserID, ActorRole: role, Action: action, TargetType: target, TargetID: pointer, Detail: map[string]any{"before": before, "after": after}})
 }
 func (s *EnterpriseService) invalidate(ctx context.Context, id int64, userIDs ...int64) {
+	flushUserGroupRateCaches()
 	if s.authCache == nil {
 		return
 	}
@@ -328,6 +329,11 @@ func (s *EnterpriseService) Identity(ctx context.Context, userID int64) (*Enterp
 	if identity.BalanceVisible {
 		identity.Balance = &e.Balance
 		identity.FrozenBalance = &e.FrozenBalance
+	}
+	// Every member can always see their own quota; a missing row means unlimited.
+	identity.MemberQuota, err = s.quotas.GetByScope(ctx, c.EnterpriseID, EnterpriseScopeMember, c.MemberID)
+	if err != nil {
+		return nil, err
 	}
 	return identity, nil
 }

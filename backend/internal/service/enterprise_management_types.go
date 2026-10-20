@@ -51,6 +51,13 @@ type UpdateEnterpriseMemberInput struct {
 }
 type EnterpriseQuotaLimitsInput struct{ DailyLimitUSD, WeeklyLimitUSD, MonthlyLimitUSD, TotalLimitUSD *float64 }
 
+type EnterpriseAllowedGroupView struct {
+	Group
+	EnterpriseRateMultiplier *float64
+	DefaultRateMultiplier    float64
+	EffectiveRateMultiplier  float64
+}
+
 type EnterprisePermissions struct {
 	ManageDepartments   bool `json:"manage_departments"`
 	ManageMembers       bool `json:"manage_members"`
@@ -84,6 +91,9 @@ type EnterpriseIdentity struct {
 	BalanceVisible   bool     `json:"balance_visible"`
 	Balance          *float64 `json:"balance"`
 	FrozenBalance    *float64 `json:"frozen_balance"`
+	// MemberQuota is the caller's own member quota. It is always populated (nil
+	// only when no quota row exists yet) and never gated by visibility settings.
+	MemberQuota *EnterpriseQuota `json:"-"`
 }
 
 type enterpriseManagementUserReader interface {
@@ -113,6 +123,7 @@ type EnterpriseService struct {
 	enterpriseGroups EnterpriseGroupRepository
 	users            enterpriseManagementUserReader
 	groups           enterpriseManagementGroupReader
+	groupRates       UserGroupRateRepository
 	admin            enterpriseManagementUserCreator
 	settings         enterpriseManagementConcurrencyDefaults
 	sessions         enterpriseSessionRevoker

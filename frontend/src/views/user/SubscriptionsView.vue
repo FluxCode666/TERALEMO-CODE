@@ -50,7 +50,7 @@
                   {{ subscription.group.description }}
                 </p>
                 <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
-                  <span>{{ t('payment.planCard.rate') }}: ×{{ subscription.group?.rate_multiplier ?? 1 }}</span>
+                  <span>{{ t('payment.planCard.rate') }}: ×{{ userGroupRates[subscription.group_id] ?? subscription.group?.rate_multiplier ?? 1 }}</span>
                   <span v-if="subscriptionHasPeakRate(subscription)" class="text-amber-700 dark:text-amber-300">
                     {{ t('payment.planCard.peakRate') }}: {{ subscriptionPeakRateLabel(subscription) }}
                   </span>
@@ -254,6 +254,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
+import { userGroupsAPI } from '@/api/groups'
 import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -283,6 +284,7 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const subscriptions = ref<UserSubscription[]>([])
+const userGroupRates = ref<Record<number, number>>({})
 const loading = ref(true)
 
 function subscriptionHasPeakRate(subscription: UserSubscription): boolean {
@@ -296,7 +298,15 @@ function subscriptionPeakRateLabel(subscription: UserSubscription): string {
 async function loadSubscriptions() {
   try {
     loading.value = true
-    subscriptions.value = await subscriptionsAPI.getMySubscriptions()
+    const [list, rates] = await Promise.all([
+      subscriptionsAPI.getMySubscriptions(),
+      userGroupsAPI.getUserGroupRates().catch((error: unknown) => {
+        console.error('Failed to load user group rates:', error)
+        return {} as Record<number, number>
+      })
+    ])
+    subscriptions.value = list
+    userGroupRates.value = rates
   } catch (error) {
     console.error('Failed to load subscriptions:', error)
     appStore.showError(t('userSubscriptions.failedToLoad'))

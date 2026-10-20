@@ -70,7 +70,7 @@ describe('AppHeader 企业余额可见性', () => {
     mocks.auth.user!.enterprise = identity({ balance_visible: true, balance: 56.78 })
     const wrapper = render()
     await wrapper.get('button[aria-label="common.userMenu"]').trigger('click')
-    expect(wrapper.get('[data-testid="header-balance"]').text()).toContain('enterprise.availableBalance')
+    expect(wrapper.get('[data-testid="header-balance"]').text()).toContain('enterprise.companyBalance')
     expect(wrapper.get('[data-testid="header-mobile-balance"]').text()).toContain('$56.78')
     expect(wrapper.text()).not.toContain('987.65')
     expect(wrapper.text()).not.toContain('12.34')

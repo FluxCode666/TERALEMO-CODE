@@ -21,6 +21,8 @@ type EnterpriseAllowedGroup struct {
 	EnterpriseID int64 `json:"enterprise_id,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID int64 `json:"group_id,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -67,6 +69,8 @@ func (*EnterpriseAllowedGroup) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case enterpriseallowedgroup.FieldRateMultiplier:
+			values[i] = new(sql.NullFloat64)
 		case enterpriseallowedgroup.FieldEnterpriseID, enterpriseallowedgroup.FieldGroupID:
 			values[i] = new(sql.NullInt64)
 		case enterpriseallowedgroup.FieldCreatedAt:
@@ -97,6 +101,13 @@ func (_m *EnterpriseAllowedGroup) assignValues(columns []string, values []any) e
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
 			} else if value.Valid {
 				_m.GroupID = value.Int64
+			}
+		case enterpriseallowedgroup.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = new(float64)
+				*_m.RateMultiplier = value.Float64
 			}
 		case enterpriseallowedgroup.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -154,6 +165,11 @@ func (_m *EnterpriseAllowedGroup) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.GroupID))
+	builder.WriteString(", ")
+	if v := _m.RateMultiplier; v != nil {
+		builder.WriteString("rate_multiplier=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

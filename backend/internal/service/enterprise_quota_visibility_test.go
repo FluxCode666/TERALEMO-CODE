@@ -35,7 +35,7 @@ func TestEnterpriseQuotaReadVisibilitySeparatesLimitsFromUsage(t *testing.T) {
 		{"manager without view or edit", EnterpriseRoleManager, false, false, false, nil},
 		{"manager views same department", EnterpriseRoleManager, false, false, true, []int64{3, 20, 40, 60}},
 		{"member views self", EnterpriseRoleMember, false, false, true, []int64{20}},
-		{"member hidden self", EnterpriseRoleMember, false, false, false, nil},
+		{"member views self even when hidden", EnterpriseRoleMember, false, false, false, []int64{20}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newEnterpriseManagementTestFixture(t)
@@ -62,7 +62,7 @@ func TestEnterpriseQuotaReadVisibilitySeparatesLimitsFromUsage(t *testing.T) {
 			for _, q := range items {
 				ids = append(ids, q.ScopeID)
 				require.NotNil(t, q.UsageVisible)
-				require.Equal(t, tc.admin || tc.role == EnterpriseRoleOwner || tc.view, *q.UsageVisible)
+				require.Equal(t, tc.admin || tc.role == EnterpriseRoleOwner || tc.view || q.ScopeID == memberID, *q.UsageVisible)
 			}
 			require.ElementsMatch(t, tc.want, ids)
 		})

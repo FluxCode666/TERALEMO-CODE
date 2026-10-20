@@ -21,6 +21,7 @@ func (EnterpriseAllowedGroup) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("enterprise_id"),
 		field.Int64("group_id"),
+		field.Float("rate_multiplier").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
 		field.Time("created_at").Immutable().Default(time.Now).SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 	}
 }

@@ -44,7 +44,7 @@ func enterpriseOperationsIntegrationService(t *testing.T) *service.EnterpriseSer
 	client := testEntClient(t)
 	users := NewUserRepository(client, integrationDB)
 	auth := service.NewAuthService(client, users, nil, NewRefreshTokenCache(integrationRedis), nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	return service.ProvideEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache(), auth, nil)
+	return service.ProvideEnterpriseService(client, NewEnterpriseRepository(client), NewEnterpriseDepartmentRepository(client), NewEnterpriseMemberRepository(client), NewEnterpriseQuotaRepository(client), NewEnterpriseBalanceLogRepository(client), NewEnterpriseAuditLogRepository(client), NewEnterpriseGroupRepository(client), users, NewGroupRepository(client, integrationDB), &enterpriseImportIntegrationAdmin{users: users}, nil, service.NewNoopEnterpriseBillingCache(), auth, nil, NewUserGroupRateRepository(integrationDB))
 }
 
 func TestEnterpriseImportTransactionsOriginAndPasswordSessions(t *testing.T) {

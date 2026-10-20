@@ -7,6 +7,39 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+// EnterpriseIdentity is shared by all signed-in user responses. Quotas must
+// pass through the quota DTO to normalize window usage and reset timestamps.
+type EnterpriseIdentity struct {
+	ID               int64            `json:"id"`
+	Name             string           `json:"name"`
+	Role             string           `json:"role"`
+	DepartmentID     *int64           `json:"department_id"`
+	DepartmentName   *string          `json:"department_name"`
+	MemberStatus     string           `json:"member_status"`
+	EnterpriseStatus string           `json:"enterprise_status"`
+	BalanceVisible   bool             `json:"balance_visible"`
+	Balance          *float64         `json:"balance"`
+	FrozenBalance    *float64         `json:"frozen_balance"`
+	MemberQuota      *EnterpriseQuota `json:"member_quota"`
+}
+
+func EnterpriseIdentityFromService(identity *service.EnterpriseIdentity) *EnterpriseIdentity {
+	if identity == nil {
+		return nil
+	}
+	out := &EnterpriseIdentity{
+		ID: identity.ID, Name: identity.Name, Role: identity.Role,
+		DepartmentID: identity.DepartmentID, DepartmentName: identity.DepartmentName,
+		MemberStatus: identity.MemberStatus, EnterpriseStatus: identity.EnterpriseStatus,
+		BalanceVisible: identity.BalanceVisible,
+		MemberQuota:    EnterpriseQuotaFromService(identity.MemberQuota),
+	}
+	if identity.BalanceVisible {
+		out.Balance, out.FrozenBalance = identity.Balance, identity.FrozenBalance
+	}
+	return out
+}
+
 type Enterprise struct {
 	MemberConcurrency   *int                       `json:"member_concurrency"`
 	ID                  int64                      `json:"id"`
@@ -132,20 +165,23 @@ func EnterpriseQuotaFromService(q *service.EnterpriseQuota) *EnterpriseQuota {
 }
 
 type EnterpriseGroup struct {
-	ID               int64   `json:"id"`
-	Name             string  `json:"name"`
-	Platform         string  `json:"platform"`
-	IsExclusive      bool    `json:"is_exclusive"`
-	SubscriptionType string  `json:"subscription_type"`
-	Status           string  `json:"status"`
-	RateMultiplier   float64 `json:"rate_multiplier"`
+	ID                       int64    `json:"id"`
+	Name                     string   `json:"name"`
+	Platform                 string   `json:"platform"`
+	IsExclusive              bool     `json:"is_exclusive"`
+	SubscriptionType         string   `json:"subscription_type"`
+	Status                   string   `json:"status"`
+	RateMultiplier           *float64 `json:"rate_multiplier"`
+	EnterpriseRateMultiplier *float64 `json:"enterprise_rate_multiplier"`
+	DefaultRateMultiplier    float64  `json:"default_rate_multiplier"`
+	EffectiveRateMultiplier  float64  `json:"effective_rate_multiplier"`
 }
 
-func EnterpriseGroupFromService(g *service.Group) *EnterpriseGroup {
+func EnterpriseGroupFromService(g *service.EnterpriseAllowedGroupView) *EnterpriseGroup {
 	if g == nil {
 		return nil
 	}
-	return &EnterpriseGroup{ID: g.ID, Name: g.Name, Platform: g.Platform, IsExclusive: g.IsExclusive, SubscriptionType: g.SubscriptionType, Status: g.Status, RateMultiplier: g.RateMultiplier}
+	return &EnterpriseGroup{ID: g.ID, Name: g.Name, Platform: g.Platform, IsExclusive: g.IsExclusive, SubscriptionType: g.SubscriptionType, Status: g.Status, RateMultiplier: &g.RateMultiplier, EnterpriseRateMultiplier: g.EnterpriseRateMultiplier, DefaultRateMultiplier: g.DefaultRateMultiplier, EffectiveRateMultiplier: g.EffectiveRateMultiplier}
 }
 
 type EnterpriseGroupWhitelist struct {
