@@ -36,7 +36,7 @@ const form = reactive<EnterpriseSettings>({ ...defaultEnterpriseSettings, ...pro
 const keys = Object.keys(defaultEnterpriseSettings) as (keyof EnterpriseSettings)[]
 const settingGroups: { key: string; keys: (keyof EnterpriseSettings)[] }[] = [
   { key: 'balance', keys: ['balance_visible_to_manager', 'balance_visible_to_member'] },
-  { key: 'visibility', keys: ['member_quota_visible_to_member', 'member_quota_visible_to_manager', 'department_quota_visible_to_manager'] },
+  { key: 'visibility', keys: ['member_quota_visible_to_manager', 'department_quota_visible_to_manager'] },
   { key: 'management', keys: ['manager_can_manage_members', 'manager_can_edit_member_quota'] }
 ]
 let serverSettings: EnterpriseSettings = { ...form }

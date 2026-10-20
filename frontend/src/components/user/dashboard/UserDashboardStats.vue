@@ -1,6 +1,6 @@
 <template>
   <!-- Row 1: Core Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div data-testid="dashboard-core-stats" class="grid grid-cols-2 gap-4" :class="compactStats ? 'lg:grid-cols-3' : 'lg:grid-cols-4'">
     <!-- Balance -->
     <div v-if="!isSimple && balance !== null" data-testid="dashboard-balance" class="card p-4">
       <div class="flex items-center gap-3">
@@ -10,15 +10,15 @@
           </svg>
         </div>
         <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ enterpriseBalance ? t('enterprise.balance') : t('dashboard.balance') }}</p>
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ enterpriseBalance ? t('enterprise.companyBalance') : t('dashboard.balance') }}</p>
           <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">${{ formatBalance(balance) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.available') }}</p>
         </div>
       </div>
     </div>
 
-    <!-- API Keys -->
-    <div class="card p-4">
+    <!-- API Keys: enterprise members without balance visibility don't see key stats -->
+    <div v-if="!hideApiKeys" data-testid="dashboard-api-keys" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
           <Icon name="key" size="md" class="text-blue-600 dark:text-blue-400" :stroke-width="2" />
@@ -65,10 +65,23 @@
         </div>
       </div>
     </div>
+    <!-- Keep the compact core row at three cards. -->
+    <div v-if="compactStats" class="card p-4">
+      <div class="flex items-center gap-3">
+        <div class="rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
+          <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
+        </div>
+        <div>
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.avgResponse') }}</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.averageTime') }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Row 2: Token Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div data-testid="dashboard-token-stats" class="grid grid-cols-2 gap-4" :class="compactStats ? 'lg:grid-cols-3' : 'lg:grid-cols-4'">
     <!-- Today Tokens -->
     <div class="card p-4">
       <div class="flex items-center gap-3">
@@ -118,7 +131,7 @@
     </div>
 
     <!-- Avg Response Time -->
-    <div class="card p-4">
+    <div v-if="!compactStats" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
           <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
@@ -132,8 +145,10 @@
     </div>
   </div>
 
-  <!-- Row 3: Per-platform breakdown -->
-  <div v-if="!isSimple && platformCards.length > 0" class="card p-4">
+  <slot name="before-platform-breakdown" />
+
+  <!-- Per-platform breakdown -->
+  <div v-if="!isSimple && platformCards.length > 0" data-testid="dashboard-platform-breakdown" class="card p-4">
     <div class="mb-3 flex items-center justify-between">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.platformBreakdown') }}</h3>
       <span class="text-xs text-gray-500 dark:text-gray-400">
@@ -249,6 +264,11 @@ const props = defineProps<{
   platformQuotas?: PlatformQuotaItem[] | null
 }>()
 const { t } = useI18n()
+
+// Enterprise members without balance visibility also skip the API-keys card and
+// arrange the remaining six cards in two rows of three.
+const hideApiKeys = computed(() => !!props.enterpriseBalance && props.balance === null)
+const compactStats = computed(() => hideApiKeys.value)
 
 const PLATFORM_LABELS: Record<string, string> = {
   anthropic: 'Claude',

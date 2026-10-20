@@ -1046,7 +1046,7 @@ func init() {
 	enterpriseallowedgroupFields := schema.EnterpriseAllowedGroup{}.Fields()
 	_ = enterpriseallowedgroupFields
 	// enterpriseallowedgroupDescCreatedAt is the schema descriptor for created_at field.
-	enterpriseallowedgroupDescCreatedAt := enterpriseallowedgroupFields[2].Descriptor()
+	enterpriseallowedgroupDescCreatedAt := enterpriseallowedgroupFields[3].Descriptor()
 	// enterpriseallowedgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
 	enterpriseallowedgroup.DefaultCreatedAt = enterpriseallowedgroupDescCreatedAt.Default.(func() time.Time)
 	enterpriseauditlogFields := schema.EnterpriseAuditLog{}.Fields()

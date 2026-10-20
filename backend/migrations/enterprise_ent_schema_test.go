@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/enterpriseallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
+	"github.com/Wei-Shaw/sub2api/ent/migrate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
@@ -55,8 +57,20 @@ func TestEnterpriseGeneratedSchemaSQLiteParity(t *testing.T) {
 
 	group, err := client.Group.Create().SetName("Enterprise Schema Group").Save(ctx)
 	require.NoError(t, err)
-	_, err = client.EnterpriseAllowedGroup.Create().SetEnterpriseID(company.ID).SetGroupID(group.ID).Save(ctx)
+	allowed, err := client.EnterpriseAllowedGroup.Create().SetEnterpriseID(company.ID).SetGroupID(group.ID).Save(ctx)
 	require.NoError(t, err)
+	require.Nil(t, allowed.RateMultiplier)
+	_, err = client.EnterpriseAllowedGroup.Update().Where(enterpriseallowedgroup.EnterpriseIDEQ(company.ID), enterpriseallowedgroup.GroupIDEQ(group.ID)).SetRateMultiplier(0).Save(ctx)
+	require.NoError(t, err)
+	allowed, err = client.EnterpriseAllowedGroup.Query().Where(enterpriseallowedgroup.EnterpriseIDEQ(company.ID), enterpriseallowedgroup.GroupIDEQ(group.ID)).Only(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, allowed.RateMultiplier)
+	require.Zero(t, *allowed.RateMultiplier)
+	_, err = client.EnterpriseAllowedGroup.Update().Where(enterpriseallowedgroup.EnterpriseIDEQ(company.ID), enterpriseallowedgroup.GroupIDEQ(group.ID)).ClearRateMultiplier().Save(ctx)
+	require.NoError(t, err)
+	allowed, err = client.EnterpriseAllowedGroup.Query().Where(enterpriseallowedgroup.EnterpriseIDEQ(company.ID), enterpriseallowedgroup.GroupIDEQ(group.ID)).Only(ctx)
+	require.NoError(t, err)
+	require.Nil(t, allowed.RateMultiplier)
 	_, err = client.EnterpriseAllowedGroup.Create().SetEnterpriseID(company.ID).SetGroupID(group.ID).Save(ctx)
 	require.True(t, dbent.IsConstraintError(err))
 	_, err = client.EnterpriseGroupWhitelist.Create().SetEnterpriseID(company.ID).SetScopeType("enterprise").SetScopeID(company.ID).SetGroupID(group.ID).Save(ctx)
@@ -83,6 +97,8 @@ func TestEnterpriseGeneratedSchemaSQLiteParity(t *testing.T) {
 	var columns int
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM pragma_table_info('enterprise_allowed_groups') WHERE pk > 0`).Scan(&columns))
 	require.Equal(t, 2, columns)
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM pragma_table_info('enterprise_allowed_groups') WHERE name = 'rate_multiplier' AND "notnull" = 0 AND dflt_value IS NULL`).Scan(&columns))
+	require.Equal(t, 1, columns)
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM pragma_table_info('enterprise_group_whitelist_scopes') WHERE pk > 0`).Scan(&columns))
 	require.Equal(t, 1, columns)
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM pragma_table_info('enterprise_group_whitelist_scopes') WHERE pk > 0 AND name = 'id'`).Scan(&columns))
@@ -94,4 +110,16 @@ func TestEnterpriseGeneratedSchemaSQLiteParity(t *testing.T) {
 
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM pragma_table_info('usage_logs') WHERE name IN ('enterprise_id', 'enterprise_department_id') AND "notnull" = 0`).Scan(&columns))
 	require.Equal(t, 2, columns)
+}
+
+func TestEnterpriseAllowedGroupRateMultiplierPostgresType(t *testing.T) {
+	for _, column := range migrate.EnterpriseAllowedGroupsColumns {
+		if column.Name == "rate_multiplier" {
+			require.True(t, column.Nullable)
+			require.Nil(t, column.Default)
+			require.Equal(t, "decimal(10,4)", column.SchemaType[dialect.Postgres])
+			return
+		}
+	}
+	t.Fatal("enterprise group rate_multiplier missing from generated schema")
 }

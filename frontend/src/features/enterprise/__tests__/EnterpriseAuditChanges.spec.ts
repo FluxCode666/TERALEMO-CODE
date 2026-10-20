@@ -37,6 +37,30 @@ describe('审计变化高亮', () => {
     expect(render({ before: [1], after: [1, 2] }, 'group_pool.update').find('[data-changed="true"]').exists()).toBe(true)
     expect(render({ name: 'Alice', group_ids: [1] }).find('[data-changed]').exists()).toBe(false)
   })
+  it('按分组名称展示企业倍率变更，区分零倍率、跟随默认与移除分组', async () => {
+    const wrapper = render({
+      before: { groups: [{ group_id: 1, rate_multiplier: 0.8 }, { group_id: 2, rate_multiplier: 0 }, { group_id: 3, rate_multiplier: null }] },
+      after: { groups: [{ group_id: 4, rate_multiplier: null }, { group_id: 2, rate_multiplier: 0 }, { group_id: 1, rate_multiplier: null }] }
+    }, 'group_pool.update')
+    await wrapper.setProps({ catalog: { groups: [{ id: 1, name: 'Claude' }, { id: 2, name: 'GPT' }, { id: 3, name: 'Gemini' }, { id: 4, name: 'New group' }] } })
+    const changed = wrapper.get('[data-field="groups.1.rate_multiplier"]')
+    expect(changed.text()).toContain('Claude · enterprise.groupAccess.enterpriseRate')
+    expect(changed.findAll('[data-test="audit-group-rate"]').map(value => value.text())).toEqual(['0.8×', 'enterprise.groupAccess.followDefault'])
+    expect(changed.attributes('data-changed')).toBe('true')
+    const same = wrapper.get('[data-field="groups.2.rate_multiplier"]')
+    expect(same.findAll('[data-test="audit-group-rate"]').map(value => value.text())).toEqual(['0×', '0×'])
+    expect(same.attributes('data-changed')).toBe('false')
+    const removed = wrapper.get('[data-field="groups.3.rate_multiplier"]')
+    expect(removed.findAll('[data-test="audit-group-rate"]').map(value => value.text())).toEqual(['enterprise.groupAccess.followDefault', '—'])
+    expect(removed.attributes('data-changed')).toBe('true')
+    const added = wrapper.get('[data-field="groups.4.rate_multiplier"]')
+    expect(added.findAll('[data-test="audit-group-rate"]').map(value => value.text())).toEqual(['—', 'enterprise.groupAccess.followDefault'])
+    expect(added.attributes('data-changed')).toBe('true')
+  })
+  it('清空企业分组池时仍列出移除的倍率', () => {
+    const wrapper = render({ before: { groups: [{ group_id: 1, rate_multiplier: 0 }] }, after: { groups: [] } }, 'group_pool.update')
+    expect(wrapper.get('[data-field="groups.1.rate_multiplier"]').findAll('[data-test="audit-group-rate"]').map(value => value.text())).toEqual(['0×', '—'])
+  })
   it('深比较忽略对象键顺序，验证嵌套数组和引用数组', () => {
     expect(auditValuesEqual('', { x: [{ a: 1, b: 2 }], group_ids: [1, 2] }, { group_ids: [2, 1], x: [{ b: 2, a: 1 }] })).toBe(true)
     expect(auditValuesEqual('', { x: [1, 2] }, { x: [2, 1] })).toBe(false)

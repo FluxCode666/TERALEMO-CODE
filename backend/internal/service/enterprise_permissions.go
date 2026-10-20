@@ -74,7 +74,9 @@ func CheckEnterprisePermission(c *EnterpriseMemberContext, settings EnterpriseSe
 		case EnterpriseScopeDepartment:
 			allowed = c.Role == EnterpriseRoleManager && settings.DepartmentQuotaVisibleToManager && c.DepartmentID != nil && ((target.Department == nil && enterpriseDepartmentInSubtree(c, target.ScopeID)) || (target.Department != nil && (target.Department.ID == *c.DepartmentID || slices.Contains(target.Department.PathIDs, *c.DepartmentID))))
 		case EnterpriseScopeMember:
-			allowed = (c.Role == EnterpriseRoleManager && settings.MemberQuotaVisibleToManager && enterpriseSameDepartment(c, target.Member)) || (c.Role == EnterpriseRoleMember && settings.MemberQuotaVisibleToMember && c.MemberID == target.ScopeID)
+			// Members of any role always see their own quota; managers additionally
+			// see same-subtree member quotas when the setting allows.
+			allowed = (c.Role == EnterpriseRoleManager && settings.MemberQuotaVisibleToManager && enterpriseSameDepartment(c, target.Member)) || c.MemberID == target.ScopeID
 		}
 	case EnterprisePermissionEditQuota:
 		allowed = c.Role == EnterpriseRoleManager && settings.ManagerCanEditMemberQuota && target.ScopeType == EnterpriseScopeMember && enterpriseSameDepartment(c, target.Member) && target.Member.Role == EnterpriseRoleMember

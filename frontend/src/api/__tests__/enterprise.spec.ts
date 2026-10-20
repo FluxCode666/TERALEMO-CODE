@@ -231,6 +231,12 @@ describe('admin enterprises API contract', () => {
     await enterprises.forEnterprise(12).updateAllowedGroups([])
     expect(put).toHaveBeenCalledWith('/admin/enterprises/12/allowed-groups', { group_ids: [] })
   })
+
+  it('sends enterprise rate overrides and null resets without changing the new payload', async () => {
+    const body = { groups: [{ group_id: 1, rate_multiplier: 0.6 }, { group_id: 2, rate_multiplier: null }] }
+    await enterprises.forEnterprise(12).updateAllowedGroups(body)
+    expect(put).toHaveBeenCalledWith('/admin/enterprises/12/allowed-groups', body)
+  })
 })
 
 describe('enterprise errors', () => {

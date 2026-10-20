@@ -145,6 +145,7 @@ describe('EnterpriseView overview lifecycle', () => {
 
     expect(overview).toHaveBeenCalledTimes(2)
     expect(refreshUser).toHaveBeenCalledTimes(1)
+    expect(refreshUser).toHaveBeenCalledWith({ fresh: true })
     expect(wrapper.text()).toContain('Updated enterprise')
     wrapper.unmount()
   })

@@ -151,6 +151,61 @@ func (r *userGroupRateRepository) GetByUserAndGroup(ctx context.Context, userID,
 	return &v, nil
 }
 
+// These predicates mirror the membership snapshot loader and EnterpriseMemberContext.Active.
+const effectiveEnterpriseGroupRatesSQL = `
+	SELECT a.group_id, a.rate_multiplier
+	FROM enterprise_members m
+	JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
+	JOIN enterprise_allowed_groups a ON a.enterprise_id = e.id
+	WHERE m.user_id = $1 AND m.deleted_at IS NULL
+		AND m.status = $2 AND e.status = $3 AND a.rate_multiplier IS NOT NULL
+`
+
+// GetEffectiveByUserAndGroup resolves enterprise overrides before personal overrides.
+// A nil result leaves the caller's group default unchanged.
+func (r *userGroupRateRepository) GetEffectiveByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error) {
+	query := `WITH enterprise_rates AS (` + effectiveEnterpriseGroupRatesSQL + `)
+		SELECT COALESCE(
+			(SELECT rate_multiplier FROM enterprise_rates WHERE group_id = $4),
+			(SELECT rate_multiplier FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = $4)
+		)`
+	var rate sql.NullFloat64
+	err := scanSingleRow(ctx, r.sql, query, []any{userID, service.EnterpriseMemberStatusActive, service.EnterpriseStatusActive, groupID}, &rate)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if !rate.Valid {
+		return nil, nil
+	}
+	v := rate.Float64
+	return &v, nil
+}
+
+// GetEffectiveByUserID returns the same enterprise-first overrides for rate displays.
+func (r *userGroupRateRepository) GetEffectiveByUserID(ctx context.Context, userID int64) (map[int64]float64, error) {
+	query := `WITH enterprise_rates AS (` + effectiveEnterpriseGroupRatesSQL + `)
+		SELECT group_id, rate_multiplier FROM enterprise_rates
+		UNION ALL
+		SELECT ugr.group_id, ugr.rate_multiplier FROM user_group_rate_multipliers ugr
+		WHERE ugr.user_id = $1 AND ugr.rate_multiplier IS NOT NULL
+			AND NOT EXISTS (SELECT 1 FROM enterprise_rates a WHERE a.group_id = ugr.group_id)`
+	rows, err := r.sql.QueryContext(ctx, query, userID, service.EnterpriseMemberStatusActive, service.EnterpriseStatusActive)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := make(map[int64]float64)
+	for rows.Next() {
+		var groupID int64
+		var rate float64
+		if err := rows.Scan(&groupID, &rate); err != nil {
+			return nil, err
+		}
+		out[groupID] = rate
+	}
+	return out, rows.Err()
+}
+
 // GetRPMOverrideByUserAndGroup 获取用户在特定分组的 rpm_override（NULL 返回 nil）
 func (r *userGroupRateRepository) GetRPMOverrideByUserAndGroup(ctx context.Context, userID, groupID int64) (*int, error) {
 	query := `SELECT rpm_override FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = $2`

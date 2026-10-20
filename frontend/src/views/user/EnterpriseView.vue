@@ -51,7 +51,7 @@ async function handleUpdated() {
   const sequence = ++identityRefreshSequence
   enterpriseStore.invalidate(false)
   try {
-    await authStore.refreshUser()
+    await authStore.refreshUser({ fresh: true })
   } catch (error) {
     if (!disposed) console.warn('Failed to refresh enterprise identity:', error)
   }

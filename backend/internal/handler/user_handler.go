@@ -86,7 +86,7 @@ type UpdateProfileRequest struct {
 
 type userProfileResponse struct {
 	dto.User
-	Enterprise        *service.EnterpriseIdentity            `json:"enterprise"`
+	Enterprise        *dto.EnterpriseIdentity                `json:"enterprise"`
 	AvatarURL         string                                 `json:"avatar_url,omitempty"`
 	AvatarSource      *userProfileSourceContext              `json:"avatar_source,omitempty"`
 	UsernameSource    *userProfileSourceContext              `json:"username_source,omitempty"`

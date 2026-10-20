@@ -90,13 +90,43 @@ describe('UserDashboardStats 按平台拆分', () => {
     expect(w.find('[data-testid="dashboard-balance"]').exists()).toBe(false)
   })
 
-  it('可见的企业零余额仍显示企业余额标签', () => {
+  it('企业成员看不到余额时同时隐藏 API 密钥卡，并按一行 3 张排列', () => {
+    const w = mount(UserDashboardStats, {
+      props: { stats: makeStats(), balance: null, enterpriseBalance: true, isSimple: false },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.find('[data-testid="dashboard-api-keys"]').exists()).toBe(false)
+    const grids = w.findAll('.grid').filter(g => g.classes().includes('lg:grid-cols-3'))
+    expect(grids.length).toBe(2)
+    expect(w.get('[data-testid="dashboard-core-stats"]').findAll(':scope > .card')).toHaveLength(3)
+    expect(w.get('[data-testid="dashboard-token-stats"]').findAll(':scope > .card')).toHaveLength(3)
+    expect(w.text().match(/dashboard.avgResponse/g)).toHaveLength(1)
+    w.unmount()
+  })
+
+  it.each([
+    ['企业成员可见余额', { stats: makeStats(), balance: 42, enterpriseBalance: true, isSimple: false }],
+    ['非企业用户', { stats: makeStats(), balance: 42, enterpriseBalance: false, isSimple: false }],
+  ])('%s时保留 API 密钥卡并保持一行 4 张', (_name, props) => {
+    const w = mount(UserDashboardStats, {
+      props: props as { stats: UserStatsType; balance: number | null; enterpriseBalance?: boolean; isSimple: boolean },
+      global: { stubs: { Icon: true } },
+    })
+    expect(w.find('[data-testid="dashboard-api-keys"]').exists()).toBe(true)
+    expect(w.get('[data-testid="dashboard-core-stats"]').findAll(':scope > .card')).toHaveLength(4)
+    expect(w.get('[data-testid="dashboard-token-stats"]').findAll(':scope > .card')).toHaveLength(4)
+    expect(w.findAll('.grid').some(g => g.classes().includes('lg:grid-cols-4'))).toBe(true)
+    expect(w.findAll('.grid').some(g => g.classes().includes('lg:grid-cols-3'))).toBe(false)
+    w.unmount()
+  })
+
+  it('可见的企业零余额仍显示公司余额标签', () => {
     const w = mount(UserDashboardStats, {
       props: { stats: makeStats(), balance: 0, enterpriseBalance: true, isSimple: false },
       global: { stubs: { Icon: true } },
     })
     const card = w.get('[data-testid="dashboard-balance"]')
-    expect(card.text()).toContain('enterprise.balance')
+    expect(card.text()).toContain('enterprise.companyBalance')
     expect(card.text()).toContain('$0.00')
     expect(card.text()).not.toContain('dashboard.balance')
   })

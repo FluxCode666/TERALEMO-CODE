@@ -16,6 +16,8 @@ const (
 	FieldEnterpriseID = "enterprise_id"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeEnterprise holds the string denoting the enterprise edge name in mutations.
@@ -48,6 +50,7 @@ const (
 var Columns = []string{
 	FieldEnterpriseID,
 	FieldGroupID,
+	FieldRateMultiplier,
 	FieldCreatedAt,
 }
 
@@ -77,6 +80,11 @@ func ByEnterpriseID(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

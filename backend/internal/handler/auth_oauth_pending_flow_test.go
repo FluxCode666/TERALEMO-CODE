@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -59,7 +60,7 @@ func assertAuthEnterpriseResponse(t *testing.T, raw []byte, envelope bool, ident
 		want.Balance = nil
 		want.FrozenBalance = nil
 	}
-	wantJSON, err := json.Marshal(want)
+	wantJSON, err := json.Marshal(dto.EnterpriseIdentityFromService(&want))
 	require.NoError(t, err)
 	require.JSONEq(t, string(wantJSON), string(user["enterprise"]))
 }

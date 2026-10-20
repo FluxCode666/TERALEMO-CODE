@@ -106,11 +106,51 @@ func (r *enterpriseGroupRepository) GetAllowedGroupIDs(ctx context.Context, ente
 	return ids, translatePersistenceError(rows.Err(), nil, nil)
 }
 
+func (r *enterpriseGroupRepository) GetAllowedGroups(ctx context.Context, enterpriseID int64) ([]service.EnterpriseAllowedGroup, error) {
+	client := clientFromContext(ctx, r.client)
+	if err := enterpriseRequireEnterprise(ctx, client, enterpriseID, false); err != nil {
+		return nil, err
+	}
+	rows, err := client.QueryContext(ctx, `SELECT a.group_id, a.rate_multiplier FROM enterprise_allowed_groups a JOIN groups g ON g.id = a.group_id AND g.deleted_at IS NULL WHERE a.enterprise_id = $1 ORDER BY a.group_id`, enterpriseID)
+	if err != nil {
+		return nil, translatePersistenceError(err, nil, nil)
+	}
+	defer func() { _ = rows.Close() }()
+	groups := make([]service.EnterpriseAllowedGroup, 0)
+	for rows.Next() {
+		var group service.EnterpriseAllowedGroup
+		if err := rows.Scan(&group.GroupID, &group.RateMultiplier); err != nil {
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, translatePersistenceError(rows.Err(), nil, nil)
+}
+
 func (r *enterpriseGroupRepository) SetAllowedGroupIDs(ctx context.Context, enterpriseID int64, groupIDs []int64) error {
 	ids, err := enterpriseNormalizeGroupIDs(groupIDs)
 	if err != nil {
 		return err
 	}
+	return r.setAllowedGroups(ctx, enterpriseID, ids, nil)
+}
+
+func (r *enterpriseGroupRepository) SetAllowedGroups(ctx context.Context, enterpriseID int64, groups []service.EnterpriseAllowedGroup) error {
+	groupIDs := make([]int64, 0, len(groups))
+	rates := make(map[int64]*float64, len(groups))
+	for _, group := range groups {
+		groupIDs = append(groupIDs, group.GroupID)
+		rates[group.GroupID] = group.RateMultiplier
+	}
+	ids, err := enterpriseNormalizeGroupIDs(groupIDs)
+	if err != nil {
+		return err
+	}
+	return r.setAllowedGroups(ctx, enterpriseID, ids, rates)
+}
+
+// nil rates keeps existing overrides for the legacy group_ids payload.
+func (r *enterpriseGroupRepository) setAllowedGroups(ctx context.Context, enterpriseID int64, ids []int64, rates map[int64]*float64) error {
 	return enterpriseWithTx(ctx, r.client, func(ctx context.Context, client *dbent.Client) error {
 		if err := enterpriseRequireEnterprise(ctx, client, enterpriseID, true); err != nil {
 			return err
@@ -124,13 +164,26 @@ func (r *enterpriseGroupRepository) SetAllowedGroupIDs(ctx context.Context, ente
 		if _, err := client.ExecContext(ctx, `UPDATE enterprises SET group_pool_configured = $2, updated_at = NOW() WHERE id = $1`, enterpriseID, len(ids) > 0); err != nil {
 			return translatePersistenceError(err, nil, nil)
 		}
-		if _, err := client.ExecContext(ctx, `DELETE FROM enterprise_allowed_groups WHERE enterprise_id = $1`, enterpriseID); err != nil {
+		if len(ids) == 0 {
+			_, err := client.ExecContext(ctx, `DELETE FROM enterprise_allowed_groups WHERE enterprise_id = $1`, enterpriseID)
 			return translatePersistenceError(err, nil, nil)
 		}
-		if len(ids) == 0 {
-			return nil
+		if _, err := client.ExecContext(ctx, `DELETE FROM enterprise_allowed_groups WHERE enterprise_id = $1 AND NOT (group_id = ANY($2::bigint[]))`, enterpriseID, pq.Array(ids)); err != nil {
+			return translatePersistenceError(err, nil, nil)
 		}
-		_, err := client.ExecContext(ctx, `INSERT INTO enterprise_allowed_groups (enterprise_id, group_id) SELECT $1, id FROM unnest($2::bigint[]) AS id`, enterpriseID, pq.Array(ids))
+		if rates == nil {
+			_, err := client.ExecContext(ctx, `INSERT INTO enterprise_allowed_groups (enterprise_id, group_id) SELECT $1, id FROM unnest($2::bigint[]) AS id ON CONFLICT (enterprise_id, group_id) DO NOTHING`, enterpriseID, pq.Array(ids))
+			return translatePersistenceError(err, nil, nil)
+		}
+		values := make([]sql.NullFloat64, len(ids))
+		for i, id := range ids {
+			if rate := rates[id]; rate != nil {
+				values[i] = sql.NullFloat64{Float64: *rate, Valid: true}
+			}
+		}
+		_, err := client.ExecContext(ctx, `INSERT INTO enterprise_allowed_groups (enterprise_id, group_id, rate_multiplier)
+ SELECT $1, data.group_id, data.rate_multiplier FROM unnest($2::bigint[], $3::numeric[]) AS data(group_id, rate_multiplier)
+ ON CONFLICT (enterprise_id, group_id) DO UPDATE SET rate_multiplier = EXCLUDED.rate_multiplier`, enterpriseID, pq.Array(ids), pq.Array(values))
 		return translatePersistenceError(err, nil, nil)
 	})
 }

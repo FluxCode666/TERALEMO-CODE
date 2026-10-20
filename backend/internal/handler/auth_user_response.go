@@ -11,10 +11,10 @@ import (
 // nested user DTOs in unrelated resource responses retain their existing shape.
 type authUserResponse struct {
 	*dto.User
-	Enterprise *service.EnterpriseIdentity `json:"enterprise"`
+	Enterprise *dto.EnterpriseIdentity `json:"enterprise"`
 }
 
-func readAuthEnterpriseIdentity(ctx context.Context, reader enterpriseIdentityReader, userID int64) (*service.EnterpriseIdentity, error) {
+func readAuthEnterpriseIdentity(ctx context.Context, reader enterpriseIdentityReader, userID int64) (*dto.EnterpriseIdentity, error) {
 	if reader == nil {
 		return nil, nil
 	}
@@ -22,12 +22,7 @@ func readAuthEnterpriseIdentity(ctx context.Context, reader enterpriseIdentityRe
 	if err != nil || identity == nil {
 		return nil, err
 	}
-	copy := *identity
-	if !copy.BalanceVisible {
-		copy.Balance = nil
-		copy.FrozenBalance = nil
-	}
-	return &copy, nil
+	return dto.EnterpriseIdentityFromService(identity), nil
 }
 
 func buildAuthUserResponse(ctx context.Context, user *service.User, reader enterpriseIdentityReader) (*authUserResponse, error) {

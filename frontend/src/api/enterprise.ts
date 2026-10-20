@@ -2,7 +2,7 @@ import { apiClient } from './client'
 import type { FetchOptions } from '@/types'
 import type {
   EnterpriseOverview, EnterpriseDepartment, EnterpriseMember, EnterpriseQuota, EnterpriseSettings,
-  EnterpriseGroup, EnterpriseGroupWhitelist, EnterpriseUsageLog, EnterpriseUsageStats,
+  EnterpriseGroup, EnterpriseAllowedGroupInput, EnterpriseGroupWhitelist, EnterpriseUsageLog, EnterpriseUsageStats,
   EnterpriseUsageTrend, EnterpriseUsageModel, EnterpriseMemberUsage, EnterpriseDepartmentUsage,
   EnterpriseUsageModelTrend, EnterpriseUsageMemberTrend, EnterpriseUsageDepartmentTrend,
   EnterpriseAuditLog, EnterpriseBalanceLog, EnterprisePage, EnterpriseQuery, EnterpriseScope,
@@ -58,7 +58,7 @@ export function createEnterpriseAPI(base: string) {
   return {
     ...createEnterpriseResourceAPI(base),
     allowedGroups: (options?: FetchOptions) => readEnterpriseResource<EnterpriseGroup[]>(base, '/allowed-groups', undefined, options),
-    updateAllowedGroups: async (group_ids: number[]): Promise<EnterpriseGroup[]> => (await apiClient.put<EnterpriseGroup[]>(`${base}/allowed-groups`, { group_ids })).data,
+    updateAllowedGroups: async (body: number[] | { groups: EnterpriseAllowedGroupInput[] }): Promise<EnterpriseGroup[]> => (await apiClient.put<EnterpriseGroup[]>(`${base}/allowed-groups`, Array.isArray(body) ? { group_ids: body } : body)).data,
     balanceLogs: (params?: EnterpriseQuery, options?: FetchOptions) => readEnterpriseResource<EnterprisePage<EnterpriseBalanceLog>>(base, '/balance-logs', params, options)
   }
 }

@@ -157,6 +157,10 @@ type EnterpriseAuditLog struct {
 	Detail                                    map[string]any
 	CreatedAt                                 time.Time
 }
+type EnterpriseAllowedGroup struct {
+	GroupID        int64    `json:"group_id"`
+	RateMultiplier *float64 `json:"rate_multiplier"`
+}
 type EnterpriseGroupWhitelist struct {
 	EnterpriseID int64
 	ScopeType    string
@@ -265,6 +269,13 @@ type EnterpriseGroupRepository interface {
 	ListWhitelists(ctx context.Context, enterpriseID int64) ([]EnterpriseGroupWhitelist, error)
 	SetWhitelist(ctx context.Context, enterpriseID int64, scopeType string, scopeID int64, groupIDs []int64) error
 }
+
+// EnterpriseGroupRateRepository extends group pools with optional billing overrides.
+type EnterpriseGroupRateRepository interface {
+	GetAllowedGroups(ctx context.Context, enterpriseID int64) ([]EnterpriseAllowedGroup, error)
+	SetAllowedGroups(ctx context.Context, enterpriseID int64, groups []EnterpriseAllowedGroup) error
+}
+
 type EnterpriseBillingCache interface {
 	InvalidateEnterpriseBalance(ctx context.Context, enterpriseID int64) error
 	InvalidateEnterpriseQuota(ctx context.Context, scopeType string, scopeID int64) error
