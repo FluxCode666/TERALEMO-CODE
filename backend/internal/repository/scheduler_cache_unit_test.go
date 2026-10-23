@@ -33,6 +33,92 @@ func newSchedulerCacheUnitWithRedis(t *testing.T) (*schedulerCache, *miniredis.M
 	return cache, mr
 }
 
+func TestSchedulerCacheSnapshotPreservesVideoProtocolCapabilities(t *testing.T) {
+	capabilities := []service.OpenAIEndpointCapability{
+		service.OpenAIEndpointCapabilitySeedance,
+		service.OpenAIEndpointCapabilityGeminiVideo,
+		service.OpenAIEndpointCapabilityMiniMaxVideo,
+		service.OpenAIEndpointCapabilityChatCompletions,
+	}
+	for _, tc := range []struct {
+		name        string
+		platform    string
+		credentials map[string]any
+		want        service.OpenAIEndpointCapability
+	}{
+		{
+			name:     "default seedance",
+			platform: service.PlatformVideo,
+			want:     service.OpenAIEndpointCapabilitySeedance,
+		},
+		{
+			name:        "explicit seedance",
+			platform:    service.PlatformVideo,
+			credentials: map[string]any{"video_protocol": service.VideoProtocolSeedance},
+			want:        service.OpenAIEndpointCapabilitySeedance,
+		},
+		{
+			name:        "gemini",
+			platform:    service.PlatformVideo,
+			credentials: map[string]any{"video_protocol": service.VideoProtocolGemini},
+			want:        service.OpenAIEndpointCapabilityGeminiVideo,
+		},
+		{
+			name:        "minimax",
+			platform:    service.PlatformVideo,
+			credentials: map[string]any{"video_protocol": service.VideoProtocolMiniMax},
+			want:        service.OpenAIEndpointCapabilityMiniMaxVideo,
+		},
+		{
+			name:        "invalid protocol cannot default to seedance",
+			platform:    service.PlatformVideo,
+			credentials: map[string]any{"video_protocol": "unsupported"},
+		},
+		{
+			name:     "legacy openai seedance opt in",
+			platform: service.PlatformOpenAI,
+			credentials: map[string]any{
+				"base_url":            "https://video.example/api/v3",
+				"openai_capabilities": []string{"seedance"},
+			},
+			want: service.OpenAIEndpointCapabilitySeedance,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			cache := newSchedulerCacheUnit(t)
+			account := service.Account{
+				ID: 4, Platform: tc.platform, Type: service.AccountTypeAPIKey,
+				Status: service.StatusActive, Schedulable: true, GroupIDs: []int64{4},
+				Credentials: tc.credentials,
+			}
+			bucket := service.SchedulerBucket{GroupID: 4, Platform: tc.platform, Mode: service.SchedulerModeSingle}
+			token, err := cache.CaptureBucketWriteToken(ctx, bucket)
+			require.NoError(t, err)
+			require.NoError(t, cache.SetSnapshot(ctx, bucket, token, []service.Account{account}))
+
+			candidates, hit, err := cache.GetSnapshot(ctx, bucket)
+			require.NoError(t, err)
+			require.True(t, hit)
+			require.Len(t, candidates, 1)
+			full, err := cache.GetAccount(ctx, account.ID)
+			require.NoError(t, err)
+			require.NotNil(t, full)
+			for _, capability := range capabilities {
+				require.Equal(t, full.SupportsOpenAIEndpointCapability(capability), candidates[0].SupportsOpenAIEndpointCapability(capability),
+					"cached candidates must use the same protocol gate as the full account: %s", capability)
+				if account.Platform == service.PlatformVideo {
+					require.Equal(t, capability == tc.want, candidates[0].SupportsOpenAIEndpointCapability(capability),
+						"video accounts must only admit their own protocol: %s", capability)
+				}
+			}
+			if tc.want != "" {
+				require.True(t, candidates[0].SupportsOpenAIEndpointCapability(tc.want))
+			}
+		})
+	}
+}
+
 func TestSchedulerCacheWriteAccountIDsSkipsUnencodableTimes(t *testing.T) {
 	ctx := context.Background()
 	cache := newSchedulerCacheUnit(t)

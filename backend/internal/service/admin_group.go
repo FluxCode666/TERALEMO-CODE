@@ -294,6 +294,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 			ids = append(ids, model.ID)
 		}
 		return ids
+	case PlatformVideo:
+		return []string{"doubao-seedance-1-0-pro", "veo-3.0-generate-001", "veo-3.0-fast-generate-001"}
 	case PlatformGrok:
 		return xai.DefaultModelIDs()
 	case PlatformOpenCodeGo:
@@ -438,7 +440,20 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	imagePrice4K := normalizePrice(input.ImagePrice4K)
 	videoPrice480P := normalizePrice(input.VideoPrice480P)
 	videoPrice720P := normalizePrice(input.VideoPrice720P)
+	videoPrice768P := normalizePrice(input.VideoPrice768P)
 	videoPrice1080P := normalizePrice(input.VideoPrice1080P)
+	videoPrice2K := normalizePrice(input.VideoPrice2K)
+	videoBillingMode := NormalizeVideoGroupBillingMode(input.VideoBillingMode)
+	videoPricePerRequest := normalizePrice(input.VideoPricePerRequest)
+	if s.cfg == nil || s.cfg.RunMode != config.RunModeSimple {
+		if err := ValidateVideoGroupFallbackPricing(&Group{
+			Platform: platform, VideoBillingMode: videoBillingMode, VideoPricePerRequest: videoPricePerRequest,
+			VideoPrice480P: videoPrice480P, VideoPrice720P: videoPrice720P, VideoPrice768P: videoPrice768P,
+			VideoPrice1080P: videoPrice1080P, VideoPrice2K: videoPrice2K,
+		}); err != nil {
+			return nil, err
+		}
+	}
 	webSearchPricePerCall := normalizePrice(input.WebSearchPricePerCall)
 	searchPricePer1k := normalizePrice(input.SearchPricePer1k)
 	audioRealtimePricePerMin := normalizePrice(input.AudioRealtimePricePerMin)
@@ -600,7 +615,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		ImagePrice4K:                    imagePrice4K,
 		VideoPrice480P:                  videoPrice480P,
 		VideoPrice720P:                  videoPrice720P,
+		VideoPrice768P:                  videoPrice768P,
 		VideoPrice1080P:                 videoPrice1080P,
+		VideoPrice2K:                    videoPrice2K,
+		VideoBillingMode:                videoBillingMode,
+		VideoPricePerRequest:            videoPricePerRequest,
 		VideoModelPrices:                NormalizeVideoModelPrices(input.VideoModelPrices),
 		WebSearchPricePerCall:           webSearchPricePerCall,
 		SearchPricePer1k:                searchPricePer1k,
@@ -923,8 +942,25 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.VideoPrice720P != nil {
 		group.VideoPrice720P = normalizePrice(input.VideoPrice720P)
 	}
+	if input.VideoPrice768P != nil {
+		group.VideoPrice768P = normalizePrice(input.VideoPrice768P)
+	}
 	if input.VideoPrice1080P != nil {
 		group.VideoPrice1080P = normalizePrice(input.VideoPrice1080P)
+	}
+	if input.VideoPrice2K != nil {
+		group.VideoPrice2K = normalizePrice(input.VideoPrice2K)
+	}
+	if input.VideoBillingMode != "" {
+		group.VideoBillingMode = input.VideoBillingMode
+	}
+	if input.VideoPricePerRequest != nil {
+		group.VideoPricePerRequest = normalizePrice(input.VideoPricePerRequest)
+	}
+	if s.cfg == nil || s.cfg.RunMode != config.RunModeSimple {
+		if err := ValidateVideoGroupFallbackPricing(group); err != nil {
+			return nil, err
+		}
 	}
 	// nil = leave unchanged; empty map = clear per-model prices.
 	if input.VideoModelPrices != nil {

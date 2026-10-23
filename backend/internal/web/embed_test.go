@@ -756,6 +756,47 @@ func TestNewFrontendServer(t *testing.T) {
 	})
 }
 
+func TestMiniMaxV2RoutesBypassEmbeddedFrontend(t *testing.T) {
+	for _, mode := range []string{"settings_injection", "legacy"} {
+		t.Run(mode, func(t *testing.T) {
+			var frontendMiddleware gin.HandlerFunc
+			if mode == "legacy" {
+				frontendMiddleware = ServeEmbeddedFrontend()
+			} else {
+				server, err := NewFrontendServer(&mockSettingsProvider{})
+				require.NoError(t, err)
+				frontendMiddleware = server.Middleware()
+			}
+
+			for _, route := range []struct {
+				method string
+				path   string
+			}{
+				{http.MethodPost, "/v2/video_generation"},
+				{http.MethodGet, "/v2/query/video_generation/task-123"},
+			} {
+				t.Run(route.method+" "+route.path, func(t *testing.T) {
+					router := gin.New()
+					router.Use(frontendMiddleware)
+					handlerCalled := false
+					router.Handle(route.method, route.path, func(c *gin.Context) {
+						handlerCalled = true
+						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing API key"})
+					})
+
+					w := httptest.NewRecorder()
+					router.ServeHTTP(w, httptest.NewRequest(route.method, route.path, nil))
+
+					require.True(t, handlerCalled)
+					require.Equal(t, http.StatusUnauthorized, w.Code)
+					require.Contains(t, w.Header().Get("Content-Type"), "application/json")
+					require.JSONEq(t, `{"error":"missing API key"}`, w.Body.String())
+				})
+			}
+		})
+	}
+}
+
 func TestHasEmbeddedFrontend(t *testing.T) {
 	t.Run("returns_true_when_frontend_embedded", func(t *testing.T) {
 		result := HasEmbeddedFrontend()

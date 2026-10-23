@@ -198,7 +198,11 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 	//   - flusher_enabled=true:跳过直写 DB，由 flusher 异步批量刷（markDirty 在 IncrementUserPlatformQuotaUsage 内部完成）
 	//   - 失败仅记 ALERT log + counter，不阻断主扣费流程
 	if !p.IsSubscriptionBill && p.Platform != "" && cost.ActualCost > 0 && p.User != nil && deps.userPlatformQuotaRepo != nil {
-		if deps.billingCacheService.HasUserPlatformQuotaLimit(billingCtx, p.User.ID, p.Platform) {
+		if durable, scopeErr := usesDurableVideoQuota(billingCtx, deps.userPlatformQuotaRepo, p.User.ID, p.Platform); durable || scopeErr != nil {
+			if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(billingCtx, p.User.ID, p.Platform, cost.ActualCost, time.Now().UTC()); err != nil {
+				logger.LegacyPrintf("service.gateway", "ALERT: durable legacy quota increment failed user=%d platform=%s: %v", p.User.ID, p.Platform, err)
+			}
+		} else if deps.billingCacheService != nil && deps.billingCacheService.HasUserPlatformQuotaLimit(billingCtx, p.User.ID, p.Platform) {
 			deps.billingCacheService.IncrementUserPlatformQuotaUsage(p.User.ID, p.Platform, cost.ActualCost)
 			if deps.cfg == nil || !deps.cfg.Database.UserPlatformQuotaFlusherEnabled {
 				// 降级路径:flusher 未启用时保留原有同步直写 DB
@@ -457,7 +461,15 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 	//   - DB 异步(flusher_enabled=false):在独立 goroutine 中走 detached context,失败用 ALERT log 触发 oncall 对账
 	//   - flusher_enabled=true:不直写 DB,由 flusher 异步批量刷（markDirty 已在 IncrementUserPlatformQuotaUsage 内部完成）
 	if !p.IsSubscriptionBill && p.Platform != "" && p.Cost.ActualCost > 0 && p.User != nil && deps.userPlatformQuotaRepo != nil && deps.billingCacheService != nil {
-		if deps.billingCacheService.HasUserPlatformQuotaLimit(ctx, p.User.ID, p.Platform) {
+		if durable, scopeErr := usesDurableVideoQuota(ctx, deps.userPlatformQuotaRepo, p.User.ID, p.Platform); durable || scopeErr != nil {
+			// Scopes with video holds use SQL as their single quota authority.
+			// Do not dirty a Redis snapshot which can overwrite committed capture.
+			dbCtx, dbCancel := detachedBillingContext(ctx)
+			if err := deps.userPlatformQuotaRepo.IncrementUsageWithReset(dbCtx, p.User.ID, p.Platform, p.Cost.ActualCost, time.Now().UTC()); err != nil {
+				logger.LegacyPrintf("service.gateway", "ALERT: durable video scope quota increment failed user=%d platform=%s: %v", p.User.ID, p.Platform, err)
+			}
+			dbCancel()
+		} else if deps.billingCacheService.HasUserPlatformQuotaLimit(ctx, p.User.ID, p.Platform) {
 			deps.billingCacheService.IncrementUserPlatformQuotaUsage(p.User.ID, p.Platform, p.Cost.ActualCost)
 			if deps.cfg == nil || !deps.cfg.Database.UserPlatformQuotaFlusherEnabled {
 				// 降级路径:flusher 未启用时保留原有异步直写 DB

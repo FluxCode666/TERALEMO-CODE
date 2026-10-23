@@ -1041,7 +1041,7 @@
           </p>
         </div>
 
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
+        <!-- 视频生成计费：视频分组必填兜底价，Grok 保留可选分辨率价 -->
         <div
           v-if="supportsVideoPricingPlatform(createForm.platform)"
           class="border-t pt-4"
@@ -1052,7 +1052,7 @@
             {{ t(videoPricingI18nKey("title")) }}
           </label>
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
+            {{ t(createForm.platform === "video" ? videoPricingI18nKey("fallbackDescription") : videoPricingI18nKey("description")) }}
           </p>
           <div class="mb-4">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -1080,43 +1080,43 @@
               placeholder="1"
             />
           </div>
-          <div class="grid grid-cols-3 gap-3">
+          <div v-if="createForm.platform === 'video'" class="mb-4 space-y-3">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t(videoPricingI18nKey("fallbackRequiredHint")) }}
+            </p>
             <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_480p')"
-              />
+              <label class="input-label" for="create-video-billing-mode">{{ t(videoPricingI18nKey("billingMode")) }}</label>
+              <select id="create-video-billing-mode" v-model="createForm.video_billing_mode" class="input" data-testid="create-video-billing-mode">
+                <option value="video">{{ t(videoPricingI18nKey("perSecond")) }}</option>
+                <option value="per_request">{{ t(videoPricingI18nKey("perRequest")) }}</option>
+              </select>
             </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_720p')"
-              />
+            <div v-if="createForm.video_billing_mode === 'per_request'">
+              <label class="input-label" for="create-video-price-per-request">{{ t(videoPricingI18nKey("perRequestPrice")) }} <span class="text-red-500">*</span></label>
+              <input id="create-video-price-per-request" v-model.number="createForm.video_price_per_request" type="number" step="0.00000001" min="0" required class="input" data-testid="create-video-price-per-request" />
             </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
+          </div>
+          <div v-if="createForm.platform !== 'video' || createForm.video_billing_mode === 'video'" class="grid grid-cols-3 gap-3">
+            <div v-for="tier in videoPricingTiers" :key="tier.key">
+              <label class="input-label" :for="`create-${tier.key}`">
+                {{ tier.label }} ($/s) <span v-if="createForm.platform === 'video'" class="text-red-500">*</span>
+              </label>
               <input
-                v-model.number="createForm.video_price_1080p"
+                :id="`create-${tier.key}`"
+                v-model.number="createForm[tier.key]"
                 type="number"
-                step="0.001"
+                step="0.00000001"
                 min="0"
+                :required="createForm.platform === 'video'"
                 class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_1080p')"
+                :data-testid="`create-video-price-${tier.key}`"
+                :placeholder="getVideoPricePlaceholder(createForm.platform, tier.key)"
               />
             </div>
           </div>
           <div
             class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
+            v-if="createForm.platform === 'grok'"
             data-testid="create-grok-video-model-prices"
           >
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1129,7 +1129,7 @@
               <div
                 v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
                 :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
+                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(5,minmax(0,5rem))] sm:items-end"
               >
                 <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
                   {{ family.label }}
@@ -1155,11 +1155,11 @@
             </div>
           </div>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
+            {{ t(videoPricingI18nKey(createForm.platform === "video" && createForm.video_billing_mode === "per_request" ? "perRequestHint" : "modeHint")) }}
           </p>
           <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
+              {{ t(videoPricingI18nKey(createForm.platform === "video" && createForm.video_billing_mode === "per_request" ? "finalPerRequestPreview" : "finalPricePreview")) }}
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div
@@ -1480,7 +1480,7 @@
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(createForm.platform === "video" ? "admin.groups.videoPricing.modelPricingHint" : "admin.groups.modelPricing.description") }}</p>
             </div>
             <button type="button" class="btn btn-secondary shrink-0 whitespace-nowrap" @click="addGroupPricing(createForm.model_pricing)">
               <Icon name="plus" size="sm" class="mr-1" />{{ t("admin.groups.modelPricing.add") }}
@@ -2681,7 +2681,7 @@
           </p>
         </div>
 
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
+        <!-- 视频生成计费：视频分组必填兜底价，Grok 保留可选分辨率价 -->
         <div
           v-if="supportsVideoPricingPlatform(editForm.platform)"
           class="border-t pt-4"
@@ -2692,7 +2692,7 @@
             {{ t(videoPricingI18nKey("title")) }}
           </label>
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
+            {{ t(editForm.platform === "video" ? videoPricingI18nKey("fallbackDescription") : videoPricingI18nKey("description")) }}
           </p>
           <div class="mb-4">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -2720,43 +2720,43 @@
               placeholder="1"
             />
           </div>
-          <div class="grid grid-cols-3 gap-3">
+          <div v-if="editForm.platform === 'video'" class="mb-4 space-y-3">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t(videoPricingI18nKey("fallbackRequiredHint")) }}
+            </p>
             <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_480p')"
-              />
+              <label class="input-label" for="edit-video-billing-mode">{{ t(videoPricingI18nKey("billingMode")) }}</label>
+              <select id="edit-video-billing-mode" v-model="editForm.video_billing_mode" class="input" data-testid="edit-video-billing-mode">
+                <option value="video">{{ t(videoPricingI18nKey("perSecond")) }}</option>
+                <option value="per_request">{{ t(videoPricingI18nKey("perRequest")) }}</option>
+              </select>
             </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_720p')"
-              />
+            <div v-if="editForm.video_billing_mode === 'per_request'">
+              <label class="input-label" for="edit-video-price-per-request">{{ t(videoPricingI18nKey("perRequestPrice")) }} <span class="text-red-500">*</span></label>
+              <input id="edit-video-price-per-request" v-model.number="editForm.video_price_per_request" type="number" step="0.00000001" min="0" required class="input" data-testid="edit-video-price-per-request" />
             </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
+          </div>
+          <div v-if="editForm.platform !== 'video' || editForm.video_billing_mode === 'video'" class="grid grid-cols-3 gap-3">
+            <div v-for="tier in videoPricingTiers" :key="tier.key">
+              <label class="input-label" :for="`edit-${tier.key}`">
+                {{ tier.label }} ($/s) <span v-if="editForm.platform === 'video'" class="text-red-500">*</span>
+              </label>
               <input
-                v-model.number="editForm.video_price_1080p"
+                :id="`edit-${tier.key}`"
+                v-model.number="editForm[tier.key]"
                 type="number"
-                step="0.001"
+                step="0.00000001"
                 min="0"
+                :required="editForm.platform === 'video'"
                 class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_1080p')"
+                :data-testid="`edit-video-price-${tier.key}`"
+                :placeholder="getVideoPricePlaceholder(editForm.platform, tier.key)"
               />
             </div>
           </div>
           <div
             class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
+            v-if="editForm.platform === 'grok'"
             data-testid="edit-grok-video-model-prices"
           >
             <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2769,7 +2769,7 @@
               <div
                 v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
                 :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
+                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(5,minmax(0,5rem))] sm:items-end"
               >
                 <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
                   {{ family.label }}
@@ -2795,11 +2795,11 @@
             </div>
           </div>
           <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
+            {{ t(videoPricingI18nKey(editForm.platform === "video" && editForm.video_billing_mode === "per_request" ? "perRequestHint" : "modeHint")) }}
           </p>
           <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
+              {{ t(videoPricingI18nKey(editForm.platform === "video" && editForm.video_billing_mode === "per_request" ? "finalPerRequestPreview" : "finalPricePreview")) }}
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div
@@ -3130,7 +3130,7 @@
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(editForm.platform === "video" ? "admin.groups.videoPricing.modelPricingHint" : "admin.groups.modelPricing.description") }}</p>
             </div>
             <button type="button" class="btn btn-secondary shrink-0 whitespace-nowrap" @click="addGroupPricing(editForm.model_pricing)">
               <Icon name="plus" size="sm" class="mr-1" />{{ t("admin.groups.modelPricing.add") }}
@@ -4321,7 +4321,7 @@ import {
 import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
-import { extractApiErrorMessage } from "@/utils/apiError";
+import { extractApiErrorCode, extractApiErrorMessage } from "@/utils/apiError";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {
@@ -4968,9 +4968,13 @@ const createForm = reactive({
   // 视频生成计费配置（仅 Grok 平台）
   video_rate_independent: false,
   video_rate_multiplier: 1,
+  video_billing_mode: "video" as "video" | "per_request",
+  video_price_per_request: null as number | null,
   video_price_480p: null as number | null,
   video_price_720p: null as number | null,
+  video_price_768p: null as number | null,
   video_price_1080p: null as number | null,
+  video_price_2k: null as number | null,
   video_model_prices: createVideoModelPricesForm(),
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
@@ -5334,9 +5338,13 @@ const editForm = reactive({
   // 视频生成计费配置（仅 Grok 平台）
   video_rate_independent: false,
   video_rate_multiplier: 1,
+  video_billing_mode: "video" as "video" | "per_request",
+  video_price_per_request: null as number | null,
   video_price_480p: null as number | null,
   video_price_720p: null as number | null,
+  video_price_768p: null as number | null,
   video_price_1080p: null as number | null,
+  video_price_2k: null as number | null,
   video_model_prices: createVideoModelPricesForm(),
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
@@ -5406,9 +5414,13 @@ type VideoPricingFormState = {
   rate_multiplier: number;
   video_rate_independent: boolean;
   video_rate_multiplier: number;
+  video_billing_mode: "video" | "per_request";
+  video_price_per_request: number | string | null;
   video_price_480p: number | string | null;
   video_price_720p: number | string | null;
+  video_price_768p: number | string | null;
   video_price_1080p: number | string | null;
+  video_price_2k: number | string | null;
 };
 
 const imagePricingTiers = [
@@ -5420,7 +5432,9 @@ const imagePricingTiers = [
 const videoPricingTiers = [
   { key: "video_price_480p", label: "480p" },
   { key: "video_price_720p", label: "720p" },
+  { key: "video_price_768p", label: "768p" },
   { key: "video_price_1080p", label: "1080p" },
+  { key: "video_price_2k", label: "2K" },
 ] as const;
 
 const normalizePreviewNumber = (value: number | string | null | undefined, fallback = 0) => {
@@ -5483,6 +5497,10 @@ const buildVideoFinalPricePreview = (form: VideoPricingFormState) => {
   const multiplier = form.video_rate_independent
     ? normalizePreviewNumber(form.video_rate_multiplier, 1)
     : normalizePreviewNumber(form.rate_multiplier, 1);
+  if (form.platform === "video" && form.video_billing_mode === "per_request") {
+    const price = parsePreviewPrice(form.video_price_per_request);
+    return [{ label: t(videoPricingI18nKey("perRequest")), value: price === null ? t(videoPricingI18nKey("notConfigured")) : formatVideoPricePreview(price * multiplier) }];
+  }
   return videoPricingTiers.map((tier) => {
     const basePrice =
       parsePreviewPrice(form[tier.key]) ??
@@ -5791,9 +5809,13 @@ const closeCreateModal = () => {
   createForm.image_price_4k = null;
   createForm.video_rate_independent = false;
   createForm.video_rate_multiplier = 1;
+  createForm.video_billing_mode = "video";
+  createForm.video_price_per_request = null;
   createForm.video_price_480p = null;
   createForm.video_price_720p = null;
+  createForm.video_price_768p = null;
   createForm.video_price_1080p = null;
+  createForm.video_price_2k = null;
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.force_openai_fast = false;
@@ -5872,6 +5894,17 @@ const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
   return true;
 };
 
+const validateVideoFallbackForm = (form: VideoPricingFormState): boolean => {
+  if (authStore.isSimpleMode || form.platform !== "video") return true;
+  const fields = form.video_billing_mode === "per_request"
+    ? [{ label: t(videoPricingI18nKey("perRequest")), value: form.video_price_per_request }]
+    : videoPricingTiers.map((tier) => ({ label: tier.label, value: form[tier.key] }));
+  const missing = fields.filter(({ value }) => parsePreviewPrice(value) === null).map(({ label }) => label);
+  if (missing.length === 0) return true;
+  appStore.showError(t(videoPricingI18nKey("fallbackRequiredError"), { tiers: missing.join(", ") }));
+  return false;
+};
+
 const validateGroupReasoningMultipliers = (pricing: PricingFormEntry[]): boolean => {
   for (const entry of pricing) {
     const error = validateReasoningEffortMultipliers(entry.reasoning_effort_multipliers, t);
@@ -5899,6 +5932,7 @@ const handleCreateGroup = async () => {
     return;
   }
   if (!validateGroupReasoningMultipliers(createForm.model_pricing)) return;
+  if (!validateVideoFallbackForm(createForm)) return;
   // 模型白名单：开启且没有任何条目时阻止提交，与后端 400 对齐。
   if (
     createModelAllowlistState.enabled &&
@@ -6000,9 +6034,12 @@ const handleCreateGroup = async () => {
     requestData.image_price_1k = emptyToNull(requestData.image_price_1k);
     requestData.image_price_2k = emptyToNull(requestData.image_price_2k);
     requestData.image_price_4k = emptyToNull(requestData.image_price_4k);
+    requestData.video_price_per_request = emptyToNull(requestData.video_price_per_request);
     requestData.video_price_480p = emptyToNull(requestData.video_price_480p);
     requestData.video_price_720p = emptyToNull(requestData.video_price_720p);
+    requestData.video_price_768p = emptyToNull(requestData.video_price_768p);
     requestData.video_price_1080p = emptyToNull(requestData.video_price_1080p);
+    requestData.video_price_2k = emptyToNull(requestData.video_price_2k);
     requestData.search_price_per_1k = emptyToNull(
       requestData.search_price_per_1k,
     );
@@ -6087,9 +6124,13 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.image_price_4k = group.image_price_4k;
   editForm.video_rate_independent = group.video_rate_independent ?? false;
   editForm.video_rate_multiplier = group.video_rate_multiplier ?? 1;
+  editForm.video_billing_mode = group.video_billing_mode || "video";
+  editForm.video_price_per_request = group.video_price_per_request ?? null;
   editForm.video_price_480p = group.video_price_480p;
   editForm.video_price_720p = group.video_price_720p;
+  editForm.video_price_768p = group.video_price_768p;
   editForm.video_price_1080p = group.video_price_1080p;
+  editForm.video_price_2k = group.video_price_2k;
   editForm.video_model_prices = createVideoModelPricesForm(
     group.video_model_prices,
   );
@@ -6200,9 +6241,13 @@ const closeEditModal = () => {
   editForm.profit_safety_buffer_percent = 0;
   editForm.video_rate_independent = false;
   editForm.video_rate_multiplier = 1;
+  editForm.video_billing_mode = "video";
+  editForm.video_price_per_request = null;
   editForm.video_price_480p = null;
   editForm.video_price_720p = null;
+  editForm.video_price_768p = null;
   editForm.video_price_1080p = null;
+  editForm.video_price_2k = null;
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.force_openai_fast = false;
@@ -6238,6 +6283,7 @@ const handleUpdateGroup = async () => {
     return;
   }
   if (!validateGroupReasoningMultipliers(editForm.model_pricing)) return;
+  if (!validateVideoFallbackForm(editForm)) return;
   // 模型白名单：开启且没有任何条目时阻止提交，与后端 400 对齐。
   if (
     editModelAllowlistState.enabled &&
@@ -6358,9 +6404,12 @@ const handleUpdateGroup = async () => {
     payload.image_price_1k = emptyPriceToClear(payload.image_price_1k);
     payload.image_price_2k = emptyPriceToClear(payload.image_price_2k);
     payload.image_price_4k = emptyPriceToClear(payload.image_price_4k);
+    payload.video_price_per_request = emptyPriceToClear(payload.video_price_per_request);
     payload.video_price_480p = emptyPriceToClear(payload.video_price_480p);
     payload.video_price_720p = emptyPriceToClear(payload.video_price_720p);
+    payload.video_price_768p = emptyPriceToClear(payload.video_price_768p);
     payload.video_price_1080p = emptyPriceToClear(payload.video_price_1080p);
+    payload.video_price_2k = emptyPriceToClear(payload.video_price_2k);
     payload.search_price_per_1k = emptyPriceToClear(
       payload.search_price_per_1k,
     );
@@ -6449,7 +6498,9 @@ const handleDuplicate = async (group: AdminGroup) => {
     await loadGroups();
   } catch (error: unknown) {
     appStore.showError(
-      extractApiErrorMessage(error, t("admin.groups.duplicateFailed")),
+      extractApiErrorCode(error) === "VIDEO_FALLBACK_PRICE_REQUIRED"
+        ? t("admin.groups.videoFallbackPriceRequired")
+        : extractApiErrorMessage(error, t("admin.groups.duplicateFailed")),
     );
   } finally {
     duplicatingGroupIds.delete(group.id);

@@ -16,6 +16,16 @@ describe('Grok video model pricing form', () => {
     ])
     expect(form['grok-imagine-video']['480p']).toBeNull()
     expect(form['grok-imagine-video-1.5']['1080p']).toBeNull()
+    expect(form['grok-imagine-video']['768p']).toBeNull()
+    expect(form['grok-imagine-video-1.5']['2k']).toBeNull()
+  })
+
+  it('keeps 720p, 768p and 2K prices independent through save and reload', () => {
+    const prices = {
+      'grok-imagine-video': { '720p': 0.07, '768p': 0.12, '2k': 0.30 },
+      'minimax-h3': { '768p': 0, '2k': 0.50 },
+    }
+    expect(serializeVideoModelPrices(createVideoModelPricesForm(prices))).toEqual(prices)
   })
 
   it('serializes only finite non-negative prices and preserves future families', () => {

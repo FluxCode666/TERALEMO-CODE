@@ -162,6 +162,20 @@
           </button>
           <button
             type="button"
+            data-testid="platform-button-video"
+            @click="form.platform = 'video'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'video'
+                ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-600 dark:text-primary-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="video" size="sm" />
+            {{ t('videoAccounts.platform') }}
+          </button>
+          <button
+            type="button"
             @click="selectTypeSafePlatform()"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
@@ -265,6 +279,16 @@
           </button>
         </div>
       </div>
+
+      <VideoProtocolField v-if="form.platform === 'video'" id="create-video-protocol" v-model="videoProtocol" />
+      <VideoPrivacyField v-if="form.platform === 'video'" id="create-video-hide-upstream-url" v-model="hideVideoUpstreamURL" />
+      <VideoCapabilityField
+        v-if="form.platform === 'video'"
+        id-prefix="create-video-capability"
+        v-model:resolutions="videoResolutions"
+        v-model:min-duration="videoMinDuration"
+        v-model:max-duration="videoMaxDuration"
+      />
 
       <!-- Account Type Selection (Anthropic) -->
       <div v-if="form.platform === 'anthropic'">
@@ -4112,6 +4136,11 @@
 </template>
 
 <script setup lang="ts">
+import VideoProtocolField from './VideoProtocolField.vue'
+import VideoPrivacyField from './VideoPrivacyField.vue'
+import VideoCapabilityField from './VideoCapabilityField.vue'
+import { videoBaseURL, switchVideoBaseURL } from '@/utils/videoProtocol'
+import { applyVideoCapabilities, validateVideoDurations } from '@/utils/videoCapabilities'
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -4255,7 +4284,7 @@ const withUpstreamRequestIdHeader = <T extends Record<string, unknown> | undefin
 const baseUrlHint = computed(() => {
   if (form.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
-  if (form.platform === 'grok') return ''
+  if (form.platform === 'grok' || form.platform === 'video') return ''
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -4263,7 +4292,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'openai') return t('admin.accounts.openai.apiKeyHint')
   if (form.platform === 'gemini') return t('admin.accounts.gemini.apiKeyHint')
   // Grok 与多协议供应商没有对应的说明文案；通用文案指 Claude Console Key。
-  if (form.platform === 'grok' || isMultiProtocolPlatform.value) return ''
+  if (form.platform === 'grok' || form.platform === 'video' || isMultiProtocolPlatform.value) return ''
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4274,6 +4303,7 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
     return defaultCNBaseUrl(form.platform, mode, apiProtocol.value) || 'https://api.example.com'
   }
   switch (form.platform) {
+    case 'video': return videoBaseURL(videoProtocol.value)
     case 'openai':
       return 'https://api.openai.com'
     case 'gemini':
@@ -4289,6 +4319,9 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
 
 const apiKeyValuePlaceholder = computed(() => {
   switch (form.platform) {
+    case 'video':
+      // 视频平台按当前协议提示密钥形态：Gemini 是 AIza 系，MiniMax 是 JWT，Ark 用通用 sk 提示
+      return videoProtocol.value === 'gemini' ? 'AIza...' : videoProtocol.value === 'minimax' ? 'eyJ...' : 'sk-...'
     case 'openai':
       return 'sk-proj-...'
     case 'gemini':
@@ -4394,6 +4427,12 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const videoProtocol = ref('seedance')
+const hideVideoUpstreamURL = ref(true)
+const videoResolutions = ref<string[]>([])
+const videoMinDuration = ref('')
+const videoMaxDuration = ref('')
+watch(videoProtocol, value => { if (form.platform === 'video') apiKeyBaseUrl.value = switchVideoBaseURL(apiKeyBaseUrl.value, value) })
 const upstreamBillingAutoProbeEnabled = ref(true)
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）账号类型、API 协议与端点 ──
@@ -5134,13 +5173,16 @@ watch(
 watch(
   () => form.platform,
   (newPlatform) => {
+    if (newPlatform === 'video') { accountCategory.value = 'apikey'; form.type = 'apikey'; videoProtocol.value = 'seedance' }
     // Reset base URL based on platform
     if (isMultiProtocolApiKeyPlatform(newPlatform)) {
       const mode = newPlatform === 'opencode_go' ? openCodeAccountMode.value : accountMode.value
       apiKeyBaseUrl.value = defaultCNBaseUrl(newPlatform, mode, apiProtocol.value)
     } else {
       apiKeyBaseUrl.value =
-        (newPlatform === 'openai')
+        (newPlatform === 'video')
+          ? videoBaseURL(videoProtocol.value)
+          : (newPlatform === 'openai')
           ? 'https://api.openai.com'
           : newPlatform === 'gemini'
             ? 'https://generativelanguage.googleapis.com'
@@ -5630,6 +5672,10 @@ const resetForm = () => {
   adaptiveBaseUrls.value = { chat_completions: '', anthropic: '', responses: '' }
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  hideVideoUpstreamURL.value = true
+  videoResolutions.value = []
+  videoMinDuration.value = ''
+  videoMaxDuration.value = ''
   upstreamRequestIdHeader.value = ''
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
@@ -6105,9 +6151,19 @@ const handleSubmit = async () => {
     return
   }
 
+  if (form.platform === 'video') {
+    const durationError = validateVideoDurations(videoMinDuration.value, videoMaxDuration.value)
+    if (durationError) {
+      appStore.showError(t(`admin.accounts.videoCapability.${durationError}`))
+      return
+    }
+  }
+
   // Determine default base URL based on platform
   const defaultBaseUrl =
-    form.platform === 'openai'
+    form.platform === 'video'
+      ? videoBaseURL(videoProtocol.value)
+      : form.platform === 'openai'
       ? 'https://api.openai.com'
       : form.platform === 'gemini'
         ? 'https://generativelanguage.googleapis.com'
@@ -6121,6 +6177,11 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (form.platform === 'video') {
+    credentials.video_protocol = videoProtocol.value
+    credentials.hide_video_upstream_url = hideVideoUpstreamURL.value
+    applyVideoCapabilities(credentials, videoResolutions.value, videoMinDuration.value, videoMaxDuration.value, 'create')
   }
   if (form.platform === 'gemini' && isOfficialGeminiBaseUrl(apiKeyBaseUrl.value)) {
     credentials.tier_id = geminiTierAIStudio.value

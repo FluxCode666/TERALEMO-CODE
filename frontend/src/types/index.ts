@@ -608,9 +608,13 @@ export interface Group {
   image_price_4k: number | null
   video_rate_independent: boolean
   video_rate_multiplier: number
+  video_billing_mode?: 'video' | 'per_request'
+  video_price_per_request?: number | null
   video_price_480p: number | null
   video_price_720p: number | null
+  video_price_768p: number | null
   video_price_1080p: number | null
+  video_price_2k: number | null
   // Optional model-family x resolution overrides for Grok video pricing.
   video_model_prices?: VideoModelPrices
   // Codex 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
@@ -833,9 +837,13 @@ export interface CreateGroupRequest {
   image_price_4k?: number | null
   video_rate_independent?: boolean
   video_rate_multiplier?: number
+  video_billing_mode?: 'video' | 'per_request'
+  video_price_per_request?: number | null
   video_price_480p?: number | null
   video_price_720p?: number | null
+  video_price_768p?: number | null
   video_price_1080p?: number | null
+  video_price_2k?: number | null
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
@@ -900,9 +908,13 @@ export interface UpdateGroupRequest {
   image_price_4k?: number | null
   video_rate_independent?: boolean
   video_rate_multiplier?: number
+  video_billing_mode?: 'video' | 'per_request'
+  video_price_per_request?: number | null
   video_price_480p?: number | null
   video_price_720p?: number | null
+  video_price_768p?: number | null
   video_price_1080p?: number | null
+  video_price_2k?: number | null
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
@@ -942,7 +954,7 @@ export interface UpdateGroupRequest {
 // ==================== Account & Proxy Types ====================
 
 /** 前端内置专属界面（图标、配色、表单等）的平台。 */
-export type KnownAccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'typesafe' | 'command_code' | 'cline'
+export type KnownAccountPlatform = 'video' | 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'typesafe' | 'command_code' | 'cline'
 /**
  * 账号平台：内置平台，或后端平台清单中新登记的平台（任意字符串）。
  * `string & {}` 保留内置平台的字面量补全。

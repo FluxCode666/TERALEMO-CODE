@@ -101,7 +101,9 @@ const sourceGroup: AdminGroup = {
   video_rate_multiplier: 1,
   video_price_480p: null,
   video_price_720p: null,
+  video_price_768p: null,
   video_price_1080p: null,
+  video_price_2k: null,
   web_search_price_per_call: null,
   peak_rate_enabled: false,
   peak_start: '',
@@ -217,6 +219,58 @@ describe('GroupsView duplicate action', () => {
     vi.restoreAllMocks()
   })
 
+  it('requires every per-second fallback tier before saving a video group', async () => {
+    const group = { ...sourceGroup, platform: 'video' as const }
+    listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(group)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('admin.groups.videoPricing.fallbackRequiredError')
+
+    for (const tier of ['480p', '720p', '768p', '1080p', '2k']) {
+      const input = wrapper.get(`[data-testid="edit-video-price-video_price_${tier}"]`)
+      expect(input.attributes('required')).toBeDefined()
+      await input.setValue('0')
+    }
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({
+      video_billing_mode: 'video', video_price_480p: 0, video_price_720p: 0,
+      video_price_768p: 0, video_price_1080p: 0, video_price_2k: 0,
+    }))
+    wrapper.unmount()
+  })
+
+  it('loads per-request video pricing and requires that price when saving', async () => {
+    const group = { ...sourceGroup, platform: 'video' as const, video_billing_mode: 'per_request' as const, video_price_per_request: 0.4 }
+    listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(group)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get<HTMLInputElement>('[data-testid="edit-video-price-per-request"]').element.value).toBe('0.4')
+    expect(wrapper.find('[data-testid="edit-video-price-video_price_768p"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="edit-video-price-per-request"]').setValue('')
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('admin.groups.videoPricing.fallbackRequiredError')
+
+    await wrapper.get('[data-testid="edit-video-price-per-request"]').setValue('0.5')
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ video_billing_mode: 'per_request', video_price_per_request: 0.5 }))
+    wrapper.unmount()
+  })
+
   it('duplicates the selected group, reports success, and refreshes the list', async () => {
     const wrapper = mountView()
     await flushPromises()
@@ -277,6 +331,24 @@ describe('GroupsView duplicate action', () => {
     await flushPromises()
 
     expect(showError).toHaveBeenCalledWith('duplicate failed')
+    expect(wrapper.get('[data-testid="group-duplicate"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('localizes the video fallback price error when duplication is rejected', async () => {
+    duplicateGroup.mockRejectedValueOnce({
+      status: 400,
+      code: 400,
+      message: 'Video group fallback prices are required (768p, 2k)',
+      reason: 'VIDEO_FALLBACK_PRICE_REQUIRED'
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="group-duplicate"]').trigger('click')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('admin.groups.videoFallbackPriceRequired')
     expect(wrapper.get('[data-testid="group-duplicate"]').attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })

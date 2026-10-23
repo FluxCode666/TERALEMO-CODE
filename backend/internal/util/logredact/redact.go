@@ -20,6 +20,13 @@ var defaultSensitiveKeys = map[string]struct{}{
 	"id_token":           {},
 	"client_secret":      {},
 	"password":           {},
+	"api_key":            {},
+	"apikey":             {},
+	"token":              {},
+	"key":                {},
+	"secret":             {},
+	"sig":                {},
+	"signature":          {},
 }
 
 var defaultSensitiveKeyList = []string{
@@ -31,6 +38,13 @@ var defaultSensitiveKeyList = []string{
 	"id_token",
 	"client_secret",
 	"password",
+	"api_key",
+	"apikey",
+	"token",
+	"key",
+	"secret",
+	"sig",
+	"signature",
 }
 
 type textRedactPatterns struct {
@@ -44,6 +58,11 @@ var (
 	reAIza   = regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`)
 	// Gemini auth key：AQ.Ab 前缀 + 48 位，长度放宽以覆盖格式变体。
 	reGeminiAuthKey = regexp.MustCompile(`AQ\.Ab[0-9A-Za-z_-]{40,}`)
+	// Require a standalone, credential-sized sk- token, not an ordinary short name
+	// or an sk- fragment inside a model/task identifier.
+	reSKKey = regexp.MustCompile(`(^|[^0-9A-Za-z_-])sk-[0-9A-Za-z_-]{16,}`)
+	// Stop at log/JSON delimiters so redacting a header preserves adjacent fields.
+	reBearer = regexp.MustCompile(`(?i)\b(Bearer\s+)[^\s"'\[\]{}<>,;]+`)
 
 	defaultTextRedactPatterns = compileTextRedactPatterns(nil)
 	extraTextPatternCache     sync.Map // map[string]*textRedactPatterns
@@ -82,7 +101,7 @@ func RedactJSON(raw []byte, extraKeys ...string) string {
 //
 // 规则：
 // - 如果文本本身是 JSON，则按 RedactJSON 处理。
-// - 否则尝试对常见 key=value / key:"value" 片段做脱敏。
+// - 对字符串中的常见凭据格式以及 key=value / key:"value" 片段做脱敏。
 //
 // 注意：该函数用于日志/错误信息兜底，不保证覆盖所有格式。
 func RedactText(input string, extraKeys ...string) string {
@@ -98,14 +117,19 @@ func RedactText(input string, extraKeys ...string) string {
 
 	patterns := getTextRedactPatterns(extraKeys)
 
-	out := input
-	out = reGOCSPX.ReplaceAllString(out, "GOCSPX-***")
+	out := redactCredentialFormats(input)
+	out = patterns.reJSONLike.ReplaceAllString(out, `$1***$3`)
+	out = patterns.reQueryLike.ReplaceAllString(out, `$1$2=***`)
+	out = patterns.rePlain.ReplaceAllString(out, `$1$2$3***`)
+	return out
+}
+
+func redactCredentialFormats(input string) string {
+	out := reGOCSPX.ReplaceAllString(input, "GOCSPX-***")
 	out = reAIza.ReplaceAllString(out, "AIza***")
 	out = reGeminiAuthKey.ReplaceAllString(out, "AQ.***")
-	out = patterns.reJSONLike.ReplaceAllString(out, `$1***$3`)
-	out = patterns.reQueryLike.ReplaceAllString(out, `$1=***`)
-	out = patterns.rePlain.ReplaceAllString(out, `$1$2***`)
-	return out
+	out = reSKKey.ReplaceAllString(out, `${1}sk-***`)
+	return reBearer.ReplaceAllString(out, `${1}***`)
 }
 
 func compileTextRedactPatterns(extraKeys []string) *textRedactPatterns {
@@ -114,9 +138,11 @@ func compileTextRedactPatterns(extraKeys []string) *textRedactPatterns {
 		// JSON-like: "access_token":"..."
 		reJSONLike: regexp.MustCompile(`(?i)("(?:` + keyAlt + `)"\s*:\s*")([^"]*)(")`),
 		// Query-like: access_token=...
-		reQueryLike: regexp.MustCompile(`(?i)\b((?:` + keyAlt + `))=([^&\s]+)`),
+		// Match whole field names, including at the start of a query, without
+		// treating e.g. cache-key or token_count as the sensitive key itself.
+		reQueryLike: regexp.MustCompile(`(?i)(^|[^0-9A-Za-z_.-])((?:` + keyAlt + `))=([^,&;\s"'<>]+)`),
 		// Plain: access_token: ... / access_token = ...
-		rePlain: regexp.MustCompile(`(?i)\b((?:` + keyAlt + `))\b(\s*[:=]\s*)([^,\s]+)`),
+		rePlain: regexp.MustCompile(`(?i)(^|[^0-9A-Za-z_.-])((?:` + keyAlt + `))(\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,&;\s"'<>]+)`),
 	}
 }
 
@@ -220,6 +246,8 @@ func redactValueWithDepth(value any, keys map[string]struct{}, depth int) any {
 			out[i] = redactValueWithDepth(item, keys, depth+1)
 		}
 		return out
+	case string:
+		return redactCredentialFormats(v)
 	default:
 		return value
 	}

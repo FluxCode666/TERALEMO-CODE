@@ -35,6 +35,7 @@ import (
 
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
+	asyncTasks                 *service.ImageTaskService
 	compositeResolver          *service.CompositeRouteResolver
 	gatewayService             *service.OpenAIGatewayService
 	billingCacheService        *service.BillingCacheService
@@ -3514,12 +3515,16 @@ func (h *OpenAIGatewayHandler) ensureResponsesDependencies(c *gin.Context, reqLo
 	reqLog.Error("openai.handler_dependencies_missing", zap.Strings("missing_dependencies", missing))
 
 	if c != nil && c.Writer != nil && !c.Writer.Written() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": gin.H{
-				"type":    "api_error",
-				"message": "Service temporarily unavailable",
-			},
-		})
+		if c.GetBool(geminiVideoErrorFormatKey) {
+			googleErrorWithType(c, http.StatusServiceUnavailable, "api_error", "", "Service temporarily unavailable")
+		} else {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": gin.H{
+					"type":    "api_error",
+					"message": "Service temporarily unavailable",
+				},
+			})
+		}
 	}
 	return false
 }
@@ -3601,6 +3606,7 @@ func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, tas
 func (h *OpenAIGatewayHandler) submitOpenAIUsageRecordTask(parent context.Context, result *service.OpenAIForwardResult, task service.UsageRecordTask) {
 	// Money-critical bills never drop on pool overflow: media, search surcharge, voice.
 	if result != nil && (result.ImageCount > 0 || result.VideoCount > 0 ||
+		(strings.HasPrefix(result.ResponseID, "seedance:") && result.Usage.OutputTokens > 0) ||
 		result.SearchCount > 0 || result.WebSearchCalls > 0 || result.AudioUsage != nil) {
 		h.submitMandatoryUsageRecordTask(parent, task)
 		return
@@ -3841,6 +3847,10 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 	streamStarted bool,
 	countTowardsSLA bool,
 ) {
+	if !streamStarted && c.GetBool(geminiVideoErrorFormatKey) {
+		googleErrorWithType(c, status, errType, code, message)
+		return
+	}
 	// body-signal compact 心跳可能已把响应头提交为 200：先停心跳（建立
 	// happens-before，接管 ResponseWriter），并升级为流内错误处理。
 	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
@@ -4022,8 +4032,12 @@ func openAIFirstOutputFailoverExhausted(failoverErr *service.UpstreamFailoverErr
 	return false
 }
 
-// errorResponse returns OpenAI API format error response
+// errorResponse preserves the entry protocol when shared media handling fails.
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	if c.GetBool(geminiVideoErrorFormatKey) {
+		googleErrorWithType(c, status, errType, "", message)
+		return
+	}
 	// body-signal compact 心跳可能已把响应头提交为 200：JSON 错误体会与已
 	// 提交的 SSE 流交错，必须降级为 response.failed 终止事件（#3887）。
 	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {

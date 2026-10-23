@@ -130,6 +130,7 @@ func ProvideGatewayHandler(
 }
 
 func ProvideOpenAIGatewayHandler(
+	asyncTasks *service.ImageTaskService,
 	gatewayService *service.OpenAIGatewayService,
 	pluginManager *service.PluginManager,
 	concurrencyService *service.ConcurrencyService,
@@ -150,6 +151,7 @@ func ProvideOpenAIGatewayHandler(
 	h.compositeResolver = compositeResolver
 	h.securityAuditCoordinator = coordinator
 	h.grokMediaEligibilityProber = grokQuotaService
+	h.asyncTasks = asyncTasks
 	return h
 }
 

@@ -15,6 +15,10 @@ type userPlatformQuotaServiceAdapter struct {
 	inner *userPlatformQuotaRepository
 }
 
+func (a *userPlatformQuotaServiceAdapter) HasVideoBillingScope(ctx context.Context, userID int64, platform string) (bool, error) {
+	return a.inner.HasVideoBillingScope(ctx, userID, platform)
+}
+
 // NewUserPlatformQuotaServiceAdapter 将 UserPlatformQuotaRepository 实现包装为
 // 满足 service.UserPlatformQuotaRepository 接口的适配器。
 func NewUserPlatformQuotaServiceAdapter(repo UserPlatformQuotaRepository) service.UserPlatformQuotaRepository {

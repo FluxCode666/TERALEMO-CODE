@@ -2,6 +2,8 @@
 package routes
 
 import (
+	"strings"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -24,6 +26,9 @@ func RegisterAdminRoutes(
 	v1.GET("/plugin-ui/:token/*path", h.Admin.Plugin.ServeUIAsset)
 
 	admin := v1.Group("/admin")
+	// Authentication may abort before the reservation subgroup executes. Scope
+	// its cache policy here so even 401/403 responses are never stored.
+	admin.Use(videoBillingReservationNoStore(admin.BasePath() + "/video-billing-reservations"))
 	admin.Use(gin.HandlerFunc(adminAuth))
 	// 面板全局按用户限流（默认管理员豁免，可在系统设置中关闭豁免）
 	admin.Use(panelRateLimiter.Global())
@@ -97,6 +102,10 @@ func RegisterAdminRoutes(
 		// 使用记录管理
 		registerUsageRoutes(admin, h)
 
+		// Global async image/video task catalog; independent of personal tasks.
+		registerAsyncTaskRoutes(admin, h, panelRateLimiter)
+		registerVideoBillingReservationRoutes(admin, h, panelRateLimiter)
+
 		// 用户属性管理
 		registerUserAttributeRoutes(admin, h)
 
@@ -134,6 +143,34 @@ func RegisterAdminRoutes(
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
 	}
+}
+
+func registerVideoBillingReservationRoutes(admin *gin.RouterGroup, h *handler.Handlers, limiter *middleware.PanelRateLimiter) {
+	reservations := admin.Group("/video-billing-reservations")
+	reservations.Use(videoBillingReservationNoStore(reservations.BasePath()))
+	reservations.Use(middleware.AdminOnly(), limiter.Heavy())
+	reservations.GET("", h.OpenAIGateway.ListVideoBillingReservations)
+	reservations.POST("/:reservation_id/release", h.OpenAIGateway.ReleaseVideoBillingReservation)
+	reservations.POST("/:reservation_id/settle", h.OpenAIGateway.SettleVideoBillingReservation)
+}
+
+func videoBillingReservationNoStore(root string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if path := c.FullPath(); path == root || strings.HasPrefix(path, root+"/") {
+			c.Header("Cache-Control", "no-store")
+		}
+		c.Next()
+	}
+}
+
+func registerAsyncTaskRoutes(admin *gin.RouterGroup, h *handler.Handlers, limiter *middleware.PanelRateLimiter) {
+	tasks := admin.Group("/async-tasks")
+	tasks.Use(func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
+	tasks.Use(middleware.AdminOnly(), limiter.Heavy())
+	tasks.GET("", h.AsyncImage.ListAdminTasks)
+	tasks.GET("/:user_id/:id", h.AsyncImage.GetAdminTask)
+	tasks.POST("/:user_id/:id/refresh", h.AsyncImage.RefreshAdminTask)
+	tasks.GET("/:user_id/:id/content", h.AsyncImage.DownloadAdminTask)
 }
 
 func registerPromptAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

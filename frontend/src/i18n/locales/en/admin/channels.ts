@@ -112,6 +112,7 @@ export default {
         video: 'Video (Per Second)'
       },
       form: {
+        videoPricePerSecond: 'Price per second (USD/s)',
         name: 'Name',
         namePlaceholder: 'Enter channel name',
         description: 'Description',

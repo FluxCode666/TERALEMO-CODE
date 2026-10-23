@@ -213,6 +213,7 @@ func TestSecurityHeaders(t *testing.T) {
 		// Default policy should contain these elements
 		assert.Contains(t, csp, "default-src 'self'")
 		assert.Contains(t, csp, TencentCaptchaDomain)
+		assert.Contains(t, csp, "media-src 'self' data: blob: https:", "generated video previews must not inherit default-src self")
 	})
 
 	t.Run("uses_default_policy_when_whitespace_only", func(t *testing.T) {

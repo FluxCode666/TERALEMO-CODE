@@ -1,7 +1,9 @@
 export const grokVideoPriceResolutions = [
   { key: '480p', label: '480p' },
   { key: '720p', label: '720p' },
-  { key: '1080p', label: '1080p' }
+  { key: '768p', label: '768p' },
+  { key: '1080p', label: '1080p' },
+  { key: '2k', label: '2K' }
 ] as const
 
 export const grokVideoPriceFamilies = [

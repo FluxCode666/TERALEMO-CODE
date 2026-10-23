@@ -254,6 +254,9 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		account.AutoPauseOnExpired = true
 	}
 
+	if err := ValidateVideoAccount(account); err != nil {
+		return nil, err
+	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, fmt.Errorf("create account: %w", err)
 	}
@@ -323,6 +326,7 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 	if err != nil {
 		return nil, fmt.Errorf("get account: %w", err)
 	}
+	previousVideoBaseURL := account.GetCredential("base_url")
 
 	// 更新字段
 	if req.Name != nil {
@@ -378,10 +382,14 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 		}
 	}
 
+	if err := ValidateVideoAccount(account); err != nil {
+		return nil, err
+	}
 	// 执行更新
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, fmt.Errorf("update account: %w", err)
 	}
+	warnVideoAccountUpstreamChange(ctx, s.accountRepo, previousVideoBaseURL, account)
 
 	// require_oauth_only 检查
 	if account.Type == AccountTypeAPIKey && req.GroupIDs != nil {

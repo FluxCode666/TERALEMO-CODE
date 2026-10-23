@@ -172,6 +172,9 @@ export default {
 
   // Navigation
   nav: {
+    asyncTasks: 'Async tasks',
+    apiDocs: 'API Docs',
+    globalAsyncTasks: 'Global async tasks',
     enterprise: 'My enterprise',
     enterprises: 'Enterprises',
     dashboard: 'Dashboard',

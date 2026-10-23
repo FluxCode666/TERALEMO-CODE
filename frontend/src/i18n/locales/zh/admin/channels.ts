@@ -112,6 +112,7 @@ export default {
         video: '视频（按秒）'
       },
       form: {
+        videoPricePerSecond: '每秒单价（USD/秒）',
         name: '名称',
         namePlaceholder: '输入渠道名称',
         description: '描述',

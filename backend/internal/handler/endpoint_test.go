@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -84,6 +85,44 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 			require.Equal(t, tt.want, NormalizeInboundEndpoint(tt.path))
 		})
 	}
+}
+
+func TestNormalizeInboundVideoAndPanelEndpoints(t *testing.T) {
+	for _, tc := range []struct{ path, want string }{
+		{"/api/v3/contents/generations/tasks/123/cancel", EndpointSeedanceTasks},
+		{"/v1beta/models/veo-3.1:predictLongRunning", EndpointGeminiVideoCreate},
+		{"/v1beta/models/veo-3.1/operations/opaque-operation-id", EndpointGeminiVideoOperation},
+		{"/v1/video_generation", EndpointMiniMaxVideoCreate},
+		{"/v1/query/video_generation?task_id=unique-task", EndpointMiniMaxVideoQuery},
+		{"/v1/files/retrieve?file_id=unique-file", EndpointMiniMaxVideoFile},
+		{"/v2/video_generation", EndpointMiniMaxV2VideoCreate},
+		{"/v2/query/video_generation/opaque-task", EndpointMiniMaxV2VideoQuery},
+		{"/v1/videos/generations/task-1/content", EndpointVideosGenerations},
+		{"/videos/task-2/content", EndpointVideos},
+		{"/api/v1/user/async-tasks", EndpointUserAsyncTasks},
+		{"/api/v1/user/async-tasks/opaque-id", EndpointUserAsyncTasks + "/:id"},
+		{"/api/v1/user/async-tasks/opaque-id/refresh", EndpointUserAsyncTasks + "/:id/refresh"},
+		{"/api/v1/user/async-tasks/opaque-id/content", EndpointUserAsyncTasks + "/:id/content"},
+		{"/api/v1/admin/async-tasks", EndpointAdminAsyncTasks},
+		{"/api/v1/admin/async-tasks/123/opaque-id", EndpointAdminAsyncTasks + "/:user_id/:id"},
+		{"/api/v1/admin/async-tasks/123/opaque-id/refresh", EndpointAdminAsyncTasks + "/:user_id/:id/refresh"},
+		{"/api/v1/admin/async-tasks/123/opaque-id/content", EndpointAdminAsyncTasks + "/:user_id/:id/content"},
+	} {
+		t.Run(tc.path, func(t *testing.T) { require.Equal(t, tc.want, NormalizeInboundEndpoint(tc.path)) })
+	}
+}
+
+func TestNormalizeInboundUnknownEndpointResourceIDs(t *testing.T) {
+	for _, id := range []string{
+		strings.Repeat("a", 64), "ABCDEF0123456789", "vidtask_opaque-task-value",
+		"imgtask_opaque-task-value", "0195fa12-bb32-7d00-9000-55aa12bb44cc", "123456789", "task_some-task",
+	} {
+		require.Equal(t, "/future/resources/:id/content", NormalizeInboundEndpoint("/future/resources/"+id+"/content?key=secret"))
+	}
+	require.Equal(t, "/future/operations/:operation", NormalizeInboundEndpoint("/future/operations/opaque-operation"))
+	require.Equal(t, "/future/operations/:operation", NormalizeInboundEndpoint("/future/operations/*operation"))
+	require.Equal(t, "/future/health", NormalizeInboundEndpoint("/future/health"))
+	require.Equal(t, "/v99/future/models", NormalizeInboundEndpoint("/v99/future/models"))
 }
 
 // ──────────────────────────────────────────────────────────

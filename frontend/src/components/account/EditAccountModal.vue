@@ -26,6 +26,15 @@
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
       </div>
 
+      <VideoProtocolField v-if="account.platform === 'video'" id="edit-video-protocol" v-model="editVideoProtocol" />
+      <VideoPrivacyField v-if="account.platform === 'video'" id="edit-video-hide-upstream-url" v-model="editHideVideoUpstreamURL" />
+      <VideoCapabilityField
+        v-if="account.platform === 'video'"
+        id-prefix="edit-video-capability"
+        v-model:resolutions="editVideoResolutions"
+        v-model:min-duration="editVideoMinDuration"
+        v-model:max-duration="editVideoMaxDuration"
+      />
       <!-- API Key fields (only for apikey type) -->
       <div v-if="account.type === 'apikey'" class="space-y-4">
         <div v-if="!isCNApiKeyAccount || editApiProtocol !== 'adaptive'">
@@ -35,7 +44,9 @@
             type="text"
             class="input"
             :placeholder="
-              account.platform === 'openai'
+              account.platform === 'video'
+                ? videoBaseURL(editVideoProtocol)
+                : account.platform === 'openai'
                 ? 'https://api.openai.com'
                 : account.platform === 'gemini'
                   ? 'https://generativelanguage.googleapis.com'
@@ -236,7 +247,9 @@
             data-lpignore="true"
             data-bwignore="true"
             :placeholder="
-              account.platform === 'openai'
+              account.platform === 'video'
+                ? videoApiKeyPlaceholder
+                : account.platform === 'openai'
                 ? 'sk-proj-...'
                 : account.platform === 'gemini'
                   ? 'AQ.Ab...'
@@ -3227,6 +3240,11 @@
 </template>
 
 <script setup lang="ts">
+import VideoProtocolField from './VideoProtocolField.vue'
+import VideoPrivacyField from './VideoPrivacyField.vue'
+import VideoCapabilityField from './VideoCapabilityField.vue'
+import { videoBaseURL, switchVideoBaseURL, resolveVideoProtocol } from '@/utils/videoProtocol'
+import { applyVideoCapabilities, normalizeVideoResolutions, readVideoDuration, validateVideoDurations } from '@/utils/videoCapabilities'
 import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -3464,7 +3482,7 @@ const baseUrlHint = computed(() => {
   if (!props.account) return t('admin.accounts.baseUrlHint')
   if (props.account.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
-  if (props.account.platform === 'grok') return ''
+  if (props.account.platform === 'grok' || props.account.platform === 'video') return ''
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3490,6 +3508,23 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const editVideoProtocol = ref('seedance')
+const editHideVideoUpstreamURL = ref(false)
+const editVideoResolutions = ref<string[]>([])
+const editVideoMinDuration = ref('')
+const editVideoMaxDuration = ref('')
+// 隐私开关写入规则：原凭据没有 hide_video_upstream_url 键且用户未改动开关时保持缺省，
+// 不在提交时隐式写入；记录初始值用于脏检测。
+let editHideVideoUpstreamURLHadKey = false
+let editHideVideoUpstreamURLInitial = false
+watch(editVideoProtocol, value => { if (props.account?.platform === 'video') editBaseUrl.value = switchVideoBaseURL(editBaseUrl.value, value) })
+
+// 视频平台 API Key 占位符随协议变化（Gemini 是 AIza 系，MiniMax 是 JWT，Ark 用通用 sk 提示）
+const videoApiKeyPlaceholder = computed(() => {
+  if (editVideoProtocol.value === 'gemini') return 'AIza...'
+  if (editVideoProtocol.value === 'minimax') return 'eyJ...'
+  return 'sk-...'
+})
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -4165,6 +4200,7 @@ const tempUnschedPresets = computed(() => [
 
 // Computed: default base URL based on platform
 const defaultBaseUrl = computed(() => {
+  if (props.account?.platform === 'video') return videoBaseURL(editVideoProtocol.value)
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
@@ -4548,6 +4584,14 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Initialize API Key fields for apikey type
   if (newAccount.type === 'apikey' && newAccount.credentials) {
     const credentials = newAccount.credentials as Record<string, unknown>
+    editVideoProtocol.value = resolveVideoProtocol(credentials.video_protocol)
+    editHideVideoUpstreamURL.value = credentials.hide_video_upstream_url === true
+    editHideVideoUpstreamURLHadKey = Object.prototype.hasOwnProperty.call(credentials, 'hide_video_upstream_url')
+    editHideVideoUpstreamURLInitial = editHideVideoUpstreamURL.value
+    // 上游能力回填：未配置的旧账号保持空值，提交时空值删除对应键，不会隐式写入
+    editVideoResolutions.value = normalizeVideoResolutions(credentials.video_resolutions)
+    editVideoMinDuration.value = readVideoDuration(credentials.video_min_duration_seconds)
+    editVideoMaxDuration.value = readVideoDuration(credentials.video_max_duration_seconds)
     // 国产供应商：读取 account_mode 与 api_protocol 作为可编辑初始值
     // （编辑弹窗允许修正两者，用于修复早期存错默认值的账号）。
     if (isMultiProtocolApiKeyPlatform(newAccount.platform)) {
@@ -4612,7 +4656,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
     }
     const platformDefaultUrl =
-      newAccount.platform === 'openai'
+      newAccount.platform === 'video'
+        ? videoBaseURL(editVideoProtocol.value)
+        : newAccount.platform === 'openai'
         ? 'https://api.openai.com'
         : newAccount.platform === 'gemini'
           ? 'https://generativelanguage.googleapis.com'
@@ -5339,6 +5385,14 @@ const handleSubmit = async () => {
 		}
 	}
 
+  if (props.account.platform === 'video' && props.account.type === 'apikey') {
+    const durationError = validateVideoDurations(editVideoMinDuration.value, editVideoMaxDuration.value)
+    if (durationError) {
+      appStore.showError(t(`admin.accounts.videoCapability.${durationError}`))
+      return
+    }
+  }
+
   const updatePayload: Record<string, unknown> = { ...form }
   try {
     // 后端期望 proxy_id: 0 表示清除代理，而不是 null
@@ -5372,6 +5426,18 @@ const handleSubmit = async () => {
       const newCredentials: Record<string, unknown> = {
         ...currentCredentials,
         base_url: newBaseUrl
+      }
+
+      if (props.account.platform === 'video') {
+        newCredentials.video_protocol = editVideoProtocol.value
+        // 隐私开关：原凭据没有该键且用户未改动时保持缺省，不隐式写入
+        if (editHideVideoUpstreamURLHadKey || editHideVideoUpstreamURL.value !== editHideVideoUpstreamURLInitial) {
+          newCredentials.hide_video_upstream_url = editHideVideoUpstreamURL.value
+        } else {
+          delete newCredentials.hide_video_upstream_url
+        }
+        // 上游能力：有值写入，清空则删除键恢复官方规则；旧账号未配置时保持缺省
+        applyVideoCapabilities(newCredentials, editVideoResolutions.value, editVideoMinDuration.value, editVideoMaxDuration.value, 'edit')
       }
 
       // 国产供应商：模式与协议写入凭据（决定额度/余额探测与转发端点/格式）。

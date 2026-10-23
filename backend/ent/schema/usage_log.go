@@ -39,7 +39,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int64("api_key_id"),
 		field.Int64("account_id"),
 		field.String("request_id").
-			MaxLen(64).
+			SchemaType(map[string]string{dialect.Postgres: "text"}).
 			NotEmpty(),
 		field.String("model").
 			MaxLen(100).

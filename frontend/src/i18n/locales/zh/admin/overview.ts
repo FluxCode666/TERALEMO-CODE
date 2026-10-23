@@ -854,6 +854,7 @@ export default {
       duplicating: '复制中',
       duplicateSuccess: '分组已复制为「{name}」，已默认停用，请确认配置后再启用',
       duplicateFailed: '复制分组失败',
+      videoFallbackPriceRequired: '复制失败：原分组未配置视频兜底价格。请先编辑原分组补齐视频兜底价格（768p、2K 等）后再复制。',
       sortOrder: '排序',
       columnSettings: '列设置',
       sortOrderHint: '拖拽分组调整显示顺序，排在前面的分组会优先显示',
@@ -1087,15 +1088,25 @@ export default {
         notConfigured: '未配置'
       },
       videoPricing: {
+        fallbackDescription: "渠道中匹配模型和分辨率的显式价格优先，未命中时使用分组逐模型价格或下方的兜底价格。",
+        modelPricingHint: "视频分组先匹配渠道定价，再使用这里的模型定价，最后使用分组兜底价格。",
+        billingMode: "兜底计费方式",
+        perSecond: "按秒计费",
+        perRequest: "按次计费",
+        perRequestPrice: "兜底价格（USD/次）",
+        fallbackRequiredHint: "视频分组必须填写兜底价格：按秒填写全部分辨率档位，按次填写每次成功任务的价格；0 表示免费。渠道中匹配模型和档位的价格优先于分组兜底价格。",
+        fallbackRequiredError: "请填写有效的视频兜底价格（≥ 0）：{tiers}",
+        perRequestHint: "按次计费：每个成功任务收取一次费用，与时长和输出视频数量无关；失败任务不计费，重复查询不重复收费。匹配的渠道定价优先，未命中时使用分组兜底价，再乘有效视频倍率。",
+        finalPerRequestPreview: "最终按次兜底价格预览",
         title: '视频生成计费',
         description:
-          '配置 Grok 视频生成的每秒单价（USD/秒），留空则使用默认每秒价（grok-imagine-video：480p $0.05/s、720p $0.07/s；video-1.5：480p $0.08/s、720p $0.14/s、1080p $0.25/s）',
+          '配置 Grok 视频生成的每秒单价（USD/秒），留空则使用默认每秒价（grok-imagine-video：480p $0.05/s、720p $0.07/s；video-1.5：480p $0.08/s、720p $0.14/s、1080p $0.25/s）。768p 和 2K 为独立档位，须配置分组或渠道价格，不沿用 720p 或其它分辨率价格。',
         modelOverridesTitle: '按模型覆盖视频价格',
         modelOverridesDescription: '已填写的单元格会覆盖该模型族的平面分辨率价格。video-1.5 的 preview 与 legacy 别名共用同一模型族；留空则回退到平面分辨率价格。',
         independentMultiplier: '视频倍率独立',
         videoMultiplier: '视频独立倍率',
         modeHint:
-          '视频按秒计费：费用 = 每秒价格 × 时长（1-15 秒，未指定默认 8 秒）。默认叠加当前分组有效倍率；开启独立倍率后改用视频独立倍率。',
+          '视频按秒计费：费用 = 每秒价格 × 时长 × 视频数；时长按所用协议的请求参数及成功结果确定。默认叠加当前分组有效倍率；开启独立倍率后改用视频独立倍率。',
         finalPricePreview: '最终每秒价格预览',
         notConfigured: '未配置'
       },

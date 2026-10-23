@@ -82,12 +82,20 @@ type Group struct {
 	VideoRateIndependent bool `json:"video_rate_independent,omitempty"`
 	// 视频生成独立倍率，仅 video_rate_independent=true 时生效
 	VideoRateMultiplier float64 `json:"video_rate_multiplier,omitempty"`
+	// 视频分组兜底计费方式：video 按秒，per_request 按成功任务
+	VideoBillingMode string `json:"video_billing_mode,omitempty"`
+	// VideoPricePerRequest holds the value of the "video_price_per_request" field.
+	VideoPricePerRequest *float64 `json:"video_price_per_request,omitempty"`
 	// VideoPrice480p holds the value of the "video_price_480p" field.
 	VideoPrice480p *float64 `json:"video_price_480p,omitempty"`
 	// VideoPrice720p holds the value of the "video_price_720p" field.
 	VideoPrice720p *float64 `json:"video_price_720p,omitempty"`
+	// VideoPrice768p holds the value of the "video_price_768p" field.
+	VideoPrice768p *float64 `json:"video_price_768p,omitempty"`
 	// VideoPrice1080p holds the value of the "video_price_1080p" field.
 	VideoPrice1080p *float64 `json:"video_price_1080p,omitempty"`
+	// VideoPrice2k holds the value of the "video_price_2k" field.
+	VideoPrice2k *float64 `json:"video_price_2k,omitempty"`
 	// 按模型族和分辨率覆盖视频每秒价格
 	VideoModelPrices map[string]map[string]float64 `json:"video_model_prices,omitempty"`
 	// Codex alpha/search 网页搜索单次价格（USD/次）；nil 表示使用默认价 0.01（官方 $10/1000 次）
@@ -286,11 +294,11 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case group.FieldPeakRateEnabled, group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldAllowBatchImageGeneration, group.FieldImageRateIndependent, group.FieldVideoRateIndependent, group.FieldLongContextPricingEnabled, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowLive, group.FieldForceOpenaiFast, group.FieldFreeOpenaiFast, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldProfitControlEnabled:
 			values[i] = new(sql.NullBool)
-		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice1080p, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
+		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPricePerRequest, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice768p, group.FieldVideoPrice1080p, group.FieldVideoPrice2k, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldDescription, group.FieldPeakStart, group.FieldPeakEnd, group.FieldStatus, group.FieldDuplicateOperationID, group.FieldPlatform, group.FieldSubscriptionType, group.FieldDefaultMappedModel, group.FieldMaxReasoningEffort, group.FieldMaxReasoningEffortOverLimit:
+		case group.FieldName, group.FieldDescription, group.FieldPeakStart, group.FieldPeakEnd, group.FieldStatus, group.FieldDuplicateOperationID, group.FieldPlatform, group.FieldSubscriptionType, group.FieldVideoBillingMode, group.FieldDefaultMappedModel, group.FieldMaxReasoningEffort, group.FieldMaxReasoningEffortOverLimit:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt, group.FieldDeletedAt:
 			values[i] = new(sql.NullTime)
@@ -512,6 +520,19 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.VideoRateMultiplier = value.Float64
 			}
+		case group.FieldVideoBillingMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field video_billing_mode", values[i])
+			} else if value.Valid {
+				_m.VideoBillingMode = value.String
+			}
+		case group.FieldVideoPricePerRequest:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field video_price_per_request", values[i])
+			} else if value.Valid {
+				_m.VideoPricePerRequest = new(float64)
+				*_m.VideoPricePerRequest = value.Float64
+			}
 		case group.FieldVideoPrice480p:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field video_price_480p", values[i])
@@ -526,12 +547,26 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 				_m.VideoPrice720p = new(float64)
 				*_m.VideoPrice720p = value.Float64
 			}
+		case group.FieldVideoPrice768p:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field video_price_768p", values[i])
+			} else if value.Valid {
+				_m.VideoPrice768p = new(float64)
+				*_m.VideoPrice768p = value.Float64
+			}
 		case group.FieldVideoPrice1080p:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {
 				return fmt.Errorf("unexpected type %T for field video_price_1080p", values[i])
 			} else if value.Valid {
 				_m.VideoPrice1080p = new(float64)
 				*_m.VideoPrice1080p = value.Float64
+			}
+		case group.FieldVideoPrice2k:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field video_price_2k", values[i])
+			} else if value.Valid {
+				_m.VideoPrice2k = new(float64)
+				*_m.VideoPrice2k = value.Float64
 			}
 		case group.FieldVideoModelPrices:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -951,6 +986,14 @@ func (_m *Group) String() string {
 	builder.WriteString("video_rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", _m.VideoRateMultiplier))
 	builder.WriteString(", ")
+	builder.WriteString("video_billing_mode=")
+	builder.WriteString(_m.VideoBillingMode)
+	builder.WriteString(", ")
+	if v := _m.VideoPricePerRequest; v != nil {
+		builder.WriteString("video_price_per_request=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.VideoPrice480p; v != nil {
 		builder.WriteString("video_price_480p=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
@@ -961,8 +1004,18 @@ func (_m *Group) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	if v := _m.VideoPrice768p; v != nil {
+		builder.WriteString("video_price_768p=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.VideoPrice1080p; v != nil {
 		builder.WriteString("video_price_1080p=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.VideoPrice2k; v != nil {
+		builder.WriteString("video_price_2k=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

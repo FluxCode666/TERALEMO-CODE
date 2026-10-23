@@ -78,12 +78,20 @@ const (
 	FieldVideoRateIndependent = "video_rate_independent"
 	// FieldVideoRateMultiplier holds the string denoting the video_rate_multiplier field in the database.
 	FieldVideoRateMultiplier = "video_rate_multiplier"
+	// FieldVideoBillingMode holds the string denoting the video_billing_mode field in the database.
+	FieldVideoBillingMode = "video_billing_mode"
+	// FieldVideoPricePerRequest holds the string denoting the video_price_per_request field in the database.
+	FieldVideoPricePerRequest = "video_price_per_request"
 	// FieldVideoPrice480p holds the string denoting the video_price_480p field in the database.
 	FieldVideoPrice480p = "video_price_480p"
 	// FieldVideoPrice720p holds the string denoting the video_price_720p field in the database.
 	FieldVideoPrice720p = "video_price_720p"
+	// FieldVideoPrice768p holds the string denoting the video_price_768p field in the database.
+	FieldVideoPrice768p = "video_price_768p"
 	// FieldVideoPrice1080p holds the string denoting the video_price_1080p field in the database.
 	FieldVideoPrice1080p = "video_price_1080p"
+	// FieldVideoPrice2k holds the string denoting the video_price_2k field in the database.
+	FieldVideoPrice2k = "video_price_2k"
 	// FieldVideoModelPrices holds the string denoting the video_model_prices field in the database.
 	FieldVideoModelPrices = "video_model_prices"
 	// FieldWebSearchPricePerCall holds the string denoting the web_search_price_per_call field in the database.
@@ -272,9 +280,13 @@ var Columns = []string{
 	FieldBatchImageHoldMultiplier,
 	FieldVideoRateIndependent,
 	FieldVideoRateMultiplier,
+	FieldVideoBillingMode,
+	FieldVideoPricePerRequest,
 	FieldVideoPrice480p,
 	FieldVideoPrice720p,
+	FieldVideoPrice768p,
 	FieldVideoPrice1080p,
+	FieldVideoPrice2k,
 	FieldVideoModelPrices,
 	FieldWebSearchPricePerCall,
 	FieldSearchPricePer1k,
@@ -398,6 +410,10 @@ var (
 	DefaultVideoRateIndependent bool
 	// DefaultVideoRateMultiplier holds the default value on creation for the "video_rate_multiplier" field.
 	DefaultVideoRateMultiplier float64
+	// DefaultVideoBillingMode holds the default value on creation for the "video_billing_mode" field.
+	DefaultVideoBillingMode string
+	// VideoBillingModeValidator is a validator for the "video_billing_mode" field. It is called by the builders before save.
+	VideoBillingModeValidator func(string) error
 	// SearchPricePer1kValidator is a validator for the "search_price_per_1k" field. It is called by the builders before save.
 	SearchPricePer1kValidator func(float64) error
 	// AudioRealtimePricePerMinValidator is a validator for the "audio_realtime_price_per_min" field. It is called by the builders before save.
@@ -618,6 +634,16 @@ func ByVideoRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoRateMultiplier, opts...).ToFunc()
 }
 
+// ByVideoBillingMode orders the results by the video_billing_mode field.
+func ByVideoBillingMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoBillingMode, opts...).ToFunc()
+}
+
+// ByVideoPricePerRequest orders the results by the video_price_per_request field.
+func ByVideoPricePerRequest(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoPricePerRequest, opts...).ToFunc()
+}
+
 // ByVideoPrice480p orders the results by the video_price_480p field.
 func ByVideoPrice480p(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoPrice480p, opts...).ToFunc()
@@ -628,9 +654,19 @@ func ByVideoPrice720p(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoPrice720p, opts...).ToFunc()
 }
 
+// ByVideoPrice768p orders the results by the video_price_768p field.
+func ByVideoPrice768p(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoPrice768p, opts...).ToFunc()
+}
+
 // ByVideoPrice1080p orders the results by the video_price_1080p field.
 func ByVideoPrice1080p(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoPrice1080p, opts...).ToFunc()
+}
+
+// ByVideoPrice2k orders the results by the video_price_2k field.
+func ByVideoPrice2k(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoPrice2k, opts...).ToFunc()
 }
 
 // ByWebSearchPricePerCall orders the results by the web_search_price_per_call field.

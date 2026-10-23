@@ -1274,7 +1274,7 @@ func TestForwardGrokMediaAppliesAccountModelMappingAfterEndpointNormalization(t 
 			modelMapping:     map[string]any{"grok-imagine-video": "grok-image-video"},
 			wantRequestModel: "grok-imagine-video-1.5",
 			wantUpstream:     "grok-imagine-video-1.5",
-			wantBody:         `{"model":"grok-imagine-video-1.5","prompt":"waves"}`,
+			wantBody:         `{"model":"grok-imagine-video-1.5","prompt":"waves","duration":8,"resolution":"480p"}`,
 			responseBody:     `{"request_id":"video-request-mapped"}`,
 		},
 		{
@@ -1285,7 +1285,7 @@ func TestForwardGrokMediaAppliesAccountModelMappingAfterEndpointNormalization(t 
 			modelMapping:     map[string]any{"grok-imagine-video-1.5": "vendor-image-video"},
 			wantRequestModel: "grok-imagine-video-1.5",
 			wantUpstream:     "vendor-image-video",
-			wantBody:         `{"model":"vendor-image-video","prompt":"animate","image":{"url":"https://example.com/input.png"}}`,
+			wantBody:         `{"model":"vendor-image-video","prompt":"animate","image":{"url":"https://example.com/input.png"},"duration":8,"resolution":"480p"}`,
 			responseBody:     `{"request_id":"image-video-request-mapped"}`,
 		},
 		{
@@ -1658,7 +1658,7 @@ func TestForwardGrokMediaVideoGenerationPreservesImageToVideoModel(t *testing.T)
 	result, err := svc.ForwardGrokMedia(context.Background(), c, account, GrokMediaEndpointVideosGenerations, "", body, "application/json")
 	require.NoError(t, err)
 	require.Equal(t, "https://xai.test/v1/videos/generations", upstream.lastReq.URL.String())
-	require.JSONEq(t, `{"model":"grok-imagine-video-1.5","prompt":"animate","image":{"url":"data:image/png;base64,aW1n"}}`, string(upstream.lastBody))
+	require.JSONEq(t, `{"model":"grok-imagine-video-1.5","prompt":"animate","image":{"url":"data:image/png;base64,aW1n"},"duration":8,"resolution":"480p"}`, string(upstream.lastBody))
 	require.Equal(t, "video-request-456", result.ResponseID)
 	require.Equal(t, "grok-imagine-video-1.5", result.BillingModel)
 	// 未指定 duration 时按上游默认 8 秒计费。

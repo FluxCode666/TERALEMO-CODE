@@ -126,9 +126,13 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		BatchImageHoldMultiplier:        source.BatchImageHoldMultiplier,
 		VideoRateIndependent:            source.VideoRateIndependent,
 		VideoRateMultiplier:             source.VideoRateMultiplier,
+		VideoBillingMode:                source.VideoBillingMode,
+		VideoPricePerRequest:            cloneGroupValuePointer(source.VideoPricePerRequest),
 		VideoPrice480P:                  cloneGroupValuePointer(source.VideoPrice480P),
 		VideoPrice720P:                  cloneGroupValuePointer(source.VideoPrice720P),
+		VideoPrice768P:                  cloneGroupValuePointer(source.VideoPrice768P),
 		VideoPrice1080P:                 cloneGroupValuePointer(source.VideoPrice1080P),
+		VideoPrice2K:                    cloneGroupValuePointer(source.VideoPrice2K),
 		VideoModelPrices:                cloneGroupVideoModelPrices(source.VideoModelPrices),
 		WebSearchPricePerCall:           cloneGroupValuePointer(source.WebSearchPricePerCall),
 		SearchPricePer1k:                cloneGroupValuePointer(source.SearchPricePer1k),
@@ -215,6 +219,9 @@ func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorSc
 	}
 
 	duplicate := cloneGroupForDuplicate(source, duplicateGroupOperationID(id, actorScope, operationKey))
+	if err := ValidateVideoGroupFallbackPricing(duplicate); err != nil {
+		return nil, err
+	}
 	sanitizeGroupReasoningEffortPolicy(duplicate)
 	for copyNumber := 1; ; copyNumber++ {
 		duplicate.Name = duplicateGroupName(source.Name, copyNumber)

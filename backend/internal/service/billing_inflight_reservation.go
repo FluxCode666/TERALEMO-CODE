@@ -491,7 +491,7 @@ func inflightBillingModelCandidates(ctx context.Context, deps inflightEstimateDe
 	return primary, fallbacks, upstreamInput
 }
 
-func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, image float64) {
+func (d inflightEstimateDeps) baseRate(ctx context.Context, apiKey *APIKey) float64 {
 	rate := 1.0
 	if d.cfg != nil && d.cfg.Default.RateMultiplier > 0 {
 		rate = d.cfg.Default.RateMultiplier
@@ -502,7 +502,11 @@ func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, 
 			rate = d.userGroupRate(ctx, apiKey.User.ID, *apiKey.GroupID, rate)
 		}
 	}
-	return computePeakAwareMultipliers(apiKey, rate, timezone.Now())
+	return rate
+}
+
+func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, image float64) {
+	return computePeakAwareMultipliers(apiKey, d.baseRate(ctx, apiKey), timezone.Now())
 }
 
 func tokenCounts(cfg config.InflightReservationConfig, bodyBytes, maxTokens int) (int, int) {
@@ -592,8 +596,14 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 			cost = tokenCost()
 		}
 	case InflightEstimateVideo:
+		if price := resolveVideoTaskPrice(ctx, d.resolver, apiKey, model, req.VideoResolution); price != nil {
+			return price.cost(units, req.VideoDurationSeconds, resolveVideoRateMultiplier(apiKey, textRate)).ActualCost
+		}
 		if perRequestMode {
 			cost = maxPerRequestPrice(resolved) * float64(units) * math.Max(textRate, imageRate)
+			if resolved.Mode == BillingModeVideo {
+				cost *= float64(NormalizeVideoBillingDurationSecondsOrDefault(req.VideoDurationSeconds))
+			}
 		}
 		if d.billing != nil {
 			if b := d.billing.CalculateVideoCost(model, req.VideoResolution, units, req.VideoDurationSeconds, videoPriceConfigFromAPIKey(apiKey), math.Max(textRate, imageRate)); b != nil && b.ActualCost > cost {
@@ -647,6 +657,10 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		return 0, true
 	}
 	textRate, imageRate := d.rates(ctx, apiKey)
+	if req.Kind == InflightEstimateVideo {
+		textRate = resolveVideoRateMultiplier(apiKey, d.baseRate(ctx, apiKey))
+		imageRate = textRate
+	}
 	if textRate <= 0 && imageRate <= 0 {
 		// 免费分组：不计费，也无需预留。
 		return 0, true
@@ -674,6 +688,13 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		if (best <= 0 || composite) && d.accountMappedModels != nil {
 			if c := bestOf(d.accountMappedModels(ctx, apiKey, upstreamInput)); c > best {
 				best = c
+			}
+		}
+	}
+	if best <= 0 && req.Kind == InflightEstimateVideo {
+		for _, model := range primary {
+			if price := resolveVideoTaskPrice(ctx, d.resolver, apiKey, model, req.VideoResolution); price != nil && price.unitPrice == 0 {
+				return 0, true
 			}
 		}
 	}

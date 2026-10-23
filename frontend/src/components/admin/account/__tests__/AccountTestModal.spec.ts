@@ -119,6 +119,37 @@ describe('AccountTestModal', () => {
     vi.restoreAllMocks()
   })
 
+  it.each([
+    ['seedance', 'doubao-seedance-1-0-pro', 'Seedance (Ark)'],
+    ['gemini', 'veo-3.0-generate-001', 'Google Gemini (Veo)'],
+    ['minimax', 'MiniMax-Hailuo-2.3', 'MiniMax (Hailuo / H3)']
+  ])('视频账号使用 %s 视频测试并显示成品', async (protocol, model, label) => {
+    getAvailableModels.mockResolvedValue([{ id: model, display_name: model }])
+    global.fetch = vi.fn().mockResolvedValue(createStreamResponse([
+      `data: ${JSON.stringify({ type: 'test_start', model })}\n`,
+      'data: {"type":"status","text":"Video task status: completed"}\n',
+      'data: {"type":"video","video_url":"https://cdn.example/test.mp4","mime_type":"video/mp4"}\n',
+      'data: {"type":"test_complete","success":true}\n'
+    ])) as any
+    const wrapper = mountModal({ id: 42, name: 'Video Account', platform: 'video', type: 'apikey', status: 'active', credentials: { video_protocol: protocol } })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="video-test-protocol"]').text()).toContain(label)
+    expect(wrapper.text()).toContain('admin.accounts.videoTestMode')
+    expect(wrapper.text()).not.toContain('admin.accounts.testPrompt')
+    const prompt = wrapper.get('textarea.textarea-stub')
+    await prompt.setValue('A moving red ball')
+    await wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))!.trigger('click')
+    await flushPromises()
+    const [url, request] = (global.fetch as any).mock.calls[0]
+    expect(url).toContain('/admin/accounts/42/test')
+    expect(JSON.parse(request.body)).toEqual({ model_id: model, prompt: 'A moving red ball', mode: 'video' })
+    expect(wrapper.text()).toContain('admin.accounts.sendingVideoRequest')
+    expect(wrapper.text()).not.toContain('admin.accounts.sendingTestMessage')
+    expect(wrapper.get('video').attributes('src')).toBe('https://cdn.example/test.mp4')
+    expect(wrapper.text()).toContain('admin.accounts.testCompleted')
+  })
+
   it('gemini 图片模型测试会携带提示词并渲染图片预览', async () => {
     const wrapper = mountModal()
     await wrapper.setProps({ show: true })
@@ -219,5 +250,49 @@ describe('AccountTestModal', () => {
       prompt: '',
       mode: 'compact'
     })
+  })
+
+  it('组件卸载时中止进行中的测试流', async () => {
+    let requestSignal: AbortSignal | undefined
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      requestSignal = init.signal as AbortSignal
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      })
+    }) as any
+
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    await startButton!.trigger('click')
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(requestSignal?.aborted).toBe(false)
+
+    wrapper.unmount()
+    expect(requestSignal?.aborted).toBe(true)
+  })
+
+  it('流正常结束但没收到终态事件时显示失败而不是一直处理中', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_start","model":"gemini-2.5-flash-image"}\n',
+        'data: {"type":"content","text":"partial"}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    await startButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('admin.accounts.testEndedWithoutResult')
+    expect(wrapper.text()).not.toContain('admin.accounts.testCompleted')
   })
 })

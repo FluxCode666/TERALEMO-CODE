@@ -30,9 +30,19 @@ const (
 	EndpointVideosEdits          = "/v1/videos/edits"
 	EndpointVideosExtensions     = "/v1/videos/extensions"
 	EndpointVideos               = "/v1/videos"
+	EndpointVideoTaskContent     = "/v1/video-tasks/:resource/content"
 	EndpointSeedanceTasks        = "/api/v3/contents/generations/tasks"
 	EndpointGeminiModels         = "/v1beta/models"
 	EndpointGeminiCachedContents = "/v1beta/cachedContents"
+	EndpointGeminiVideoCreate    = "/v1beta/models/:model:predictLongRunning"
+	EndpointGeminiVideoOperation = "/v1beta/models/:model/operations/:operation"
+	EndpointMiniMaxVideoCreate   = "/v1/video_generation"
+	EndpointMiniMaxVideoQuery    = "/v1/query/video_generation"
+	EndpointMiniMaxVideoFile     = "/v1/files/retrieve"
+	EndpointMiniMaxV2VideoCreate = "/v2/video_generation"
+	EndpointMiniMaxV2VideoQuery  = "/v2/query/video_generation/:task_id"
+	EndpointUserAsyncTasks       = "/api/v1/user/async-tasks"
+	EndpointAdminAsyncTasks      = "/api/v1/admin/async-tasks"
 )
 
 const EndpointAntigravityGenerateContent = "/v1internal:streamGenerateContent"
@@ -84,9 +94,29 @@ const (
 // would erroneously match first.
 func NormalizeInboundEndpoint(path string) string {
 	path = strings.TrimSpace(path)
+	path, _, _ = strings.Cut(path, "?")
+	if endpoint := normalizeAsyncTaskEndpoint(path); endpoint != "" {
+		return endpoint
+	}
 	switch {
+	case isVideoTaskContentPath(path):
+		return EndpointVideoTaskContent
 	case strings.Contains(path, "/contents/generations/tasks"):
 		return EndpointSeedanceTasks
+	case strings.Contains(path, "/v2/query/video_generation/"):
+		return EndpointMiniMaxV2VideoQuery
+	case strings.HasSuffix(strings.TrimRight(path, "/"), "/v2/video_generation"):
+		return EndpointMiniMaxV2VideoCreate
+	case strings.Contains(path, "/query/video_generation"):
+		return EndpointMiniMaxVideoQuery
+	case strings.HasSuffix(strings.TrimRight(path, "/"), "/video_generation"):
+		return EndpointMiniMaxVideoCreate
+	case strings.HasSuffix(strings.TrimRight(path, "/"), "/files/retrieve"):
+		return EndpointMiniMaxVideoFile
+	case strings.Contains(path, "/v1beta/models/") && strings.Contains(path, "/operations/"):
+		return EndpointGeminiVideoOperation
+	case strings.Contains(path, "/v1beta/models/") && strings.HasSuffix(path, ":predictLongRunning"):
+		return EndpointGeminiVideoCreate
 	case strings.Contains(path, EndpointResponsesInputTokens) || isResponsesInputTokensAliasPath(path):
 		return EndpointResponsesInputTokens
 	case strings.Contains(path, EndpointEmbeddings):
@@ -122,8 +152,100 @@ func NormalizeInboundEndpoint(path string) string {
 	case strings.Contains(path, EndpointGeminiCachedContents):
 		return EndpointGeminiCachedContents
 	default:
+		return normalizeEndpointResourceIDs(path)
+	}
+}
+
+func isVideoTaskContentPath(path string) bool {
+	_, suffix, ok := strings.Cut(path, "/video-tasks/")
+	if !ok {
+		return false
+	}
+	parts := strings.Split(strings.TrimRight(suffix, "/"), "/")
+	return len(parts) == 2 && parts[0] != "" && parts[1] == "content"
+}
+
+// Keep the original request path for non-video diagnostics, but never persist
+// a task resource in the redundant Ops request_path field on content downloads.
+func normalizeVideoContentOpsRequestPath(path string) string {
+	cleanPath, _, _ := strings.Cut(path, "?")
+	if !strings.HasSuffix(strings.TrimRight(cleanPath, "/"), "/content") {
 		return path
 	}
+	normalized := NormalizeInboundEndpoint(cleanPath)
+	switch normalized {
+	case EndpointVideoTaskContent, EndpointVideos, EndpointVideosGenerations, EndpointVideosEdits, EndpointVideosExtensions,
+		EndpointUserAsyncTasks + "/:id/content", EndpointAdminAsyncTasks + "/:user_id/:id/content":
+		return normalized
+	default:
+		return path
+	}
+}
+
+func normalizeAsyncTaskEndpoint(path string) string {
+	for _, root := range []string{EndpointUserAsyncTasks, EndpointAdminAsyncTasks} {
+		if !isBareOrSubpathOf(path, root) {
+			continue
+		}
+		suffix := strings.Trim(strings.TrimPrefix(path, root), "/")
+		if suffix == "" {
+			return root
+		}
+		parts := strings.Split(suffix, "/")
+		want := 1
+		template := root + "/:id"
+		if root == EndpointAdminAsyncTasks {
+			want = 2
+			template = root + "/:user_id/:id"
+		}
+		if len(parts) == want {
+			return template
+		}
+		if len(parts) == want+1 && (parts[want] == "refresh" || parts[want] == "content") {
+			return template + "/" + parts[want]
+		}
+	}
+	return ""
+}
+
+// Unknown routes can still reach request telemetry. Remove resource IDs there
+// as well, so task polling does not create one endpoint series per task.
+func normalizeEndpointResourceIDs(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if i > 0 && parts[i-1] == "operations" && part != "" {
+			parts[i] = ":operation"
+			continue
+		}
+		if isEndpointResourceID(part) {
+			parts[i] = ":id"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func isEndpointResourceID(part string) bool {
+	if part == "" || strings.HasPrefix(part, ":") || strings.HasPrefix(part, "*") {
+		return false
+	}
+	for _, prefix := range []string{"vidtask_", "imgtask_", "task_", "task-", "req_", "file_", "file-"} {
+		if strings.HasPrefix(part, prefix) && len(part) > len(prefix) {
+			return true
+		}
+	}
+	digits, hex, base64url := true, true, true
+	for _, c := range part {
+		if c < '0' || c > '9' {
+			digits = false
+		}
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' || c == '-') {
+			hex = false
+		}
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '-' || c == '_') {
+			base64url = false
+		}
+	}
+	return digits || hex && len(part) >= 16 || base64url && len(part) >= 32
 }
 
 func isResponsesInputTokensAliasPath(path string) bool {
@@ -207,6 +329,13 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 
 	switch platform {
 	case service.PlatformOpenAI, service.PlatformGrok:
+		// Native async video endpoints also run on enabled legacy OpenAI
+		// accounts. They do not pass through the Responses compatibility API.
+		if inbound == EndpointVideoTaskContent || inbound == EndpointSeedanceTasks || inbound == EndpointGeminiVideoCreate || inbound == EndpointGeminiVideoOperation ||
+			inbound == EndpointMiniMaxVideoCreate || inbound == EndpointMiniMaxVideoQuery || inbound == EndpointMiniMaxVideoFile ||
+			inbound == EndpointMiniMaxV2VideoCreate || inbound == EndpointMiniMaxV2VideoQuery {
+			return inbound
+		}
 		if inbound == EndpointEmbeddings || inbound == EndpointAlphaSearch || inbound == EndpointResponsesInputTokens || inbound == EndpointImagesGenerations || inbound == EndpointImagesEdits || inbound == EndpointVideosGenerations || inbound == EndpointVideosEdits || inbound == EndpointVideosExtensions || inbound == EndpointVideos {
 			return inbound
 		}
@@ -234,6 +363,9 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 		return EndpointSystemOne
 
 	case service.PlatformGemini:
+		if inbound == EndpointGeminiVideoCreate || inbound == EndpointGeminiVideoOperation {
+			return inbound
+		}
 		if inbound == EndpointGeminiCachedContents {
 			return EndpointGeminiCachedContents
 		}
@@ -306,9 +438,11 @@ func InboundEndpointMiddleware() gin.HandlerFunc {
 // otherwise mis-normalize concrete requests like "/v1/responses/compact"
 // to the root Responses endpoint).
 func GetInboundEndpoint(c *gin.Context) string {
-	if v, ok := c.Get(ctxKeyInboundEndpoint); ok {
-		if s, ok := v.(string); ok && s != "" {
-			return s
+	if c != nil {
+		if v, ok := c.Get(ctxKeyInboundEndpoint); ok {
+			if s, ok := v.(string); ok && s != "" {
+				return s
+			}
 		}
 	}
 	// Fallback: normalize on the fly.

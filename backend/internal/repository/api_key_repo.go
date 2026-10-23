@@ -89,6 +89,40 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 	return r.attachEnterpriseContext(ctx, apiKeyEntityToService(m))
 }
 
+// GetTaskMetadataByIDs performs at most three queries for an entire task page:
+// keys, their owners, and their groups. None of these projections loads secrets.
+func (r *apiKeyRepository) GetTaskMetadataByIDs(ctx context.Context, ids []int64) (map[int64]service.APIKeyTaskMetadata, error) {
+	metadata := make(map[int64]service.APIKeyTaskMetadata, len(ids))
+	if len(ids) == 0 {
+		return metadata, nil
+	}
+	keys, err := r.activeQuery().
+		Where(apikey.IDIn(ids...)).
+		Select(apikey.FieldID, apikey.FieldUserID, apikey.FieldName, apikey.FieldGroupID).
+		WithUser(func(q *dbent.UserQuery) {
+			q.Select(user.FieldID, user.FieldEmail, user.FieldUsername)
+		}).
+		WithGroup(func(q *dbent.GroupQuery) {
+			q.Select(group.FieldID, group.FieldName)
+		}).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		item := service.APIKeyTaskMetadata{UserID: key.UserID, KeyName: key.Name}
+		if key.Edges.User != nil {
+			item.UserEmail, item.UserName = key.Edges.User.Email, key.Edges.User.Username
+		}
+		if key.Edges.Group != nil {
+			groupID := key.Edges.Group.ID
+			item.GroupID, item.GroupName = &groupID, key.Edges.Group.Name
+		}
+		metadata[key.ID] = item
+	}
+	return metadata, nil
+}
+
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
 // 相比 GetByID，此方法性能更优，因为：
 //   - 使用 Select() 只查询必要字段，减少数据传输量
@@ -190,9 +224,13 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldImagePrice4k,
 				group.FieldVideoRateIndependent,
 				group.FieldVideoRateMultiplier,
+				group.FieldVideoBillingMode,
+				group.FieldVideoPricePerRequest,
 				group.FieldVideoPrice480p,
 				group.FieldVideoPrice720p,
+				group.FieldVideoPrice768p,
 				group.FieldVideoPrice1080p,
+				group.FieldVideoPrice2k,
 				group.FieldVideoModelPrices,
 				group.FieldWebSearchPricePerCall,
 				group.FieldSearchPricePer1k,
@@ -1015,9 +1053,13 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		BatchImageHoldMultiplier:        g.BatchImageHoldMultiplier,
 		VideoRateIndependent:            g.VideoRateIndependent,
 		VideoRateMultiplier:             g.VideoRateMultiplier,
+		VideoBillingMode:                g.VideoBillingMode,
+		VideoPricePerRequest:            g.VideoPricePerRequest,
 		VideoPrice480P:                  g.VideoPrice480p,
 		VideoPrice720P:                  g.VideoPrice720p,
+		VideoPrice768P:                  g.VideoPrice768p,
 		VideoPrice1080P:                 g.VideoPrice1080p,
+		VideoPrice2K:                    g.VideoPrice2k,
 		VideoModelPrices:                service.NormalizeVideoModelPrices(g.VideoModelPrices),
 		WebSearchPricePerCall:           g.WebSearchPricePerCall,
 		SearchPricePer1k:                g.SearchPricePer1k,

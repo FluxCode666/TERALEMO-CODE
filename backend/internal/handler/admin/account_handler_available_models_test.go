@@ -38,6 +38,34 @@ func setupAvailableModelsRouter(adminSvc service.AdminService) *gin.Engine {
 	return router
 }
 
+func TestAccountHandlerGetAvailableModels_VideoProtocols(t *testing.T) {
+	for _, protocol := range []string{"seedance", "gemini", "minimax"} {
+		t.Run(protocol, func(t *testing.T) {
+			svc := &availableModelsAdminService{stubAdminService: newStubAdminService(), account: service.Account{
+				ID: 42, Platform: service.PlatformVideo, Type: service.AccountTypeAPIKey,
+				Credentials: map[string]any{"video_protocol": protocol},
+			}}
+			router := setupAvailableModelsRouter(svc)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/42/models", nil))
+			require.Equal(t, http.StatusOK, rec.Code)
+			var response struct {
+				Data []struct {
+					ID string `json:"id"`
+				} `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			ids := make([]string, 0, len(response.Data))
+			for _, model := range response.Data {
+				ids = append(ids, model.ID)
+			}
+			require.Equal(t, svc.account.VideoTestModelIDs(), ids)
+			require.NotEmpty(t, ids)
+			require.NotContains(t, rec.Body.String(), "claude")
+		})
+	}
+}
+
 type syncUpstreamHTTPUpstream struct {
 	resp      *http.Response
 	responses []*http.Response

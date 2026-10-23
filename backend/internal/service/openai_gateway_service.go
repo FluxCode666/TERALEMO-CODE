@@ -233,8 +233,12 @@ type OpenAIUsage struct {
 
 // OpenAIForwardResult represents the result of forwarding
 type OpenAIForwardResult struct {
-	RequestID  string
-	ResponseID string
+	AsyncTaskStatus string
+	AsyncTaskURL    string
+	AsyncTaskError  string
+	VideoFileID     string
+	RequestID       string
+	ResponseID      string
 	// UpstreamHeaders 是直接上游的响应头，用于按账户配置解析上游请求标识。
 	UpstreamHeaders http.Header
 	Usage           OpenAIUsage
@@ -288,6 +292,9 @@ type OpenAIForwardResult struct {
 	VideoResolution       string
 	// VideoDurationSeconds 是提交时请求的生成时长（xAI 按输出秒数计费），已归一化到 1-15 秒。
 	VideoDurationSeconds int
+	// VideoDurationSecondsExact preserves frame-derived/fractional provider
+	// durations. Monetary settlement uses it before the integer display field.
+	VideoDurationSecondsExact float64
 	// AsyncVideoBillingIdentity is copied from the task's create-time snapshot.
 	AsyncVideoBillingIdentity *GrokVideoBillingIdentity
 	// WebSearchCalls 是 Codex alpha/search 网页搜索调用次数（每次成功请求为 1）。
@@ -470,6 +477,8 @@ type OpenAIGatewayService struct {
 	balanceNotifyService  *BalanceNotifyService
 	settingService        *SettingService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	videoBillingRepo      VideoBillingReservationRepository
+	videoBillingWorker    *videoBillingReconciler
 	liveAttestation       liveattestation.Provider
 	liveAttestationCipher SecretEncryptor
 

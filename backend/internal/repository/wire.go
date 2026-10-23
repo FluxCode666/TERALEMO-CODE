@@ -63,6 +63,12 @@ func ProvideSchedulerCache(rdb *redis.Client, cfg *config.Config) service.Schedu
 	return newSchedulerCacheWithChunkSizes(rdb, mgetChunkSize, writeChunkSize)
 }
 
+// ProvideVideoBillingReservationRepository keeps the enterprise cache attached
+// to every durable video wallet transition, including background settlement.
+func ProvideVideoBillingReservationRepository(db *sql.DB, cache service.EnterpriseBillingCache) service.VideoBillingReservationRepository {
+	return NewVideoBillingReservationRepository(db, cache)
+}
+
 // ProviderSet is the Wire provider set for all repositories
 var ProviderSet = wire.NewSet(
 	NewUserRepository,
@@ -88,6 +94,7 @@ var ProviderSet = wire.NewSet(
 	NewEnterpriseGroupRepository,
 	NewUsageLogRepository,
 	ProvideUsageBillingRepository,
+	ProvideVideoBillingReservationRepository,
 	NewBatchImageRepository,
 	NewGeminiCachedContentRepository,
 	NewIdempotencyRepository,

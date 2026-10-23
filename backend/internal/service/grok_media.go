@@ -41,11 +41,11 @@ func (e GrokMediaEndpoint) RequiresRequestBody() bool {
 }
 
 func (e GrokMediaEndpoint) IsVideoLookupRequest() bool {
-	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent || e == SeedanceEndpointStatus || e == SeedanceEndpointDelete
+	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent || e == SeedanceEndpointStatus || e == SeedanceEndpointDelete || e == GeminiVideoEndpointStatus || e == MiniMaxVideoEndpointStatus || e == MiniMaxVideoEndpointFile
 }
 
 func (e GrokMediaEndpoint) IsGenerationRequest() bool {
-	if e == SeedanceEndpointCreate {
+	if e == SeedanceEndpointCreate || e == GeminiVideoEndpointCreate || e == MiniMaxVideoEndpointCreate {
 		return true
 	}
 	switch e {
@@ -57,6 +57,10 @@ func (e GrokMediaEndpoint) IsGenerationRequest() bool {
 }
 
 type GrokMediaRequestInfo struct {
+	// Exact timing is retained for Seedance frames and durable price contracts.
+	DurationSecondsExact float64
+	Frames               int
+
 	Model           string
 	Prompt          string
 	N               int
@@ -134,7 +138,19 @@ func ParseGrokMediaRequest(contentType string, body []byte) GrokMediaRequestInfo
 	info.SizeTier = NormalizeImageBillingTierOrDefault(info.Size)
 	info.AspectRatio = strings.TrimSpace(info.AspectRatio)
 	info.ImageResolution = grokImagineImageResolution(info.ImageResolution)
-	info.Resolution = NormalizeVideoBillingResolutionOrDefault(info.Resolution)
+	// 2K is shared by image and video protocols. Preserve both meanings here;
+	// the endpoint consumes the relevant field. Public aliases cannot identify
+	// the protocol from their model name.
+	if info.Resolution == "" && info.ImageResolution == "2k" {
+		info.Resolution = VideoBillingResolution2K
+	}
+	if normalized, known := LookupVideoBillingResolution(info.Resolution); known {
+		info.Resolution = normalized
+	} else if strings.TrimSpace(info.Resolution) == "" {
+		info.Resolution = VideoBillingResolution480P
+	} else {
+		info.Resolution = strings.ToLower(strings.TrimSpace(info.Resolution))
+	}
 	info.DurationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(info.DurationSeconds)
 	if info.N <= 0 {
 		info.N = 1
@@ -391,8 +407,9 @@ type GrokVideoPendingBilling struct {
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
-// GrokVideoBillingIdentity contains only the payer fields needed at completion.
-// Enterprise video creation is disabled, so balance tasks retain a personal payer.
+// GrokVideoBillingIdentity preserves the personal/subscription payer of legacy
+// Redis pending entries. New tasks freeze enterprise and other payer fields in
+// VideoBillingReservation; joining an enterprise never reassigns an old payer.
 type GrokVideoBillingIdentity struct {
 	BillingType         int8  `json:"billing_type"`
 	UserID              int64 `json:"user_id"`
@@ -673,6 +690,13 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	if account.Platform != PlatformGrok {
 		return nil, fmt.Errorf("account platform %s is not supported for grok media", account.Platform)
 	}
+	if endpoint == GrokMediaEndpointVideosGenerations || endpoint == GrokMediaEndpointVideosEdits || endpoint == GrokMediaEndpointVideosExtensions {
+		var err error
+		body, _, err = NormalizeGrokVideoSubmission(body, contentType, endpoint)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	token, _, err := s.getRequestCredential(ctx, c, account)
 	if err != nil {
@@ -742,7 +766,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		proxyURL = account.Proxy.URL()
 	}
 	upstreamStart := time.Now()
-	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	resp, err := s.doVideoUpstreamRequest(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
@@ -790,7 +814,9 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 			resultBillingModel = m
 		}
 	}
+	taskStatus, taskURL, taskError := videoTaskObservation("grok", respBody)
 	return &OpenAIForwardResult{
+		AsyncTaskStatus: taskStatus, AsyncTaskURL: taskURL, AsyncTaskError: taskError,
 		RequestID:            requestIDHeader,
 		UpstreamHeaders:      resp.Header,
 		ResponseID:           usage.ResponseID,
@@ -931,6 +957,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		ResponseHeaders: contentResp.Header.Clone(),
 		Duration:        time.Since(startTime),
 	}
+	result.AsyncTaskStatus, result.AsyncTaskURL, result.AsyncTaskError = videoTaskObservation("grok", statusBody)
 	if billed := ExtractGrokVideoBillingFromStatusBody(statusBody, nil, requestID); billed != nil {
 		result.ResponseID = firstNonEmpty(billed.ResponseID, strings.TrimSpace(requestID))
 		result.Model = billed.Model

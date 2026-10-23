@@ -857,6 +857,7 @@ export default {
       duplicating: 'Duplicating',
       duplicateSuccess: 'Group duplicated as "{name}" and disabled. Review its configuration before enabling it.',
       duplicateFailed: 'Failed to duplicate group',
+      videoFallbackPriceRequired: 'Copy failed: the source group has no video fallback prices. Edit the original group and fill in the video fallback prices (768p, 2K, etc.) before copying it again.',
       sortOrder: 'Sort',
       columnSettings: 'Column Settings',
       sortOrderHint: 'Drag groups to adjust display order, groups at the top will be displayed first',
@@ -1090,15 +1091,25 @@ export default {
         notConfigured: 'Not configured'
       },
       videoPricing: {
+        fallbackDescription: "Explicit channel prices matching the model and resolution take priority. Group model prices and the fallback below cover unmatched requests.",
+        modelPricingHint: "Video groups use matching channel pricing first, then these model prices, then the group fallback.",
+        billingMode: "Fallback billing mode",
+        perSecond: "Per second",
+        perRequest: "Per request",
+        perRequestPrice: "Fallback price (USD/request)",
+        fallbackRequiredHint: "Video groups require fallback prices: all resolution tiers for per-second billing, or one price per successful task for per-request billing. Zero means free. Matching channel model/tier prices take priority over group fallback prices.",
+        fallbackRequiredError: "Enter valid video fallback prices (≥ 0): {tiers}",
+        perRequestHint: "Charge once per successfully completed task, regardless of duration or output count. Failed tasks are free and repeated queries never charge again. Matching channel pricing takes priority; otherwise the group fallback applies, multiplied by the effective video multiplier.",
+        finalPerRequestPreview: "Final per-request fallback price preview",
         title: 'Video Generation Pricing',
         description:
-          'Configure Grok video generation prices in USD per second of output video. Leave empty to use the default per-second rates (grok-imagine-video: $0.05/s 480p, $0.07/s 720p; video-1.5: $0.08/s 480p, $0.14/s 720p, $0.25/s 1080p).',
+          'Configure Grok video generation prices in USD per second of output video. Leave empty to use the default per-second rates (grok-imagine-video: $0.05/s 480p, $0.07/s 720p; video-1.5: $0.08/s 480p, $0.14/s 720p, $0.25/s 1080p). 768p and 2K are independent tiers and require group or channel pricing; they do not use 720p or other resolution rates.',
         modelOverridesTitle: 'Per-model video price overrides',
         modelOverridesDescription: 'Each populated cell overrides the flat resolution price for that model family. Preview and legacy aliases for video-1.5 use the same family; empty cells fall back to the flat resolution price.',
         independentMultiplier: 'Use independent video multiplier',
         videoMultiplier: 'Video multiplier',
         modeHint:
-          'Videos are billed per second: per-second price × duration (1-15s, default 8s). By default the current effective group multiplier applies; independent mode uses the video multiplier instead.',
+          'Videos are billed per second: per-second price × duration × video count. Duration follows the protocol request and completed result. By default the current effective group multiplier applies; independent mode uses the video multiplier instead.',
         finalPricePreview: 'Final per-second price preview',
         notConfigured: 'Not configured'
       },

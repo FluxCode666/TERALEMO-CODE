@@ -152,6 +152,73 @@ func TestPasskeyLoginAuditUsesCanonicalLoginActionAndOmitsCredentialBody(t *test
 	require.Contains(t, auditBodyOmittedRoutes, route)
 }
 
+func TestAdminAsyncTaskSensitiveReadsAreAudited(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repository := &auditCaptureRepository{}
+	auditService := service.NewAuditLogService(repository, nil)
+	auditService.Start()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyUser), AuthSubject{UserID: 99})
+		c.Set(string(ContextKeyUserRole), service.RoleAdmin)
+		c.Next()
+	})
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+	router.GET("/api/v1/admin/async-tasks", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"items": []any{}})
+	})
+	router.GET("/api/v1/admin/async-tasks/:user_id/:id", func(c *gin.Context) {
+		if c.Param("id") == "missing" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"result_url": "https://upstream.example/result?signature=private"})
+	})
+	router.GET("/api/v1/admin/async-tasks/:user_id/:id/content", func(c *gin.Context) {
+		// DownloadAdminTask uses a copy to impersonate the recorded task owner.
+		// The audit must continue to identify the original administrator.
+		owned := c.Copy()
+		owned.Set(string(ContextKeyUser), AuthSubject{UserID: 10})
+		c.Data(http.StatusOK, "video/mp4", []byte("private-video-content"))
+	})
+	for _, path := range []string{
+		"/api/v1/admin/async-tasks",
+		"/api/v1/admin/async-tasks/10/task-1",
+		"/api/v1/admin/async-tasks/10/task-1/content",
+		"/api/v1/admin/async-tasks/10/missing",
+	} {
+		router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+	auditService.Stop()
+
+	repository.mu.Lock()
+	logs := append([]*service.AuditLog(nil), repository.logs...)
+	repository.mu.Unlock()
+	require.Len(t, logs, 3, "list reads stay outside the sensitive-read audit")
+	byIdentity := make(map[string]*service.AuditLog)
+	for _, entry := range logs {
+		require.Equal(t, http.MethodGet, entry.Method)
+		require.NotNil(t, entry.ActorUserID)
+		require.Equal(t, int64(99), *entry.ActorUserID)
+		require.Equal(t, service.RoleAdmin, entry.ActorRole)
+		require.Empty(t, entry.RequestBody)
+		require.NotContains(t, entry.Extra, "result_url")
+		params, ok := entry.Extra["params"].(map[string]string)
+		require.True(t, ok)
+		require.Equal(t, "10", params["user_id"])
+		byIdentity[entry.Action+":"+params["id"]] = entry
+	}
+	for identity, status := range map[string]int{
+		"admin.async_tasks.read:task-1":     http.StatusOK,
+		"admin.async_tasks.download:task-1": http.StatusOK,
+		"admin.async_tasks.read:missing":    http.StatusNotFound,
+	} {
+		require.NotNil(t, byIdentity[identity], identity)
+		require.Equal(t, status, byIdentity[identity].StatusCode, identity)
+	}
+}
+
 // Ollama 会话保存的请求体整体就是浏览器 Cookie 明文，键级脱敏清单曾漏掉裸键
 // "session"，必须走整体不入库路径，防止会话凭证长期留存在 audit_logs。
 func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {

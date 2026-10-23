@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 27 // v27: only enterprise-level group whitelists apply
+const apiKeyAuthSnapshotVersion = 29 // v29: include video group billing mode and per-request fallback
 
 func cloneEnterpriseMemberContext(src *EnterpriseMemberContext) *EnterpriseMemberContext {
 	if src == nil {
@@ -415,9 +415,13 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			ImagePrice4K:                    apiKey.Group.ImagePrice4K,
 			VideoRateIndependent:            apiKey.Group.VideoRateIndependent,
 			VideoRateMultiplier:             apiKey.Group.VideoRateMultiplier,
+			VideoBillingMode:                apiKey.Group.VideoBillingMode,
+			VideoPricePerRequest:            apiKey.Group.VideoPricePerRequest,
 			VideoPrice480P:                  apiKey.Group.VideoPrice480P,
 			VideoPrice720P:                  apiKey.Group.VideoPrice720P,
+			VideoPrice768P:                  apiKey.Group.VideoPrice768P,
 			VideoPrice1080P:                 apiKey.Group.VideoPrice1080P,
+			VideoPrice2K:                    apiKey.Group.VideoPrice2K,
 			VideoModelPrices:                NormalizeVideoModelPrices(apiKey.Group.VideoModelPrices),
 			WebSearchPricePerCall:           apiKey.Group.WebSearchPricePerCall,
 			SearchPricePer1k:                apiKey.Group.SearchPricePer1k,
@@ -518,9 +522,13 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			ImagePrice4K:                    snapshot.Group.ImagePrice4K,
 			VideoRateIndependent:            snapshot.Group.VideoRateIndependent,
 			VideoRateMultiplier:             snapshot.Group.VideoRateMultiplier,
+			VideoBillingMode:                snapshot.Group.VideoBillingMode,
+			VideoPricePerRequest:            snapshot.Group.VideoPricePerRequest,
 			VideoPrice480P:                  snapshot.Group.VideoPrice480P,
 			VideoPrice720P:                  snapshot.Group.VideoPrice720P,
+			VideoPrice768P:                  snapshot.Group.VideoPrice768P,
 			VideoPrice1080P:                 snapshot.Group.VideoPrice1080P,
+			VideoPrice2K:                    snapshot.Group.VideoPrice2K,
 			VideoModelPrices:                NormalizeVideoModelPrices(snapshot.Group.VideoModelPrices),
 			WebSearchPricePerCall:           snapshot.Group.WebSearchPricePerCall,
 			SearchPricePer1k:                snapshot.Group.SearchPricePer1k,

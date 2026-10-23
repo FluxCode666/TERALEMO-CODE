@@ -219,6 +219,50 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it.each([
+    ['seedance', 'https://ark.cn-beijing.volces.com/api/v3'],
+    ['gemini', 'https://generativelanguage.googleapis.com'],
+    ['minimax', 'https://api.minimax.io']
+  ])('creates video accounts using the %s protocol and its default upstream', async (protocol, baseURL) => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
+    expect((wrapper.get('#create-video-protocol').element as HTMLSelectElement).value).toBe('seedance')
+    await wrapper.get('#create-video-protocol').setValue(protocol)
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Video account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('video-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'video', type: 'apikey',
+      credentials: { video_protocol: protocol, api_key: 'video-key', base_url: baseURL, hide_video_upstream_url: true }
+    })
+    wrapper.unmount()
+  })
+
+  it('allows disabling upstream video URL privacy per new account', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
+    await wrapper.get('#create-video-hide-upstream-url').setValue(false)
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Direct video account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('video-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials.hide_video_upstream_url).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['seedance', 'sk-...'],
+    ['gemini', 'AIza...'],
+    ['minimax', 'eyJ...']
+  ])('shows the %s API key placeholder instead of sk-ant for video accounts', async (protocol, placeholder) => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
+    await wrapper.get('#create-video-protocol').setValue(protocol)
+    expect(wrapper.get('form#create-account-form input[type="password"]').attributes('placeholder')).toBe(placeholder)
+    wrapper.unmount()
+  })
+
   it('sets month and year expiry presets without submitting the account form', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-31T12:34:00'))

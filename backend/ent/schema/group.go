@@ -143,6 +143,14 @@ func (Group) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
 			Default(1.0).
 			Comment("视频生成独立倍率，仅 video_rate_independent=true 时生效"),
+		field.String("video_billing_mode").
+			MaxLen(20).
+			Default("video").
+			Comment("视频分组兜底计费方式：video 按秒，per_request 按成功任务"),
+		field.Float("video_price_per_request").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("video_price_480p").
 			Optional().
 			Nillable().
@@ -151,7 +159,15 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("video_price_768p").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Float("video_price_1080p").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("video_price_2k").
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),

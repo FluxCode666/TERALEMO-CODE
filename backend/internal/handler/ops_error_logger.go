@@ -212,6 +212,7 @@ func enqueueOpsErrorLog(ops *service.OpsService, entry *service.OpsInsertErrorLo
 	if ops == nil || entry == nil {
 		return
 	}
+	entry.RequestPath = normalizeVideoContentOpsRequestPath(entry.RequestPath)
 	entry.UserAgent = normalizeOpsPersistentUserAgent(entry.UserAgent)
 	if entry.ErrorBody != "" {
 		originalBody := entry.ErrorBody

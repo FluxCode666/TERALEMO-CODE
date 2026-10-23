@@ -120,11 +120,13 @@ func (s *grokMediaSlotsCache) assertReleased(t *testing.T) {
 
 type grokMediaSlotBindings struct {
 	testutil.StubGatewayCache
-	owner   int64
-	writes  int
-	key     string
-	billed  map[string]bool
-	pending map[string][]byte
+	owner        int64
+	writes       int
+	key          string
+	bindings     map[int64]map[string]int64
+	billed       map[string]bool
+	pending      map[string][]byte
+	reservations *videoSubmissionReservationRepo
 }
 
 func (s *grokMediaSlotBindings) SetGrokVideoPendingBilling(_ context.Context, key string, body []byte, _ time.Duration) error {
@@ -139,12 +141,22 @@ func (s *grokMediaSlotBindings) GetGrokVideoPendingBilling(_ context.Context, ke
 }
 
 func (s *grokMediaSlotBindings) GetSessionAccountID(_ context.Context, groupID int64, key string) (int64, error) {
+	if owner, ok := s.bindings[groupID][key]; ok {
+		return owner, nil
+	}
 	if groupID != 24 || key != s.key {
 		return 0, service.ErrStickySessionNotFound
 	}
 	return s.owner, nil
 }
-func (s *grokMediaSlotBindings) SetSessionAccountID(_ context.Context, _ int64, key string, owner int64, _ time.Duration) error {
+func (s *grokMediaSlotBindings) SetSessionAccountID(_ context.Context, groupID int64, key string, owner int64, _ time.Duration) error {
+	if s.bindings == nil {
+		s.bindings = make(map[int64]map[string]int64)
+	}
+	if s.bindings[groupID] == nil {
+		s.bindings[groupID] = make(map[string]int64)
+	}
+	s.bindings[groupID][key] = owner
 	s.key, s.owner = key, owner
 	s.writes++
 	return nil
@@ -210,6 +222,15 @@ func newGrokMediaSlotHandler(t *testing.T, oauth, mismatch bool, platforms ...st
 			accounts[i].Platform = platforms[0]
 			accounts[i].Credentials["base_url"] = "https://ark.cn-beijing.volces.com/api/v3"
 			accounts[i].Credentials["openai_capabilities"] = []string{"seedance"}
+			if len(platforms) > 1 {
+				accounts[i].Credentials["video_protocol"] = platforms[1]
+			}
+			if len(platforms) > 2 {
+				accounts[i].Credentials["base_url"] = platforms[2]
+			}
+			if len(platforms) > 3 {
+				accounts[i].Credentials["hide_video_upstream_url"] = platforms[3] == "true"
+			}
 		}
 		if oauth {
 			accounts[i].Type = service.AccountTypeOAuth
@@ -219,7 +240,7 @@ func newGrokMediaSlotHandler(t *testing.T, oauth, mismatch bool, platforms ...st
 	}
 	slots := &grokMediaSlotsCache{accounts: map[string]int64{}, users: map[string]int64{}}
 	concurrency := service.NewConcurrencyService(slots)
-	bindings := &grokMediaSlotBindings{owner: 1}
+	bindings := &grokMediaSlotBindings{owner: 1, reservations: newVideoSubmissionReservationRepo()}
 	upstream := &grokMediaSlotUpstream{call: func(*http.Request, int64) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}},
 			Body: io.NopCloser(strings.NewReader(`{"request_id":"task","status":"pending"}`))}, nil
@@ -234,7 +255,8 @@ func newGrokMediaSlotHandler(t *testing.T, oauth, mismatch bool, platforms ...st
 		_, err := provider.GetAccessToken(context.Background(), &accounts[1])
 		require.NoError(t, err)
 	}
-	gateway := service.NewOpenAIGatewayService(repo, nil, nil, nil, nil, nil, bindings, cfg, nil, concurrency, nil, nil, nil, upstream, nil, nil, provider, nil, nil, nil, nil, nil)
+	gateway := service.NewOpenAIGatewayService(repo, nil, nil, nil, nil, nil, bindings, cfg, nil, concurrency, service.NewBillingService(cfg, nil), nil, nil, upstream, service.NewDeferredService(nil, nil, time.Second), nil, provider, nil, nil, nil, nil, nil)
+	gateway.SetVideoBillingReservationRepository(bindings.reservations)
 	groupID := int64(24)
 	require.NoError(t, gateway.BindGrokMediaVideoRequestAccount(context.Background(), &groupID, "task", 10, 20, 1))
 	bindings.writes = 0
@@ -259,8 +281,10 @@ func grokMediaSlotContext(ctx context.Context, generation bool) (*gin.Context, *
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
 	c.Params = gin.Params{{Key: "request_id", Value: "task"}}
+	free := 0.0
 	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{ID: 20, UserID: 10, GroupID: &groupID,
-		Group: &service.Group{ID: groupID, Platform: service.PlatformGrok, AllowImageGeneration: true}, User: &service.User{ID: 10}})
+		Group: &service.Group{ID: groupID, Platform: service.PlatformGrok, AllowImageGeneration: true, RateMultiplier: 1,
+			VideoBillingMode: string(service.BillingModeVideo), VideoPrice480P: &free, VideoPrice720P: &free, VideoPrice768P: &free, VideoPrice1080P: &free, VideoPrice2K: &free}, User: &service.User{ID: 10}})
 	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: 10, Concurrency: 5})
 	return c, w
 }

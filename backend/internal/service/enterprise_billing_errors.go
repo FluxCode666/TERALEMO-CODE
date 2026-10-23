@@ -12,6 +12,5 @@ var (
 	ErrEnterpriseBillingQuotaExceeded           = infraerrors.TooManyRequests("ENTERPRISE_QUOTA_EXCEEDED", "Enterprise usage quota exceeded.")
 	ErrEnterpriseBillingDepartmentQuotaExceeded = infraerrors.TooManyRequests("DEPARTMENT_QUOTA_EXCEEDED", "Department usage quota exceeded.")
 	ErrEnterpriseBillingMemberQuotaExceeded     = infraerrors.TooManyRequests("MEMBER_QUOTA_EXCEEDED", "Member usage quota exceeded.")
-	ErrEnterpriseGatewayFeatureUnsupported      = infraerrors.Forbidden("ENTERPRISE_FEATURE_UNSUPPORTED", "Batch images are unavailable for enterprise members.")
 	ErrEnterpriseBillingLegacyUnsupported       = infraerrors.ServiceUnavailable("BILLING_SERVICE_ERROR", "Enterprise billing requires transactional usage settlement.")
 )

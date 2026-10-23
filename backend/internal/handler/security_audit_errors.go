@@ -18,6 +18,10 @@ func (h *OpenAIGatewayHandler) openAISecurityAuditError(c *gin.Context, decision
 	if decision == nil {
 		return
 	}
+	if c.GetBool(geminiVideoErrorFormatKey) {
+		googleSecurityAuditError(c, decision)
+		return
+	}
 	if decision.Legacy != nil && decision.Legacy.Blocked {
 		h.errorResponse(c, securityAuditStatus(decision), securityAuditErrorCode(decision), securityAuditMessage(decision))
 		return
