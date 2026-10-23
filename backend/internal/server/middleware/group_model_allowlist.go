@@ -37,6 +37,12 @@ func GroupModelAllowlist() gin.HandlerFunc {
 			return
 		}
 		allowlist := apiKey.Group.ModelAllowlist
+		// Operation resources may contain the account-mapped upstream model.
+		// Their handler authorizes the exact creating key and bound account.
+		if apiKey.Group.Platform == service.PlatformVideo && c.Request != nil && isAsyncVideoTaskRead(c.Request.Method, c.Request.URL.Path) {
+			c.Next()
+			return
+		}
 		if c.Request == nil {
 			c.Next()
 			return

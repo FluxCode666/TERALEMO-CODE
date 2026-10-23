@@ -77,6 +77,23 @@ type userPlatformQuotaRepository struct {
 	client *dbent.Client
 }
 
+func (r *userPlatformQuotaRepository) HasVideoBillingScope(ctx context.Context, userID int64, platform string) (bool, error) {
+	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM video_billing_reservations WHERE user_id=$1 AND platform=$2)`, userID, platform)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return false, rows.Err()
+	}
+	var exists bool
+	if err := rows.Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, rows.Err()
+}
+
 // NewUserPlatformQuotaRepository 创建 UserPlatformQuotaRepository 实现。
 func NewUserPlatformQuotaRepository(client *dbent.Client) UserPlatformQuotaRepository {
 	return &userPlatformQuotaRepository{client: client}
@@ -427,7 +444,8 @@ func insertLimitsRow(ctx context.Context, client *dbent.Client, userID int64, re
 // batchRows 是 BatchSnapshotUsage 每批最大行数（8 参/行 × 6000 + 1 ≈ 48001 参,低于 Postgres 65535 上限）。
 const batchRows = 6000
 
-// BatchSnapshotUsage 用一条多行 UPDATE ... FROM (VALUES ...) 把整批 usage 以绝对值覆盖写入既有活跃行（非累加）。
+// BatchSnapshotUsage 合并绝对值快照。窗口只前进，同窗口用量只增加，
+// 避免迟到的 Redis flusher 覆盖持久视频结算已原子增加的数据库用量。
 // 每批最多 batchRows 行；$1=now 共用；每行 8 个 per-row 参（user_id, platform, 3×usage, 3×window_start）。
 // 只命中 deleted_at IS NULL 的既有行：行不存在或已软删的 (user, platform) 直接跳过，不建行。
 //
@@ -451,16 +469,16 @@ func (r *userPlatformQuotaRepository) BatchSnapshotUsage(ctx context.Context, sn
 		batch := snapshots[start:end]
 
 		var sb strings.Builder
-		_, _ = sb.WriteString(
-			"UPDATE user_platform_quotas AS q SET" +
-				"  daily_usage_usd      = v.daily_usage_usd," +
-				"  weekly_usage_usd     = v.weekly_usage_usd," +
-				"  monthly_usage_usd    = v.monthly_usage_usd," +
-				"  daily_window_start   = v.daily_window_start," +
-				"  weekly_window_start  = v.weekly_window_start," +
-				"  monthly_window_start = v.monthly_window_start," +
-				"  updated_at           = $1" +
-				" FROM (VALUES ")
+		_, _ = sb.WriteString("UPDATE user_platform_quotas AS q SET ")
+		for _, window := range []string{"daily", "weekly", "monthly"} {
+			fmt.Fprintf(&sb, `%[1]s_usage_usd = CASE
+ WHEN q.%[1]s_window_start IS NULL OR v.%[1]s_window_start > q.%[1]s_window_start THEN v.%[1]s_usage_usd
+ WHEN v.%[1]s_window_start = q.%[1]s_window_start THEN GREATEST(q.%[1]s_usage_usd,v.%[1]s_usage_usd)
+ ELSE q.%[1]s_usage_usd END,
+ %[1]s_window_start = CASE WHEN q.%[1]s_window_start IS NULL OR v.%[1]s_window_start > q.%[1]s_window_start
+ THEN v.%[1]s_window_start ELSE q.%[1]s_window_start END, `, window)
+		}
+		_, _ = sb.WriteString("updated_at=$1 FROM (VALUES ")
 
 		// $1 = now（共用）；每行 8 个 per-row 参，从 $2 起连续编号。
 		// VALUES 里的占位符显式转型，避免 Postgres 对多行 VALUES 推断不出参数类型。

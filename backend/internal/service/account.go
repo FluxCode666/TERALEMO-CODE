@@ -1855,9 +1855,21 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		return false
 	}
 	if capability == OpenAIEndpointCapabilitySeedance {
+		if a.Platform == PlatformVideo {
+			return a.Type == AccountTypeAPIKey && a.VideoProtocol() == VideoProtocolSeedance
+		}
 		configured, _ := a.openAIEndpointCapabilitySet()
 		return configured["seedance"] && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey &&
 			strings.TrimSpace(a.GetCredential("base_url")) != ""
+	}
+	if capability == OpenAIEndpointCapabilityGeminiVideo {
+		return a.Platform == PlatformVideo && a.Type == AccountTypeAPIKey && a.VideoProtocol() == VideoProtocolGemini
+	}
+	if capability == OpenAIEndpointCapabilityMiniMaxVideo {
+		return a.Platform == PlatformVideo && a.Type == AccountTypeAPIKey && a.VideoProtocol() == VideoProtocolMiniMax
+	}
+	if a.Platform == PlatformVideo && capability != "" {
+		return false
 	}
 	if capability == "" {
 		return true

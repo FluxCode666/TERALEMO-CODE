@@ -27,9 +27,9 @@
           <p class="mt-0.5 text-gray-900 dark:text-dark-100">{{ detail.model || '-' }}</p>
         </div>
         <!-- Endpoint -->
-        <div>
+        <div class="min-w-0">
           <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.endpoint') }}</span>
-          <p class="mt-0.5 text-gray-900 dark:text-dark-100">{{ detail.inbound_endpoint || '-' }}</p>
+          <p class="mt-0.5 break-all text-gray-900 dark:text-dark-100">{{ detail.inbound_endpoint || '-' }}</p>
         </div>
         <!-- Status Code -->
         <div>

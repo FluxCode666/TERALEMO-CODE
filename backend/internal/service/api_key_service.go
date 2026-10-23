@@ -129,6 +129,21 @@ type apiKeyAllByUserIDLister interface {
 	ListAllByUserID(ctx context.Context, userID int64, filters APIKeyListFilters) ([]APIKey, error)
 }
 
+// APIKeyTaskMetadata is the public identity projection used by task listings.
+// It deliberately cannot hold credentials, usage or enterprise membership data.
+type APIKeyTaskMetadata struct {
+	UserID    int64
+	KeyName   string
+	UserEmail string
+	UserName  string
+	GroupID   *int64
+	GroupName string
+}
+
+type apiKeyTaskMetadataReader interface {
+	GetTaskMetadataByIDs(context.Context, []int64) (map[int64]APIKeyTaskMetadata, error)
+}
+
 // APIKeyRateLimitData holds rate limit usage and window state for an API key.
 type APIKeyRateLimitData struct {
 	// QuotaUsed 是总额度已用量（quota_used）。
@@ -766,6 +781,44 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 		apiKey.CurrentConcurrency = s.currentConcurrencyForAPIKey(ctx, apiKey.ID)
 	}
 	return apiKey, nil
+}
+
+// GetTaskMetadataByIDs loads one page's display identities without full key
+// hydration or per-key concurrency/enterprise queries. Legacy repositories may
+// fall back to one lookup per distinct key; a failed batch never fans out.
+func (s *APIKeyService) GetTaskMetadataByIDs(ctx context.Context, ids []int64) (map[int64]APIKeyTaskMetadata, error) {
+	unique := make([]int64, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if _, exists := seen[id]; id <= 0 || exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return map[int64]APIKeyTaskMetadata{}, nil
+	}
+	if reader, ok := s.apiKeyRepo.(apiKeyTaskMetadataReader); ok {
+		return reader.GetTaskMetadataByIDs(ctx, unique)
+	}
+	metadata := make(map[int64]APIKeyTaskMetadata, len(unique))
+	for _, id := range unique {
+		key, err := s.apiKeyRepo.GetByID(ctx, id)
+		if err != nil || key == nil {
+			continue
+		}
+		item := APIKeyTaskMetadata{UserID: key.UserID, KeyName: key.Name}
+		if key.User != nil {
+			item.UserEmail, item.UserName = key.User.Email, key.User.Username
+		}
+		if key.Group != nil {
+			groupID := key.Group.ID
+			item.GroupID, item.GroupName = &groupID, key.Group.Name
+		}
+		metadata[id] = item
+	}
+	return metadata, nil
 }
 
 // GetByKey 根据Key字符串获取API Key（用于认证）

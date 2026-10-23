@@ -107,6 +107,45 @@ func ProvideBatchImageCleanupService(repo BatchImageRepository, accountRepo Acco
 	return svc
 }
 
+// ProvideOpenAIGatewayService installs durable video billing before the gateway
+// is exposed to handlers and starts recovery independently of user polling.
+func ProvideOpenAIGatewayService(
+	accountRepo AccountRepository,
+	usageLogRepo UsageLogRepository,
+	usageBillingRepo UsageBillingRepository,
+	userRepo UserRepository,
+	userSubRepo UserSubscriptionRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache GatewayCache,
+	cfg *config.Config,
+	schedulerSnapshot *SchedulerSnapshotService,
+	concurrencyService *ConcurrencyService,
+	billingService *BillingService,
+	rateLimitService *RateLimitService,
+	billingCacheService *BillingCacheService,
+	httpUpstream HTTPUpstream,
+	deferredService *DeferredService,
+	openAITokenProvider *OpenAITokenProvider,
+	grokTokenProvider *GrokTokenProvider,
+	resolver *ModelPricingResolver,
+	channelService *ChannelService,
+	balanceNotifyService *BalanceNotifyService,
+	settingService *SettingService,
+	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	videoReservations VideoBillingReservationRepository,
+) *OpenAIGatewayService {
+	svc := NewOpenAIGatewayService(
+		accountRepo, usageLogRepo, usageBillingRepo, userRepo, userSubRepo,
+		userGroupRateRepo, cache, cfg, schedulerSnapshot, concurrencyService,
+		billingService, rateLimitService, billingCacheService, httpUpstream,
+		deferredService, openAITokenProvider, grokTokenProvider, resolver,
+		channelService, balanceNotifyService, settingService, userPlatformQuotaRepo,
+	)
+	svc.SetVideoBillingReservationRepository(videoReservations)
+	svc.StartVideoBillingReconciler()
+	return svc
+}
+
 // ProvideOpenAIOAuthService creates OpenAIOAuthService with privacy/account enrichment support.
 func ProvideOpenAIOAuthService(
 	proxyRepo ProxyRepository,
@@ -892,7 +931,7 @@ var ProviderSet = wire.NewSet(
 	NewAnnouncementService,
 	ProvideAdminService,
 	NewGatewayService,
-	NewOpenAIGatewayService,
+	ProvideOpenAIGatewayService,
 	ProvideImageStorageSettingService,
 	ProvideImageTaskService,
 	ProvideBatchImageModelPricingResolver,

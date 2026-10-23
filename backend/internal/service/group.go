@@ -53,9 +53,13 @@ type Group struct {
 	BatchImageHoldMultiplier     float64
 	VideoRateIndependent         bool
 	VideoRateMultiplier          float64
+	VideoBillingMode             string
+	VideoPricePerRequest         *float64
 	VideoPrice480P               *float64
 	VideoPrice720P               *float64
+	VideoPrice768P               *float64
 	VideoPrice1080P              *float64
+	VideoPrice2K                 *float64
 	// VideoModelPrices is optional per-model-family per-second pricing
 	// (groups.video_model_prices JSONB). Shape: family → resolution → USD/s.
 	// When set for a model, overrides VideoPrice* for that model only.
@@ -187,15 +191,23 @@ func (g *Group) GetImagePrice(imageSize string) *float64 {
 // GetVideoPrice 根据 resolution 返回对应的视频生成价格。
 // 如果分组未配置价格，返回 nil（调用方应使用默认值）。
 func (g *Group) GetVideoPrice(resolution string) *float64 {
-	switch NormalizeVideoBillingResolutionOrDefault(resolution) {
+	tier, known := LookupVideoBillingResolution(resolution)
+	if g == nil || !known {
+		return nil
+	}
+	switch tier {
 	case VideoBillingResolution480P:
 		return g.VideoPrice480P
 	case VideoBillingResolution720P:
 		return g.VideoPrice720P
+	case VideoBillingResolution768P:
+		return g.VideoPrice768P
 	case VideoBillingResolution1080P:
 		return g.VideoPrice1080P
+	case VideoBillingResolution2K:
+		return g.VideoPrice2K
 	default:
-		return g.VideoPrice480P
+		return nil
 	}
 }
 
@@ -218,7 +230,9 @@ func (g *Group) VideoPriceConfig() *VideoPriceConfig {
 	return &VideoPriceConfig{
 		Price480P:   g.VideoPrice480P,
 		Price720P:   g.VideoPrice720P,
+		Price768P:   g.VideoPrice768P,
 		Price1080P:  g.VideoPrice1080P,
+		Price2K:     g.VideoPrice2K,
 		ModelPrices: NormalizeVideoModelPrices(g.VideoModelPrices),
 	}
 }

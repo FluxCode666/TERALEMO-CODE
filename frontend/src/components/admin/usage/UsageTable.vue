@@ -108,11 +108,18 @@
 
         <template #cell-endpoint="{ row }">
           <div class="max-w-[320px] space-y-1 text-xs">
-            <div class="break-all text-gray-700 dark:text-gray-300">
+            <div
+              class="truncate text-gray-700 dark:text-gray-300"
+              :title="`${t('usage.inbound')}: ${row.inbound_endpoint?.trim() || '-'}`"
+            >
               <span class="font-medium text-gray-500 dark:text-gray-400">{{ t('usage.inbound') }}:</span>
               <span class="ml-1">{{ row.inbound_endpoint?.trim() || '-' }}</span>
             </div>
-            <div v-if="showUpstreamEndpoint" class="break-all text-gray-700 dark:text-gray-300">
+            <div
+              v-if="showUpstreamEndpoint"
+              class="truncate text-gray-700 dark:text-gray-300"
+              :title="`${t('usage.upstream')}: ${row.upstream_endpoint?.trim() || '-'}`"
+            >
               <span class="font-medium text-gray-500 dark:text-gray-400">{{ t('usage.upstream') }}:</span>
               <span class="ml-1">{{ row.upstream_endpoint?.trim() || '-' }}</span>
             </div>

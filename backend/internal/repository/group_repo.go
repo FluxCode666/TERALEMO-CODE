@@ -117,9 +117,13 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetBatchImageHoldMultiplier(groupIn.BatchImageHoldMultiplier).
 		SetVideoRateIndependent(groupIn.VideoRateIndependent).
 		SetVideoRateMultiplier(groupIn.VideoRateMultiplier).
+		SetVideoBillingMode(service.NormalizeVideoGroupBillingMode(groupIn.VideoBillingMode)).
+		SetNillableVideoPricePerRequest(groupIn.VideoPricePerRequest).
 		SetNillableVideoPrice480p(groupIn.VideoPrice480P).
 		SetNillableVideoPrice720p(groupIn.VideoPrice720P).
+		SetNillableVideoPrice768p(groupIn.VideoPrice768P).
 		SetNillableVideoPrice1080p(groupIn.VideoPrice1080P).
+		SetNillableVideoPrice2k(groupIn.VideoPrice2K).
 		SetVideoModelPrices(service.NormalizeVideoModelPrices(groupIn.VideoModelPrices)).
 		SetNillableWebSearchPricePerCall(groupIn.WebSearchPricePerCall).
 		SetNillableSearchPricePer1k(groupIn.SearchPricePer1k).
@@ -308,9 +312,13 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetBatchImageHoldMultiplier(groupIn.BatchImageHoldMultiplier).
 		SetVideoRateIndependent(groupIn.VideoRateIndependent).
 		SetVideoRateMultiplier(groupIn.VideoRateMultiplier).
+		SetVideoBillingMode(service.NormalizeVideoGroupBillingMode(groupIn.VideoBillingMode)).
+		SetNillableVideoPricePerRequest(groupIn.VideoPricePerRequest).
 		SetNillableVideoPrice480p(groupIn.VideoPrice480P).
 		SetNillableVideoPrice720p(groupIn.VideoPrice720P).
+		SetNillableVideoPrice768p(groupIn.VideoPrice768P).
 		SetNillableVideoPrice1080p(groupIn.VideoPrice1080P).
+		SetNillableVideoPrice2k(groupIn.VideoPrice2K).
 		SetVideoModelPrices(service.NormalizeVideoModelPrices(groupIn.VideoModelPrices)).
 		SetLongContextPricingEnabled(groupIn.LongContextPricingEnabled).
 		SetModelPricing(modelPricing).
@@ -371,6 +379,11 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	} else {
 		builder = builder.ClearImagePrice4k()
 	}
+	if groupIn.VideoPricePerRequest != nil {
+		builder = builder.SetVideoPricePerRequest(*groupIn.VideoPricePerRequest)
+	} else {
+		builder = builder.ClearVideoPricePerRequest()
+	}
 	if groupIn.VideoPrice480P != nil {
 		builder = builder.SetVideoPrice480p(*groupIn.VideoPrice480P)
 	} else {
@@ -381,10 +394,20 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	} else {
 		builder = builder.ClearVideoPrice720p()
 	}
+	if groupIn.VideoPrice768P != nil {
+		builder = builder.SetVideoPrice768p(*groupIn.VideoPrice768P)
+	} else {
+		builder = builder.ClearVideoPrice768p()
+	}
 	if groupIn.VideoPrice1080P != nil {
 		builder = builder.SetVideoPrice1080p(*groupIn.VideoPrice1080P)
 	} else {
 		builder = builder.ClearVideoPrice1080p()
+	}
+	if groupIn.VideoPrice2K != nil {
+		builder = builder.SetVideoPrice2k(*groupIn.VideoPrice2K)
+	} else {
+		builder = builder.ClearVideoPrice2k()
 	}
 	if groupIn.WebSearchPricePerCall != nil {
 		builder = builder.SetWebSearchPricePerCall(*groupIn.WebSearchPricePerCall)

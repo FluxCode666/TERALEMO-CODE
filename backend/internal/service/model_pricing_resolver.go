@@ -377,12 +377,41 @@ func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *
 
 // GetRequestTierPrice 根据层级标签获取按次价格
 func (r *ModelPricingResolver) GetRequestTierPrice(resolved *ResolvedPricing, tierLabel string) float64 {
+	if resolved.Mode == BillingModeVideo {
+		price, _ := resolved.VideoUnitPrice(tierLabel)
+		return price
+	}
 	for _, tier := range resolved.RequestTiers {
 		if tier.TierLabel == tierLabel && tier.PerRequestPrice != nil {
 			return *tier.PerRequestPrice
 		}
 	}
 	return 0
+}
+
+// VideoUnitPrice matches only the requested resolution, then the explicit default.
+// A configured zero is a valid free tier. Video tiers never use token intervals.
+func (p *ResolvedPricing) VideoUnitPrice(resolution string) (float64, bool) {
+	if p == nil || p.Mode != BillingModeVideo {
+		return 0, false
+	}
+	if strings.TrimSpace(resolution) == "" {
+		resolution = VideoBillingResolution480P
+	}
+	resolution, known := LookupVideoBillingResolution(resolution)
+	for _, tier := range p.RequestTiers {
+		label, ok := LookupVideoBillingResolution(tier.TierLabel)
+		if known && ok && label == resolution && tier.PerRequestPrice != nil {
+			return *tier.PerRequestPrice, true
+		}
+	}
+	if p.channelPricing != nil && p.channelPricing.PerRequestPrice != nil {
+		return *p.channelPricing.PerRequestPrice, true
+	}
+	if p.DefaultPerRequestPrice > 0 {
+		return p.DefaultPerRequestPrice, true
+	}
+	return 0, false
 }
 
 // GetRequestTierPriceByContext 根据 context token 数获取按次价格

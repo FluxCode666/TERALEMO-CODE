@@ -71,6 +71,9 @@
     <rect x="65.5996" y="44.8008" width="9.6" height="28.8" rx="4.8" />
     <rect x="36.8008" y="44.8008" width="9.6" height="28.8" rx="4.8" />
   </svg>
+  <svg v-else-if="platform === 'video'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+    <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
+  </svg>
   <!-- Composite group icon -->
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />

@@ -437,6 +437,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Status:      StatusActive,
 		Schedulable: true,
 	}
+	if err := ValidateVideoAccount(account); err != nil {
+		return nil, err
+	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid
@@ -579,6 +582,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if err != nil {
 		return nil, err
 	}
+	previousVideoBaseURL := account.GetCredential("base_url")
 	if account.Platform == PlatformTypeSafe && input.Type != "" && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
 	}
@@ -660,6 +664,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 		// Strip SSO/password residue that must never sit next to OAuth tokens.
 		account.Credentials = SanitizeStoredCredentials(account.Platform, account.Credentials)
+	}
+	if err := ValidateVideoAccount(account); err != nil {
+		return nil, err
 	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。
@@ -900,6 +907,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 	}
 
+	warnVideoAccountUpstreamChange(ctx, s.accountRepo, previousVideoBaseURL, account)
 	// 将 proxy 变更传播到 spark 影子账号（同步；Update 内部已触发调度快照）。
 	// 影子自身 proxy 不可独立编辑(见上),故对影子的更新不触发传播。
 	if input.ProxyID != nil && !account.IsCredentialShadow() {
@@ -1110,6 +1118,28 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if input.Credentials != nil {
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
 	}
+	for _, target := range cachedTargets {
+		if target != nil && target.Platform == PlatformVideo && len(input.Credentials) > 0 {
+			candidate := *target
+			// Bulk writes merge JSONB keys. Validate that same final object so a
+			// one-sided duration update cannot bypass the other stored bound.
+			candidate.Credentials = make(map[string]any, len(target.Credentials)+len(input.Credentials))
+			for name, value := range target.Credentials {
+				candidate.Credentials[name] = value
+			}
+			for name, value := range input.Credentials {
+				candidate.Credentials[name] = value
+			}
+			if err := ValidateVideoAccount(&candidate); err != nil {
+				return nil, err
+			}
+			for _, name := range []string{"video_resolutions", "video_min_duration_seconds", "video_max_duration_seconds"} {
+				if _, provided := input.Credentials[name]; provided {
+					input.Credentials[name] = candidate.Credentials[name]
+				}
+			}
+		}
+	}
 
 	// Prepare bulk updates for columns and JSONB fields.
 	repoUpdates := AccountBulkUpdate{
@@ -1169,6 +1199,15 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// Run bulk update for column/jsonb fields first.
 	if _, err := s.accountRepo.BulkUpdate(ctx, input.AccountIDs, repoUpdates); err != nil {
 		return nil, err
+	}
+	if _, changingURL := input.Credentials["base_url"]; changingURL {
+		for _, target := range cachedTargets {
+			if target != nil {
+				candidate := *target
+				candidate.Credentials = MergePreservingSensitiveCreds(target.Credentials, input.Credentials)
+				warnVideoAccountUpstreamChange(ctx, s.accountRepo, target.GetCredential("base_url"), &candidate)
+			}
+		}
 	}
 
 	// 将 proxy 变更传播到每个目标账号的 spark 影子账号

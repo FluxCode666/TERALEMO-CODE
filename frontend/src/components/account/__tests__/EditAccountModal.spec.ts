@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import {
   BUILTIN_PLATFORM_CATALOG,
   resetPlatformCatalog,
@@ -335,6 +335,123 @@ describe('EditAccountModal', () => {
   })
 
   afterEach(() => vi.useRealTimers())
+
+  it('reads, enables, and disables video URL privacy without losing credentials', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://metaso.cn/api/minimax/v2', video_protocol: 'minimax', hide_video_upstream_url: true } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-video-hide-upstream-url').element as HTMLInputElement).checked).toBe(true)
+    await wrapper.get('#edit-video-hide-upstream-url').setValue(false)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({ ...account.credentials, hide_video_upstream_url: false })
+    await wrapper.setProps({ account: { ...account, credentials: { ...account.credentials, hide_video_upstream_url: false } } })
+    expect((wrapper.get('#edit-video-hide-upstream-url').element as HTMLInputElement).checked).toBe(false)
+    await wrapper.get('#edit-video-hide-upstream-url').setValue(true)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls.at(-1)?.[1]?.credentials.hide_video_upstream_url).toBe(true)
+    wrapper.unmount()
+  })
+
+  it.each(['gemini', 'minimax'])('switches a video account to %s while preserving its custom relay and API key', async protocol => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: 'seedance' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('#edit-video-protocol').setValue(protocol)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+      api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: protocol
+    })
+    wrapper.unmount()
+  })
+
+  it('preserves the MiniMax protocol and default upstream when reopening and saving an account', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://api.minimax.io', video_protocol: 'minimax' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-video-protocol').element as HTMLSelectElement).value).toBe('minimax')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject(account.credentials)
+    wrapper.unmount()
+  })
+
+  it('falls back to the protocol default base URL instead of anthropic for video accounts with empty base_url', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: '', video_protocol: 'gemini' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials.base_url).toBe('https://generativelanguage.googleapis.com')
+    wrapper.unmount()
+  })
+
+  it('follows the protocol default base URL when switching protocols on a video account with empty base_url', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: '', video_protocol: 'seedance' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('#edit-video-protocol').setValue('minimax')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+      base_url: 'https://api.minimax.io',
+      video_protocol: 'minimax'
+    })
+    wrapper.unmount()
+  })
+
+  it('does not write hide_video_upstream_url when the key was absent and the toggle untouched', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: 'seedance' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('hide_video_upstream_url')
+    wrapper.unmount()
+  })
+
+  it('writes hide_video_upstream_url when the user toggles it even if the key was absent', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: 'seedance' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('#edit-video-hide-upstream-url').setValue(true)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials.hide_video_upstream_url).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('keeps writing hide_video_upstream_url when the key already existed even if untouched', async () => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: 'seedance', hide_video_upstream_url: false } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials.hide_video_upstream_url).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['seedance', 'sk-...'],
+    ['gemini', 'AIza...'],
+    ['minimax', 'eyJ...']
+  ])('shows the %s API key placeholder instead of sk-ant for video accounts', async (protocol, placeholder) => {
+    const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: protocol } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const keyInput = wrapper.get('form#edit-account-form input[type="password"]')
+    expect(keyInput.attributes('placeholder')).toBe(placeholder)
+    wrapper.unmount()
+  })
 
   it('passes existing non-identity mappings to the whitelist selector and preserves them on save', async () => {
     const account = buildAccount()

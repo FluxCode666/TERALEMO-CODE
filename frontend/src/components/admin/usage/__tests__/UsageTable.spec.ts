@@ -843,6 +843,75 @@ const DataTableStubWithUser = {
   `,
 }
 
+describe('admin UsageTable endpoint column truncation', () => {
+  const DataTableStubWithEndpoint = {
+    props: ['data'],
+    template: `
+      <div>
+        <div v-for="row in data" :key="row.request_id" :data-request-id="row.request_id">
+          <slot name="cell-endpoint" :row="row" />
+        </div>
+      </div>
+    `,
+  }
+
+  const longInbound = '/api/v1/admin/async-tasks/1/vidtask_' + 'a'.repeat(64) + '/refresh'
+  const longUpstream = '/api/v1/admin/async-tasks/2/vidtask_' + 'b'.repeat(64) + '/refresh'
+
+  it('truncates long endpoints to one line and exposes the full text via title', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{
+          request_id: 'req-long-endpoint',
+          inbound_endpoint: longInbound,
+          upstream_endpoint: longUpstream,
+        }],
+        loading: false,
+        columns: [{ key: 'endpoint', label: 'Endpoint' }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStubWithEndpoint,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const cells = wrapper.findAll('[data-request-id="req-long-endpoint"] .truncate')
+    expect(cells).toHaveLength(2)
+    expect(cells[0].attributes('title')).toContain(longInbound)
+    expect(cells[0].text()).toContain(longInbound)
+    expect(cells[1].attributes('title')).toContain(longUpstream)
+    expect(cells[1].text()).toContain(longUpstream)
+    expect(wrapper.find('[data-request-id="req-long-endpoint"] .max-w-\\[320px\\]').exists()).toBe(true)
+  })
+
+  it('falls back to a dash for missing endpoints', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{ request_id: 'req-no-endpoint', inbound_endpoint: null, upstream_endpoint: null }],
+        loading: false,
+        columns: [{ key: 'endpoint', label: 'Endpoint' }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStubWithEndpoint,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    const cells = wrapper.findAll('[data-request-id="req-no-endpoint"] .truncate')
+    expect(cells).toHaveLength(2)
+    expect(cells[0].text()).toContain('-')
+    expect(cells[0].attributes('title')).toContain('-')
+  })
+})
+
 describe('admin UsageTable deleted-user badge', () => {
   it('renders deleted badge for a soft-deleted user row', () => {
     const row = {

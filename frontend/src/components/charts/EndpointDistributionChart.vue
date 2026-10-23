@@ -91,13 +91,13 @@
               <tr
                 class="border-t border-gray-100 transition-colors dark:border-dark-700"
                 :class="enableBreakdown ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700/40' : ''"
-                @click="enableBreakdown && toggleBreakdown(item.endpoint)"
+                @click="enableBreakdown && toggleBreakdown(item)"
               >
-                <td class="max-w-[180px] truncate py-1.5 font-medium" :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'" :title="item.endpoint">
-                  <span class="inline-flex items-center gap-1">
+                <td class="max-w-[180px] py-1.5 font-medium" :class="enableBreakdown ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300' : 'text-gray-900 dark:text-white'" :title="item.endpoint">
+                  <span class="flex items-center gap-1">
                     <svg v-if="enableBreakdown && expandedKey === item.endpoint" class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     <svg v-else-if="enableBreakdown" class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    {{ item.endpoint }}
+                    <span class="min-w-0 truncate">{{ item.endpoint }}</span>
                   </span>
                 </td>
                 <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
@@ -141,6 +141,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { EndpointStat, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
+import { normalizeEndpointPath } from '@/utils/endpointNormalize'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -187,12 +188,17 @@ const expandedKey = ref<string | null>(null)
 const breakdownItems = ref<UserBreakdownItem[]>([])
 const breakdownLoading = ref(false)
 
-const toggleBreakdown = async (endpoint: string) => {
-  if (expandedKey.value === endpoint) {
+// Display row: endpoint is the normalized template shown in the UI; rawEndpoint is the
+// highest-metric member's original value, used verbatim for breakdown queries so the
+// backend filter contract stays unchanged.
+type DisplayEndpointStat = EndpointStat & { rawEndpoint: string; rawMetric: number }
+
+const toggleBreakdown = async (item: DisplayEndpointStat) => {
+  if (expandedKey.value === item.endpoint) {
     expandedKey.value = null
     return
   }
-  expandedKey.value = endpoint
+  expandedKey.value = item.endpoint
   breakdownLoading.value = true
   breakdownItems.value = []
   try {
@@ -200,7 +206,7 @@ const toggleBreakdown = async (endpoint: string) => {
       ...props.filters,
       start_date: props.startDate,
       end_date: props.endDate,
-      endpoint,
+      endpoint: item.rawEndpoint,
       endpoint_type: props.source,
     })
     breakdownItems.value = res.users || []
@@ -226,7 +232,7 @@ const chartColors = [
   '#a855f7'
 ]
 
-const displayEndpointStats = computed(() => {
+const displayEndpointStats = computed<DisplayEndpointStat[]>(() => {
   const sourceStats = props.source === 'upstream'
     ? props.upstreamEndpointStats
     : props.source === 'path'
@@ -235,7 +241,29 @@ const displayEndpointStats = computed(() => {
   if (!sourceStats?.length) return []
 
   const metricKey = props.metric === 'actual_cost' ? 'actual_cost' : 'total_tokens'
-  return [...sourceStats].sort((a, b) => b[metricKey] - a[metricKey])
+  const merged = new Map<string, DisplayEndpointStat>()
+  for (const item of sourceStats) {
+    const normalized = normalizeEndpointPath(item.endpoint) || item.endpoint
+    const existing = merged.get(normalized)
+    if (existing) {
+      existing.requests += item.requests
+      existing.total_tokens += item.total_tokens
+      existing.actual_cost += item.actual_cost
+      existing.cost += item.cost
+      if (item[metricKey] > existing.rawMetric) {
+        existing.rawEndpoint = item.endpoint
+        existing.rawMetric = item[metricKey]
+      }
+    } else {
+      merged.set(normalized, {
+        ...item,
+        endpoint: normalized,
+        rawEndpoint: item.endpoint,
+        rawMetric: item[metricKey],
+      })
+    }
+  }
+  return [...merged.values()].sort((a, b) => b[metricKey] - a[metricKey])
 })
 
 const chartData = computed(() => {

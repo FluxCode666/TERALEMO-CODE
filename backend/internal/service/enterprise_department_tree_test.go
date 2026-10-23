@@ -82,7 +82,7 @@ func TestEnterpriseManagerSubtreePermissionsUsageAndRanking(t *testing.T) {
 }
 
 func TestEnterpriseTreeAuthSnapshotVersionAndClone(t *testing.T) {
-	require.Equal(t, 27, apiKeyAuthSnapshotVersion)
+	require.Equal(t, 29, apiKeyAuthSnapshotVersion)
 	c := &EnterpriseMemberContext{DepartmentID: enterpriseTestID(15), DepartmentPathIDs: []int64{3, 7, 11, 15}, DepartmentSubtreeIDs: []int64{15, 19}}
 	clone := cloneEnterpriseMemberContext(c)
 	clone.DepartmentPathIDs[0] = 99

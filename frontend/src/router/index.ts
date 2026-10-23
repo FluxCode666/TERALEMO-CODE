@@ -190,6 +190,18 @@ const routes: RouteRecordRaw[] = [
 
   // ==================== User Routes ====================
   {
+    path: '/async-tasks',
+    name: 'AsyncTasks',
+    component: () => import('@/views/user/AsyncTasksView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Async tasks', titleKey: 'asyncTasks.title', descriptionKey: 'asyncTasks.description' }
+  },
+  {
+    path: '/docs/api',
+    name: 'ApiDocs',
+    component: () => import('@/views/user/ApiDocsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'API Docs', titleKey: 'apiDocs.title', descriptionKey: 'apiDocs.description' }
+  },
+  {
     path: '/',
     redirect: '/home'
   },
@@ -669,6 +681,12 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'admin.usage.title',
       descriptionKey: 'admin.usage.description'
     }
+  },
+  {
+    path: '/admin/async-tasks',
+    name: 'AdminAsyncTasks',
+    component: () => import('@/views/admin/AsyncTasksView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Global async tasks', titleKey: 'adminAsyncTasks.title', descriptionKey: 'adminAsyncTasks.description' }
   },
   {
     path: '/admin/affiliates',

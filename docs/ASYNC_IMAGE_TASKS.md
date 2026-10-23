@@ -2,6 +2,8 @@
 
 Asynchronous image tasks let clients submit long-running OpenAI-compatible image requests without keeping one HTTP connection open. This avoids proxy/CDN response timeouts such as Cloudflare 524 while preserving the existing image routing, billing, moderation, concurrency, and failover behavior.
 
+Users can also track new image tasks in the **Async tasks** page (`/async-tasks`), alongside video tasks. The page supports search and status/type filters and shows the first generated result. See [ASYNC_VIDEO_TASKS.md](ASYNC_VIDEO_TASKS.md) for the video platform and unified task catalog.
+
 ## Endpoints
 
 The authenticated gateway exposes both `/v1` paths and their existing no-prefix aliases:

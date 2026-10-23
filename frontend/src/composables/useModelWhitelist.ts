@@ -496,6 +496,7 @@ export const commonErrorCodes = [
 // 按平台获取模型
 export function getModelsByPlatform(platform: string): string[] {
   switch (platform) {
+    case 'video': return ['doubao-seedance-1-0-pro', 'veo-3.0-generate-001', 'veo-3.0-fast-generate-001', 'MiniMax-H3', 'MiniMax-H3-Max', 'MiniMax-Hailuo-2.3', 'MiniMax-Hailuo-2.3-Fast', 'MiniMax-Hailuo-02']
     case 'openai': return openaiModels
     case 'anthropic':
     case 'claude': return claudeModels

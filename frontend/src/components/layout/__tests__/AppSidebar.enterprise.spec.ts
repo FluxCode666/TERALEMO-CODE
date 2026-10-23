@@ -33,6 +33,43 @@ beforeEach(() => {
   mocks.enterprise.tabs = ['overview', 'organization', 'groups', 'usage']
 })
 
+describe('AppSidebar 异步任务入口', () => {
+  it.each([false, true])('简易模式=%s 时仅管理员显示全局入口，并可正确高亮', isSimpleMode => {
+    mocks.auth.isSimpleMode = isSimpleMode
+    let wrapper = render()
+    expect(wrapper.find('a[href="/admin/async-tasks"]').exists()).toBe(false)
+    wrapper.unmount()
+    mocks.auth.isAdmin = true
+    mocks.route.path = '/admin/async-tasks'
+    wrapper = render()
+    const link = wrapper.get('a[href="/admin/async-tasks"]')
+    expect(link.text()).toBe('nav.globalAsyncTasks')
+    expect(link.classes()).toContain('sidebar-link-active')
+    expect(wrapper.findAll('a[href="/admin/async-tasks"]')).toHaveLength(1)
+    expect(wrapper.find('a[href="/async-tasks"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it.each([
+    { isAdmin: false, isSimpleMode: false, previousPath: '/usage' },
+    { isAdmin: false, isSimpleMode: true, previousPath: '/keys' },
+    { isAdmin: true, isSimpleMode: false, previousPath: '/usage' },
+    { isAdmin: true, isSimpleMode: true, previousPath: '/keys' },
+  ])('管理员=$isAdmin，简易模式=$isSimpleMode 时提供唯一且可高亮的入口', ({ isAdmin, isSimpleMode, previousPath }) => {
+    mocks.auth.isAdmin = isAdmin
+    mocks.auth.isSimpleMode = isSimpleMode
+    mocks.route.path = '/async-tasks'
+    const wrapper = render()
+    const links = wrapper.findAll('nav a')
+    const taskLinks = wrapper.findAll('a[href="/async-tasks"]')
+    expect(taskLinks).toHaveLength(1)
+    expect(taskLinks[0]?.text()).toBe('nav.asyncTasks')
+    expect(taskLinks[0]?.classes()).toContain('sidebar-link-active')
+    const index = links.findIndex(link => link.attributes('href') === '/async-tasks')
+    expect(links[index - 1]?.attributes('href')).toBe(previousPath)
+    wrapper.unmount()
+  })
+})
+
 describe('AppSidebar 企业菜单与钱包入口', () => {
   it.each(['owner', 'manager', 'member'] as const)('企业角色 %s 的管理入口按权限显示，个人钱包及批量图片入口隐藏', role => {
     mocks.auth.user.enterprise = { id: 1, role }
@@ -40,6 +77,9 @@ describe('AppSidebar 企业菜单与钱包入口', () => {
     expect(wrapper.find('[data-nav-group="/enterprise"]').exists()).toBe(role !== 'member')
     for (const path of ['/purchase', '/orders', '/redeem', '/batch-image']) expect(wrapper.find(`a[href="${path}"]`).exists(), path).toBe(false)
     expect(wrapper.find('a[href="/subscriptions"]').exists()).toBe(true)
+    // 企业成员可使用视频功能：异步任务与 API 密钥入口对所有企业角色可见
+    expect(wrapper.find('a[href="/async-tasks"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/keys"]').exists()).toBe(true)
     wrapper.unmount()
   })
 

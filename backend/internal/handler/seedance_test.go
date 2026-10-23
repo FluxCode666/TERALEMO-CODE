@@ -34,7 +34,7 @@ func TestSeedanceHandlerLifecycleAndOwnership(t *testing.T) {
 		key.Group.Platform = service.PlatformOpenAI
 		body := ""
 		if method == http.MethodPost {
-			body = `{"model":"doubao-seedance","content":[{"type":"text","text":"waves"}]}`
+			body = `{"model":"doubao-seedance-1-0-pro-250528","content":[{"type":"text","text":"waves"}]}`
 		}
 		c.Request = httptest.NewRequest(method, "/api/v3/contents/generations/tasks", strings.NewReader(body))
 		c.Params = gin.Params{{Key: "task_id", Value: "task-ark"}}
@@ -74,19 +74,28 @@ func TestSeedanceHandlerLifecycleAndOwnership(t *testing.T) {
 		} else {
 			h.SeedanceTasks(c)
 		}
+		if other == "group" {
+			require.Equal(t, 200, w.Code, w.Body.String(), "accepted task keeps its frozen group after key reassignment")
+			require.Equal(t, before+1, upstream.calls)
+			slots.assertReleased(t)
+			continue
+		}
 		require.Equal(t, 404, w.Code, other+": "+w.Body.String())
 		require.Equal(t, before, upstream.calls)
 		slots.assertReleased(t)
 	}
+	// The old pending-entry fallback remains independently supported.
+	require.NoError(t, h.gatewayService.StoreGrokVideoPendingBilling(context.Background(), "seedance:task-ark", 10, 20, service.GrokVideoPendingBilling{Model: "doubao-seedance-1-0-pro-250528"}))
 	c, _ = newContext(http.MethodGet)
 	key, _ := middleware.GetAPIKeyFromContext(c)
+	key.Group.VideoPrice480P, key.Group.VideoPrice720P, key.Group.VideoPrice768P, key.Group.VideoPrice1080P, key.Group.VideoPrice2K = nil, nil, nil, nil, nil
 	subject, _ := middleware.GetAuthSubjectFromContext(c)
 	result := &service.OpenAIForwardResult{Usage: service.OpenAIUsage{OutputTokens: 12345}, ResponseID: "seedance:task-ark"}
 	for i := range 20 {
 		billed := prepareSeedanceCompletionBilling(context.Background(), h, key, subject, result.ResponseID, result)
 		if i == 0 {
 			require.NotNil(t, billed)
-			require.Equal(t, "doubao-seedance", billed.BillingModel)
+			require.Equal(t, "doubao-seedance-1-0-pro-250528", billed.BillingModel)
 			require.Equal(t, 12345, billed.Usage.OutputTokens)
 			require.Zero(t, billed.VideoCount)
 		} else {

@@ -42,13 +42,16 @@ func TestSanitizeGrokMediaForwardBodyConvertsImageSize(t *testing.T) {
 	require.Equal(t, "1:1", gjson.GetBytes(out, "aspect_ratio").String())
 }
 
-func TestParseGrokMediaRequestKeepsImageResolutionOutOfVideoNormalize(t *testing.T) {
+func TestParseGrokMediaRequestPreservesShared2KResolution(t *testing.T) {
 	t.Parallel()
 
 	info := ParseGrokMediaRequest("application/json", []byte(`{"model":"grok-imagine-image-2.0","resolution":"2K","aspect_ratio":"16:9"}`))
 	require.Equal(t, "2k", info.ImageResolution)
 	require.Equal(t, "16:9", info.AspectRatio)
-	require.Equal(t, VideoBillingResolution480P, info.Resolution)
+	// Parsing is shared by image/video endpoints and public model aliases.
+	// Preserve the explicit tier for both; the endpoint chooses which field
+	// it consumes. Model-name inference must not turn video aliases into 480p.
+	require.Equal(t, VideoBillingResolution2K, info.Resolution)
 }
 
 func TestGrokImagineAspectRatioFromSize(t *testing.T) {

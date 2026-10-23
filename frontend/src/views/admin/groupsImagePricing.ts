@@ -10,7 +10,7 @@ export const supportsImagePricingPlatform = (platform: string): boolean =>
   imagePricingPlatforms.has(platform);
 
 export const supportsVideoPricingPlatform = (platform: string): boolean =>
-  platform === "grok";
+  platform === "grok" || platform === "video";
 
 export const imagePricingI18nKey = (_platform: string, key: string): string =>
   `admin.groups.imagePricing.${key}`;
@@ -22,7 +22,9 @@ type ImagePricingTierKey = "image_price_1k" | "image_price_2k" | "image_price_4k
 type VideoPricingTierKey =
   | "video_price_480p"
   | "video_price_720p"
-  | "video_price_1080p";
+  | "video_price_768p"
+  | "video_price_1080p"
+  | "video_price_2k";
 
 const defaultImagePricePlaceholders: Record<
   string,
@@ -49,7 +51,9 @@ const defaultVideoPricePlaceholders: Record<
   grok: {
     video_price_480p: "0.05",
     video_price_720p: "0.07",
+    video_price_768p: "",
     video_price_1080p: "0.25",
+    video_price_2k: "",
   },
 };
 

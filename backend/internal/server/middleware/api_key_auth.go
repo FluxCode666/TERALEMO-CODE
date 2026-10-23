@@ -178,7 +178,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path) || isAsyncVideoTaskRead(c.Request.Method, c.Request.URL.Path)
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -347,6 +347,31 @@ func isAsyncImageTaskRead(method, path string) bool {
 		return false
 	}
 	return strings.HasPrefix(path, "/v1/images/tasks/") || strings.HasPrefix(path, "/images/tasks/")
+}
+
+func isAsyncVideoTaskRead(method, path string) bool {
+	if method != http.MethodGet && method != http.MethodDelete {
+		return false
+	}
+	if strings.Contains(path, "/contents/generations/tasks/") {
+		return true
+	}
+	if method == http.MethodGet && (strings.HasPrefix(path, "/videos/") || strings.HasPrefix(path, "/v1/videos/")) {
+		return true
+	}
+	if method == http.MethodGet && (path == "/v1/query/video_generation" || path == "/v1/files/retrieve") {
+		return true
+	}
+	if method == http.MethodGet && strings.HasPrefix(path, "/v2/query/video_generation/") {
+		id := strings.TrimPrefix(path, "/v2/query/video_generation/")
+		return service.ValidateMiniMaxVideoID(id) == nil
+	}
+	if method == http.MethodGet && strings.HasPrefix(path, "/v1/video-tasks/") && strings.HasSuffix(path, "/content") {
+		resource := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/video-tasks/"), "/content")
+		_, err := service.ParseVideoContentResource(resource)
+		return err == nil
+	}
+	return method == http.MethodGet && strings.HasPrefix(path, "/v1beta/models/") && strings.Contains(path, "/operations/")
 }
 
 // GetAPIKeyFromContext 从上下文中获取API key

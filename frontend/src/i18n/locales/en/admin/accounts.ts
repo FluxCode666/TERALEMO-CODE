@@ -788,11 +788,13 @@ export default {
         sendingRealtimeRequest: 'Dialing standalone /realtime WebSocket...',
         selectedTestMode: 'Test mode: {mode}',
         imageUploadLabel: 'Source image (optional, for edits)',
-        videoFirstFrameLabel: 'First-frame / reference image (optional)',
+        videoFirstFrameLabel: 'First-frame image (optional)',
         imageUploadHint:
           'PNG/JPEG recommended, both sides ≥ 8 px, under ~4 MB for edits. Uploading a source image switches to /images/edits (image-to-image). Leave empty for text-to-image /images/generations.',
         videoFirstFrameHint:
           'Optional first-frame / reference image for image-to-video. PNG/JPEG recommended, both sides ≥ 8 px.',
+        nativeVideoFirstFrameHint:
+          'Optional first frame for image-to-video. PNG/JPEG recommended; dimensions must meet the selected model requirements. MiniMax H3 requires 256–5760 px per side and aspect ratio 0.4–2.5. Test uploads are limited to 6 MB.',
         audioUploadLabel: 'Audio file (optional for STT)',
         audioUploadHint:
           'Upload a real audio clip to transcribe. Without a file, a silent WAV is used for connectivity only.',
@@ -1123,6 +1125,11 @@ export default {
       mixedChannelWarning: 'Warning: Group "{groupName}" contains both {currentPlatform} and {otherPlatform} accounts. Mixing different channels may cause thinking block signature validation issues, which will fallback to non-thinking mode. Are you sure you want to continue?',
       pleaseEnterAccountName: 'Please enter account name',
       pleaseEnterApiKey: 'Please enter API Key',
+      videoCapability: {
+        minInvalid: 'Minimum duration must be an integer between 1 and 60 seconds',
+        maxInvalid: 'Maximum duration must be an integer between 1 and 60 seconds',
+        minGtMax: 'Minimum duration cannot be greater than maximum duration'
+      },
       bedrockAccessKeyId: 'AWS Access Key ID',
       bedrockSecretAccessKey: 'AWS Secret Access Key',
       bedrockSessionToken: 'AWS Session Token',
@@ -1580,6 +1587,7 @@ export default {
       connectingToApi: 'Connecting to API...',
       testCompleted: 'Test completed successfully!',
       testFailed: 'Test failed',
+      testEndedWithoutResult: 'Connection closed before a final test result was returned',
       connectedToApi: 'Connected to API',
       usingModel: 'Using model: {model}',
       sendingTestMessage: 'Sending test message: "hi"',
@@ -1607,6 +1615,7 @@ export default {
       videoTestHint:
         'Calls standalone /v1/videos/generations, polls until done, then downloads the finished video for on-page preview.',
       videoTestMode: 'Mode: Video generation test',
+      nativeVideoTestHint: 'Generates a video using the native {protocol} protocol and shows the task ID, status and preview, waiting up to 10 minutes. Upstream charges may apply. Closing stops polling; submitted tasks may continue.',
       sendingVideoRequest: 'Sending video generation request...',
       imagePreview: 'Generated images:',
       imageReceived: 'Received test image #{count}',

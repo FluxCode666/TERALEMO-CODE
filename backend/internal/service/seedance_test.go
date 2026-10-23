@@ -25,18 +25,20 @@ func TestSeedanceNativeForwarding(t *testing.T) {
 	upstream := &grokMediaContentUpstreamStub{response: grokMediaContentStatusResponse(`{"id":"task-1"}`)}
 	svc := &OpenAIGatewayService{httpUpstream: upstream}
 	c, w := grokMediaContentTestContext(http.MethodPost, "/api/v3/contents/generations/tasks", nil)
-	result, err := svc.ForwardSeedance(context.Background(), c, seedanceTestAccount(), SeedanceEndpointCreate, "", body)
+	account := seedanceTestAccount()
+	account.Credentials["model_mapping"] = map[string]any{"video": "doubao-seedance-2-5-pro"}
+	result, err := svc.ForwardSeedance(context.Background(), c, account, SeedanceEndpointCreate, "", body)
 	require.NoError(t, err)
 	require.JSONEq(t, `{"id":"task-1"}`, w.Body.String())
 	require.Equal(t, "seedance:task-1", result.ResponseID)
 	require.Zero(t, result.Usage.OutputTokens)
 	require.Equal(t, "video", result.BillingModel)
-	require.Equal(t, "ep-seedance", result.UpstreamModel)
+	require.Equal(t, "doubao-seedance-2-5-pro", result.UpstreamModel)
 	require.Equal(t, "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks", upstream.request.URL.String())
 	require.Equal(t, "Bearer ark-secret", upstream.request.Header.Get("Authorization"))
 	forwarded, err := io.ReadAll(upstream.request.Body)
 	require.NoError(t, err)
-	require.Equal(t, "ep-seedance", gjson.GetBytes(forwarded, "model").String())
+	require.Equal(t, "doubao-seedance-2-5-pro", gjson.GetBytes(forwarded, "model").String())
 	for _, field := range []string{"content", "duration", "generate_audio", "future_field"} {
 		require.Equal(t, gjson.GetBytes(body, field).Raw, gjson.GetBytes(forwarded, field).Raw)
 	}

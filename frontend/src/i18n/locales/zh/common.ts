@@ -172,6 +172,9 @@ export default {
 
   // Navigation
   nav: {
+    asyncTasks: '异步任务',
+    apiDocs: 'API 文档',
+    globalAsyncTasks: '全局异步任务',
     enterprise: '我的企业',
     enterprises: '企业管理',
     dashboard: '仪表盘',

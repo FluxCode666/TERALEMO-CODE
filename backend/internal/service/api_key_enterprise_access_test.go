@@ -179,7 +179,7 @@ func TestEnterpriseAPIKeyAuthSnapshotRoundTrip(t *testing.T) {
 	key := &APIKey{ID: 1, UserID: 8, User: &User{ID: 8, Enterprise: membership}}
 	svc := &APIKeyService{}
 	snapshot := svc.snapshotFromAPIKey(context.Background(), key)
-	require.Equal(t, 27, snapshot.Version)
+	require.Equal(t, 29, snapshot.Version)
 	require.Equal(t, membership, snapshot.User.Enterprise)
 	encoded, err := json.Marshal(snapshot)
 	require.NoError(t, err)

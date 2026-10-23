@@ -20,7 +20,7 @@ import (
 func TestEveryGatewayPOSTRouteIsClassifiedForPromptAuditCoverage(t *testing.T) {
 	routeSource, err := os.ReadFile("gateway.go")
 	require.NoError(t, err)
-	pattern := regexp.MustCompile(`(?:gateway|gemini|r|codexDirect|antigravityV1|antigravityV1Beta)\.POST\("([^"]+)"`)
+	pattern := regexp.MustCompile(`(?:gateway|minimaxV2|gemini|r|codexDirect|antigravityV1|antigravityV1Beta)\.POST\("([^"]+)"`)
 	matches := pattern.FindAllStringSubmatch(string(routeSource), -1)
 	actual := map[string]struct{}{}
 	for _, match := range matches {
@@ -46,6 +46,7 @@ func TestEveryGatewayPOSTRouteIsClassifiedForPromptAuditCoverage(t *testing.T) {
 		"/videos/generations":       {"grok_media.go"},
 		"/videos/edits":             {"grok_media.go"},
 		"/videos/extensions":        {"grok_media.go"},
+		"/video_generation":         {"grok_media.go"},
 		"/models/*modelAction":      {"gemini_v1beta_handler.go"},
 		"/cachedContents":           {"gemini_cached_contents_handler.go"},
 		"/tts":                      {"grok_audio.go"},

@@ -32,6 +32,9 @@ var (
 // ImageTaskRecord is the private Redis representation of an asynchronous image
 // request. Ownership fields are intentionally omitted from the public view.
 type ImageTaskRecord struct {
+	Model       string          `json:"model,omitempty"`
+	Platform    string          `json:"platform,omitempty"`
+	GroupID     *int64          `json:"group_id,omitempty"`
 	ID          string          `json:"id"`
 	UserID      int64           `json:"user_id"`
 	APIKeyID    int64           `json:"api_key_id"`
@@ -151,11 +154,16 @@ func (s *ImageTaskService) ExecutionTimeout() time.Duration {
 }
 
 func (s *ImageTaskService) Create(ctx context.Context, owner ImageTaskOwner) (*ImageTask, error) {
+	return s.CreateWithMetadata(ctx, owner, "", "", nil)
+}
+
+func (s *ImageTaskService) CreateWithMetadata(ctx context.Context, owner ImageTaskOwner, model, platform string, groupID *int64) (*ImageTask, error) {
 	if s == nil || s.store == nil {
 		return nil, ErrImageTaskUnavailable
 	}
 	now := time.Now().UTC()
 	task := &ImageTaskRecord{
+		Model: model, Platform: platform, GroupID: groupID,
 		ID:        "imgtask_" + strings.ReplaceAll(uuid.NewString(), "-", ""),
 		UserID:    owner.UserID,
 		APIKeyID:  owner.APIKeyID,

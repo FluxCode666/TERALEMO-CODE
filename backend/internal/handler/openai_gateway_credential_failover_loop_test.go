@@ -363,6 +363,9 @@ func (u *grokCredentialHandlerUpstream) Do(req *http.Request, _ string, accountI
 			Body:       io.NopCloser(bytes.NewBufferString(`{"error":{"message":"payment required"}}`)),
 		}, nil
 	}
+	if strings.Contains(req.URL.Path, "/videos/") {
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"request_id":"video-healthy","status":"pending"}`))}, nil
+	}
 	if bytes.Contains(requestBody, []byte(`"stream":true`)) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -664,35 +667,28 @@ func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 	})
 }
 
-func TestGrokMedia429FailoverIsBounded(t *testing.T) {
+func TestGrokMedia429DoesNotRetryVideoSubmission(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	t.Run("first 429 selects one healthy followup", func(t *testing.T) {
-		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "first_429")
-		defer cleanup()
-		recorder := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/openai/v1/videos/generations", bytes.NewBufferString(`{"model":"grok-imagine-video","prompt":"waves"}`))
-		req.Header.Set("Content-Type", "application/json")
-
-		router.ServeHTTP(recorder, req)
-
-		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
-	})
-
-	t.Run("second 429 stops without sweeping a third account", func(t *testing.T) {
-		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "all_429")
-		defer cleanup()
-		recorder := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/openai/v1/videos/generations", bytes.NewBufferString(`{"model":"grok-imagine-video","prompt":"waves"}`))
-		req.Header.Set("Content-Type", "application/json")
-
-		router.ServeHTTP(recorder, req)
-
-		require.Equal(t, http.StatusTooManyRequests, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
-		require.NotContains(t, recorder.Body.String(), "rate limited")
-	})
+	for _, mode := range []string{"first_429", "all_429"} {
+		t.Run(mode, func(t *testing.T) {
+			h, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, mode)
+			defer cleanup()
+			reservations := newVideoSubmissionReservationRepo()
+			h.gatewayService.SetVideoBillingReservationRepository(reservations)
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/openai/v1/videos/generations", bytes.NewBufferString(`{"model":"grok-imagine-video","prompt":"waves"}`))
+			req.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, req)
+			require.Equal(t, http.StatusTooManyRequests, recorder.Code, recorder.Body.String())
+			require.Equal(t, []int64{801}, upstream.accountHits(), "video creation never repeats a dispatched POST")
+			require.NotContains(t, recorder.Body.String(), "rate limited")
+			require.Len(t, reservations.rows, 1)
+			for _, v := range reservations.rows {
+				require.Equal(t, service.VideoReservationReleased, v.State, "explicit rejection releases the hold")
+			}
+			require.Empty(t, reservations.settlements)
+		})
+	}
 }
 
 func TestGrokOAuthCredentialFailoverAcrossHTTPHandlers(t *testing.T) {
@@ -929,13 +925,14 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 		service.NewBillingService(cfg, nil), nil, billingCache, upstream,
 		&service.DeferredService{}, nil, provider, nil, nil, nil, nil, nil,
 	)
+	gateway.SetVideoBillingReservationRepository(newVideoSubmissionReservationRepo())
 	cache := &concurrencyCacheMock{
 		acquireUserSlotFn:    func(context.Context, int64, int, string) (bool, error) { return true, nil },
 		acquireAccountSlotFn: func(context.Context, int64, int, string) (bool, error) { return true, nil },
 	}
 	h := NewOpenAIGatewayHandler(gateway, service.NewConcurrencyService(cache), billingCache, &service.APIKeyService{}, nil, nil, nil, nil, cfg)
 	apiKey := &service.APIKey{
-		ID: 902, GroupID: &groupID,
+		ID: 902, UserID: 903, GroupID: &groupID,
 		User:  &service.User{ID: 903, Status: service.StatusActive},
 		Group: &service.Group{ID: groupID, Platform: service.PlatformGrok, Status: service.StatusActive, AllowImageGeneration: true},
 	}

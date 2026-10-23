@@ -1253,6 +1253,10 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 		return nil
 	}
 
+	durableQuota, durableErr := usesDurableVideoQuota(ctx, s.userPlatformQuotaRepo, userID, platform)
+	if durableErr != nil {
+		return ErrBillingServiceUnavailable.WithCause(durableErr)
+	}
 	// cache 未配置（如简化部署 / 单测路径）→ 直接走 DB 查询，避免 nil panic。
 	// 其他 check* 方法（balance/subscription/rate-limit）也有类似守卫。
 	var (
@@ -1260,7 +1264,7 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 		ok       bool
 		cacheErr error
 	)
-	if s.cache != nil {
+	if s.cache != nil && !durableQuota {
 		entry, ok, cacheErr = s.cache.GetUserPlatformQuotaCache(ctx, userID, platform)
 	} else {
 		// 标记为"cache 故障"分支：跳过 HIT 路径、不回填、走 DB 一次性检查
@@ -1363,11 +1367,17 @@ func (s *BillingCacheService) checkUserPlatformQuotaEligibility(
 	case res := <-ch:
 		v, dbErr = res.Val, res.Err
 	case <-ctx.Done():
+		if durableQuota {
+			return ErrBillingServiceUnavailable.WithCause(ctx.Err())
+		}
 		// 当前 caller 的 ctx 被取消：fail-open，不阻断 (此请求已无意义)。
 		logger.LegacyPrintf("service.billing_cache", "Warning: user platform quota check ctx cancelled user=%d platform=%s: %v (fail-open)", userID, platform, ctx.Err())
 		return nil
 	}
 	if dbErr != nil {
+		if durableQuota {
+			return ErrBillingServiceUnavailable.WithCause(dbErr)
+		}
 		logger.LegacyPrintf("service.billing_cache", "Warning: load user platform quota failed user=%d platform=%s: %v (fail-open)", userID, platform, dbErr)
 		return nil
 	}

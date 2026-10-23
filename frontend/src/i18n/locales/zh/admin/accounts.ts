@@ -897,11 +897,13 @@ export default {
         sendingRealtimeRequest: '正在拨号独立 /realtime WebSocket...',
         selectedTestMode: '测试模式：{mode}',
         imageUploadLabel: '源图片（可选，图生图/编辑）',
-        videoFirstFrameLabel: '首帧 / 参考图（可选）',
+        videoFirstFrameLabel: '首帧图片（可选）',
         imageUploadHint:
           '建议 PNG/JPEG，宽高均 ≥ 8 像素，编辑建议小于约 4MB。上传源图会走 /images/edits（图生图）；不上传则走 /images/generations 文生图。',
         videoFirstFrameHint:
           '可选首帧/参考图用于图生视频。建议 PNG/JPEG，宽高均 ≥ 8 像素。',
+        nativeVideoFirstFrameHint:
+          '可选首帧用于图生视频，建议 PNG/JPEG，尺寸须符合所选模型要求。MiniMax H3 宽高需为 256–5760 像素，宽高比为 0.4–2.5。测试上传上限为 6MB。',
         audioUploadLabel: '音频文件（STT 可选）',
         audioUploadHint: '上传真实音频做转写；不上传则用静音 WAV 仅测连通。',
         mediaTooLarge: '文件过大（管理端测试上传上限约 6MB）。',
@@ -1225,6 +1227,11 @@ export default {
       mixedChannelWarning: '警告：分组 "{groupName}" 中同时包含 {currentPlatform} 和 {otherPlatform} 账号。混合使用不同渠道可能导致 thinking block 签名验证问题，会自动回退到非 thinking 模式。确定要继续吗？',
       pleaseEnterAccountName: '请输入账号名称',
       pleaseEnterApiKey: '请输入 API Key',
+      videoCapability: {
+        minInvalid: '最短时长必须为 1–60 的整数秒',
+        maxInvalid: '最长时长必须为 1–60 的整数秒',
+        minGtMax: '最短时长不能大于最长时长'
+      },
       bedrockAccessKeyId: 'AWS Access Key ID',
       bedrockSecretAccessKey: 'AWS Secret Access Key',
       bedrockSessionToken: 'AWS Session Token',
@@ -1669,6 +1676,7 @@ export default {
       readyToTest: '准备测试。点击"开始测试"按钮开始...',
       connectingToApi: '连接 API 中...',
       testCompleted: '测试完成！',
+      testEndedWithoutResult: '连接已关闭，但未收到最终测试结果',
       connectedToApi: '已连接到 API',
       usingModel: '使用模型：{model}',
       sendingTestMessage: '发送测试消息："hi"',
@@ -1695,6 +1703,7 @@ export default {
       videoTestHint:
         '调用独立 /v1/videos/generations，轮询至完成后下载成品视频并在页面上预览。',
       videoTestMode: '模式：视频生成测试',
+      nativeVideoTestHint: '使用 {protocol} 原生协议实际生成一段视频，显示任务 ID、轮询状态和成品预览，最多等待 10 分钟。上游可能产生费用；关闭窗口只停止查询，已提交的任务可能继续生成。',
       sendingVideoRequest: '正在发送视频生成测试请求...',
       imagePreview: '生成结果：',
       imageReceived: '已收到第 {count} 张测试图片',

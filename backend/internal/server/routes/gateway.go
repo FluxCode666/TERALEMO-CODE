@@ -176,6 +176,12 @@ func RegisterGatewayRoutes(
 		}
 	}
 
+	// MiniMax H3 native v2 resources use the same auth, policy and audit chain.
+	minimaxV2 := r.Group("/v2")
+	minimaxV2.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, requireGroupAnthropic)
+	minimaxV2.POST("/video_generation", h.OpenAIGateway.MiniMaxVideoTasks)
+	minimaxV2.GET("/query/video_generation/:task_id", h.OpenAIGateway.MiniMaxVideoTasks)
+
 	// API网关（Claude API兼容）
 	gateway := r.Group("/v1")
 	gateway.Use(bodyLimit)
@@ -207,6 +213,10 @@ func RegisterGatewayRoutes(
 		gateway.GET("/models", modelsHandler)
 		// Single-model discovery never selects the Codex client_version manifest.
 		gateway.GET("/models/:model", h.Gateway.Models)
+		gateway.POST("/video_generation", h.OpenAIGateway.MiniMaxVideoTasks)
+		gateway.GET("/query/video_generation", h.OpenAIGateway.MiniMaxVideoTasks)
+		gateway.GET("/files/retrieve", h.OpenAIGateway.MiniMaxVideoTasks)
+		gateway.GET("/video-tasks/:resource/content", h.OpenAIGateway.NativeVideoContent)
 		gateway.GET("/usage", h.Gateway.Usage)
 		gateway.POST("/live", h.OpenAIGateway.Live)
 		gateway.GET("/live/:call_id", h.OpenAIGateway.LiveSideband)
@@ -348,7 +358,14 @@ func RegisterGatewayRoutes(
 		gemini.GET("/models", h.Gateway.GeminiV1BetaListModels)
 		gemini.GET("/models/:model", h.Gateway.GeminiV1BetaGetModel)
 		// Gin treats ":" as a param marker, but Gemini uses "{model}:{action}" in the same segment.
-		gemini.POST("/models/*modelAction", h.Gateway.GeminiV1BetaModels)
+		gemini.POST("/models/*modelAction", func(c *gin.Context) {
+			if getGroupPlatform(c) == service.PlatformVideo {
+				h.OpenAIGateway.GeminiVideoTasks(c)
+				return
+			}
+			h.Gateway.GeminiV1BetaModels(c)
+		})
+		gemini.GET("/models/:model/operations/:operation", h.OpenAIGateway.GeminiVideoTasks)
 		// 显式上下文缓存：网关自管资源 ID 与账号绑定，list/get 只读本地记录。
 		gemini.POST("/cachedContents", h.Gateway.GeminiCachedContentsCreate)
 		gemini.GET("/cachedContents", h.Gateway.GeminiCachedContentsList)

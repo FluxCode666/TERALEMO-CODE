@@ -110,14 +110,16 @@ type Group struct {
 	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
-	AllowImageGeneration         bool    `json:"allow_image_generation"`
-	AllowBatchImageGeneration    bool    `json:"allow_batch_image_generation"`
-	ImageRateIndependent         bool    `json:"image_rate_independent"`
-	ImageRateMultiplier          float64 `json:"image_rate_multiplier"`
-	BatchImageDiscountMultiplier float64 `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier     float64 `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent         bool    `json:"video_rate_independent"`
-	VideoRateMultiplier          float64 `json:"video_rate_multiplier"`
+	AllowImageGeneration         bool     `json:"allow_image_generation"`
+	AllowBatchImageGeneration    bool     `json:"allow_batch_image_generation"`
+	ImageRateIndependent         bool     `json:"image_rate_independent"`
+	ImageRateMultiplier          float64  `json:"image_rate_multiplier"`
+	BatchImageDiscountMultiplier float64  `json:"batch_image_discount_multiplier"`
+	BatchImageHoldMultiplier     float64  `json:"batch_image_hold_multiplier"`
+	VideoRateIndependent         bool     `json:"video_rate_independent"`
+	VideoRateMultiplier          float64  `json:"video_rate_multiplier"`
+	VideoBillingMode             string   `json:"video_billing_mode"`
+	VideoPricePerRequest         *float64 `json:"video_price_per_request"`
 	// 高峰时段倍率配置
 	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
 	PeakStart          string   `json:"peak_start"`
@@ -128,7 +130,9 @@ type Group struct {
 	ImagePrice4K       *float64 `json:"image_price_4k"`
 	VideoPrice480P     *float64 `json:"video_price_480p"`
 	VideoPrice720P     *float64 `json:"video_price_720p"`
+	VideoPrice768P     *float64 `json:"video_price_768p"`
 	VideoPrice1080P    *float64 `json:"video_price_1080p"`
+	VideoPrice2K       *float64 `json:"video_price_2k"`
 	// VideoModelPrices 可选按模型族×分辨率覆盖视频每秒单价 (USD/s)。
 	VideoModelPrices map[string]map[string]float64 `json:"video_model_prices,omitempty"`
 	// Codex alpha/search 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01

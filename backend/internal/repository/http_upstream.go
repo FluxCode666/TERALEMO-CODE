@@ -203,6 +203,7 @@ func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
 func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	applyGrokCLIProxyHeaders(req)
 	if err := s.validateRequestHost(req); err != nil {
+		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
 	profile := service.HTTPUpstreamProfileDefault
@@ -213,6 +214,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	// 获取或创建对应的客户端，并标记请求占用
 	entry, err := s.acquireClientWithProfile(proxyURL, accountID, accountConcurrency, profile)
 	if err != nil {
+		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
 
@@ -269,11 +271,13 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo, "profile", profile.Name)
 
 	if err := s.validateRequestHost(req); err != nil {
+		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
 
 	entry, err := s.acquireClientWithTLS(proxyURL, accountID, accountConcurrency, profile, upstreamProfile)
 	if err != nil {
+		service.ConfirmHTTPUpstreamWriteTrace(req)
 		slog.Debug("tls_fingerprint_acquire_client_failed", "account_id", accountID, "error", err)
 		return nil, err
 	}
@@ -299,6 +303,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 // doUpstreamRequest owns cancellation for one attempt, without cancelling the
 // caller's context (which may be detached for billing or reused for retries).
 func doUpstreamRequest(client *http.Client, req *http.Request) (*http.Response, error) {
+	if upstreamTransportSupportsWriteTrace(client.Transport) {
+		service.ConfirmHTTPUpstreamWriteTrace(req)
+	}
 	ctx, cancel := context.WithCancel(req.Context())
 	resp, err := servertiming.Do(client, req.WithContext(ctx))
 	if err != nil {
@@ -308,6 +315,22 @@ func doUpstreamRequest(client *http.Client, req *http.Request) (*http.Response, 
 	decompressResponseBody(resp)
 	resp.Body = &cancelOnCloseBody{ReadCloser: resp.Body, cancel: cancel}
 	return resp, nil
+}
+
+// All production transports use net/http, including uTLS DialTLSContext and
+// configured HTTP/2. Unknown/custom RoundTrippers cannot prove non-delivery.
+func upstreamTransportSupportsWriteTrace(transport http.RoundTripper) bool {
+	switch t := transport.(type) {
+	case nil:
+		_, supported := http.DefaultTransport.(*http.Transport)
+		return supported
+	case *http.Transport:
+		return true
+	case *grokAccessDeniedFallbackTransport:
+		return upstreamTransportSupportsWriteTrace(t.base)
+	default:
+		return false
+	}
 }
 
 type cancelOnCloseBody struct {

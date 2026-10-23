@@ -2804,6 +2804,15 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	if account.Platform == service.PlatformVideo {
+		models := make([]openai.Model, 0)
+		for _, id := range account.VideoTestModelIDs() {
+			models = append(models, openai.Model{ID: id, Object: "model", Type: "model", DisplayName: id})
+		}
+		response.Success(c, models)
+		return
+	}
+
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {
 		// Prefer the shared, account-keyed upstream catalog. If discovery fails,

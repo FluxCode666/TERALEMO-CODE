@@ -21,8 +21,8 @@ func TestImageTaskStoreRoundTripAndTTL(t *testing.T) {
 		UserID:    7,
 		APIKeyID:  9,
 		Status:    service.ImageTaskStatusProcessing,
-		CreatedAt: 100,
-		ExpiresAt: 200,
+		CreatedAt: time.Now().Unix(),
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 	}
 
 	require.NoError(t, store.Save(context.Background(), task, 24*time.Hour))

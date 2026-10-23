@@ -42,6 +42,10 @@ func RegisterUserRoutes(
 			user.POST("/auth-identities/bind/start", h.User.StartIdentityBinding)
 			user.GET("/api-keys/:id/usage/daily", panelRateLimiter.Heavy(), h.Usage.GetMyAPIKeyDailyUsage)
 			user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
+			user.GET("/async-tasks", h.AsyncImage.ListUserTasks)
+			user.GET("/async-tasks/:id", h.AsyncImage.GetUserTask)
+			user.POST("/async-tasks/:id/refresh", h.AsyncImage.RefreshUserTask)
+			user.GET("/async-tasks/:id/content", h.AsyncImage.DownloadUserTask)
 
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")

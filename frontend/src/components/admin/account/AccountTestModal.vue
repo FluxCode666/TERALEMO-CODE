@@ -41,6 +41,10 @@
         </span>
       </div>
 
+      <p v-if="isVideoAccount" data-testid="video-test-protocol" class="text-sm text-gray-700 dark:text-gray-300">
+        {{ t('videoAccounts.protocol') }}: {{ videoProtocolName }}
+      </p>
+
       <!-- Grok: mode first, then optional model / mode params -->
       <div v-if="isGrokAccount" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -312,7 +316,7 @@
           </span>
         </div>
         <span class="flex items-center gap-1">
-          <Icon name="chat" size="sm" :stroke-width="2" />
+          <Icon :name="isVideoAccount ? 'play' : 'chat'" size="sm" :stroke-width="2" />
           {{ testModeSummary }}
         </span>
       </div>
@@ -365,7 +369,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -375,6 +379,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import { adminAPI } from '@/api/admin'
+import { resolveVideoProtocol } from '@/utils/videoProtocol'
 import type { Account, ClaudeModel } from '@/types'
 
 const { t } = useI18n()
@@ -424,6 +429,11 @@ const imageFileInput = ref<HTMLInputElement | null>(null)
 const audioFileInput = ref<HTMLInputElement | null>(null)
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
+const isVideoAccount = computed(() => props.account?.platform === 'video')
+const videoProtocolName = computed(() => {
+  const protocol = resolveVideoProtocol(props.account?.credentials?.video_protocol)
+  return { seedance: 'Seedance (Ark)', gemini: 'Google Gemini (Veo)', minimax: 'MiniMax (Hailuo / H3)' }[protocol]
+})
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
   { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
@@ -497,6 +507,7 @@ const modelOptionsForMode = computed(() => {
 })
 
 const supportsPromptInput = computed(() => {
+  if (isVideoAccount.value) return true
   if (!isGrokAccount.value) {
     return supportsImageTest.value
   }
@@ -509,17 +520,19 @@ const supportsPromptInput = computed(() => {
 })
 
 const supportsImageUpload = computed(
-  () => isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video')
+  () => isVideoAccount.value || (isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video'))
 )
 const supportsAudioUpload = computed(() => isGrokAccount.value && grokTestMode.value === 'stt')
 const imageUploadLabel = computed(() =>
-  grokTestMode.value === 'video'
+  isVideoAccount.value || grokTestMode.value === 'video'
     ? t('admin.accounts.grok.videoFirstFrameLabel')
     : t('admin.accounts.grok.imageUploadLabel')
 )
 
 const imageUploadHint = computed(() =>
-  grokTestMode.value === 'video'
+  isVideoAccount.value
+    ? t('admin.accounts.grok.nativeVideoFirstFrameHint')
+    : grokTestMode.value === 'video'
     ? t('admin.accounts.grok.videoFirstFrameHint')
     : t('admin.accounts.grok.imageUploadHint')
 )
@@ -597,7 +610,7 @@ const clearMediaUploads = () => {
 }
 
 const promptInputLabel = computed(() => {
-  if (supportsGrokVideoTest.value || grokTestMode.value === 'video') {
+  if (isVideoAccount.value || supportsGrokVideoTest.value || grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptLabel')
   }
   if (supportsImageTest.value || grokTestMode.value === 'image') {
@@ -613,7 +626,7 @@ const promptInputLabel = computed(() => {
 })
 
 const promptInputPlaceholder = computed(() => {
-  if (grokTestMode.value === 'video') {
+  if (isVideoAccount.value || grokTestMode.value === 'video') {
     return t('admin.accounts.videoPromptPlaceholder')
   }
   if (grokTestMode.value === 'image' || supportsImageTest.value) {
@@ -629,6 +642,9 @@ const promptInputPlaceholder = computed(() => {
 })
 
 const promptInputHint = computed(() => {
+  if (isVideoAccount.value) {
+    return t('admin.accounts.nativeVideoTestHint', { protocol: videoProtocolName.value })
+  }
   if (grokTestMode.value === 'video') {
     return t('admin.accounts.videoTestHint')
   }
@@ -651,6 +667,7 @@ const promptInputHint = computed(() => {
 })
 
 const testModeSummary = computed(() => {
+  if (isVideoAccount.value) return t('admin.accounts.videoTestMode')
   if (isGrokAccount.value) {
     switch (grokTestMode.value) {
       case 'video':
@@ -704,7 +721,7 @@ const sortTestModels = (models: ClaudeModel[]) => {
 const applyDefaultPromptForMode = () => {
   if (!supportsPromptInput.value) return
   if (testPrompt.value.trim()) return
-  if (grokTestMode.value === 'video') {
+  if (isVideoAccount.value || grokTestMode.value === 'video') {
     testPrompt.value = t('admin.accounts.videoPromptDefault')
   } else if (grokTestMode.value === 'image' || supportsImageTest.value) {
     testPrompt.value = t('admin.accounts.imagePromptDefault')
@@ -740,12 +757,13 @@ watch(
       testPrompt.value = ''
       testMode.value = 'default'
       grokTestMode.value = 'text'
+      clearMediaUploads()
       resetState()
       await loadAvailableModels()
       if (isGrokAccount.value) {
         pickDefaultModelForMode()
-        applyDefaultPromptForMode()
       }
+      applyDefaultPromptForMode()
     } else {
       abortStream()
     }
@@ -813,6 +831,10 @@ const abortStream = () => {
   }
 }
 
+onBeforeUnmount(() => {
+  abortStream()
+})
+
 const addLine = (text: string, className: string = 'text-gray-300') => {
   outputLines.value.push({ text, class: className })
   scrollToBottom()
@@ -856,6 +878,10 @@ const startTest = async () => {
     }
     if (isOpenAIAccount.value) {
       requestBody.mode = testMode.value
+    }
+    if (isVideoAccount.value) {
+      requestBody.mode = 'video'
+      if (uploadImageDataURL.value) requestBody.image_data_url = uploadImageDataURL.value
     }
     if (isGrokAccount.value) {
       // Always send explicit Grok mode. search/tts/stt/realtime are standalone
@@ -904,6 +930,17 @@ const startTest = async () => {
     const decoder = new TextDecoder()
     let buffer = ''
 
+    const handleSSELine = (line: string) => {
+      if (!line.startsWith('data: ')) return
+      const jsonStr = line.slice(6).trim()
+      if (!jsonStr) return
+      try {
+        handleEvent(JSON.parse(jsonStr))
+      } catch (e) {
+        console.error('Failed to parse SSE event:', e)
+      }
+    }
+
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
@@ -913,18 +950,17 @@ const startTest = async () => {
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6).trim()
-          if (jsonStr) {
-            try {
-              const event = JSON.parse(jsonStr)
-              handleEvent(event)
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e)
-            }
-          }
-        }
+        handleSSELine(line)
       }
+    }
+    // 冲刷结尾没有换行的残余事件行
+    if (buffer) handleSSELine(buffer)
+
+    // 流正常结束但没收到终态事件（test_complete / error）时按失败处理，避免永远"处理中"
+    if (status.value === 'connecting') {
+      status.value = 'error'
+      errorMessage.value = t('admin.accounts.testEndedWithoutResult')
+      addLine(t('admin.accounts.errorPrefix', { message: errorMessage.value }), 'text-red-400')
     }
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -956,7 +992,9 @@ const handleEvent = (event: {
         addLine(t('admin.accounts.usingModel', { model: event.model }), 'text-cyan-400')
       }
       addLine(
-        isGrokAccount.value
+        isVideoAccount.value
+          ? t('admin.accounts.sendingVideoRequest')
+          : isGrokAccount.value
           ? grokTestMode.value === 'video'
             ? t('admin.accounts.sendingVideoRequest')
             : grokTestMode.value === 'image'

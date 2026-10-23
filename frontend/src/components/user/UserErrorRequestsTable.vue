@@ -31,7 +31,10 @@
 
         <template #cell-endpoint="{ row }">
           <div class="max-w-[320px] text-xs">
-            <div class="break-all text-gray-700 dark:text-gray-300">
+            <div
+              class="truncate text-gray-700 dark:text-gray-300"
+              :title="`${t('usage.inbound')}: ${row.inbound_endpoint?.trim() || '-'}`"
+            >
               <span class="font-medium text-gray-500 dark:text-gray-400">{{ t('usage.inbound') }}:</span>
               <span class="ml-1">{{ row.inbound_endpoint?.trim() || '-' }}</span>
             </div>

@@ -37,11 +37,15 @@ import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
 import pluginsAPI from './plugins'
+import asyncTasksAPI from './asyncTasks'
+import adminVideoBillingReservationsAPI from './videoBillingReservations'
 
 /**
  * Unified admin API object for convenient access
  */
 export const adminAPI = {
+  asyncTasks: asyncTasksAPI,
+  videoBillingReservations: adminVideoBillingReservationsAPI,
   enterprises: enterprisesAPI,
   dashboard: dashboardAPI,
   users: usersAPI,
@@ -79,6 +83,8 @@ export const adminAPI = {
 }
 
 export {
+  asyncTasksAPI,
+  adminVideoBillingReservationsAPI,
   enterprisesAPI,  dashboardAPI,
   usersAPI,
   groupsAPI,
