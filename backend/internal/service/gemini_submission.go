@@ -171,7 +171,7 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		return nil, info, "", err
 	}
 	if account == nil {
-		return nil, info, "", fmt.Errorf("Gemini video account is required")
+		return nil, info, "", fmt.Errorf("a Gemini video account is required")
 	}
 	upstreamModel := strings.TrimPrefix(strings.TrimSpace(account.GetMappedModel(info.Model)), "models/")
 	if upstreamModel == "" {
@@ -184,7 +184,7 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 	if instance.Get("video").Exists() {
 		// Extension appends seven seconds and returns a video containing the
 		// input. Its billing semantics differ from ordinary video generation.
-		return nil, info, "", fmt.Errorf("Gemini video extension is not supported by video generation billing")
+		return nil, info, "", fmt.Errorf("video extension is not supported by Gemini video generation billing")
 	}
 	references := instance.Get("referenceImages")
 	if references.Exists() && (!references.IsArray() || len(references.Array()) > 3) {
@@ -205,7 +205,7 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		// Google's Veo 2 cookbook prose documents 1-2 (some code comments say
 		// 1-4). Use the smaller documented Gemini API limit, never Vertex's 4.
 		if info.N > 2 {
-			return nil, info, "", fmt.Errorf("Gemini Veo 2 requires 1-2 videos")
+			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 2 requires 1-2 videos")
 		}
 		official.MinDuration = 5
 		if len(references.Array()) > 0 {
@@ -213,7 +213,7 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		}
 	case "3":
 		if info.N != 1 {
-			return nil, info, "", fmt.Errorf("Gemini Veo 3 requires one video")
+			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 3 requires one video")
 		}
 		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
 		if len(references.Array()) > 0 {
@@ -221,7 +221,7 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		}
 	case "3.1":
 		if info.N != 1 {
-			return nil, info, "", fmt.Errorf("Gemini Veo 3.1 requires one video")
+			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 3.1 requires one video")
 		}
 		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
 		official.MinDuration, official.Durations = 4, []int{4, 6, 8}

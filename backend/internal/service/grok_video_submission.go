@@ -32,12 +32,12 @@ func NormalizeGrokVideoSubmission(body []byte, contentType string, endpoint Grok
 		return body, ParseGrokMediaRequest(contentType, body), nil
 	case GrokMediaEndpointVideosGenerations:
 	default:
-		return nil, info, fmt.Errorf("Grok video submission normalization requires a video creation endpoint")
+		return nil, info, fmt.Errorf("internal error: Grok video submission normalization requires a video creation endpoint")
 	}
 	if strings.TrimSpace(contentType) != "" {
 		mediaType, _, err := mime.ParseMediaType(contentType)
 		if err != nil || !strings.EqualFold(mediaType, "application/json") {
-			return nil, info, fmt.Errorf("Grok video submissions require Content-Type application/json")
+			return nil, info, fmt.Errorf("invalid video request: Grok video submissions require Content-Type application/json")
 		}
 	}
 	if err := ValidateVideoSubmissionJSON(body); err != nil {
@@ -53,14 +53,14 @@ func NormalizeGrokVideoSubmission(body []byte, contentType string, endpoint Grok
 	}
 	if prompt := root.Get("prompt"); prompt.Exists() {
 		if prompt.Type != gjson.String {
-			return nil, info, fmt.Errorf("Grok video prompt must be a string")
+			return nil, info, fmt.Errorf("invalid video request: Grok video prompt must be a string")
 		}
 		if grokVideoUsageCommand.MatchString(prompt.String()) {
-			return nil, info, fmt.Errorf("Grok video prompt usage commands are unsupported; use top-level duration, seconds or resolution fields")
+			return nil, info, fmt.Errorf("invalid video request: Grok video prompt usage commands are unsupported; use top-level duration, seconds or resolution fields")
 		}
 	}
 	if n := root.Get("n"); n.Exists() && (n.Type != gjson.Number || n.Float() != 1) {
-		return nil, info, fmt.Errorf("Grok video generation returns one video per task; n must be 1")
+		return nil, info, fmt.Errorf("invalid video request: Grok video generation returns one video per task; n must be 1")
 	}
 	duration, err := grokVideoSubmissionDuration(root)
 	if err != nil {
@@ -69,12 +69,12 @@ func NormalizeGrokVideoSubmission(body []byte, contentType string, endpoint Grok
 	resolution := VideoBillingResolution480P
 	if value := root.Get("resolution"); value.Exists() {
 		if value.Type != gjson.String {
-			return nil, info, fmt.Errorf("Grok video resolution must be a recognized resolution string")
+			return nil, info, fmt.Errorf("invalid video request: Grok video resolution must be a recognized resolution string")
 		}
 		var known bool
 		resolution, known = LookupVideoBillingResolution(value.String())
 		if !known {
-			return nil, info, fmt.Errorf("Grok video resolution must be 480p, 720p, 768p, 1080p or 2K")
+			return nil, info, fmt.Errorf("invalid video request: Grok video resolution must be 480p, 720p, 768p, 1080p or 2K")
 		}
 	}
 	// Keep explicit 768p/2K relay tiers: an account can map even a built-in
@@ -118,20 +118,20 @@ func grokVideoSubmissionDuration(root gjson.Result) (int, error) {
 		case gjson.Number:
 			seconds := value.Float()
 			if math.IsInf(seconds, 0) || math.IsNaN(seconds) || seconds != math.Trunc(seconds) || seconds < 1 || seconds > 15 {
-				return 0, fmt.Errorf("Grok video %s must be an integer from 1 to 15 seconds", field)
+				return 0, fmt.Errorf("invalid video request: Grok video %s must be an integer from 1 to 15 seconds", field)
 			}
 			parsed = int(seconds)
 		case gjson.String:
 			var err error
 			parsed, err = strconv.Atoi(strings.TrimSpace(value.String()))
 			if err != nil || parsed < 1 || parsed > 15 {
-				return 0, fmt.Errorf("Grok video %s must be an integer from 1 to 15 seconds", field)
+				return 0, fmt.Errorf("invalid video request: Grok video %s must be an integer from 1 to 15 seconds", field)
 			}
 		default:
-			return 0, fmt.Errorf("Grok video %s must be an integer from 1 to 15 seconds", field)
+			return 0, fmt.Errorf("invalid video request: Grok video %s must be an integer from 1 to 15 seconds", field)
 		}
 		if duration != 0 && duration != parsed {
-			return 0, fmt.Errorf("Grok video duration and seconds must agree")
+			return 0, fmt.Errorf("invalid video request: Grok video duration and seconds must agree")
 		}
 		duration = parsed
 	}
@@ -169,7 +169,7 @@ func rejectGrokVideoAlternateControls(value gjson.Result, path string) error {
 		// inputs silently turn generation into source-dependent edit/extension.
 		switch normalizedGrokVideoControlName(name) {
 		case "video", "videourl", "sourcevideo", "sourcevideourl", "mode":
-			fieldErr = fmt.Errorf("Grok video generation does not accept source-dependent mode control %s", field)
+			fieldErr = fmt.Errorf("invalid video request: Grok video generation does not accept source-dependent mode control %s", field)
 			return false
 		}
 		if path != "" && (name == "prompt" || name == "text") && child.Type == gjson.String && grokVideoUsageCommand.MatchString(child.String()) {

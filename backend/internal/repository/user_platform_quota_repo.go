@@ -83,7 +83,7 @@ func (r *userPlatformQuotaRepository) HasVideoBillingScope(ctx context.Context, 
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return false, rows.Err()
 	}

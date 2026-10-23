@@ -52,19 +52,19 @@ func validateSeedanceDraftMode(body []byte, model, resolution string) error {
 		return nil
 	}
 	if draft.Type != gjson.True && draft.Type != gjson.False {
-		return fmt.Errorf("Seedance draft must be a boolean")
+		return fmt.Errorf("invalid video request: Seedance draft must be a boolean")
 	}
 	if !draft.Bool() {
 		return nil
 	}
 	if resolution != VideoBillingResolution480P {
-		return fmt.Errorf("Seedance draft mode requires resolution 480p")
+		return fmt.Errorf("invalid video request: Seedance draft mode requires resolution 480p")
 	}
 	if model != "" {
 		model = strings.ToLower(model)
 		if !strings.Contains(model, "seedance-2-5") && !strings.Contains(model, "seedance-2.5") {
 			if strings.Contains(model, "seedance") {
-				return fmt.Errorf("Seedance draft mode requires a Seedance 2.5 model")
+				return fmt.Errorf("invalid video request: Seedance draft mode requires a Seedance 2.5 model")
 			}
 			var texts []string
 			for _, item := range gjson.GetBytes(body, "content").Array() {
@@ -74,7 +74,7 @@ func validateSeedanceDraftMode(body []byte, model, resolution string) error {
 			}
 			duration, frames, specified, err := seedanceTiming(body, strings.Join(texts, "\n"))
 			if err != nil || !specified || duration <= 0 || frames > 0 {
-				return fmt.Errorf("Seedance draft mode with an opaque deployment requires explicit fixed duration")
+				return fmt.Errorf("invalid video request: Seedance draft mode with an opaque deployment requires explicit fixed duration")
 			}
 		}
 	}

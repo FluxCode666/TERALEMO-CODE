@@ -32,7 +32,7 @@ func ValidateMiniMaxVideoID(id string) error {
 		return fmt.Errorf("invalid MiniMax task or file ID")
 	}
 	for _, ch := range id {
-		if !(ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_' || ch == '-') {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && ch != '_' && ch != '-' {
 			return fmt.Errorf("invalid MiniMax task or file ID")
 		}
 	}
@@ -220,7 +220,7 @@ func (s *OpenAIGatewayService) miniMaxVideoRequest(ctx context.Context, account 
 	if !code.Exists() || code.Type != gjson.Number || code.Float() != float64(code.Int()) {
 		return resp, responseBody, fmt.Errorf("invalid MiniMax response")
 	}
-	if code.Int() != 0 && !(endpoint == MiniMaxVideoEndpointStatus && strings.EqualFold(gjson.GetBytes(responseBody, "status").String(), "Fail")) {
+	if code.Int() != 0 && (endpoint != MiniMaxVideoEndpointStatus || !strings.EqualFold(gjson.GetBytes(responseBody, "status").String(), "Fail")) {
 		return resp, responseBody, fmt.Errorf("MiniMax upstream business status %d", code.Int())
 	}
 	return resp, responseBody, nil

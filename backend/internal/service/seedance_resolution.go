@@ -18,14 +18,14 @@ func seedanceResolution(body []byte, prompt string) (string, error) {
 	normalize := func(value string) (string, error) {
 		resolution, ok := LookupVideoBillingResolution(value)
 		if !ok {
-			return "", fmt.Errorf("Seedance gateway supports billable resolutions 480p, 720p, 768p, 1080p or 2K")
+			return "", fmt.Errorf("invalid video request: Seedance gateway supports billable resolutions 480p, 720p, 768p, 1080p or 2K")
 		}
 		return resolution, nil
 	}
 	resolution := ""
 	if value := gjson.GetBytes(body, "resolution"); value.Exists() {
 		if value.Type != gjson.String {
-			return "", fmt.Errorf("Seedance resolution must be a string")
+			return "", fmt.Errorf("invalid video request: Seedance resolution must be a string")
 		}
 		var err error
 		resolution, err = normalize(value.String())
@@ -36,14 +36,14 @@ func seedanceResolution(body []byte, prompt string) (string, error) {
 	words := strings.Fields(prompt)
 	for index, word := range words {
 		if seedanceQuantityFlag.MatchString(word) {
-			return "", fmt.Errorf("Seedance does not support output quantity flags")
+			return "", fmt.Errorf("invalid video request: Seedance does not support output quantity flags")
 		}
 		flag := seedanceResolutionFlag.FindStringSubmatch(word)
 		if flag == nil {
 			continue
 		}
 		if word != "--"+flag[1] || index+1 >= len(words) || flag[1] != "resolution" && flag[1] != "rs" {
-			return "", fmt.Errorf("Seedance resolution flags require a separate resolution value")
+			return "", fmt.Errorf("invalid video request: Seedance resolution flags require a separate resolution value")
 		}
 		value, err := normalize(words[index+1])
 		if err != nil {
@@ -64,7 +64,7 @@ func validateSeedanceModelResolution(model, resolution string) error {
 	model = strings.ToLower(model)
 	isV2 := strings.Contains(model, "seedance-2-0") || strings.Contains(model, "seedance-2.0")
 	if isV2 && (strings.Contains(model, "fast") || strings.Contains(model, "mini")) && resolution == VideoBillingResolution1080P {
-		return fmt.Errorf("Seedance 2.0 fast/mini support 480p or 720p")
+		return fmt.Errorf("invalid video request: Seedance 2.0 fast/mini support 480p or 720p")
 	}
 	return nil
 }

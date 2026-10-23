@@ -43,7 +43,7 @@ func seedanceModelTiming(model string) (minDuration, maxDuration int, smart, fra
 func seedanceTiming(body []byte, prompt string) (duration, frames int, specified bool, err error) {
 	readInt := func(value gjson.Result, name string) (int, error) {
 		if value.Type != gjson.Number || math.IsNaN(value.Float()) || math.IsInf(value.Float(), 0) || value.Float() != math.Trunc(value.Float()) {
-			return 0, fmt.Errorf("Seedance %s must be an integer", name)
+			return 0, fmt.Errorf("invalid video request: Seedance %s must be an integer", name)
 		}
 		return int(value.Int()), nil
 	}
@@ -74,7 +74,7 @@ func seedanceTiming(body []byte, prompt string) (duration, frames int, specified
 		}
 		name := flag[1]
 		if word != "--"+name || i+1 >= len(words) {
-			err = fmt.Errorf("Seedance timing flags require a separate integer value")
+			err = fmt.Errorf("invalid video request: Seedance timing flags require a separate integer value")
 			return
 		}
 		if name != "duration" && name != "dur" && name != "frames" {
@@ -106,7 +106,7 @@ func seedanceTiming(body []byte, prompt string) (duration, frames int, specified
 		}
 	}
 	if frames != 0 && (frames < 29 || frames > 289 || (frames-25)%4 != 0) {
-		err = fmt.Errorf("Seedance frames must be 25+4n in [29,289]")
+		err = fmt.Errorf("invalid video request: Seedance frames must be 25+4n in [29,289]")
 		return
 	}
 	if gjson.GetBytes(body, "frames").Exists() && frames == 0 {
@@ -114,7 +114,7 @@ func seedanceTiming(body []byte, prompt string) (duration, frames int, specified
 		return
 	}
 	if specified && duration != -1 && duration <= 0 {
-		err = fmt.Errorf("Seedance duration must be positive or supported smart duration -1")
+		err = fmt.Errorf("invalid video request: Seedance duration must be positive or supported smart duration -1")
 	}
 	return
 }
@@ -130,7 +130,7 @@ func NormalizeSeedanceSubmission(body []byte, mappedModel string) ([]byte, GrokM
 // capabilities after model mapping. Absent overrides retain the native rules.
 func NormalizeSeedanceSubmissionWithAccount(body []byte, account *Account) ([]byte, GrokMediaRequestInfo, error) {
 	if account == nil {
-		return nil, GrokMediaRequestInfo{}, fmt.Errorf("Seedance account is required")
+		return nil, GrokMediaRequestInfo{}, fmt.Errorf("internal error: Seedance account is required")
 	}
 	model := strings.TrimSpace(gjson.GetBytes(body, "model").String())
 	return normalizeSeedanceSubmission(body, account.GetMappedModel(model), account)
@@ -216,7 +216,7 @@ func normalizeSeedanceSubmission(body []byte, mappedModel string, account *Accou
 				duration = normalizedDuration
 			}
 		} else if duration != -1 && (duration < minDuration || duration > maxDuration) {
-			return nil, info, seedanceAccountLimitError(account, fmt.Errorf("Seedance duration must be in [%d,%d] for this model", minDuration, maxDuration))
+			return nil, info, seedanceAccountLimitError(account, fmt.Errorf("invalid video request: Seedance duration must be in [%d,%d] for this model", minDuration, maxDuration))
 		}
 		body, err = sjson.SetBytes(body, "duration", duration)
 		info.DurationSeconds = duration

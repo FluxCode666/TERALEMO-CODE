@@ -19,7 +19,7 @@ func (r *videoBillingReservationRepository) ListVideoBillingReservations(ctx con
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]*service.VideoBillingReservation, 0, pageSize)
 	for rows.Next() {
 		item, err := scanVideoReservation(rows)

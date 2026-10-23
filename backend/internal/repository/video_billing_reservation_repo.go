@@ -122,7 +122,7 @@ func (r *videoBillingReservationRepository) Reserve(ctx context.Context, v *serv
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var inserted string
 	err = tx.QueryRowContext(ctx, `INSERT INTO video_billing_reservations
  (id,user_id,api_key_id,group_id,subscription_id,enterprise_id,enterprise_department_id,
@@ -389,13 +389,13 @@ func (r *videoBillingReservationRepository) checkEnterpriseQuotas(ctx context.Co
 	for rows.Next() {
 		var q quota
 		if err = rows.Scan(&q.scope, &q.id, &q.limits[0], &q.limits[1], &q.limits[2], &q.limits[3], &q.used[0], &q.used[1], &q.used[2], &q.used[3], &q.starts[0], &q.starts[1], &q.starts[2]); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return err
 		}
 		quotas = append(quotas, q)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return err
 	}
@@ -460,7 +460,7 @@ func (r *videoBillingReservationRepository) ClaimDue(ctx context.Context, owner 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var result []*service.VideoBillingReservation
 	for rows.Next() {
 		v, err := scanVideoReservation(rows)
@@ -507,7 +507,7 @@ func (r *videoBillingReservationRepository) Settle(ctx context.Context, s *servi
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	v, err := scanVideoReservation(tx.QueryRowContext(ctx, `SELECT `+videoReservationColumns+` FROM video_billing_reservations WHERE id=$1 FOR UPDATE`, s.ID))
 	if err != nil {
 		return nil, err
@@ -644,7 +644,7 @@ func (r *videoBillingReservationRepository) Release(ctx context.Context, id, rea
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	v, err := scanVideoReservation(tx.QueryRowContext(ctx, `SELECT `+videoReservationColumns+` FROM video_billing_reservations WHERE id=$1 FOR UPDATE`, id))
 	if err != nil {
 		return nil, err

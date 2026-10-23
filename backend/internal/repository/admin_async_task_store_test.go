@@ -18,7 +18,8 @@ func TestAdminAsyncTasksGlobalPaginationFiltersAndUserIsolation(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	store := NewImageTaskStore(rdb)
-	catalog := store.(service.AsyncTaskStore)
+	catalog, ok := store.(service.AsyncTaskStore)
+	require.True(t, ok)
 	svc := service.NewImageTaskService(store)
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -79,6 +80,8 @@ func TestAdminAsyncTasksBackfillsExistingRecordsAndPrunesExpiredIndex(t *testing
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	store := NewImageTaskStore(rdb)
+	catalog, ok := store.(service.AsyncTaskStore)
+	require.True(t, ok)
 	svc := service.NewImageTaskService(store)
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -102,7 +105,7 @@ func TestAdminAsyncTasksBackfillsExistingRecordsAndPrunesExpiredIndex(t *testing
 	// A later write is indexed immediately, without another scan.
 	newTask := old
 	newTask.ID, newTask.TaskID, newTask.UserID, newTask.CreatedAt = "new-image", "new-image", 8, now
-	require.NoError(t, store.(service.AsyncTaskStore).SaveAsyncTask(ctx, &newTask))
+	require.NoError(t, catalog.SaveAsyncTask(ctx, &newTask))
 	page, err = svc.ListAdminTasks(ctx, service.AdminAsyncTaskFilter{Page: 1, PageSize: 20})
 	require.NoError(t, err)
 	require.Equal(t, 2, page.Total)
@@ -110,7 +113,7 @@ func TestAdminAsyncTasksBackfillsExistingRecordsAndPrunesExpiredIndex(t *testing
 	// Missing/expired records never count; their expired index members are pruned.
 	require.NoError(t, rdb.ZAdd(ctx, asyncTasksGlobalIndex, redis.Z{Score: float64(now), Member: "async_task:7:expired"}).Err())
 	require.NoError(t, rdb.ZAdd(ctx, asyncTasksGlobalExpiry, redis.Z{Score: float64(now - 1), Member: "async_task:7:expired"}).Err())
-	require.NoError(t, store.(service.AsyncTaskStore).SaveAsyncTask(ctx, &newTask))
+	require.NoError(t, catalog.SaveAsyncTask(ctx, &newTask))
 	require.Equal(t, int64(2), rdb.ZCard(ctx, asyncTasksGlobalIndex).Val(), "writes prune expired global index entries without an admin reader")
 	mr.FastForward(11 * time.Minute)
 	page, err = svc.ListAdminTasks(ctx, service.AdminAsyncTaskFilter{Page: 1, PageSize: 20})

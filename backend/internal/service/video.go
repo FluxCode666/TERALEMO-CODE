@@ -146,7 +146,7 @@ func videoTaskObservation(protocol string, body []byte) (status, resultURL, task
 
 func (s *OpenAIGatewayService) ForwardGeminiVideo(ctx context.Context, c *gin.Context, account *Account, endpoint GrokMediaEndpoint, taskID string, body []byte) (*OpenAIForwardResult, error) {
 	if !account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityGeminiVideo) || !endpoint.IsGeminiVideo() {
-		return nil, fmt.Errorf("Gemini video requires a video account using the Gemini protocol")
+		return nil, fmt.Errorf("internal error: Gemini video requires a video account using the Gemini protocol")
 	}
 	base, err := s.validateUpstreamBaseURL(account.VideoBaseURL())
 	if err != nil {
@@ -203,18 +203,18 @@ func (s *OpenAIGatewayService) ForwardGeminiVideo(ctx context.Context, c *gin.Co
 	}
 	if resp.StatusCode >= 300 {
 		s.writeNativeVideoResponse(c, account, resp, responseBody, taskID)
-		return nil, fmt.Errorf("Gemini video upstream status %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected upstream response: Gemini video upstream status %d", resp.StatusCode)
 	}
 	result := &OpenAIForwardResult{Model: model, BillingModel: model, UpstreamModel: upstreamModel, ResponseID: taskID, Duration: time.Since(started), ResponseHeaders: resp.Header.Clone(), VideoResolution: requestInfo.Resolution, VideoDurationSeconds: requestInfo.DurationSeconds}
 	result.AsyncTaskStatus, result.AsyncTaskURL, result.AsyncTaskError = videoTaskObservation(VideoProtocolGemini, responseBody)
 	if endpoint == GeminiVideoEndpointCreate {
 		name := gjson.GetBytes(responseBody, "name").String()
 		if err := ValidateGeminiVideoOperation(name); err != nil {
-			return nil, fmt.Errorf("Gemini video create response missing valid operation name: %w", err)
+			return nil, fmt.Errorf("unexpected upstream response: Gemini video create response missing valid operation name: %w", err)
 		}
 		result.ResponseID = "gemini:" + name
 	} else if name := gjson.GetBytes(responseBody, "name").String(); name != "" && name != resource {
-		return nil, fmt.Errorf("Gemini returned a different operation name")
+		return nil, fmt.Errorf("unexpected upstream response: Gemini returned a different operation name")
 	} else if result.AsyncTaskStatus == "completed" && result.AsyncTaskURL != "" {
 		result.VideoCount = max(1, max(len(gjson.GetBytes(responseBody, "response.generateVideoResponse.generatedSamples").Array()), len(gjson.GetBytes(responseBody, "response.generatedVideos").Array())))
 	}

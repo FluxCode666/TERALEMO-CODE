@@ -90,7 +90,14 @@ func TestRedactCredentialFormatsInStructuredStrings(t *testing.T) {
 	if redacted["message"] != "request rejected sk-***" {
 		t.Fatalf("credential remains in structured message: %#v", redacted)
 	}
-	details := redacted["details"].([]any)[0].(map[string]any)
+	detailsList, ok := redacted["details"].([]any)
+	if !ok || len(detailsList) != 1 {
+		t.Fatalf("unexpected details: %#v", redacted["details"])
+	}
+	details, ok := detailsList[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected detail: %#v", detailsList[0])
+	}
 	if details["header"] != "Bearer ***" || details["token_count"] != 42 {
 		t.Fatalf("unexpected nested redaction: %#v", details)
 	}

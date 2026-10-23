@@ -134,7 +134,7 @@ func (s *imageTaskStore) ListAsyncTasks(ctx context.Context, userID int64) ([]se
 	if err := s.rdb.ZRemRangeByScore(ctx, index, "-inf", strconv.FormatInt(time.Now().Unix(), 10)).Err(); err != nil {
 		return nil, err
 	}
-	ids, err := s.rdb.ZRevRange(ctx, index, 0, 999).Result()
+	ids, err := s.rdb.ZRangeArgs(ctx, redis.ZRangeArgs{Key: index, Start: 0, Stop: 999, Rev: true}).Result()
 	if err != nil {
 		return nil, err
 	}

@@ -105,7 +105,7 @@ func (s *imageTaskStore) ListAdminAsyncTasks(ctx context.Context, filter service
 	items := make([]service.AsyncTaskRecord, 0, filter.PageSize)
 	start, total := (filter.Page-1)*filter.PageSize, 0
 	for offset := int64(0); ; offset += asyncTaskBatchSize {
-		keys, err := s.rdb.ZRevRange(ctx, asyncTasksGlobalIndex, offset, offset+asyncTaskBatchSize-1).Result()
+		keys, err := s.rdb.ZRangeArgs(ctx, redis.ZRangeArgs{Key: asyncTasksGlobalIndex, Start: offset, Stop: offset + asyncTaskBatchSize - 1, Rev: true}).Result()
 		if err != nil {
 			return nil, 0, err
 		}

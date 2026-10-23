@@ -24,7 +24,7 @@ func (r *accountRepository) CountActiveVideoBillingReservations(ctx context.Cont
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return 0, service.ErrBillingServiceUnavailable
 	}

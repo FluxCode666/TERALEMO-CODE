@@ -72,7 +72,7 @@ func ParseSeedanceRequest(body []byte) (GrokMediaRequestInfo, error) {
 	// Account defaults are selected after scheduling. Draft's mandatory 480p
 	// tier is checked then; the pre-scheduling parser only checks its hard type.
 	if draft := gjson.GetBytes(body, "draft"); draft.Exists() && draft.Type != gjson.True && draft.Type != gjson.False {
-		return info, fmt.Errorf("Seedance draft must be a boolean")
+		return info, fmt.Errorf("invalid video request: Seedance draft must be a boolean")
 	}
 	info.DurationSeconds = SeedanceDefaultDurationSeconds
 	durationValue, framesValue, _, timingErr := seedanceTiming(body, info.Prompt)
@@ -202,7 +202,7 @@ func (s *OpenAIGatewayService) ForwardSeedance(ctx context.Context, c *gin.Conte
 	}
 	if endpoint == SeedanceEndpointStatus {
 		if id := gjson.GetBytes(responseBody, "id").String(); id != "" && id != strings.TrimPrefix(taskID, "seedance:") {
-			return nil, fmt.Errorf("Seedance returned a different task ID")
+			return nil, fmt.Errorf("unexpected upstream response: Seedance returned a different task ID")
 		}
 		result.ResponseID = taskID
 		result.UpstreamModel = gjson.GetBytes(responseBody, "model").String()

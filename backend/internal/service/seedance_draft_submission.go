@@ -14,7 +14,7 @@ import (
 )
 
 // Use the same error for an unknown, inaccessible, stale or incompatible draft.
-var ErrSeedanceDraftTaskUnavailable = errors.New("Seedance draft task is unavailable or incompatible")
+var ErrSeedanceDraftTaskUnavailable = errors.New("the Seedance draft task is unavailable or incompatible")
 
 type seedanceDraftReceiptKey struct{}
 

@@ -29,10 +29,6 @@ func videoPriceConfigFromAPIKey(apiKey *APIKey) *VideoPriceConfig {
 	}
 }
 
-func apiKeyHasConfiguredVideoPrice(apiKey *APIKey, model, resolution string) bool {
-	return apiKey != nil && apiKey.Group != nil && apiKey.Group.GetVideoPriceForModel(model, resolution) != nil
-}
-
 func webSearchPricePerCallFromAPIKey(apiKey *APIKey) *float64 {
 	if apiKey == nil || apiKey.Group == nil {
 		return nil
