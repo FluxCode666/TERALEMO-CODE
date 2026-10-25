@@ -7,6 +7,8 @@ export default {
     "keyPlaceholderOption": "不填入 Key（使用占位符）",
     "keySelectHint": "选择后示例使用完整 Key；未选择时示例显示 sk-YOUR_KEY 占位符。",
     "copy": "复制",
-    "copied": "已复制到剪贴板"
+    "copied": "已复制到剪贴板",
+    "request": "请求",
+    "response": "响应"
   }
 }

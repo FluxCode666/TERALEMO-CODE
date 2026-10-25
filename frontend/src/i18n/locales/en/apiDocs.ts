@@ -7,6 +7,8 @@ export default {
     "keyPlaceholderOption": "Do not fill a key (use placeholder)",
     "keySelectHint": "Examples show the full selected key; without a selection they show the sk-YOUR_KEY placeholder.",
     "copy": "Copy",
-    "copied": "Copied to clipboard"
+    "copied": "Copied to clipboard",
+    "request": "Request",
+    "response": "Response"
   }
 }

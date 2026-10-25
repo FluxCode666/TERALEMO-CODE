@@ -26,6 +26,31 @@ export interface DocCode {
   code: string
 }
 
+/** A request/response example shown under a protocol section. */
+export interface DocExampleResponse {
+  /** A short label such as "Processing" or "Success". */
+  title: string
+  /** HTTP status returned by the gateway. */
+  status: number
+  /** JSON response body. Omitted for binary downloads. */
+  body?: string
+  /** Human-readable response headers for binary downloads. */
+  headers?: string
+  /** Additional context for this response. */
+  description?: string
+}
+
+export interface DocExample {
+  type: 'example'
+  /** Stable id used by the protocol-scoped table of contents. */
+  id: string
+  title: string
+  description?: string
+  /** curl request; may contain {{BASE_URL}} and {{API_KEY}} placeholders. */
+  request: string
+  responses: DocExampleResponse[]
+}
+
 /** Internal router link rendered with RouterLink. */
 export interface DocLink {
   type: 'link'
@@ -33,7 +58,7 @@ export interface DocLink {
   text: string
 }
 
-export type DocBlock = DocParagraph | DocList | DocTable | DocCode | DocLink
+export type DocBlock = DocParagraph | DocList | DocTable | DocCode | DocExample | DocLink
 
 export interface DocSection {
   id: string
