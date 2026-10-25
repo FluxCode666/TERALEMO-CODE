@@ -756,4 +756,42 @@ describe('PlazaModelPricingTable 分时计价', () => {
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
     expect(wrapper.find('[title*="modelPlaza.table.timePricingRowHint"]').exists()).toBe(false)
   })
+
+  it('视频按秒计费展示每个分辨率的每秒单价,不写成按次', () => {
+    const model = tokenModel({ name: 'MiniMax-H3', platform: 'video', official_pricing: null })
+    model.pricing = {
+      billing_mode: 'video',
+      input_price: null,
+      output_price: null,
+      cache_write_price: null,
+      cache_read_price: null,
+      image_input_price: null,
+      image_output_price: null,
+      per_request_price: null,
+      intervals: [
+        { tier_label: '768p', min_tokens: 0, max_tokens: null, input_price: null, output_price: null, per_request_price: 0.06, cache_write_price: null, cache_read_price: null },
+        { tier_label: '1080p', min_tokens: 0, max_tokens: null, input_price: null, output_price: null, per_request_price: 0.12, cache_write_price: null, cache_read_price: null }
+      ]
+    } as never
+    const wrapper = mountTable([model], 1)
+    const text = wrapper.text()
+    expect(text).toContain('modelPlaza.table.perSecond')
+    expect(text).not.toContain('modelPlaza.table.perRequest')
+    expect(text).toContain('modelPlaza.table.perUnitSecond')
+    expect(text).not.toContain('modelPlaza.table.perUnitRequest')
+    expect(text).toContain('768p')
+    expect(text).toContain('$0.06')
+    expect(text).toContain('$0.12')
+    expect(wrapper.find('[title="modelPlaza.table.perSecondHint"]').exists()).toBe(true)
+  })
+
+  it('按次计费的模型仍展示 / 次,不受视频文案影响', () => {
+    const model = tokenModel({ name: 'gpt-4o-search', official_pricing: null })
+    model.pricing!.billing_mode = 'per_request'
+    model.pricing!.per_request_price = 0.01
+    const wrapper = mountTable([model], 1)
+    expect(wrapper.text()).toContain('modelPlaza.table.perUnitRequest')
+    expect(wrapper.text()).toContain('modelPlaza.table.perRequest')
+    expect(wrapper.text()).not.toContain('modelPlaza.table.perUnitSecond')
+  })
 })

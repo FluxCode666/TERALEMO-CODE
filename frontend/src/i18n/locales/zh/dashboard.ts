@@ -706,6 +706,9 @@ export default {
       unitPerMillion: '$ / 1M token',
       perUnitRequest: '/ 次',
       perUnitImage: '/ 张',
+      perUnitSecond: '/ 秒',
+      perSecond: '按秒计费',
+      perSecondHint: '单价为每秒价格，总价 = 每秒价 × 视频时长（秒） × 视频数',
       perRequest: '按次计费',
       perImage: '按图片计费'
     },

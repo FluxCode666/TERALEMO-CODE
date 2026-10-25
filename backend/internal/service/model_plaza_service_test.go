@@ -509,3 +509,95 @@ func TestListGroups_TimePricingPassthrough(t *testing.T) {
 	// 展示单价为标准时段价
 	require.InDelta(t, 0.28e-6, *m.Pricing.InputPrice, 1e-15)
 }
+
+func TestListPlazaGroups_VideoPerSecondPricesUseBillingTiers(t *testing.T) {
+	// 视频按秒计费：广场必须给出每个分辨率档位的每秒单价，且取值顺序与计费一致。
+	channelTier := 0.06
+	channelPerReq := 0.99
+	groupFlat480 := 0.04
+	groupModel1080 := 0.5
+	groups := []Group{
+		{ID: 30, Name: "g-video", Platform: PlatformVideo, RateMultiplier: 1, VideoBillingMode: string(BillingModeVideo),
+			VideoPrice480P: &groupFlat480, VideoPrice720P: testPtrFloat64(0.07),
+			VideoPrice768P: testPtrFloat64(0.08), VideoPrice1080P: testPtrFloat64(0.12), VideoPrice2K: testPtrFloat64(0.2),
+			VideoModelPrices: map[string]map[string]float64{"minimax-h3": {"1080p": groupModel1080}}},
+		{ID: 40, Name: "g-video-per-request", Platform: PlatformVideo, RateMultiplier: 1, VideoBillingMode: string(BillingModePerRequest),
+			VideoPricePerRequest: testPtrFloat64(1.5)},
+	}
+	t.Run("channel price wins when the channel prices video", func(t *testing.T) {
+		channels := []Channel{{
+			ID: 1, Name: "video-ch", Status: StatusActive, GroupIDs: []int64{30, 40},
+			ModelPricing: []ChannelModelPricing{{
+				Platform:        PlatformVideo,
+				Models:          []string{"MiniMax-H3"},
+				BillingMode:     BillingModeVideo,
+				PerRequestPrice: &channelPerReq,
+				Intervals:       []PricingInterval{{TierLabel: "768p", PerRequestPrice: &channelTier}},
+			}},
+		}}
+		byName := plazaGroupsByName(t, channels, groups)
+		perSecond := byName["g-video"].Models[0].Pricing
+		require.NotNil(t, perSecond)
+		require.Equal(t, BillingModeVideo, perSecond.BillingMode, "按秒计费必须保留视频模式，不能退化为按次")
+		tiers := map[string]float64{}
+		for _, iv := range perSecond.Intervals {
+			require.NotNil(t, iv.PerRequestPrice)
+			tiers[iv.TierLabel] = *iv.PerRequestPrice
+		}
+		require.Len(t, tiers, 5, "五个分辨率档位都应展示")
+		require.InDelta(t, channelTier, tiers["768p"], 1e-9, "渠道同档位价最高优先")
+		require.InDelta(t, channelPerReq, tiers["480p"], 1e-9, "缺档位时回到渠道默认每秒价")
+		require.InDelta(t, channelPerReq, tiers["1080p"], 1e-9, "渠道默认价先于分组按模型价")
+
+		// 视频分组的渠道价在计费中优先于分组按次价，展示与之一致。
+		require.Equal(t, BillingModeVideo, byName["g-video-per-request"].Models[0].Pricing.BillingMode)
+	})
+
+	t.Run("group fallback prices fill tiers the channel leaves unpriced", func(t *testing.T) {
+		channels := []Channel{{
+			ID: 2, Name: "video-ch-unpriced", Status: StatusActive, GroupIDs: []int64{30},
+			ModelPricing: []ChannelModelPricing{{
+				Platform: PlatformVideo, Models: []string{"MiniMax-H3"}, BillingMode: BillingModeVideo,
+			}},
+		}}
+		byName := plazaGroupsByName(t, channels, groups)
+		pricing := byName["g-video"].Models[0].Pricing
+		require.NotNil(t, pricing)
+		require.Equal(t, BillingModeVideo, pricing.BillingMode)
+		tiers := map[string]float64{}
+		for _, iv := range pricing.Intervals {
+			require.NotNil(t, iv.PerRequestPrice)
+			tiers[iv.TierLabel] = *iv.PerRequestPrice
+		}
+		require.InDelta(t, groupFlat480, tiers["480p"], 1e-9, "分组兜底价")
+		require.InDelta(t, 0.08, tiers["768p"], 1e-9)
+		require.InDelta(t, groupModel1080, tiers["1080p"], 1e-9, "分组按模型价优先于兜底价")
+		require.InDelta(t, 0.2, tiers["2k"], 1e-9)
+	})
+
+	t.Run("per-request video group without channel price shows a single request price", func(t *testing.T) {
+		channels := []Channel{{
+			ID: 3, Name: "video-ch-mapped", Status: StatusActive, GroupIDs: []int64{40},
+			ModelMapping: map[string]map[string]string{"video": {"MiniMax-H3": "MiniMax-H3"}},
+		}}
+		byName := plazaGroupsByName(t, channels, groups)
+		pricing := byName["g-video-per-request"].Models[0].Pricing
+		require.NotNil(t, pricing)
+		require.Equal(t, BillingModePerRequest, pricing.BillingMode)
+		require.NotNil(t, pricing.PerRequestPrice)
+		require.InDelta(t, 1.5, *pricing.PerRequestPrice, 1e-9, "按次分组只展示一个价格")
+		require.Empty(t, pricing.Intervals)
+	})
+}
+
+func plazaGroupsByName(t *testing.T, channels []Channel, groups []Group) map[string]PlazaGroup {
+	t.Helper()
+	svc := newPlazaService(channels, groups, nil)
+	out, err := svc.ListGroups(context.Background())
+	require.NoError(t, err)
+	byName := map[string]PlazaGroup{}
+	for _, g := range out {
+		byName[g.Name] = g
+	}
+	return byName
+}

@@ -181,7 +181,7 @@
             </td>
           </template>
 
-          <!-- 按次 / 按图片计费:实付区整体合并,阶梯芯片或单一按次价 -->
+          <!-- 按次 / 按图片 / 视频按秒计费:实付区整体合并,阶梯芯片或单一单价 -->
           <template v-else>
             <td colspan="3" class="pz-cell px-3 py-2.5 align-middle">
               <div
@@ -191,6 +191,7 @@
                 <span
                   v-for="(iv, idx) in requestIntervals(m)"
                   :key="idx"
+                  :title="perSecondHint(m)"
                   class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-800 dark:bg-dark-700/60 dark:text-gray-200"
                 >
                   <span class="font-sans text-gray-400 dark:text-dark-500">{{ tierLabel(iv) }}</span>
@@ -199,7 +200,7 @@
                 </span>
               </div>
               <template v-else-if="m.pricing?.per_request_price != null">
-                <span class="font-mono font-semibold text-gray-900 dark:text-gray-50">
+                <span class="font-mono font-semibold text-gray-900 dark:text-gray-50" :title="perSecondHint(m)">
                   {{ paidRequestPrice(m, m.pricing.per_request_price) }}
                 </span>
                 <span class="ml-1 text-xs text-gray-400 dark:text-dark-500">{{ perUnitSuffix(m) }}</span>
@@ -362,7 +363,7 @@ const PER_MILLION = 1_000_000
 
 /**
  * 展示顺序:
- * 1. token 计费的排在前,按图/按次计费的沉到末尾——它们的官方 token 价与实付的按张/按次价不同量纲,混排无意义;
+ * 1. token 计费的排在前,按图/按秒/按次计费的沉到末尾——它们的官方 token 价与实付的按张/按秒/按次价不同量纲,混排无意义;
  * 2. 组内按官方输出价从高到低,无官方价的排最后;
  * 3. 同价按名称降序(新版本号在前,如 gpt-5.6 先于 gpt-5.5)。
  */
@@ -390,9 +391,14 @@ function billingMode(m: PlazaModel): BillingMode {
 }
 
 function billingModeLabel(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perImage')
-    : t('modelPlaza.table.perRequest')
+  switch (billingMode(m)) {
+    case BILLING_MODE_IMAGE:
+      return t('modelPlaza.table.perImage')
+    case BILLING_MODE_VIDEO:
+      return t('modelPlaza.table.perSecond')
+    default:
+      return t('modelPlaza.table.perRequest')
+  }
 }
 
 /** 价格统一保底 2 位小数,更长的有效小数原样保留。 */
@@ -457,11 +463,21 @@ function official(value: number | null | undefined): string {
   return formatScaled(value, PER_MILLION, MIN_DECIMALS)
 }
 
-/** 非 token 计费的单位后缀:按图片 → “/ 张”,按次 → “/ 次”。 */
+/** 非 token 计费的单位后缀:按图片 → “/ 张”,按秒(视频) → “/ 秒”,按次 → “/ 次”。 */
 function perUnitSuffix(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perUnitImage')
-    : t('modelPlaza.table.perUnitRequest')
+  switch (billingMode(m)) {
+    case BILLING_MODE_IMAGE:
+      return t('modelPlaza.table.perUnitImage')
+    case BILLING_MODE_VIDEO:
+      return t('modelPlaza.table.perUnitSecond')
+    default:
+      return t('modelPlaza.table.perUnitRequest')
+  }
+}
+
+/** 视频按秒行的补充说明:单价是每秒价格,总价 = 每秒价 × 时长 × 视频数。 */
+function perSecondHint(m: PlazaModel): string | undefined {
+  return billingMode(m) === BILLING_MODE_VIDEO ? t('modelPlaza.table.perSecondHint') : undefined
 }
 
 function hasCachePricing(m: PlazaModel): boolean {
@@ -532,7 +548,7 @@ function tierHint(m: PlazaModel): string {
 }
 
 
-/** 按次/按图模式的阶梯定价(仅保留配了按次价的档位)。 */
+/** 按次/按图/按秒模式的阶梯定价(仅保留配了单价的档位)。 */
 function requestIntervals(m: PlazaModel): UserPricingInterval[] {
   return (m.pricing?.intervals ?? []).filter((iv) => iv.per_request_price != null)
 }

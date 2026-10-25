@@ -229,7 +229,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
-// 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
+// 图片/视频/按次模型（或阶梯表不可用时）沿用渠道定价与分组媒体档位价。
 func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
 	if groupPricing := matchGroupModelPricing(g, m.Name); groupPricing != nil {
 		m.Pricing = groupPricing
@@ -249,7 +249,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 			return
 		}
 	}
-	m.Pricing = plazaImageDisplayPricing(m.Pricing, g)
+	m.Pricing = plazaDisplayPricing(m.Pricing, g, m.Name)
 }
 
 // plazaPricingFromSchedule 把阶梯表压成展示用的 ChannelModelPricing：
@@ -290,6 +290,93 @@ func plazaIntervalsFromTiers(tiers []ContextPricingTier) []PricingInterval {
 		})
 	}
 	return intervals
+}
+
+// plazaDisplayPricing 分发到图片或视频的展示定价合成。
+func plazaDisplayPricing(p *ChannelModelPricing, g *Group, model string) *ChannelModelPricing {
+	if p != nil && p.BillingMode == BillingModeImage {
+		return plazaImageDisplayPricing(p, g)
+	}
+	return plazaVideoDisplayPricing(p, g, model)
+}
+
+// videoDisplayResolutions 视频按秒计的展示档位，顺序与计费档位一致。
+var videoDisplayResolutions = []string{
+	VideoBillingResolution480P, VideoBillingResolution720P, VideoBillingResolution768P,
+	VideoBillingResolution1080P, VideoBillingResolution2K,
+}
+
+// plazaVideoDisplayPricing 为视频模型合成展示定价，直接复用计费侧的解析函数
+// （configuredVideoTaskPrice / groupVideoTaskPrice），保证展示的档位与单价就是
+// 提交时实际采用的费率：
+//   - 视频分组：渠道价优先，缺失时回落分组按模型价与分组兜底价；
+//   - 其它分组（Grok 等）：分组价优先，缺失时回落渠道价；分组配了 token 卡片
+//     说明整单走 token 计费，不展示按秒价；
+//   - 分组按次计费时收敛为单一按次价。
+//
+// 返回克隆，不修改入参（渠道定价指针指向缓存共享数据）。
+func plazaVideoDisplayPricing(p *ChannelModelPricing, g *Group, model string) *ChannelModelPricing {
+	if g == nil {
+		return p
+	}
+	videoGroup := g.Platform == PlatformVideo
+	if !videoGroup {
+		channelMode := BillingMode("")
+		if p != nil {
+			channelMode = p.BillingMode
+		}
+		if channelMode == "" || channelMode == BillingModeToken {
+			card := matchGroupModelPricing(g, model)
+			if card == nil || card.BillingMode == "" || card.BillingMode == BillingModeToken {
+				return p
+			}
+		}
+	}
+
+	clone := ChannelModelPricing{}
+	if p != nil {
+		clone = *p
+	}
+	clone.PerRequestPrice = nil
+	clone.Intervals = nil
+
+	pick := func(resolution string) *videoTaskPrice {
+		if videoGroup {
+			if price := configuredVideoTaskPrice(p, resolution, PricingSourceChannel); price != nil {
+				return price
+			}
+			return groupVideoTaskPrice(g, model, resolution)
+		}
+		if price := groupVideoTaskPrice(g, model, resolution); price != nil {
+			return price
+		}
+		return configuredVideoTaskPrice(p, resolution, PricingSourceChannel)
+	}
+
+	for index, resolution := range videoDisplayResolutions {
+		price := pick(resolution)
+		if price == nil {
+			continue
+		}
+		clone.BillingMode = price.mode
+		if price.mode == BillingModePerRequest {
+			// 按次计费与分辨率无关：只保留一个价格。
+			value := price.unitPrice
+			clone.PerRequestPrice = &value
+			clone.Intervals = nil
+			return &clone
+		}
+		value := price.unitPrice
+		clone.Intervals = append(clone.Intervals, PricingInterval{
+			TierLabel:       resolution,
+			PerRequestPrice: &value,
+			SortOrder:       index,
+		})
+	}
+	if len(clone.Intervals) == 0 && p == nil {
+		return p
+	}
+	return &clone
 }
 
 // plazaImageDisplayPricing 为图片计费模型合成展示定价，使档位价与实收口径一致：

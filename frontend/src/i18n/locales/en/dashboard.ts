@@ -702,6 +702,9 @@ export default {
       unitPerMillion: '$ / 1M tokens',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',
+      perUnitSecond: '/ second',
+      perSecond: 'Per second',
+      perSecondHint: 'Price per second. Total = per-second price × duration (s) × number of videos.',
       perRequest: 'Per request',
       perImage: 'Per image'
     },
