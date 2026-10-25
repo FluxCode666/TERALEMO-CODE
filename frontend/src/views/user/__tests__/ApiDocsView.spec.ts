@@ -22,6 +22,7 @@ vi.mock('@/api/keys', () => ({ keysAPI: { list: mocks.listKeys }, default: { lis
 vi.mock('@/i18n', () => ({ i18n: { global: { t: (key: string) => key } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: mocks.showSuccess, showError: mocks.showError }) }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ isReady: () => Promise.resolve() }) }))
 
 import ApiDocsView from '../ApiDocsView.vue'
 
@@ -37,6 +38,7 @@ function render() {
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
+  window.history.replaceState(null, '', window.location.pathname)
   mocks.setLocale('en')
   mocks.listKeys.mockResolvedValue({ items: [userKey], total: 1, page: 1, page_size: 100, pages: 1 })
   Object.defineProperty(window, 'isSecureContext', { value: true, writable: true, configurable: true })
@@ -148,6 +150,37 @@ describe('ApiDocsView', () => {
     expect(second.text()).not.toContain('sk-YOUR_KEY')
     expect((second.get('#api-docs-key').element as HTMLSelectElement).value).toBe('5')
     second.unmount()
+  })
+
+  it('pins the catalog navigation on desktop while the docs scroll', async () => {
+    const wrapper = render()
+    await flushPromises()
+    const toc = wrapper.get('[data-test="api-docs-toc"]')
+    expect(toc.classes()).toEqual(expect.arrayContaining(['lg:sticky', 'lg:top-20', 'lg:max-h-[calc(100vh-6rem)]', 'lg:overflow-y-auto']))
+    expect(toc.findAll('a').length).toBeGreaterThan(0)
+    wrapper.unmount()
+  })
+
+  it('scrolls to the section and updates the hash without a router navigation when a catalog entry is clicked', async () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const wrapper = render()
+    await flushPromises()
+    try {
+      const link = wrapper.get('[data-test="api-docs-toc"] a[href="#api-docs-errors"]')
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+      link.element.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+      expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.get('#api-docs-errors').element)
+      expect(replaceState).toHaveBeenLastCalledWith(window.history.state, '', '#api-docs-errors')
+    } finally {
+      Element.prototype.scrollIntoView = original
+      replaceState.mockRestore()
+      wrapper.unmount()
+    }
   })
 
   it('renders a mobile protocol select that mirrors the tab list', async () => {

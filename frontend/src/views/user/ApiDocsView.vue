@@ -16,12 +16,13 @@
       </div>
 
       <div class="lg:flex lg:items-start lg:gap-6">
-        <nav :aria-label="t('apiDocs.contents')" class="mb-4 flex gap-2 overflow-x-auto pb-1 lg:mb-0 lg:w-56 lg:shrink-0 lg:flex-col lg:overflow-visible">
+        <nav :aria-label="t('apiDocs.contents')" data-test="api-docs-toc" class="mb-4 flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100vh-6rem)] lg:w-56 lg:shrink-0 lg:flex-col lg:overflow-y-auto">
           <span class="shrink-0 rounded-md bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700 dark:bg-primary-950 dark:text-primary-300">{{ docs.category }}</span>
           <a
             v-for="entry in tocEntries"
             :key="entry.id"
             :href="`#api-docs-${entry.id}`"
+            @click.prevent="jumpTo(entry.id)"
             class="shrink-0 rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
           >{{ entry.title }}</a>
         </nav>
@@ -70,8 +71,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import DocBlocks from '@/components/docs/DocBlocks.vue'
 import { keysAPI } from '@/api/keys'
@@ -81,6 +83,7 @@ import zhDocs from '@/docs/video/zh'
 import enDocs from '@/docs/video/en'
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const docs = computed<VideoDocsContent>(() => (locale.value === 'zh' ? zhDocs : enDocs))
 
 const SELECTED_KEY_STORAGE = 'apiDocs.selectedKeyId'
@@ -130,7 +133,24 @@ function resolveCode(code: string): string {
   return code.split('{{BASE_URL}}').join(baseUrl).split('{{API_KEY}}').join(exampleKey.value)
 }
 
+// The router scrolls to the top on every navigation, including hash-only
+// changes, which races the native anchor jump. Scroll here and update the
+// hash without a router navigation.
+function jumpTo(id: string, behavior: 'auto' | 'smooth' = 'smooth') {
+  const target = document.getElementById(`api-docs-${id}`)
+  if (!target) return
+  target.scrollIntoView({ behavior, block: 'start' })
+  history.replaceState(history.state, '', `#api-docs-${id}`)
+}
+
 onMounted(async () => {
+  const initial = window.location.hash.startsWith('#api-docs-') ? window.location.hash.slice('#api-docs-'.length) : ''
+  if (initial) {
+    // Wait for the router's own scroll-to-top after the initial navigation.
+    await router?.isReady()
+    await nextTick()
+    window.setTimeout(() => window.requestAnimationFrame(() => jumpTo(initial, 'auto')), 0)
+  }
   try {
     const data = await keysAPI.list(1, 100)
     apiKeys.value = data.items
