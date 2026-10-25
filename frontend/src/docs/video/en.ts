@@ -1,6 +1,6 @@
-import type { VideoDocsContent } from './types'
+import type { DocBlock, DocExample, VideoDocsContent } from './types'
 
-const en: VideoDocsContent = {
+const enBase: VideoDocsContent = {
   category: 'Video Generation',
   beforeProtocols: [
     {
@@ -197,7 +197,7 @@ const en: VideoDocsContent = {
             },
             {
               type: 'p',
-              text: 'The tasks page shows queued / running as "Processing", succeeded as "Completed", and failed / cancelled as their terminal states. Download with the exact result URL returned by the response — do not build it from the task ID.'
+              text: 'The tasks page shows queued / running as "Processing", succeeded as "Completed", and failed / cancelled as their terminal states. A successful cancellation normally returns the upstream HTTP 204 No Content response; the actual upstream status is authoritative and hidden and non-hidden URL modes behave the same. Download with the exact result URL returned by the response — do not build it from the task ID.'
             }
           ]
         }
@@ -250,7 +250,7 @@ const en: VideoDocsContent = {
             {
               type: 'code',
               title: 'Text to video',
-              code: `curl '{{BASE_URL}}/v1beta/models/YOUR_VIDEO_MODEL:predictLongRunning' \\
+              code: `curl '{{BASE_URL}}/v1beta/models/veo-3.0-generate-001:predictLongRunning' \\
   -H 'Authorization: Bearer {{API_KEY}}' \\
   -H 'Content-Type: application/json' \\
   -d '{"instances":[{"prompt":"Waves under the setting sun"}],"parameters":{"durationSeconds":8,"resolution":"720p"}}'`
@@ -258,7 +258,7 @@ const en: VideoDocsContent = {
             {
               type: 'code',
               title: 'Image to video (first frame)',
-              code: `curl '{{BASE_URL}}/v1beta/models/YOUR_VIDEO_MODEL:predictLongRunning' \\
+              code: `curl '{{BASE_URL}}/v1beta/models/veo-3.0-generate-001:predictLongRunning' \\
   -H 'Authorization: Bearer {{API_KEY}}' \\
   -H 'Content-Type: application/json' \\
   -d '{"instances":[{"prompt":"The camera pushes in slowly","image":{"inlineData":{"mimeType":"image/png","data":"<BASE64_IMAGE>"}}}],"parameters":{"durationSeconds":8,"resolution":"720p"}}'`
@@ -501,7 +501,7 @@ const en: VideoDocsContent = {
             {
               type: 'code',
               title: 'Submit response',
-              code: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":""}}'
+              code: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}'
             },
             {
               type: 'p',
@@ -555,5 +555,195 @@ const en: VideoDocsContent = {
     }
   ]
 }
+
+type ExampleSpec = Omit<DocExample, 'type' | 'request'> & { requestTitle: string }
+
+const responseHeaders = 'Content-Type: video/mp4\nContent-Disposition: attachment; filename="generated-video.mp4"\nCache-Control: no-store'
+
+function responseTable(rows: string[][], appendRoot = true): DocBlock {
+  const hasRoot = rows.some(row => row[0] === '{root}')
+  const isDownload = rows.some(row => row[0] === 'response body')
+  const completeRows = hasRoot || isDownload || !appendRoot
+    ? rows
+    : [...rows, ['{root}', 'object', 'Other fields follow the upstream structure. When hidden-link mode is enabled, all upstream URL strings and response headers containing them are redacted or removed under the privacy rules; see the vendor documentation.']]
+  return { type: 'table', headers: ['Field path', 'Type', 'Description'], rows: completeRows }
+}
+
+const responseTables: Record<string, string[][][]> = {
+  seedance: [
+    [['id', 'string', 'Seedance task ID returned after a successful submission (for example, cgt-…).']],
+    [
+      ['id', 'string', 'Task ID.'],
+      ['model', 'string', 'Upstream model name, passed through in the native Ark response.'],
+      ['status', 'string', 'queued / running are processing; succeeded is successful; failed / cancelled / expired are terminal states.'],
+      ['content.video_url', 'string', 'Successful video URL; when upstream links are hidden, replaced with /v1/video-tasks/{resource}/content?index=N.'],
+      ['usage.completion_tokens', 'integer', 'Optional usage field in a successful response, passed through from the upstream.']
+    ],
+    [
+      ['HTTP status', 'integer', 'A successful cancellation normally returns 204 No Content; use the actual upstream status as authoritative. Hidden and non-hidden URL modes behave the same.'],
+      ['response body', 'empty', 'The successful cancellation response has no JSON body or root object.']
+    ],
+    [
+      ['HTTP status', 'integer', 'Success returns 200; an invalid resource or index returns 400; an unauthenticated request returns 401; a missing or unauthorized task returns 404; a non-200 upstream response or non-video Content-Type returns an error or 502.'],
+      ['response body', 'binary', 'Video bytes; there is no JSON response body on success. Error responses use the gateway/task error object.'],
+      ['Content-Type', 'string', 'The upstream video/* or application/octet-stream content type.'],
+      ['Content-Disposition', 'string', 'The gateway sets attachment; filename="generated-video.mp4".'],
+      ['Cache-Control', 'string', 'The gateway sets no-store.']
+    ]
+  ],
+  gemini: [
+    [['name', 'string', 'Operation name returned on submission, such as models/{model}/operations/{id}.']],
+    [
+      ['name', 'string', 'Operation name; use the complete name for later queries.'],
+      ['done', 'boolean', 'false means processing; true means the operation has ended.'],
+      ['response.generateVideoResponse.generatedSamples[].video.uri', 'string', 'Successful video URL; when upstream links are hidden, replaced with /v1/video-tasks/{resource}/content?index=N.'],
+      ['error.code / message / status', 'number / string', 'Native Google error shape; an error or empty video output means the task failed.']
+    ],
+    [
+      ['HTTP status', 'integer', 'Success returns 200; an invalid resource or index returns 400; an unauthenticated request returns 401; a missing or unauthorized task returns 404; a non-200 upstream response or non-video Content-Type returns an error or 502.'],
+      ['response body', 'binary', 'Video bytes; there is no JSON response body on success. Error responses use the gateway/task error object.'],
+      ['Content-Type', 'string', 'The upstream video/* or application/octet-stream content type.'],
+      ['Content-Disposition', 'string', 'The gateway sets attachment; filename="generated-video.mp4".'],
+      ['Cache-Control', 'string', 'The gateway sets no-store.']
+    ]
+  ],
+  'minimax-v2': [
+    [['task_id', 'string', 'MiniMax v2 task ID; the successful v2 submission root object contains only task_id. Error responses follow the gateway/upstream error contract.']],
+    [
+      ['task.id', 'string', 'Task ID.'],
+      ['task.status', 'string', 'queued / running are processing; succeeded is successful; failed / cancelled are terminal states.'],
+      ['task.content.url', 'string', 'Successful video URL; when upstream links are hidden, replaced with /v1/video-tasks/{resource}/content?index=N.'],
+      ['task.error.message', 'string', 'If the upstream response contains this field, the gateway reads and passes it through; it may be absent.']
+    ],
+    [
+      ['HTTP status', 'integer', 'Success returns 200; an invalid resource or index returns 400; an unauthenticated request returns 401; a missing or unauthorized task returns 404; a non-200 upstream response or non-video Content-Type returns an error or 502.'],
+      ['response body', 'binary', 'Video bytes; there is no JSON response body on success. Error responses use the gateway/task error object.'],
+      ['Content-Type', 'string', 'The upstream video/* or application/octet-stream content type.'],
+      ['Content-Disposition', 'string', 'The gateway sets attachment; filename="generated-video.mp4".'],
+      ['Cache-Control', 'string', 'The gateway sets no-store.']
+    ]
+  ],
+  'minimax-v1': [
+    [
+      ['task_id', 'string', 'MiniMax v1 task ID returned after a successful submission.'],
+      ['base_resp.status_code', 'integer', '0 means submission succeeded; a non-zero value in an HTTP 200 creation response is treated as failure and is not charged.'],
+      ['base_resp.status_msg', 'string', 'Native upstream business status message.']
+    ],
+    [
+      ['task_id', 'string', 'The queried task ID.'],
+      ['status', 'string', 'Preparing / Queueing / Processing are processing; Success is successful; Fail is failed.'],
+      ['file_id', 'string', 'File ID returned by Success, used with files/retrieve.'],
+      ['base_resp.status_code / status_msg', 'integer / string', 'Native MiniMax business fields, passed through from the upstream.']
+    ],
+    [
+      ['file.file_id', 'string', 'File ID; it should match the file_id in the request.'],
+      ['file.download_url', 'string', 'Short-lived download URL; when upstream links are hidden, rewritten to /v1/video-tasks/{resource}/content?index=N.'],
+      ['base_resp.status_code / status_msg', 'integer / string', 'Native MiniMax business fields.']
+    ],
+    [
+      ['HTTP status', 'integer', 'Success returns 200; an invalid resource or index returns 400; an unauthenticated request returns 401; a missing or unauthorized task returns 404; a non-200 upstream response or non-video Content-Type returns an error or 502.'],
+      ['response body', 'binary', 'Video bytes; there is no JSON response body on success. Error responses use the gateway/task error object.'],
+      ['Content-Type', 'string', 'The upstream video/* or application/octet-stream content type.'],
+      ['Content-Disposition', 'string', 'The gateway sets attachment; filename="generated-video.mp4".'],
+      ['Cache-Control', 'string', 'The gateway sets no-store.']
+    ]
+  ]
+}
+
+const responseTableLabels: Record<string, string[]> = {
+  seedance: ['POST /api/v3/contents/generations/tasks', 'GET /api/v3/contents/generations/tasks/{task_id}', 'DELETE /api/v3/contents/generations/tasks/{task_id}', 'GET /v1/video-tasks/{resource}/content'],
+  gemini: ['POST /v1beta/models/{model}:predictLongRunning', 'GET /v1beta/{operation_name}', 'GET /v1/video-tasks/{resource}/content'],
+  'minimax-v2': ['POST /v2/video_generation', 'GET /v2/query/video_generation/{task_id}', 'GET /v1/video-tasks/{resource}/content'],
+  'minimax-v1': ['POST /v1/video_generation', 'GET /v1/query/video_generation?task_id={task_id}', 'GET /v1/files/retrieve?file_id={file_id}', 'GET /v1/video-tasks/{resource}/content']
+}
+
+const exampleSpecs: Record<string, ExampleSpec[]> = {
+  seedance: [
+    { id: 'text-to-video', title: 'Text to video', description: 'Submit a text prompt to create an asynchronous task.', requestTitle: 'Text to video', responses: [{ title: 'Accepted', status: 200, body: '{"id":"cgt-example-task-id"}', description: 'Seedance returns the task ID.' }] },
+    { id: 'first-frame', title: 'Image to video (first frame)', description: 'Use a first-frame image together with a text prompt.', requestTitle: 'Image to video (first frame)', responses: [{ title: 'Accepted', status: 200, body: '{"id":"cgt-example-task-id"}' }] },
+    { id: 'reference-image', title: 'Reference image to video', description: 'Use a reference image to guide the video.', requestTitle: 'Reference image to video', responses: [{ title: 'Accepted', status: 200, body: '{"id":"cgt-example-task-id"}' }] },
+    { id: 'draft', title: 'Generate a draft (480p)', description: 'Seedance 2.5 draft requests use 480p.', requestTitle: 'Create a draft (480p sample)', responses: [{ title: 'Accepted', status: 200, body: '{"id":"cgt-draft-task-id"}' }] },
+    { id: 'draft-task', title: 'Create the final video from a draft (fixed 1080p)', description: 'Reference a successful draft without resending inherited duration or ratio fields.', requestTitle: 'Create the official film from a draft (fixed 1080p, no inherited fields)', responses: [{ title: 'Accepted', status: 200, body: '{"id":"cgt-final-task-id"}' }] },
+    { id: 'query', title: 'Query a task', description: 'Poll the same task_id until it reaches a terminal state.', requestTitle: 'Query a task', responses: [
+      { title: 'Processing', status: 200, body: '{"id":"cgt-example-task-id","status":"running"}' },
+      { title: 'Succeeded', status: 200, body: '{"id":"cgt-example-task-id","model":"YOUR_VIDEO_MODEL","status":"succeeded","content":{"video_url":"/v1/video-tasks/c2VlZGFuY2U6Y2d0LWV4YW1wbGUtdGFzay1pZA/content?index=0"},"usage":{"completion_tokens":12345}}' }
+    ] },
+    { id: 'cancel', title: 'Cancel a task', description: 'Cancel a Seedance task that is still processing.', requestTitle: 'Cancel a task', responses: [{ title: 'Cancelled', status: 204, description: 'A successful cancellation normally has an empty HTTP 204 response body; the actual upstream status is authoritative and hidden and non-hidden URL modes behave the same.' }] },
+    { id: 'download', title: 'Download the result', description: 'Download with the complete opaque resource URL returned by the response.', requestTitle: 'Download the result (use the exact URL from the response)', responses: [{ title: 'Video content', status: 200, headers: responseHeaders, description: 'The body is binary video and is intentionally omitted here.' }] }
+  ],
+  gemini: [
+    { id: 'text-to-video', title: 'Text to video', description: 'Call predictLongRunning to create an operation.', requestTitle: 'Text to video', responses: [{ title: 'Accepted', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id"}' }] },
+    { id: 'first-frame', title: 'Image to video (first frame)', description: 'Provide the first frame through inlineData.', requestTitle: 'Image to video (first frame)', responses: [{ title: 'Accepted', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id"}' }] },
+    { id: 'reference-image', title: 'Reference images', description: 'Veo 3.1 accepts up to three reference images and requires 8 seconds.', requestTitle: 'Reference images (Veo 3.1 only, up to 3, requires 8s)', responses: [{ title: 'Accepted', status: 200, body: '{"name":"models/veo-3.1-generate-preview/operations/example-operation-id"}' }] },
+    { id: 'query', title: 'Query a task', description: 'Copy the complete name from the submission response and use that exact operation name to query the task.', requestTitle: 'Query a task', responses: [
+      { title: 'Processing', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id","done":false}' },
+      { title: 'Succeeded', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id","done":true,"response":{"generateVideoResponse":{"generatedSamples":[{"video":{"uri":"/v1/video-tasks/Z2VtaW5pOm1vZGVscy92ZW8tMy4wLWdlbmVyYXRlLTAwMS9vcGVyYXRpb25zL2V4YW1wbGUtb3BlcmF0aW9uLWlk/content?index=0"}}]}}}' }
+    ] },
+    { id: 'download', title: 'Download the result', description: 'Use the complete result URL from the query response.', requestTitle: 'Download the result (use the exact URL from the response)', responses: [{ title: 'Video content', status: 200, headers: responseHeaders, description: 'The body is binary video and is intentionally omitted here.' }] }
+  ],
+  'minimax-v2': [
+    { id: 'text-to-video', title: 'Text to video', description: 'Create an H3 task with content text.', requestTitle: 'Text to video', responses: [{ title: 'Accepted', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'first-frame', title: 'Image to video (first frame)', description: 'Provide the first frame with the first_frame role.', requestTitle: 'Image to video (first frame)', responses: [{ title: 'Accepted', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'reference-image', title: 'Reference images', description: 'Use reference_image; it cannot be mixed with first/last frames.', requestTitle: 'Reference images (up to 9, cannot mix with first/last frames)', responses: [{ title: 'Accepted', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'query', title: 'Query a task', description: 'Query with the task_id in the path.', requestTitle: 'Query a task', responses: [
+      { title: 'Processing', status: 200, body: '{"task":{"id":"example-task-id","status":"running"}}' },
+      { title: 'Succeeded', status: 200, body: '{"task":{"id":"example-task-id","status":"succeeded","content":{"url":"/v1/video-tasks/bWluaW1heDpleGFtcGxlLXRhc2staWQ/content?index=0"}}}' }
+    ] },
+    { id: 'download', title: 'Download the result', description: 'Use the complete result URL from the query response.', requestTitle: 'Download the result (use the exact URL from the response)', responses: [{ title: 'Video content', status: 200, headers: responseHeaders, description: 'The body is binary video and is intentionally omitted here.' }] }
+  ],
+  'minimax-v1': [
+    { id: 'text-to-video', title: 'Text to video', description: 'Create a Hailuo v1 task with prompt.', requestTitle: 'Text to video', responses: [{ title: 'Accepted', status: 200, body: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'first-frame', title: 'Image to video (first frame)', description: 'Create an image-to-video task with first_frame_image.', requestTitle: 'Image to video (first frame)', responses: [{ title: 'Accepted', status: 200, body: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'query', title: 'Query a task', description: 'Poll task status; a Success response includes file_id.', requestTitle: 'Query a task', responses: [
+      { title: 'Processing', status: 200, body: '{"task_id":"example-task-id","status":"Processing","base_resp":{"status_code":0,"status_msg":"success"}}' },
+      { title: 'Succeeded', status: 200, body: '{"task_id":"example-task-id","status":"Success","file_id":"example-file-id","base_resp":{"status_code":0,"status_msg":"success"}}' }
+    ] },
+    { id: 'file', title: 'Fetch file download information', description: 'Use the successful task file_id to obtain a short-lived download URL.', requestTitle: 'Fetch file download information', responses: [{ title: 'Success', status: 200, body: '{"file":{"file_id":"example-file-id","download_url":"/v1/video-tasks/bWluaW1heC1maWxlOmV4YW1wbGUtZmlsZS1pZA/content?index=0"},"base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'download', title: 'Download the result', description: 'Download with the complete result URL returned by the response.', requestTitle: 'Download the result (use the exact URL from the response)', responses: [{ title: 'Video content', status: 200, headers: responseHeaders, description: 'The body is binary video and is intentionally omitted here.' }] }
+  ]
+}
+
+function enrichDocs(base: VideoDocsContent): VideoDocsContent {
+  const formatJson = (value: string): string => {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2)
+    } catch {
+      return value
+    }
+  }
+  const formatBlock = (block: DocBlock): DocBlock => {
+    if (block.type === 'code') return { ...block, code: formatJson(block.code) }
+    if (block.type === 'example') {
+      return {
+        ...block,
+        responses: block.responses.map(response => response.body ? { ...response, body: formatJson(response.body) } : response)
+      }
+    }
+    return block
+  }
+  const protocols = base.protocols.map(protocol => {
+    const tables = responseTables[protocol.id] ?? []
+    const endpointIndex = protocol.sections.findIndex(section => section.id.endsWith('-endpoints'))
+    const endpoint = protocol.sections[endpointIndex]
+    const labels = responseTableLabels[protocol.id] ?? []
+    const endpointBlocks = endpoint
+      ? [...endpoint.blocks, ...tables.flatMap((rows, index) => [{ type: 'p' as const, text: `Response parameters (${labels[index] ?? `interface ${index + 1}`})` }, responseTable(rows, !(protocol.id === 'minimax-v2' && index === 0))])]
+      : []
+    const specs = exampleSpecs[protocol.id] ?? []
+    const exampleSectionIndex = protocol.sections.findIndex(section => section.id.endsWith('-examples'))
+    const exampleSection = protocol.sections[exampleSectionIndex]
+    const codeByTitle = new Map((exampleSection?.blocks ?? []).filter((block): block is Extract<DocBlock, { type: 'code' }> => block.type === 'code').map(block => [block.title, block.code]))
+    const examples: DocExample[] = specs.map(spec => ({ type: 'example', id: spec.id, title: spec.title, description: spec.description, request: codeByTitle.get(spec.requestTitle) ?? '', responses: spec.responses }))
+    const sections = protocol.sections.map((section, index) => {
+      if (index === endpointIndex) return { ...section, blocks: endpointBlocks }
+      if (index === exampleSectionIndex) return { ...section, blocks: examples }
+      return section
+    }).map(section => ({ ...section, blocks: section.blocks.map(formatBlock) }))
+    return { ...protocol, sections }
+  })
+  return { ...base, protocols }
+}
+
+const en = enrichDocs(enBase)
 
 export default en

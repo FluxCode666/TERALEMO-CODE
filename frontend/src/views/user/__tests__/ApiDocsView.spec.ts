@@ -22,6 +22,7 @@ vi.mock('@/api/keys', () => ({ keysAPI: { list: mocks.listKeys }, default: { lis
 vi.mock('@/i18n', () => ({ i18n: { global: { t: (key: string) => key } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: mocks.showSuccess, showError: mocks.showError }) }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ isReady: () => Promise.resolve() }) }))
 
 import ApiDocsView from '../ApiDocsView.vue'
 
@@ -37,6 +38,7 @@ function render() {
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
+  window.history.replaceState(null, '', window.location.pathname)
   mocks.setLocale('en')
   mocks.listKeys.mockResolvedValue({ items: [userKey], total: 1, page: 1, page_size: 100, pages: 1 })
   Object.defineProperty(window, 'isSecureContext', { value: true, writable: true, configurable: true })
@@ -150,6 +152,37 @@ describe('ApiDocsView', () => {
     second.unmount()
   })
 
+  it('pins the catalog navigation on desktop while the docs scroll', async () => {
+    const wrapper = render()
+    await flushPromises()
+    const toc = wrapper.get('[data-test="api-docs-toc"]')
+    expect(toc.classes()).toEqual(expect.arrayContaining(['lg:sticky', 'lg:top-20', 'lg:max-h-[calc(100vh-6rem)]', 'lg:overflow-y-auto']))
+    expect(toc.findAll('a').length).toBeGreaterThan(0)
+    wrapper.unmount()
+  })
+
+  it('scrolls to the section and updates the hash without a router navigation when a catalog entry is clicked', async () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const wrapper = render()
+    await flushPromises()
+    try {
+      const link = wrapper.get('[data-test="api-docs-toc"] a[href="#api-docs-errors"]')
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+      link.element.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+      expect(scrollIntoView.mock.contexts[0]).toBe(wrapper.get('#api-docs-errors').element)
+      expect(replaceState).toHaveBeenLastCalledWith(window.history.state, '', '#api-docs-errors')
+    } finally {
+      Element.prototype.scrollIntoView = original
+      replaceState.mockRestore()
+      wrapper.unmount()
+    }
+  })
+
   it('renders a mobile protocol select that mirrors the tab list', async () => {
     const wrapper = render()
     await flushPromises()
@@ -165,6 +198,148 @@ describe('ApiDocsView', () => {
     expect(wrapper.get('[data-protocol="gemini"]').isVisible()).toBe(true)
     expect(wrapper.get('[data-protocol="seedance"]').isVisible()).toBe(false)
     wrapper.unmount()
+  })
+
+  it('renders one protocol directory with interface and example children per protocol', async () => {
+    const wrapper = render()
+    await flushPromises()
+    expect(wrapper.findAll('[data-test="api-docs-toc-protocol"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-test="api-docs-toc-interface"]').length).toBeGreaterThan(0)
+    const tocExamples = wrapper.findAll('[data-test="api-docs-toc-example"]')
+    const renderedExamples = wrapper.findAll('[data-doc-example]')
+    expect(tocExamples).toHaveLength(renderedExamples.length)
+    for (const protocol of ['seedance', 'gemini', 'minimax-v2', 'minimax-v1']) {
+      expect(tocExamples.filter(link => link.attributes('data-protocol-id') === protocol).length).toBeGreaterThan(0)
+    }
+    expect(wrapper.findAll('[data-test="api-docs-toc-toggle"]')).toHaveLength(4)
+    wrapper.unmount()
+  })
+
+  it('keeps each protocol directory anchor order identical to the page DOM order', async () => {
+    const wrapper = render()
+    await flushPromises()
+    const toc = wrapper.get('[data-test="api-docs-toc"]')
+    for (const protocol of ['seedance', 'gemini', 'minimax-v2', 'minimax-v1']) {
+      const tocOrder = toc.findAll('[data-protocol-id]')
+        .filter(item => ['api-docs-toc-interface', 'api-docs-toc-example'].includes(item.attributes('data-test') || ''))
+        .filter(item => item.attributes('data-protocol-id') === protocol)
+        .map(item => item.attributes('data-toc-id'))
+      const pageOrder = wrapper.get(`[data-protocol="${protocol}"]`).findAll('[data-scrollspy-id]')
+        .map(item => item.attributes('data-scrollspy-id'))
+        .filter(token => token?.startsWith(`${protocol}-`))
+      expect(tocOrder).toEqual(pageOrder)
+    }
+    wrapper.unmount()
+  })
+
+  it('switches protocol, scrolls to the selected example, and updates the example hash', async () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const wrapper = render()
+    await flushPromises()
+    try {
+      const link = wrapper.get('[data-test="api-docs-toc-example"][data-protocol-id="gemini"][data-example-id="query"]')
+      await link.trigger('click')
+      await nextTick()
+      expect((wrapper.get('#api-docs-protocol').element as HTMLSelectElement).value).toBe('gemini')
+      expect(scrollIntoView).toHaveBeenCalled()
+      expect(scrollIntoView.mock.contexts.at(-1)).toBe(wrapper.get('#api-docs-gemini-query').element)
+      expect(replaceState).toHaveBeenLastCalledWith(window.history.state, '', '#api-docs-gemini-query')
+    } finally {
+      Element.prototype.scrollIntoView = original
+      replaceState.mockRestore()
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps the clicked example highlighted while the smooth scroll passes other sections', async () => {
+    type ObserverEntry = { isIntersecting: boolean; target: Element; boundingClientRect: { top: number } }
+    let callback: ((entries: ObserverEntry[]) => void) | null = null
+    class MockIntersectionObserver {
+      observe = vi.fn()
+      disconnect = vi.fn()
+      constructor(handler: (entries: ObserverEntry[]) => void) { callback = handler }
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = vi.fn()
+    const wrapper = render()
+    await flushPromises()
+    const exampleLink = (protocol: string, example: string) => wrapper.get(`[data-test="api-docs-toc-example"][data-protocol-id="${protocol}"][data-example-id="${example}"]`)
+    try {
+      await exampleLink('minimax-v2', 'reference-image').trigger('click')
+      await nextTick()
+      callback?.([{ isIntersecting: true, target: wrapper.get('#api-docs-minimax-v2-query').element, boundingClientRect: { top: 90 } }])
+      await nextTick()
+      expect(exampleLink('minimax-v2', 'reference-image').classes()).toContain('bg-primary-100')
+      expect(exampleLink('minimax-v2', 'query').classes()).not.toContain('bg-primary-100')
+      window.dispatchEvent(new Event('scrollend'))
+      callback?.([{ isIntersecting: true, target: wrapper.get('#api-docs-minimax-v2-query').element, boundingClientRect: { top: 90 } }])
+      await nextTick()
+      expect(exampleLink('minimax-v2', 'query').classes()).toContain('bg-primary-100')
+      await exampleLink('seedance', 'draft-task').trigger('click')
+      await nextTick()
+      expect(exampleLink('seedance', 'draft-task').classes()).toContain('bg-primary-100')
+      expect(exampleLink('seedance', 'draft').classes()).not.toContain('bg-primary-100')
+    } finally {
+      Element.prototype.scrollIntoView = original
+      vi.unstubAllGlobals()
+      wrapper.unmount()
+    }
+  })
+
+  it('opens an example hash on the matching protocol tab after mount', async () => {
+    window.history.replaceState(null, '', '#api-docs-minimax-v1-file')
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    const wrapper = render()
+    try {
+      await flushPromises()
+      await new Promise(resolve => window.setTimeout(resolve, 25))
+      await nextTick()
+      expect((wrapper.get('#api-docs-protocol').element as HTMLSelectElement).value).toBe('minimax-v1')
+      expect(scrollIntoView.mock.contexts.some(context => context === wrapper.get('#api-docs-minimax-v1-file').element)).toBe(true)
+    } finally {
+      Element.prototype.scrollIntoView = original
+      wrapper.unmount()
+    }
+  })
+
+  it('uses IntersectionObserver scrollspy to highlight and expand the active example', async () => {
+    type ObserverEntry = { isIntersecting: boolean; target: Element; boundingClientRect: { top: number } }
+    let callback: ((entries: ObserverEntry[]) => void) | null = null
+    const observers: Array<{ observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }> = []
+    class MockIntersectionObserver {
+      observe = vi.fn()
+      disconnect = vi.fn()
+
+      constructor(handler: (entries: ObserverEntry[]) => void) {
+        callback = handler
+        observers.push(this)
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const wrapper = render()
+    await flushPromises()
+    try {
+      expect(observers).toHaveLength(1)
+      const target = wrapper.get('#api-docs-gemini-reference-image').element
+      callback?.([{ isIntersecting: true, target, boundingClientRect: { top: 10 } }])
+      await nextTick()
+      expect((wrapper.get('#api-docs-protocol').element as HTMLSelectElement).value).toBe('gemini')
+      const protocolToggle = wrapper.find('[data-test="api-docs-toc-toggle"][aria-label*="Gemini"]')
+      expect(protocolToggle.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.get('[data-test="api-docs-toc-example"][data-protocol-id="gemini"][data-example-id="reference-image"]').classes()).toContain('bg-primary-100')
+      expect(replaceState).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+      replaceState.mockRestore()
+      wrapper.unmount()
+    }
   })
 
   it('switches the copy button label to the copied state after a successful copy', async () => {

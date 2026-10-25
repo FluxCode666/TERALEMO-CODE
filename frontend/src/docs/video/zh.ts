@@ -1,6 +1,6 @@
-import type { VideoDocsContent } from './types'
+import type { DocBlock, DocExample, VideoDocsContent } from './types'
 
-const zh: VideoDocsContent = {
+const zhBase: VideoDocsContent = {
   category: '视频生成',
   beforeProtocols: [
     {
@@ -197,7 +197,7 @@ const zh: VideoDocsContent = {
             },
             {
               type: 'p',
-              text: '任务页将 queued／running 显示为「处理中」，succeeded 为「已完成」，failed／cancelled 为对应终态。下载时直接使用响应中返回的完整结果 URL，不要用任务 ID 自行拼接。'
+              text: '任务页将 queued／running 显示为「处理中」，succeeded 为「已完成」，failed／cancelled 为对应终态。取消成功通常返回上游 HTTP 204 空响应体，以上游实际状态为准；隐藏与非隐藏模式行为一致。下载时直接使用响应中返回的完整结果 URL，不要用任务 ID 自行拼接。'
             }
           ]
         }
@@ -250,7 +250,7 @@ const zh: VideoDocsContent = {
             {
               type: 'code',
               title: '文生视频',
-              code: `curl '{{BASE_URL}}/v1beta/models/YOUR_VIDEO_MODEL:predictLongRunning' \\
+              code: `curl '{{BASE_URL}}/v1beta/models/veo-3.0-generate-001:predictLongRunning' \\
   -H 'Authorization: Bearer {{API_KEY}}' \\
   -H 'Content-Type: application/json' \\
   -d '{"instances":[{"prompt":"夕阳下的海浪"}],"parameters":{"durationSeconds":8,"resolution":"720p"}}'`
@@ -258,7 +258,7 @@ const zh: VideoDocsContent = {
             {
               type: 'code',
               title: '首帧图生视频',
-              code: `curl '{{BASE_URL}}/v1beta/models/YOUR_VIDEO_MODEL:predictLongRunning' \\
+              code: `curl '{{BASE_URL}}/v1beta/models/veo-3.0-generate-001:predictLongRunning' \\
   -H 'Authorization: Bearer {{API_KEY}}' \\
   -H 'Content-Type: application/json' \\
   -d '{"instances":[{"prompt":"镜头缓慢推进","image":{"inlineData":{"mimeType":"image/png","data":"<BASE64_IMAGE>"}}}],"parameters":{"durationSeconds":8,"resolution":"720p"}}'`
@@ -501,7 +501,7 @@ const zh: VideoDocsContent = {
             {
               type: 'code',
               title: '提交响应',
-              code: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":""}}'
+              code: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}'
             },
             {
               type: 'p',
@@ -555,5 +555,195 @@ const zh: VideoDocsContent = {
     }
   ]
 }
+
+type ExampleSpec = Omit<DocExample, 'type' | 'request'> & { requestTitle: string }
+
+const responseHeaders = 'Content-Type: video/mp4\nContent-Disposition: attachment; filename="generated-video.mp4"\nCache-Control: no-store'
+
+function responseTable(rows: string[][], appendRoot = true): DocBlock {
+  const hasRoot = rows.some(row => row[0] === '{root}')
+  const isDownload = rows.some(row => row[0] === 'response body')
+  const completeRows = hasRoot || isDownload || !appendRoot
+    ? rows
+    : [...rows, ['{root}', 'object', '其它字段按上游结构透传；开启隐藏链接时，所有上游 URL 字符串及含 URL 的响应头会按隐私规则脱敏或删除，以厂商文档为准。']]
+  return { type: 'table', headers: ['字段路径', '类型', '说明'], rows: completeRows }
+}
+
+const responseTables: Record<string, string[][][]> = {
+  seedance: [
+    [['id', 'string', '提交成功返回的 Seedance 任务 ID（如 cgt-…）。']],
+    [
+      ['id', 'string', '任务 ID。'],
+      ['model', 'string', '上游返回的模型名，按 Ark 原生响应透传。'],
+      ['status', 'string', 'queued／running 表示处理中；succeeded 表示成功；failed／cancelled／expired 表示终态。'],
+      ['content.video_url', 'string', '成功视频 URL；开启隐藏上游链接时替换为本站 /v1/video-tasks/{resource}/content?index=N。'],
+      ['usage.completion_tokens', 'integer', '成功响应中可能返回的用量字段，按上游原样透传。']
+    ],
+    [
+      ['HTTP status', 'integer', '取消成功通常返回 204 No Content；以上游实际状态为准，隐藏与非隐藏模式行为一致。'],
+      ['response body', 'empty', '取消成功响应体为空，不包含 JSON 根对象。']
+    ],
+    [
+      ['HTTP status', 'integer', '成功返回 200；非法 resource 或 index 返回 400；未认证返回 401；任务不存在或无权访问返回 404；上游非 200 或 Content-Type 不是视频时返回错误或 502。'],
+      ['response body', 'binary', '成功时返回视频二进制，不包含 JSON 响应体；错误时返回网关或任务错误对象。'],
+      ['Content-Type', 'string', '上游返回的 video/* 或 application/octet-stream。'],
+      ['Content-Disposition', 'string', '网关设置为 attachment; filename="generated-video.mp4"。'],
+      ['Cache-Control', 'string', '网关设置为 no-store。']
+    ]
+  ],
+  gemini: [
+    [['name', 'string', '提交成功返回的 operation name，形如 models/{model}/operations/{id}。']],
+    [
+      ['name', 'string', '操作名称；后续查询使用完整 name。'],
+      ['done', 'boolean', 'false 表示处理中；true 表示操作已结束。'],
+      ['response.generateVideoResponse.generatedSamples[].video.uri', 'string', '成功视频 URL；开启隐藏上游链接时替换为本站 /v1/video-tasks/{resource}/content?index=N。'],
+      ['error.code / message / status', 'number / string', 'Google 原生错误结构；出现 error 或空视频结果时任务失败。']
+    ],
+    [
+      ['HTTP status', 'integer', '成功返回 200；非法 resource 或 index 返回 400；未认证返回 401；任务不存在或无权访问返回 404；上游非 200 或 Content-Type 不是视频时返回错误或 502。'],
+      ['response body', 'binary', '成功时返回视频二进制，不包含 JSON 响应体；错误时返回网关或任务错误对象。'],
+      ['Content-Type', 'string', '上游返回的 video/* 或 application/octet-stream。'],
+      ['Content-Disposition', 'string', '网关设置为 attachment; filename="generated-video.mp4"。'],
+      ['Cache-Control', 'string', '网关设置为 no-store。']
+    ]
+  ],
+  'minimax-v2': [
+    [['task_id', 'string', '提交成功返回的 MiniMax v2 任务 ID；v2 成功提交的根对象只包含 task_id，错误响应按网关或上游错误契约返回。']],
+    [
+      ['task.id', 'string', '任务 ID。'],
+      ['task.status', 'string', 'queued／running 表示处理中；succeeded 表示成功；failed／cancelled 表示终态。'],
+      ['task.content.url', 'string', '成功视频 URL；开启隐藏上游链接时替换为本站 /v1/video-tasks/{resource}/content?index=N。'],
+      ['task.error.message', 'string', '若上游响应包含此字段，网关会读取并透传；该字段可能不存在。']
+    ],
+    [
+      ['HTTP status', 'integer', '成功返回 200；非法 resource 或 index 返回 400；未认证返回 401；任务不存在或无权访问返回 404；上游非 200 或 Content-Type 不是视频时返回错误或 502。'],
+      ['response body', 'binary', '成功时返回视频二进制，不包含 JSON 响应体；错误时返回网关或任务错误对象。'],
+      ['Content-Type', 'string', '上游返回的 video/* 或 application/octet-stream。'],
+      ['Content-Disposition', 'string', '网关设置为 attachment; filename="generated-video.mp4"。'],
+      ['Cache-Control', 'string', '网关设置为 no-store。']
+    ]
+  ],
+  'minimax-v1': [
+    [
+      ['task_id', 'string', '提交成功返回的 MiniMax v1 任务 ID。'],
+      ['base_resp.status_code', 'integer', '0 表示提交成功；HTTP 200 中非零值按创建失败处理且不收取生成费用。'],
+      ['base_resp.status_msg', 'string', '上游业务状态说明。']
+    ],
+    [
+      ['task_id', 'string', '被查询的任务 ID。'],
+      ['status', 'string', 'Preparing／Queueing／Processing 表示处理中；Success 表示成功；Fail 表示失败。'],
+      ['file_id', 'string', 'Success 时的文件 ID，用于调用 files/retrieve。'],
+      ['base_resp.status_code / status_msg', 'integer / string', 'MiniMax 原生业务状态字段，按上游原样透传。']
+    ],
+    [
+      ['file.file_id', 'string', '文件 ID，应与请求中的 file_id 一致。'],
+      ['file.download_url', 'string', '短期有效的下载 URL；开启隐藏上游链接时改写为本站 /v1/video-tasks/{resource}/content?index=N。'],
+      ['base_resp.status_code / status_msg', 'integer / string', 'MiniMax 原生业务状态字段。']
+    ],
+    [
+      ['HTTP status', 'integer', '成功返回 200；非法 resource 或 index 返回 400；未认证返回 401；任务不存在或无权访问返回 404；上游非 200 或 Content-Type 不是视频时返回错误或 502。'],
+      ['response body', 'binary', '成功时返回视频二进制，不包含 JSON 响应体；错误时返回网关或任务错误对象。'],
+      ['Content-Type', 'string', '上游返回的 video/* 或 application/octet-stream。'],
+      ['Content-Disposition', 'string', '网关设置为 attachment; filename="generated-video.mp4"。'],
+      ['Cache-Control', 'string', '网关设置为 no-store。']
+    ]
+  ]
+}
+
+const responseTableLabels: Record<string, string[]> = {
+  seedance: ['POST /api/v3/contents/generations/tasks', 'GET /api/v3/contents/generations/tasks/{task_id}', 'DELETE /api/v3/contents/generations/tasks/{task_id}', 'GET /v1/video-tasks/{resource}/content'],
+  gemini: ['POST /v1beta/models/{model}:predictLongRunning', 'GET /v1beta/{operation_name}', 'GET /v1/video-tasks/{resource}/content'],
+  'minimax-v2': ['POST /v2/video_generation', 'GET /v2/query/video_generation/{task_id}', 'GET /v1/video-tasks/{resource}/content'],
+  'minimax-v1': ['POST /v1/video_generation', 'GET /v1/query/video_generation?task_id={task_id}', 'GET /v1/files/retrieve?file_id={file_id}', 'GET /v1/video-tasks/{resource}/content']
+}
+
+const exampleSpecs: Record<string, ExampleSpec[]> = {
+  seedance: [
+    { id: 'text-to-video', title: '文生视频', description: '提交文本提示词并创建异步任务。', requestTitle: '文生视频', responses: [{ title: '已接受', status: 200, body: '{"id":"cgt-example-task-id"}', description: 'Seedance 返回任务 ID。' }] },
+    { id: 'first-frame', title: '首帧图生视频', description: '使用一张首帧图和文本提示词。', requestTitle: '首帧图生视频', responses: [{ title: '已接受', status: 200, body: '{"id":"cgt-example-task-id"}' }] },
+    { id: 'reference-image', title: '参考图生视频', description: '使用参考图引导视频内容。', requestTitle: '参考图生视频', responses: [{ title: '已接受', status: 200, body: '{"id":"cgt-example-task-id"}' }] },
+    { id: 'draft', title: '生成样片（draft，480p）', description: 'Seedance 2.5 样片请求固定使用 480p。', requestTitle: '生成样片（draft，480p）', responses: [{ title: '已接受', status: 200, body: '{"id":"cgt-draft-task-id"}' }] },
+    { id: 'draft-task', title: '用样片创建正式片（固定 1080p）', description: '引用已成功样片，不重传继承的时长和比例字段。', requestTitle: '用样片创建正式片（固定 1080p，不重传继承参数）', responses: [{ title: '已接受', status: 200, body: '{"id":"cgt-final-task-id"}' }] },
+    { id: 'query', title: '查询任务', description: '轮询同一个 task_id，直到任务进入终态。', requestTitle: '查询任务', responses: [
+      { title: '处理中', status: 200, body: '{"id":"cgt-example-task-id","status":"running"}' },
+      { title: '已成功', status: 200, body: '{"id":"cgt-example-task-id","model":"YOUR_VIDEO_MODEL","status":"succeeded","content":{"video_url":"/v1/video-tasks/c2VlZGFuY2U6Y2d0LWV4YW1wbGUtdGFzay1pZA/content?index=0"},"usage":{"completion_tokens":12345}}' }
+    ] },
+    { id: 'cancel', title: '取消任务', description: '取消仍在处理中的 Seedance 任务。', requestTitle: '取消任务', responses: [{ title: '已取消', status: 204, description: '取消成功通常为空的 HTTP 204 响应体，以上游实际状态为准；隐藏与非隐藏模式行为一致。' }] },
+    { id: 'download', title: '下载结果', description: '使用响应中返回的完整 opaque resource URL 下载视频。', requestTitle: '下载结果（使用响应中返回的完整 URL）', responses: [{ title: '视频内容', status: 200, headers: responseHeaders, description: '响应体为视频二进制，不在文档中放置二进制内容。' }] }
+  ],
+  gemini: [
+    { id: 'text-to-video', title: '文生视频', description: '调用 predictLongRunning 创建操作。', requestTitle: '文生视频', responses: [{ title: '已接受', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id"}' }] },
+    { id: 'first-frame', title: '首帧图生视频', description: '使用 inlineData 提供首帧图。', requestTitle: '首帧图生视频', responses: [{ title: '已接受', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id"}' }] },
+    { id: 'reference-image', title: '参考图生视频', description: 'Veo 3.1 使用 referenceImages，最多三张且须 8 秒。', requestTitle: '参考图生视频（仅 Veo 3.1，最多 3 张，须 8 秒）', responses: [{ title: '已接受', status: 200, body: '{"name":"models/veo-3.1-generate-preview/operations/example-operation-id"}' }] },
+    { id: 'query', title: '查询任务', description: '必须复制提交响应中的完整 name，并使用该完整 operation name 查询任务。', requestTitle: '查询任务', responses: [
+      { title: '处理中', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id","done":false}' },
+      { title: '已成功', status: 200, body: '{"name":"models/veo-3.0-generate-001/operations/example-operation-id","done":true,"response":{"generateVideoResponse":{"generatedSamples":[{"video":{"uri":"/v1/video-tasks/Z2VtaW5pOm1vZGVscy92ZW8tMy4wLWdlbmVyYXRlLTAwMS9vcGVyYXRpb25zL2V4YW1wbGUtb3BlcmF0aW9uLWlk/content?index=0"}}]}}}' }
+    ] },
+    { id: 'download', title: '下载结果', description: '直接使用查询响应中的完整结果 URL。', requestTitle: '下载结果（使用响应中返回的完整 URL）', responses: [{ title: '视频内容', status: 200, headers: responseHeaders, description: '响应体为视频二进制，不在文档中放置二进制内容。' }] }
+  ],
+  'minimax-v2': [
+    { id: 'text-to-video', title: '文生视频', description: '使用 H3 content 文本创建任务。', requestTitle: '文生视频', responses: [{ title: '已接受', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'first-frame', title: '首帧图生视频', description: '使用 first_frame role 提供首帧。', requestTitle: '首帧图生视频', responses: [{ title: '已接受', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'reference-image', title: '参考图生视频', description: '使用 reference_image role，不能与首尾帧混用。', requestTitle: '参考图生视频（最多 9 张，不可与首尾帧混用）', responses: [{ title: '已接受', status: 200, body: '{"task_id":"example-task-id"}' }] },
+    { id: 'query', title: '查询任务', description: '使用路径中的 task_id 查询任务。', requestTitle: '查询任务', responses: [
+      { title: '处理中', status: 200, body: '{"task":{"id":"example-task-id","status":"running"}}' },
+      { title: '已成功', status: 200, body: '{"task":{"id":"example-task-id","status":"succeeded","content":{"url":"/v1/video-tasks/bWluaW1heDpleGFtcGxlLXRhc2staWQ/content?index=0"}}}' }
+    ] },
+    { id: 'download', title: '下载结果', description: '使用查询响应中返回的完整结果 URL。', requestTitle: '下载结果（使用响应中返回的完整 URL）', responses: [{ title: '视频内容', status: 200, headers: responseHeaders, description: '响应体为视频二进制，不在文档中放置二进制内容。' }] }
+  ],
+  'minimax-v1': [
+    { id: 'text-to-video', title: '文生视频', description: '使用 prompt 创建 Hailuo v1 任务。', requestTitle: '文生视频', responses: [{ title: '已接受', status: 200, body: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'first-frame', title: '首帧图生视频', description: '使用 first_frame_image 创建图生任务。', requestTitle: '首帧图生视频', responses: [{ title: '已接受', status: 200, body: '{"task_id":"example-task-id","base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'query', title: '查询任务', description: '轮询任务状态；Success 响应会给出 file_id。', requestTitle: '查询任务', responses: [
+      { title: '处理中', status: 200, body: '{"task_id":"example-task-id","status":"Processing","base_resp":{"status_code":0,"status_msg":"success"}}' },
+      { title: '已成功', status: 200, body: '{"task_id":"example-task-id","status":"Success","file_id":"example-file-id","base_resp":{"status_code":0,"status_msg":"success"}}' }
+    ] },
+    { id: 'file', title: '获取文件下载信息', description: '使用成功任务返回的 file_id 获取短期下载 URL。', requestTitle: '获取文件下载信息', responses: [{ title: '成功', status: 200, body: '{"file":{"file_id":"example-file-id","download_url":"/v1/video-tasks/bWluaW1heC1maWxlOmV4YW1wbGUtZmlsZS1pZA/content?index=0"},"base_resp":{"status_code":0,"status_msg":"success"}}' }] },
+    { id: 'download', title: '下载结果', description: '使用响应中返回的完整结果 URL 下载视频。', requestTitle: '下载结果（使用响应中返回的完整 URL）', responses: [{ title: '视频内容', status: 200, headers: responseHeaders, description: '响应体为视频二进制，不在文档中放置二进制内容。' }] }
+  ]
+}
+
+function enrichDocs(base: VideoDocsContent): VideoDocsContent {
+  const formatJson = (value: string): string => {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2)
+    } catch {
+      return value
+    }
+  }
+  const formatBlock = (block: DocBlock): DocBlock => {
+    if (block.type === 'code') return { ...block, code: formatJson(block.code) }
+    if (block.type === 'example') {
+      return {
+        ...block,
+        responses: block.responses.map(response => response.body ? { ...response, body: formatJson(response.body) } : response)
+      }
+    }
+    return block
+  }
+  const protocols = base.protocols.map(protocol => {
+    const tables = responseTables[protocol.id] ?? []
+    const endpointIndex = protocol.sections.findIndex(section => section.id.endsWith('-endpoints'))
+    const endpoint = protocol.sections[endpointIndex]
+    const labels = responseTableLabels[protocol.id] ?? []
+    const endpointBlocks = endpoint
+      ? [...endpoint.blocks, ...tables.flatMap((rows, index) => [{ type: 'p' as const, text: `响应参数（${labels[index] ?? `接口 ${index + 1}`}）` }, responseTable(rows, !(protocol.id === 'minimax-v2' && index === 0))])]
+      : []
+    const specs = exampleSpecs[protocol.id] ?? []
+    const exampleSectionIndex = protocol.sections.findIndex(section => section.id.endsWith('-examples'))
+    const exampleSection = protocol.sections[exampleSectionIndex]
+    const codeByTitle = new Map((exampleSection?.blocks ?? []).filter((block): block is Extract<DocBlock, { type: 'code' }> => block.type === 'code').map(block => [block.title, block.code]))
+    const examples: DocExample[] = specs.map(spec => ({ type: 'example', id: spec.id, title: spec.title, description: spec.description, request: codeByTitle.get(spec.requestTitle) ?? '', responses: spec.responses }))
+    const sections = protocol.sections.map((section, index) => {
+      if (index === endpointIndex) return { ...section, blocks: endpointBlocks }
+      if (index === exampleSectionIndex) return { ...section, blocks: examples }
+      return section
+    }).map(section => ({ ...section, blocks: section.blocks.map(formatBlock) }))
+    return { ...protocol, sections }
+  })
+  return { ...base, protocols }
+}
+
+const zh = enrichDocs(zhBase)
 
 export default zh

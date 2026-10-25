@@ -115,6 +115,14 @@ func (s *OpenAIGatewayService) writeNativeVideoResponse(c *gin.Context, account 
 		writeGrokMediaResponse(c, resp, body, s.responseHeaderFilter)
 		return
 	}
+	// An empty body (e.g. 204 after a Seedance cancel) carries no URLs to
+	// rewrite and is not JSON; keep its status instead of reporting a 502.
+	if len(bytes.TrimSpace(body)) == 0 {
+		copy := videoPrivateResponseHeaders(resp)
+		c.Header("Cache-Control", "no-store")
+		writeGrokMediaResponse(c, copy, body, s.responseHeaderFilter)
+		return
+	}
 	// URL-bearing diagnostic/future fields and headers must not bypass the switch.
 	replacements := make(map[string]string)
 	if taskID != "" {
@@ -136,6 +144,15 @@ func (s *OpenAIGatewayService) writeNativeVideoResponse(c *gin.Context, account 
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"message": "Invalid upstream video response"}})
 		return
 	}
+	copy := videoPrivateResponseHeaders(resp)
+	copy.Header.Set("Content-Type", "application/json")
+	c.Header("Cache-Control", "no-store")
+	writeGrokMediaResponse(c, copy, safeBody, s.responseHeaderFilter)
+}
+
+// videoPrivateResponseHeaders copies the upstream response without headers
+// that expose an upstream URL; the body length is recomputed by the writer.
+func videoPrivateResponseHeaders(resp *http.Response) *http.Response {
 	copy := *resp
 	copy.Header = resp.Header.Clone()
 	for key, values := range copy.Header {
@@ -147,9 +164,7 @@ func (s *OpenAIGatewayService) writeNativeVideoResponse(c *gin.Context, account 
 		}
 	}
 	copy.Header.Del("Content-Length")
-	copy.Header.Set("Content-Type", "application/json")
-	c.Header("Cache-Control", "no-store")
-	writeGrokMediaResponse(c, &copy, safeBody, s.responseHeaderFilter)
+	return &copy
 }
 
 func rejectPrivateVideoCallback(c *gin.Context, account *Account, body []byte) error {

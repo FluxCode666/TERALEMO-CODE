@@ -17,7 +17,7 @@ const nodes = computed(() => {
 </script>
 <template>
   <div class="shadcn-scope space-y-2 rounded-md border p-2" :class="disabled ? 'pointer-events-none opacity-50' : ''">
-    <Input v-model="search" type="search" :aria-label="t('enterprise.orgTree.searchDepartments')" :placeholder="t('enterprise.orgTree.searchDepartments')" :disabled="disabled" />
+    <Input v-model="search" type="search" @keydown.enter.prevent :aria-label="t('enterprise.orgTree.searchDepartments')" :placeholder="t('enterprise.orgTree.searchDepartments')" :disabled="disabled" />
     <ScrollArea class="h-48"><div class="w-full overflow-x-auto"><div class="min-w-max"><EnterpriseTree :nodes="nodes" :model-value="String(modelValue ?? 0)" :search="search" :label="label || t('enterprise.departments')" :disabled-keys="disabledKeys" @update:model-value="value => { if (!disabled) emit('update:modelValue', Number(value)) }" /></div></div></ScrollArea>
   </div>
 </template>

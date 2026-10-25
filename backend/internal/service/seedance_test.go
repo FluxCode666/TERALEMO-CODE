@@ -73,6 +73,23 @@ func TestSeedanceStatusAndDelete(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
+func TestSeedanceCancelEmptyResponsePassesThroughWhenUpstreamURLsHidden(t *testing.T) {
+	account := seedanceTestAccount()
+	account.Credentials["hide_video_upstream_url"] = true
+	upstream := &grokMediaContentUpstreamStub{response: grokMediaContentStatusResponse("")}
+	upstream.response.StatusCode = http.StatusNoContent
+	upstream.response.Header.Set("Location", "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/task-1")
+	upstream.response.Header.Set("X-Request-Id", "req-1")
+	svc := &OpenAIGatewayService{httpUpstream: upstream}
+	c, w := grokMediaContentTestContext(http.MethodDelete, "/api/v3/contents/generations/tasks/task-1", nil)
+	_, err := svc.ForwardSeedance(context.Background(), c, account, SeedanceEndpointDelete, "seedance:task-1", nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, w.Code)
+	require.Empty(t, w.Body.String())
+	require.Empty(t, w.Header().Get("Location"), "headers carrying upstream URLs stay hidden")
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+}
+
 func TestSeedanceValidationAndCapability(t *testing.T) {
 	for _, body := range []string{`{`, `[]`, `{}`, `{"model":12,"content":[{}]}`, `{"model":"x","content":[]}`} {
 		_, err := ParseSeedanceRequest([]byte(body))
