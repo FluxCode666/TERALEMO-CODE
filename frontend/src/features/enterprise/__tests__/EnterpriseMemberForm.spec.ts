@@ -103,4 +103,27 @@ describe('EnterpriseMemberForm identity and role validation', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ department_id: undefined })
     wrapper.unmount()
   })
+
+  it('selecting a department, toggling a branch or pressing Enter in the department search does not submit the form', async () => {
+    const tree = [
+      { id: 3, enterprise_id: 1, name: '研发部', sort_order: 0, member_count: 1, created_at: '' },
+      { id: 5, enterprise_id: 1, parent_id: 3, name: '前端组', sort_order: 0, member_count: 0, created_at: '' }
+    ]
+    const wrapper = mount(EnterpriseMemberForm, { props: { departments: tree }, attachTo: document.body })
+    await wrapper.get('[data-test="member-email"]').setValue('employee@example.com')
+    await wrapper.get('[data-test="member-password"]').setValue('password123')
+    const node = wrapper.get('[data-test="member-department"] [data-test="org-node-3"]')
+    expect(node.attributes('type')).toBe('button')
+    ;(node.element as HTMLButtonElement).click()
+    ;(node.element.querySelector('span[aria-hidden="true"]') as HTMLElement).click()
+    const search = wrapper.get('[data-test="member-department"] input[type="search"]')
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    search.element.dispatchEvent(enter)
+    await flushPromises()
+    expect(enter.defaultPrevented).toBe(true)
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ email: 'employee@example.com', department_id: 3 })
+    wrapper.unmount()
+  })
 })
