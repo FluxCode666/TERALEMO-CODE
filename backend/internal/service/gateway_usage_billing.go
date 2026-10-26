@@ -585,11 +585,12 @@ func notifyAccountQuota(p *postUsageBillingParams, deps *billingDeps, result *Us
 			slog.Error("panic in notifyAccountQuota", "recover", r)
 		}
 	}()
-	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.IsAPIKeyOrBedrock() || deps.balanceNotifyService == nil {
+	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.IsAPIKeyOrBedrock() || !p.Account.HasAnyQuotaLimit() || deps.balanceNotifyService == nil {
 		slog.Debug("notifyAccountQuota: skipped",
 			"total_cost", p.Cost.TotalCost,
 			"account_nil", p.Account == nil,
 			"is_apikey_or_bedrock", p.Account != nil && p.Account.IsAPIKeyOrBedrock(),
+			"has_quota_limit", p.Account != nil && p.Account.HasAnyQuotaLimit(),
 			"service_nil", deps.balanceNotifyService == nil,
 		)
 		return
@@ -598,6 +599,11 @@ func notifyAccountQuota(p *postUsageBillingParams, deps *billingDeps, result *Us
 	var quotaState *AccountQuotaState
 	if result != nil {
 		quotaState = result.QuotaState
+		// A missing post-increment state means accounting was skipped (e.g. the
+		// account was deleted). Do not reconstruct a crossing from stale usage.
+		if quotaState == nil && p.shouldUpdateAccountQuota() {
+			return
+		}
 	}
 	slog.Debug("notifyAccountQuota: calling CheckAccountQuotaAfterIncrement",
 		"account_id", p.Account.ID,
