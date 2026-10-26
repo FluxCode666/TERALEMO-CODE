@@ -27,7 +27,11 @@ func TestMigrationsOnRealPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() {
+		if cerr := db.Close(); cerr != nil {
+			t.Logf("close db: %v", cerr)
+		}
+	})
 	ctx := context.Background()
 
 	// Apply the full chain twice: the second run must be a no-op (idempotency).
