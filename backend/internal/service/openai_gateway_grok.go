@@ -2012,6 +2012,12 @@ func (s *OpenAIGatewayService) handleGrokAccountUpstreamError(ctx context.Contex
 	if s == nil || account == nil {
 		return
 	}
+	// Edge blocks must precede quota snapshots, body classification and custom
+	// forbidden policies: none of those account-level side effects apply.
+	if statusCode == http.StatusForbidden && isCloudflare1010Block(responseBody) {
+		slog.Warn("grok_403_cloudflare_1010_skips_account_penalty", "account_id", account.ID)
+		return
+	}
 	if isGrokContentPolicyRejection(statusCode, responseBody) {
 		return
 	}
