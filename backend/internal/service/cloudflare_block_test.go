@@ -15,10 +15,18 @@ func TestIsCloudflare1010Block(t *testing.T) {
 		body string
 		want bool
 	}{
-		{"nested numeric code", `{"error":{"code":1010,"message":"Access denied"}}`, true},
-		{"nested string code", `{"error":{"code":"1010"}}`, true},
-		{"top numeric code", `{"code":1010}`, true},
-		{"top string code", `{"code":"1010"}`, true},
+		// JSON bodies need Cloudflare corroboration (cloudflare_error, error_name
+		// or an error_code sibling): a bare 1010 numeric code is reused by relays
+		// and providers for their own errors, and exempting a genuine ban would
+		// keep a dead account scheduled forever.
+		{"nested bare numeric code", `{"error":{"code":1010,"message":"Access denied"}}`, false},
+		{"nested bare string code", `{"error":{"code":"1010"}}`, false},
+		{"top bare numeric code", `{"code":1010}`, false},
+		{"top bare string code", `{"code":"1010"}`, false},
+		{"cloudflare flagged numeric code", `{"cloudflare_error":true,"code":1010}`, true},
+		{"cloudflare flagged nested code", `{"errors":[{"cloudflare_error":true,"code":"1010"}]}`, true},
+		{"cloudflare error code field", `{"cloudflare_error":true,"error_code":1010}`, true},
+		{"browser signature name", `{"error_name":"browser_signature_banned"}`, true},
 		{"text error code", "error code: 1010", true},
 		{"text mixed case", "ErRoR CoDe: 1010\n", true},
 		{"text whitespace", "ERROR\tCODE :\t1010", true},
@@ -37,6 +45,10 @@ func TestIsCloudflare1010Block(t *testing.T) {
 		{"unrelated number", "Forbidden request 1010", false},
 		{"unrelated json field", `{"request_id":1010,"error":{"code":403}}`, false},
 		{"cloudflare other block", "Cloudflare Error 1020: access denied", false},
+		{"malformed json", `{"code":1010`, false},
+		// A provider using 1010 as its own error code must still be penalized.
+		{"provider ban with bare 1010", `{"error":{"code":1010,"message":"account banned"}}`, false},
+		{"message mentions 1010", `{"message":"error code: 1010"}`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -46,7 +58,7 @@ func TestIsCloudflare1010Block(t *testing.T) {
 }
 
 func TestTypeSafeAccountTestCloudflare1010KeepsAccountState(t *testing.T) {
-	for _, body := range []string{`{"error":{"code":1010}}`, "Error 1010: bad browser"} {
+	for _, body := range []string{`{"cloudflare_error":true,"error_code":1010}`, "Error 1010: bad browser"} {
 		t.Run(body, func(t *testing.T) {
 			svc, repo, _, c, recorder := newTypeSafeAccountTestFixture(t, http.StatusForbidden, body)
 			require.Error(t, svc.TestAccountConnection(c, 31, "", "", AccountTestModeDefault))
@@ -63,7 +75,7 @@ func TestCNAnthropicAccountTestCloudflare1010KeepsAccountState(t *testing.T) {
 		body      string
 		wantError int
 	}{
-		{"numeric code", http.StatusForbidden, `{"error":{"code":1010}}`, 0},
+		{"numeric code", http.StatusForbidden, `{"cloudflare_error":true,"error_code":1010}`, 0},
 		{"text code", http.StatusForbidden, "Error code: 1010", 0},
 		{"ordinary forbidden", http.StatusForbidden, `{"error":{"code":"access_denied"}}`, 1},
 		{"unauthorized", http.StatusUnauthorized, `{"error":{"message":"invalid key"}}`, 1},
@@ -105,7 +117,7 @@ func TestGrokCloudflare1010SkipsAccountSideEffects(t *testing.T) {
 		body     string
 		wantCool int
 	}{
-		{"JSON block", `{"error":{"code":1010}}`, 0},
+		{"JSON block", `{"cloudflare_error":true,"error_code":1010,"error_name":"browser_signature_banned"}`, 0},
 		{"text block", "Cloudflare Error 1010: bad browser", 0},
 		{"ordinary forbidden", `{"error":{"code":"access_denied"}}`, 1},
 	} {

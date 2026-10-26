@@ -474,20 +474,26 @@ func NewGeminiBatchHTTPClient(baseURL string, client *http.Client) *GeminiBatchH
 	}
 }
 
-// 下载 URI 来自上游响应，必须使用独立的安全传输，不能继承 API 客户端的
-// 自定义代理或 DialContext。直连时解析后只拨号到已校验的公网 IP，防止 DNS rebinding。
-// 不启用环境代理：CONNECT 目标由代理解析时，无法在本地保证其实际连接 IP。
-var geminiBatchDownloadTransport = sync.OnceValue(func() *http.Transport {
-	return &http.Transport{
-		DialContext:           safeDialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   10,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 60 * time.Second,
-		ExpectContinueTimeout: time.Second,
+// 下载 URI 来自上游响应，是不可信输入：必须使用独立的安全传输，不能继承 API
+// 客户端的自定义 DialContext。复用 image_storage 的下载策略，使两条下载路径保持
+// 同一套 SSRF 语义：
+//   - 不走代理时在 socket 层校验真实连接 IP（防 DNS rebinding）
+//   - 走环境代理时（http.ProxyFromEnvironment）在发出前校验本地解析结果；CONNECT
+//     目标由代理解析，本地无法再保证其实际连接 IP，这是既有策略接受的权衡。
+//
+// 之前这里完全禁用代理，导致「只能通过代理出网」的部署批量生图下载直接失败。
+//
+// 常驻化的是 transport（连接池），client 每次返回新值：*http.Client 可被调用方
+// 修改（测试会替换 Transport），共享同一个 client 会让一处改动影响全部下载。
+var geminiBatchDownloadTransport = sync.OnceValue(func() *imageDownloadTransport {
+	client := newImageDownloadHTTPClient(http.ProxyFromEnvironment)
+	transport, ok := client.Transport.(*imageDownloadTransport)
+	if !ok {
+		// newImageDownloadHTTPClient 的契约就是返回该 transport；真出现偏差时也不能
+		// 退回无校验的默认传输，宁可让下载失败。
+		panic("image download transport changed; Gemini download SSRF policy is unenforced")
 	}
+	return transport
 })
 
 func newGeminiBatchDownloadHTTPClient() *http.Client {
@@ -498,7 +504,7 @@ func newGeminiBatchDownloadHTTPClient() *http.Client {
 				return errors.New("stopped after 10 Gemini download redirects")
 			}
 			if len(via) == 0 {
-				return errors.New("Gemini download redirect has no original request")
+				return errors.New("gemini download redirect has no original request")
 			}
 			original := via[0].URL
 			if err := validateGeminiDownloadHost(req.URL.String(), original.String()); err != nil {

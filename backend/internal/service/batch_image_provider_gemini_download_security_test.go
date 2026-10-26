@@ -128,19 +128,25 @@ func TestBatchImageGeminiDownloadDialRejectsPrivateResolvedAddresses(t *testing.
 	}))
 	defer internal.Close()
 
-	client := NewGeminiBatchHTTPClient("", nil)
-	transport, ok := client.downloadClient.Transport.(*http.Transport)
-	require.True(t, ok)
-	require.Nil(t, transport.Proxy, "a proxy must not resolve the target outside the safe dialer")
+	// 无论是否需要代理，直连分支都必须在 socket 层拒绝非公网地址：该分支由
+	// imageDownloadDialControl 实现，与 image_storage 的图片下载共用同一策略。
+	direct := newImageDownloadBaseTransport(imageDownloadDialControl)
 	_, port, err := net.SplitHostPort(internal.Listener.Addr().String())
 	require.NoError(t, err)
 	// localhost. 绕过裸 localhost 名称黑名单，覆盖 DNS 解析后回环 IP 的校验。
 	for _, host := range []string{"127.0.0.1", "localhost", "localhost."} {
-		conn, err := transport.DialContext(context.Background(), "tcp", net.JoinHostPort(host, port))
+		conn, err := direct.DialContext(context.Background(), "tcp", net.JoinHostPort(host, port))
 		if conn != nil {
 			_ = conn.Close()
 		}
-		require.ErrorContains(t, err, "blocked by SSRF policy", host)
+		require.Error(t, err, host)
 	}
 	require.Zero(t, hits.Load())
+
+	// Gemini 批量下载客户端必须复用同一套安全传输，而不是自带一份不许走代理的实现。
+	client := NewGeminiBatchHTTPClient("", nil)
+	transport, ok := client.downloadClient.Transport.(*imageDownloadTransport)
+	require.True(t, ok, "Gemini download must reuse the shared image download transport")
+	require.NotNil(t, transport.proxy, "a proxy-aware transport keeps proxy-only deployments working")
+	require.NotNil(t, transport.resolvesPrivate, "proxied downloads must pre-check local resolution")
 }

@@ -28,7 +28,10 @@ func TestAntigravityModelRateLimitInCache_SharedSnapshotCopyOnWrite(t *testing.T
 	}
 	for range workers {
 		account := <-results
-		limits := account.Extra[modelRateLimitsKey].(map[string]any)
+		limits, ok := account.Extra[modelRateLimitsKey].(map[string]any)
+		if !ok {
+			t.Fatalf("model rate limits missing or of wrong type: %#v", account.Extra)
+		}
 		if len(limits) != 2 || !reflect.DeepEqual(limits["existing-model"], oldLimit) {
 			t.Fatalf("expected the existing limit and this request's limit, got %#v", limits)
 		}
@@ -39,7 +42,10 @@ func TestAntigravityModelRateLimitInCache_SharedSnapshotCopyOnWrite(t *testing.T
 			if key == "existing-model" {
 				continue
 			}
-			limit := value.(map[string]any)
+			limit, ok := value.(map[string]any)
+			if !ok {
+				t.Fatalf("model rate limit payload is not an object: %#v", value)
+			}
 			if limit["rate_limit_reset_at"] != resetAt.UTC().Format(time.RFC3339) {
 				t.Fatalf("unexpected reset time: %#v", limit)
 			}
@@ -109,7 +115,10 @@ func TestAntigravityClearCreditsExhausted_SharedSnapshotCopyOnWrite(t *testing.T
 
 			svc.clearCreditsExhausted(context.Background(), account)
 
-			limits := account.Extra[modelRateLimitsKey].(map[string]any)
+			limits, ok := account.Extra[modelRateLimitsKey].(map[string]any)
+			if !ok {
+				t.Fatalf("model rate limits missing or of wrong type: %#v", account.Extra)
+			}
 			if _, exists := limits[creditsExhaustedKey]; exists {
 				t.Fatal("credits exhaustion was not cleared")
 			}
@@ -130,7 +139,11 @@ func TestAntigravityClearCreditsExhausted_SharedSnapshotCopyOnWrite(t *testing.T
 			if oldExtra["allow_overages"] != true || oldLimits["new-only"] != nil {
 				t.Fatal("updated account still aliases the shared map layers")
 			}
-			if repo.updates[modelRateLimitsKey].(map[string]any)["new-only"] != true {
+			updated, ok := repo.updates[modelRateLimitsKey].(map[string]any)
+			if !ok {
+				t.Fatalf("repository received limits of the wrong type: %#v", repo.updates[modelRateLimitsKey])
+			}
+			if updated["new-only"] != true {
 				t.Fatal("repository received a different limits map")
 			}
 		})
