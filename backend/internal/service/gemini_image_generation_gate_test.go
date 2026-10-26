@@ -7,8 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -280,6 +282,47 @@ func TestAntigravityForwards_ImageGenerationGate(t *testing.T) {
 			_, _ = fw.forward(svc, c, newAntigravityImageGateAccount())
 			require.Equal(t, 1, upstream.callCount)
 			require.NotEqual(t, http.StatusBadRequest, rec.Code)
+		})
+	}
+}
+
+func TestAntigravityForwardGemini_ImageGenerationGateChecksFallbackModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, allowImages := range []bool{false, true} {
+		name := "disabled group rejects image fallback"
+		if allowImages {
+			name = "enabled group forwards image fallback"
+		}
+		t.Run(name, func(t *testing.T) {
+			body := []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`)
+			upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"error":{"code":404,"message":"model not found"}}`)),
+				},
+				antigravityCompatSuccessResponse(),
+			}}
+			svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+			svc.settingService = NewSettingService(&antigravitySettingRepoStub{values: map[string]string{
+				SettingKeyEnableModelFallback:      "true",
+				SettingKeyFallbackModelAntigravity: "gemini-3-pro-image",
+			}}, &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}})
+			c, rec := newAntigravityCompatContext(http.MethodPost, "/v1beta/models/gemini-3.1-pro-high:generateContent", body)
+			withGeminiImageGateAPIKey(c, &Group{ID: 22, Platform: PlatformAntigravity, AllowImageGeneration: allowImages})
+
+			result, err := svc.ForwardGemini(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), "gemini-3.1-pro-high", "generateContent", false, body, false)
+			if allowImages {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				require.Equal(t, 2, upstream.callCount)
+				require.Contains(t, string(upstream.requestBodies[1]), `"model":"gemini-3-pro-image"`)
+				return
+			}
+			requireGeminiImageLocalRejection(t, c, err)
+			require.Nil(t, result)
+			require.Equal(t, 1, upstream.callCount, "image fallback must be rejected before a second upstream request")
+			requireGeminiImagePermissionError(t, rec, "INVALID_ARGUMENT")
 		})
 	}
 }
