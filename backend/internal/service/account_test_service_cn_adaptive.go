@@ -288,6 +288,9 @@ func (s *AccountTestService) testCNProviderAnthropicConnection(c *gin.Context, a
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("Anthropic endpoint returned %d: %s", resp.StatusCode, string(body))
+		if resp.StatusCode == http.StatusForbidden && isCloudflare1010Block(body) {
+			return s.sendErrorAndEnd(c, cloudflare1010TestBlockedMessage)
+		}
 		if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
