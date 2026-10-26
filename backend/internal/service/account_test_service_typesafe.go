@@ -77,8 +77,11 @@ func (s *AccountTestService) testTypeSafeAccountConnection(c *gin.Context, accou
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		if resp.StatusCode == http.StatusForbidden && isCloudflare1010Block(body) {
+			return s.sendErrorAndEnd(c, cloudflare1010TestBlockedMessage)
+		}
 		errMsg := fmt.Sprintf("API returned %d: %s", resp.StatusCode, truncateString(string(body), typeSafeTestMaxPreviewBytes))
-		// 401/403 表示 API Key 无效或被上游拒绝，标记为 error 状态。
+		// 排除边缘拦截后，401/403 表示 API Key 无效或被上游拒绝。
 		if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}

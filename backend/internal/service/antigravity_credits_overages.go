@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -84,10 +85,16 @@ func (s *AntigravityGatewayService) clearCreditsExhausted(ctx context.Context, a
 	if _, exists := rawLimits[creditsExhaustedKey]; !exists {
 		return
 	}
-	delete(rawLimits, creditsExhaustedKey)
-	account.Extra[modelRateLimitsKey] = rawLimits
+	// 账号可能与调度快照共享 Extra，删除积分状态前复制两层 map。
+	limits := make(map[string]any, len(rawLimits))
+	maps.Copy(limits, rawLimits)
+	delete(limits, creditsExhaustedKey)
+	extra := make(map[string]any, len(account.Extra))
+	maps.Copy(extra, account.Extra)
+	extra[modelRateLimitsKey] = limits
+	account.Extra = extra
 	if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{
-		modelRateLimitsKey: rawLimits,
+		modelRateLimitsKey: limits,
 	}); err != nil {
 		logger.LegacyPrintf("service.antigravity_gateway", "clear credits exhausted failed: account=%d err=%v", account.ID, err)
 	}

@@ -1003,10 +1003,19 @@ func buildForbiddenErrorMessage(prefix string, upstreamMsg string, responseBody 
 	return prefix + fallback
 }
 
-// handle403 处理 403 Forbidden 错误
-// Antigravity 平台区分 validation/violation/generic 三种类型，均 SetError 永久禁用；
-// 其他平台保持原有 SetError 行为。
+// handle403 处理 403 Forbidden 错误。Cloudflare 1010 是请求/边缘级拦截，
+// 不应将其视为账号级故障；其他真实 403 继续按平台策略处理。
 func (s *RateLimitService) handle403(ctx context.Context, account *Account, upstreamMsg string, responseBody []byte) (shouldDisable bool) {
+	if isCloudflareBotBlockResponse(responseBody) {
+		slog.Warn(
+			"403_cloudflare_bot_block_skips_account_penalty",
+			"account_id", account.ID,
+			"platform", account.Platform,
+			"upstream_message", upstreamMsg,
+		)
+		return false
+	}
+
 	if account.Platform == PlatformAntigravity {
 		return s.handleAntigravity403(ctx, account, upstreamMsg, responseBody)
 	}
@@ -1064,16 +1073,6 @@ func (s *RateLimitService) handleOpenAI403(ctx context.Context, account *Account
 		)
 		return false
 	}
-	if isCloudflareBotBlockResponse(responseBody) {
-		slog.Warn(
-			"openai_403_cloudflare_bot_block_skips_account_penalty",
-			"account_id", account.ID,
-			"platform", account.Platform,
-			"upstream_message", upstreamMsg,
-		)
-		return false
-	}
-
 	msg := buildForbiddenErrorMessage(
 		"Access forbidden (403):",
 		upstreamMsg,
@@ -1121,9 +1120,12 @@ func (s *RateLimitService) handleOpenAI403(ctx context.Context, account *Account
 // isCloudflareBotBlockResponse reports Cloudflare's WAF bot-signature response
 // (error code 1010). The upstream never reached the account API, so this is a
 // request/edge-level failure and must not consume the account 403 strike budget.
+//
+// Delegates to isCloudflare1010Block so the shared 403 handler, the Grok path and
+// the account probes cannot drift apart: one body must not be exempted on one
+// path and penalized on another.
 func isCloudflareBotBlockResponse(body []byte) bool {
-	normalized := strings.ToLower(strings.TrimSpace(string(body)))
-	return strings.Contains(normalized, "error code: 1010")
+	return isCloudflare1010Block(body)
 }
 
 // handleAntigravity403 处理 Antigravity 平台的 403 错误

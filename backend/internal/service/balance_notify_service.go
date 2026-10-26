@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -201,19 +202,26 @@ func (s *BalanceNotifyService) CheckAccountQuotaAfterIncrement(ctx context.Conte
 		dims = buildQuotaDimsFromState(account, quotaState)
 	} else {
 		freshAccount := s.fetchFreshAccount(ctx, account)
+		if freshAccount == nil {
+			return
+		}
 		dims = buildQuotaDims(freshAccount)
 		account = freshAccount // use fresh data for alert metadata
 	}
 	s.checkQuotaDimCrossings(account, dims, cost, adminEmails, siteName)
 }
 
-// fetchFreshAccount loads the latest account from DB; falls back to the snapshot on error.
+// fetchFreshAccount loads the latest account from DB. Missing accounts are skipped;
+// other read failures retain the legacy snapshot fallback.
 func (s *BalanceNotifyService) fetchFreshAccount(ctx context.Context, snapshot *Account) *Account {
 	if s.accountRepo == nil {
 		return snapshot
 	}
 	fresh, err := s.accountRepo.GetByID(ctx, snapshot.ID)
 	if err != nil {
+		if errors.Is(err, ErrAccountNotFound) {
+			return nil
+		}
 		slog.Warn("failed to fetch fresh account for quota notify, using snapshot",
 			"account_id", snapshot.ID, "error", err)
 		return snapshot

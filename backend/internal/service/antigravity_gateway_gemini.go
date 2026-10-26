@@ -96,6 +96,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
 		return nil, s.writeGoogleError(c, http.StatusForbidden, fmt.Sprintf("model %s not in whitelist", originalModel))
 	}
+	if geminiImageGenerationDenied(c, body, originalModel, mappedModel) {
+		return nil, s.writeGoogleError(c, http.StatusBadRequest, ImageGenerationPermissionMessage())
+	}
 	forwardedModel := mappedModel
 
 	// 获取 access_token
@@ -205,6 +208,10 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			isModelNotFoundError(resp.StatusCode, respBody) {
 			fallbackModel := s.settingService.GetFallbackModel(ctx, PlatformAntigravity)
 			if fallbackModel != "" && fallbackModel != mappedModel {
+				// 兜底模型绕过了前面的账号模型映射，发送前同样需要检查生图权限。
+				if geminiImageGenerationDenied(c, injectedBody, fallbackModel) {
+					return nil, s.writeGoogleError(c, http.StatusBadRequest, ImageGenerationPermissionMessage())
+				}
 				logger.LegacyPrintf("service.antigravity_gateway", "[Antigravity] Model not found (%s), retrying with fallback model %s (account: %s)", mappedModel, fallbackModel, account.Name)
 
 				fallbackWrapped, err := s.wrapV1InternalRequest(projectID, fallbackModel, injectedBody)
