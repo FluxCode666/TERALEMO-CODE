@@ -9,15 +9,18 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
+	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
 const defaultGeminiBatchRequeueAfter = 30 * time.Second
@@ -451,8 +454,9 @@ func mapGeminiClientError(err error) error {
 }
 
 type GeminiBatchHTTPClient struct {
-	baseURL string
-	client  *http.Client
+	baseURL        string
+	client         *http.Client
+	downloadClient *http.Client
 }
 
 func NewGeminiBatchHTTPClient(baseURL string, client *http.Client) *GeminiBatchHTTPClient {
@@ -463,7 +467,51 @@ func NewGeminiBatchHTTPClient(baseURL string, client *http.Client) *GeminiBatchH
 	if client == nil {
 		client = batchImageDefaultHTTPClient()
 	}
-	return &GeminiBatchHTTPClient{baseURL: baseURL, client: client}
+	return &GeminiBatchHTTPClient{
+		baseURL:        baseURL,
+		client:         client,
+		downloadClient: newGeminiBatchDownloadHTTPClient(),
+	}
+}
+
+// 下载 URI 来自上游响应，必须使用独立的安全传输，不能继承 API 客户端的
+// 自定义代理或 DialContext。直连时解析后只拨号到已校验的公网 IP，防止 DNS rebinding。
+// 不启用环境代理：CONNECT 目标由代理解析时，无法在本地保证其实际连接 IP。
+var geminiBatchDownloadTransport = sync.OnceValue(func() *http.Transport {
+	return &http.Transport{
+		DialContext:           safeDialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	}
+})
+
+func newGeminiBatchDownloadHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: geminiBatchDownloadTransport(),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 Gemini download redirects")
+			}
+			if len(via) == 0 {
+				return errors.New("Gemini download redirect has no original request")
+			}
+			original := via[0].URL
+			if err := validateGeminiDownloadHost(req.URL.String(), original.String()); err != nil {
+				return err
+			}
+			// x-goog-api-key 是自定义头，net/http 不会自动在跨主机跳转时删除。
+			// 拒绝跨 origin（包括端口变化）以免把凭据发给其他目标。
+			if req.URL.Scheme != original.Scheme || !strings.EqualFold(req.URL.Host, original.Host) {
+				return geminiProviderError("GEMINI_INVALID_RESPONSE", "Gemini download redirect origin is not allowed", nil)
+			}
+			return nil
+		},
+	}
 }
 
 // batchImageDefaultHTTPClient 返回带连接/握手/响应头超时的共享客户端。
@@ -591,7 +639,7 @@ func (c *GeminiBatchHTTPClient) DownloadFile(ctx context.Context, apiKey string,
 		return nil, "", err
 	}
 	req.Header.Set("x-goog-api-key", apiKey)
-	resp, err := c.client.Do(req)
+	resp, err := c.downloadClient.Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -672,7 +720,13 @@ func validateGeminiDownloadHost(downloadURL, baseURL string) error {
 	if parsed.Scheme != "https" {
 		return geminiProviderError("GEMINI_INVALID_RESPONSE", "Gemini download uri must use https", nil)
 	}
-	host := strings.ToLower(parsed.Hostname())
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	if urlvalidator.IsBlockedHost(host) || isBlockedHostname(host) {
+		return geminiProviderError("GEMINI_INVALID_RESPONSE", "Gemini download uri host is not allowed", nil)
+	}
+	if ip := net.ParseIP(host); ip != nil && isPrivateIP(ip) {
+		return geminiProviderError("GEMINI_INVALID_RESPONSE", "Gemini download uri host is not allowed", nil)
+	}
 	if host == "googleapis.com" || strings.HasSuffix(host, ".googleapis.com") {
 		return nil
 	}
