@@ -52,6 +52,7 @@
         </label>
         <Select
           v-model="grokTestMode"
+          data-testid="grok-test-mode"
           :options="grokTestModeOptions"
           :disabled="status === 'connecting'"
         />
@@ -60,12 +61,25 @@
         </p>
       </div>
 
+      <div v-if="showTestTypeSelect" class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{ t('admin.accounts.testQuestion.typeLabel') }}
+        </label>
+        <Select
+          v-model="testType"
+          data-testid="test-type"
+          :options="testTypeOptions"
+          :disabled="status === 'connecting'"
+        />
+      </div>
+
       <div v-if="showModelSelect" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('admin.accounts.selectTestModel') }}
         </label>
         <Select
           v-model="selectedModelId"
+          data-testid="test-model"
           :options="modelOptionsForMode"
           :disabled="loadingModels || status === 'connecting'"
           value-key="id"
@@ -80,9 +94,50 @@
         </label>
         <Select
           v-model="testMode"
+          data-testid="openai-test-mode"
           :options="openAITestModeOptions"
           :disabled="status === 'connecting'"
         />
+      </div>
+
+      <div v-if="isQuestionMode" class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('admin.accounts.testQuestion.select') }}
+          </label>
+          <Select
+            v-model="selectedQuestionId"
+            data-testid="test-question"
+            :options="questionOptions"
+            :disabled="loadingQuestions || status === 'connecting' || questionOptions.length === 0"
+            :placeholder="loadingQuestions ? t('common.loading') + '...' : t('admin.accounts.testQuestion.select')"
+          />
+          <p v-if="!loadingQuestions && questionOptions.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.testQuestion.empty') }}
+          </p>
+        </div>
+
+        <div v-if="selectedQuestion" data-testid="question-preview" class="space-y-3 text-sm">
+          <div>
+            <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.testQuestion.contentLabel') }}
+            </div>
+            <p class="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-gray-700 dark:bg-dark-700 dark:text-gray-300">{{ selectedQuestion.content }}</p>
+          </div>
+          <div>
+            <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.testQuestion.patternsLabel') }}
+            </div>
+            <div v-if="selectedQuestion.answer_patterns.length > 0" class="flex flex-wrap gap-1">
+              <span v-for="pattern in selectedQuestion.answer_patterns" :key="pattern" class="badge badge-primary font-mono text-xs">
+                {{ pattern }}
+              </span>
+            </div>
+            <p v-else class="text-xs text-amber-600 dark:text-amber-400">
+              {{ t('admin.accounts.testQuestion.noPatterns') }}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div v-if="supportsPromptInput" class="space-y-1.5">
@@ -381,6 +436,7 @@ import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import { adminAPI } from '@/api/admin'
 import { resolveVideoProtocol } from '@/utils/videoProtocol'
 import type { Account, ClaudeModel } from '@/types'
+import type { AccountTestQuestion } from '@/api/admin/accountTestQuestions'
 
 const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
@@ -393,6 +449,14 @@ interface OutputLine {
 interface PreviewMedia {
   url: string
   mimeType?: string
+}
+
+interface QuestionResult {
+  question_id: number
+  question_name: string
+  judged: boolean
+  answer_patterns: string[]
+  matched_patterns: string[]
 }
 
 const props = defineProps<{
@@ -418,8 +482,14 @@ const generatedImages = ref<PreviewMedia[]>([])
 const generatedAudios = ref<PreviewMedia[]>([])
 const generatedVideos = ref<PreviewMedia[]>([])
 const previewImageUrl = ref('')
-const testMode = ref<'default' | 'compact'>('default')
-const grokTestMode = ref<'text' | 'image' | 'video' | 'search' | 'tts' | 'stt' | 'realtime'>('text')
+const testType = ref<'connectivity' | 'question'>('connectivity')
+const testMode = ref<'default' | 'compact' | 'question'>('default')
+const grokTestMode = ref<'text' | 'question' | 'image' | 'video' | 'search' | 'tts' | 'stt' | 'realtime'>('text')
+const testQuestions = ref<AccountTestQuestion[]>([])
+const selectedQuestionId = ref<number | null>(null)
+const loadingQuestions = ref(false)
+const questionResultFailed = ref(false)
+let questionLoadVersion = 0
 const uploadImageDataURL = ref('')
 const uploadImagePreview = ref('')
 const uploadImageName = ref('')
@@ -430,16 +500,42 @@ const audioFileInput = ref<HTMLInputElement | null>(null)
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
 const isVideoAccount = computed(() => props.account?.platform === 'video')
+const supportsTestQuestions = computed(() => {
+  const platform = props.account?.platform
+  return Boolean(platform && platform !== 'video' && platform !== 'typesafe')
+})
+const showTestTypeSelect = computed(
+  () => supportsTestQuestions.value && !isOpenAIAccount.value && !isGrokAccount.value
+)
+const isQuestionMode = computed(() => {
+  if (!supportsTestQuestions.value) return false
+  if (isOpenAIAccount.value) return testMode.value === 'question'
+  if (isGrokAccount.value) return grokTestMode.value === 'question'
+  return testType.value === 'question'
+})
+const testTypeOptions = computed(() => [
+  { value: 'connectivity', label: t('admin.accounts.testQuestion.connectivity') },
+  { value: 'question', label: t('admin.accounts.testQuestion.question') }
+])
+const questionOptions = computed(() => testQuestions.value.map((question) => ({
+  value: question.id,
+  label: question.name
+})))
+const selectedQuestion = computed(
+  () => testQuestions.value.find((question) => question.id === selectedQuestionId.value) ?? null
+)
 const videoProtocolName = computed(() => {
   const protocol = resolveVideoProtocol(props.account?.credentials?.video_protocol)
   return { seedance: 'Seedance (Ark)', gemini: 'Google Gemini (Veo)', minimax: 'MiniMax (Hailuo / H3)' }[protocol]
 })
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
-  { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
+  { value: 'compact', label: t('admin.accounts.openai.testModeCompact') },
+  { value: 'question', label: t('admin.accounts.testQuestion.question') }
 ])
 const grokTestModeOptions = computed(() => [
   { value: 'text', label: t('admin.accounts.grok.testModeText') },
+  { value: 'question', label: t('admin.accounts.testQuestion.question') },
   { value: 'image', label: t('admin.accounts.grok.testModeImage') },
   { value: 'video', label: t('admin.accounts.grok.testModeVideo') },
   { value: 'search', label: t('admin.accounts.grok.testModeSearch') },
@@ -474,6 +570,13 @@ const isGrokVideoModel = (id: string) => {
   return modelID.startsWith('grok-imagine-video') || modelID.startsWith('grok-video')
 }
 const isGrokTextModel = (id: string) => !isGrokImageModel(id) && !isGrokVideoModel(id)
+const isQuestionTextModel = (id: string) => {
+  const modelID = id.toLowerCase()
+  if (modelID.startsWith('gpt-image-')) return false
+  if (modelID.startsWith('gemini-') && modelID.includes('-image')) return false
+  if (modelID.startsWith('veo-') || modelID === 'sora' || modelID.startsWith('sora-')) return false
+  return isGrokTextModel(id)
+}
 
 const supportsGrokImageTest = computed(
   () => isGrokAccount.value && grokTestMode.value === 'image'
@@ -489,10 +592,13 @@ const supportsImageTest = computed(
 // Model select only when the mode needs a model.
 const showModelSelect = computed(() => {
   if (!isGrokAccount.value) return true
-  return grokTestMode.value === 'text' || grokTestMode.value === 'image' || grokTestMode.value === 'video'
+  return grokTestMode.value === 'text' || grokTestMode.value === 'question' || grokTestMode.value === 'image' || grokTestMode.value === 'video'
 })
 
 const modelOptionsForMode = computed(() => {
+  if (isQuestionMode.value) {
+    return availableModels.value.filter((model) => isQuestionTextModel(model.id))
+  }
   if (!isGrokAccount.value) return availableModels.value
   if (grokTestMode.value === 'image') {
     return availableModels.value.filter((m) => isGrokImageModel(m.id))
@@ -507,6 +613,7 @@ const modelOptionsForMode = computed(() => {
 })
 
 const supportsPromptInput = computed(() => {
+  if (isQuestionMode.value) return false
   if (isVideoAccount.value) return true
   if (!isGrokAccount.value) {
     return supportsImageTest.value
@@ -520,9 +627,9 @@ const supportsPromptInput = computed(() => {
 })
 
 const supportsImageUpload = computed(
-  () => isVideoAccount.value || (isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video'))
+  () => !isQuestionMode.value && (isVideoAccount.value || (isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video')))
 )
-const supportsAudioUpload = computed(() => isGrokAccount.value && grokTestMode.value === 'stt')
+const supportsAudioUpload = computed(() => !isQuestionMode.value && isGrokAccount.value && grokTestMode.value === 'stt')
 const imageUploadLabel = computed(() =>
   isVideoAccount.value || grokTestMode.value === 'video'
     ? t('admin.accounts.grok.videoFirstFrameLabel')
@@ -642,6 +749,7 @@ const promptInputPlaceholder = computed(() => {
 })
 
 const promptInputHint = computed(() => {
+  if (isQuestionMode.value) return ''
   if (isVideoAccount.value) {
     return t('admin.accounts.nativeVideoTestHint', { protocol: videoProtocolName.value })
   }
@@ -667,6 +775,7 @@ const promptInputHint = computed(() => {
 })
 
 const testModeSummary = computed(() => {
+  if (isQuestionMode.value) return t('admin.accounts.testQuestion.summary')
   if (isVideoAccount.value) return t('admin.accounts.videoTestMode')
   if (isGrokAccount.value) {
     switch (grokTestMode.value) {
@@ -692,6 +801,9 @@ const testModeSummary = computed(() => {
 
 const canStartTest = computed(() => {
   if (status.value === 'connecting') return false
+  if (isQuestionMode.value) {
+    return Boolean(selectedModelId.value && selectedQuestionId.value)
+  }
   if (isGrokAccount.value) {
     if (
       grokTestMode.value === 'search' ||
@@ -739,7 +851,7 @@ const pickDefaultModelForMode = () => {
     return
   }
   if (opts.some((m) => m.id === selectedModelId.value)) return
-  if (grokTestMode.value === 'text') {
+  if (isGrokAccount.value && (grokTestMode.value === 'text' || grokTestMode.value === 'question')) {
     const preferred =
       opts.find((m) => m.id.includes('grok-4.5')) ||
       opts.find((m) => m.id === 'grok') ||
@@ -753,10 +865,15 @@ const pickDefaultModelForMode = () => {
 watch(
   () => props.show,
   async (newVal) => {
+    questionLoadVersion += 1
     if (newVal && props.account) {
       testPrompt.value = ''
+      testType.value = 'connectivity'
       testMode.value = 'default'
       grokTestMode.value = 'text'
+      testQuestions.value = []
+      selectedQuestionId.value = null
+      loadingQuestions.value = false
       clearMediaUploads()
       resetState()
       await loadAvailableModels()
@@ -765,6 +882,7 @@ watch(
       }
       applyDefaultPromptForMode()
     } else {
+      selectedQuestionId.value = null
       abortStream()
     }
   }
@@ -777,6 +895,40 @@ watch(grokTestMode, () => {
   pickDefaultModelForMode()
   applyDefaultPromptForMode()
 })
+
+watch(isQuestionMode, async (questionMode) => {
+  selectedQuestionId.value = null
+  if (!questionMode) {
+    questionLoadVersion += 1
+    loadingQuestions.value = false
+    pickDefaultModelForMode()
+    return
+  }
+  testPrompt.value = ''
+  clearMediaUploads()
+  pickDefaultModelForMode()
+  await loadTestQuestions()
+})
+
+const loadTestQuestions = async () => {
+  const loadVersion = ++questionLoadVersion
+  loadingQuestions.value = true
+  try {
+    const questions = await adminAPI.accountTestQuestions.list(true)
+    if (loadVersion !== questionLoadVersion || !props.show || !isQuestionMode.value) return
+    testQuestions.value = questions
+      .filter((question) => question.enabled)
+      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+  } catch (error) {
+    if (loadVersion !== questionLoadVersion || !isQuestionMode.value) return
+    testQuestions.value = []
+    status.value = 'error'
+    errorMessage.value = t('admin.accounts.testQuestion.loadFailed')
+    console.error('Failed to load account test questions:', error)
+  } finally {
+    if (loadVersion === questionLoadVersion) loadingQuestions.value = false
+  }
+}
 
 const loadAvailableModels = async () => {
   if (!props.account) return
@@ -798,6 +950,7 @@ const loadAvailableModels = async () => {
         selectedModelId.value = sonnetModel?.id || availableModels.value[0].id
       }
     }
+    pickDefaultModelForMode()
   } catch (error) {
     console.error('Failed to load available models:', error)
     // Fallback to empty list
@@ -813,6 +966,7 @@ const resetState = () => {
   outputLines.value = []
   streamingContent.value = ''
   errorMessage.value = ''
+  questionResultFailed.value = false
   generatedImages.value = []
   generatedAudios.value = []
   generatedVideos.value = []
@@ -832,6 +986,7 @@ const abortStream = () => {
 }
 
 onBeforeUnmount(() => {
+  questionLoadVersion += 1
   abortStream()
 })
 
@@ -854,6 +1009,9 @@ const startTest = async () => {
   status.value = 'connecting'
   addLine(t('admin.accounts.startingTestForAccount', { name: props.account.name }), 'text-blue-400')
   addLine(t('admin.accounts.testAccountTypeLabel', { type: props.account.type }), 'text-gray-400')
+  if (isQuestionMode.value && selectedQuestion.value) {
+    addLine(t('admin.accounts.testQuestion.starting', { name: selectedQuestion.value.name }), 'text-cyan-400')
+  }
   if (isGrokAccount.value) {
     const modeLabel =
       grokTestModeOptions.value.find((o) => o.value === grokTestMode.value)?.label || grokTestMode.value
@@ -870,6 +1028,7 @@ const startTest = async () => {
       model_id: string
       prompt: string
       mode?: string
+      test_question_id?: number
       image_data_url?: string
       audio_data_url?: string
     } = {
@@ -877,7 +1036,7 @@ const startTest = async () => {
       prompt: supportsPromptInput.value ? testPrompt.value.trim() : ''
     }
     if (isOpenAIAccount.value) {
-      requestBody.mode = testMode.value
+      requestBody.mode = isQuestionMode.value ? 'default' : testMode.value
     }
     if (isVideoAccount.value) {
       requestBody.mode = 'video'
@@ -886,7 +1045,7 @@ const startTest = async () => {
     if (isGrokAccount.value) {
       // Always send explicit Grok mode. search/tts/stt/realtime are standalone
       // endpoints (no free-form model select). text/image/video use optional model.
-      requestBody.mode = grokTestMode.value
+      requestBody.mode = isQuestionMode.value ? 'text' : grokTestMode.value
       if (
         grokTestMode.value === 'search' ||
         grokTestMode.value === 'tts' ||
@@ -901,6 +1060,10 @@ const startTest = async () => {
       if (uploadAudioDataURL.value && grokTestMode.value === 'stt') {
         requestBody.audio_data_url = uploadAudioDataURL.value
       }
+    }
+    if (isQuestionMode.value && selectedQuestion.value) {
+      requestBody.prompt = ''
+      requestBody.test_question_id = selectedQuestion.value.id
     }
 
     // Use the configured API base; EventSource does not support POST.
@@ -931,8 +1094,8 @@ const startTest = async () => {
     let buffer = ''
 
     const handleSSELine = (line: string) => {
-      if (!line.startsWith('data: ')) return
-      const jsonStr = line.slice(6).trim()
+      if (!line.startsWith('data:')) return
+      const jsonStr = line.slice(5).replace(/^ /, '').trim()
       if (!jsonStr) return
       try {
         handleEvent(JSON.parse(jsonStr))
@@ -984,6 +1147,7 @@ const handleEvent = (event: {
   audio_url?: string
   video_url?: string
   mime_type?: string
+  data?: QuestionResult
 }) => {
   switch (event.type) {
     case 'test_start':
@@ -992,7 +1156,9 @@ const handleEvent = (event: {
         addLine(t('admin.accounts.usingModel', { model: event.model }), 'text-cyan-400')
       }
       addLine(
-        isVideoAccount.value
+        isQuestionMode.value
+          ? t('admin.accounts.testQuestion.sending')
+          : isVideoAccount.value
           ? t('admin.accounts.sendingVideoRequest')
           : isGrokAccount.value
           ? grokTestMode.value === 'video'
@@ -1060,6 +1226,28 @@ const handleEvent = (event: {
       }
       break
 
+    case 'question_result':
+      if (!event.data) break
+      if (!event.data.judged) {
+        questionResultFailed.value = false
+        addLine(t('admin.accounts.testQuestion.noPatternsResult'), 'text-yellow-400')
+        break
+      }
+      addLine(
+        t('admin.accounts.testQuestion.answerPatterns', { patterns: event.data.answer_patterns.join(', ') }),
+        'text-gray-300'
+      )
+      questionResultFailed.value = event.success === false || event.data.matched_patterns.length === 0
+      if (event.data.matched_patterns.length > 0) {
+        addLine(
+          t('admin.accounts.testQuestion.matchedPatterns', { patterns: event.data.matched_patterns.join(', ') }),
+          'text-green-400'
+        )
+      } else {
+        addLine(t('admin.accounts.testQuestion.noMatchedPatterns'), 'text-red-400')
+      }
+      break
+
     case 'test_complete':
       // Move streaming content to output lines
       if (streamingContent.value) {
@@ -1070,7 +1258,9 @@ const handleEvent = (event: {
         status.value = 'success'
       } else {
         status.value = 'error'
-        errorMessage.value = event.error || t('admin.accounts.testFailed')
+        errorMessage.value = isQuestionMode.value && questionResultFailed.value
+          ? t('admin.accounts.testQuestion.failed')
+          : event.error || t('admin.accounts.testFailed')
       }
       break
 

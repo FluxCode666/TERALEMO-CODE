@@ -607,6 +607,20 @@ export async function getAvailableModels(id: number): Promise<ClaudeModel[]> {
   return data
 }
 
+export interface AccountModelIntersection {
+  platform: string
+  models: Array<{ id: string; display_name: string }>
+  account_count: number
+  failed_account_ids: number[]
+}
+
+export async function getModelIntersection(accountIds: number[]): Promise<AccountModelIntersection> {
+  const { data } = await apiClient.post<AccountModelIntersection>('/admin/accounts/model-intersection', {
+    account_ids: accountIds
+  })
+  return data
+}
+
 export interface SyncUpstreamModelsResult {
   models: string[]
   metadata?: Record<string, UpstreamModelMetadata>
@@ -1160,6 +1174,7 @@ export const accountsAPI = {
   resetTempUnschedulable,
   setSchedulable,
   getAvailableModels,
+  getModelIntersection,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,
