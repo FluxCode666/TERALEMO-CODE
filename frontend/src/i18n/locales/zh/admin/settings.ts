@@ -1434,5 +1434,58 @@ export default {
       loadFailed: '加载模板失败',
       saveFailed: '保存模板失败',
       deleteFailed: '删除模板失败'
+    },
+
+    accountTestQuestions: {
+      title: '测试题目',
+      description: '管理账号测试使用的题目、期望答案正则、启用状态和显示顺序',
+      createQuestion: '新建题目',
+      editQuestion: '编辑题目',
+      deleteQuestion: '删除题目',
+      noQuestions: '暂无测试题目',
+      createFirstQuestion: '新建第一道测试题目，用于验证账号回答是否符合预期',
+      toggleLabel: '切换题目 "{name}" 的启用状态',
+
+      columns: {
+        name: '名称',
+        content: '题干摘要',
+        patterns: '期望答案正则',
+        enabled: '启用',
+        sortOrder: '排序',
+        actions: '操作'
+      },
+
+      form: {
+        name: '题目名称',
+        namePlaceholder: '例如：身份自检',
+        content: '题干',
+        contentPlaceholder: '输入要发送给模型的完整测试题干...',
+        patterns: '期望答案正则（可选）',
+        patternsPlaceholder: '每行一条 RE2 正则，例如：\n(?i)claude\n(?i)anthropic',
+        patternsHint: '使用 Go RE2 语法；每行一条，匹配任意一条即通过；(?i) 忽略大小写，(?s) 让 . 匹配换行',
+        enabled: '启用此题目',
+        sortOrder: '排序',
+        sortOrderHint: '数值越小越靠前，相同数值按创建顺序排列'
+      },
+
+      validation: {
+        nameRequired: '请输入题目名称',
+        nameLength: '题目名称去除首尾空白后不能超过 100 个字符',
+        contentRequired: '请输入题干',
+        contentLength: '题干去除首尾空白后不能超过 20000 个字符',
+        patternCount: '期望答案正则最多 20 条',
+        patternLength: '每条期望答案正则不能超过 500 个字符',
+        sortOrderInvalid: '排序必须是整数',
+        sortOrderRange: '排序必须在 -2147483648 到 2147483647 之间'
+      },
+
+      deleteConfirm: '确定要删除题目 "{name}" 吗？此操作无法撤销。',
+      createSuccess: '题目创建成功',
+      updateSuccess: '题目更新成功',
+      deleteSuccess: '题目删除成功',
+      loadFailed: '加载测试题目失败',
+      saveFailed: '保存测试题目失败',
+      deleteFailed: '删除测试题目失败',
+      toggleFailed: '切换题目启用状态失败'
     }
 }
