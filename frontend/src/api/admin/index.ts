@@ -28,6 +28,8 @@ import apiKeysAPI from './apiKeys'
 import scheduledTestsAPI from './scheduledTests'
 import backupAPI from './backup'
 import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
+import accountTestQuestionsAPI from './accountTestQuestions'
+import scheduledQuestionTestsAPI from './scheduledQuestionTests'
 import channelsAPI from './channels'
 import channelMonitorAPI from './channelMonitor'
 import channelMonitorTemplateAPI from './channelMonitorTemplate'
@@ -71,6 +73,8 @@ export const adminAPI = {
   scheduledTests: scheduledTestsAPI,
   backup: backupAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
+  accountTestQuestions: accountTestQuestionsAPI,
+  scheduledQuestionTests: scheduledQuestionTestsAPI,
   channels: channelsAPI,
   channelMonitor: channelMonitorAPI,
   channelMonitorTemplate: channelMonitorTemplateAPI,
@@ -109,6 +113,8 @@ export {
   scheduledTestsAPI,
   backupAPI,
   tlsFingerprintProfileAPI,
+  accountTestQuestionsAPI,
+  scheduledQuestionTestsAPI,
   channelsAPI,
   channelMonitorAPI,
   channelMonitorTemplateAPI,
@@ -128,7 +134,20 @@ export type { BalanceHistoryItem } from './users'
 export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from './errorPassthrough'
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'
+export type {
+  AccountTestQuestion,
+  CreateAccountTestQuestionRequest,
+  UpdateAccountTestQuestionRequest,
+  DeleteAccountTestQuestionResponse
+} from './accountTestQuestions'
 export type { ContentModerationConfig, ContentModerationLog, ModerationMode } from './riskControl'
+export type { AccountModelIntersection } from './accounts'
+export type {
+  ScheduledQuestionTestPlan,
+  ScheduledQuestionTestRun,
+  ScheduledQuestionTestSummary,
+  ScheduledQuestionTestRequest
+} from './scheduledQuestionTests'
 export type {
   PluginInstallation,
   PluginCompatibility,

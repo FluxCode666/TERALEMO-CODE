@@ -64,6 +64,9 @@ func (s *AccountTestService) testCNProviderAdaptiveConnection(c *gin.Context, ac
 
 func (s *AccountTestService) testCNProviderAdaptiveAnthropicConnection(c *gin.Context, account *Account, testModelID string, authToken string) error {
 	ctx := c.Request.Context()
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	baseURL, err := s.validateUpstreamBaseURL(account.GetCNProtocolBaseURL(APIProtocolAnthropic))
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid adaptive Anthropic base URL: %s", err.Error()))
@@ -74,6 +77,7 @@ func (s *AccountTestService) testCNProviderAdaptiveAnthropicConnection(c *gin.Co
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create adaptive Anthropic test payload")
 	}
+	applyAccountTestQuestion(c, payload, "messages")
 	payloadBytes, _ := json.Marshal(payload)
 
 	s.sendEvent(c, TestEvent{Type: "status", Text: "正在通过原生 /v1/messages 测试自适应 Anthropic 端点"})
@@ -163,6 +167,9 @@ func (s *AccountTestService) processCNProviderAdaptiveAnthropicStream(c *gin.Con
 
 func (s *AccountTestService) testCNProviderAdaptiveResponsesConnection(c *gin.Context, account *Account, testModelID string, authToken string) error {
 	ctx := c.Request.Context()
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	baseURL, err := s.validateUpstreamBaseURL(account.GetCNProtocolBaseURL(APIProtocolResponses))
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid adaptive Responses base URL: %s", err.Error()))
@@ -170,6 +177,7 @@ func (s *AccountTestService) testCNProviderAdaptiveResponsesConnection(c *gin.Co
 	apiURL := buildOpenAIResponsesURLForPlatform(account.Platform, baseURL)
 
 	payload := createOpenAITestPayload(testModelID, false)
+	applyAccountTestQuestion(c, payload, "input")
 	// DeepSeek / Kimi native Responses endpoints are stateless and do not need
 	// the OpenAI probe's synthetic instructions.
 	delete(payload, "instructions")
@@ -234,6 +242,9 @@ func (s *AccountTestService) testCNProviderAnthropicConnection(c *gin.Context, a
 		testModelID = claude.DefaultTestModel
 	}
 	testModelID = account.GetMappedModel(testModelID)
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 
 	authToken := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())
 	if authToken == "" {
@@ -259,6 +270,7 @@ func (s *AccountTestService) testCNProviderAnthropicConnection(c *gin.Context, a
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create Anthropic test payload")
 	}
+	applyAccountTestQuestion(c, payload, "messages")
 	payloadBytes, _ := json.Marshal(payload)
 
 	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})

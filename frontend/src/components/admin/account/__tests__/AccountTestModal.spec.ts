@@ -245,7 +245,7 @@ describe('AccountTestModal', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1)
     const [, request] = (global.fetch as any).mock.calls[0]
-    expect(JSON.parse(request.body)).toMatchObject({
+    expect(JSON.parse(request.body)).toEqual({
       model_id: 'gpt-5.4',
       prompt: '',
       mode: 'compact'

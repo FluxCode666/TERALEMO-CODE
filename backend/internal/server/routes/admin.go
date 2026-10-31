@@ -114,6 +114,7 @@ func RegisterAdminRoutes(
 
 		// TLS 指纹模板管理
 		registerTLSFingerprintProfileRoutes(admin, h)
+		registerAccountTestQuestionRoutes(admin, h)
 
 		// 本地进程插件管理
 		registerPluginRoutes(admin, h, stepUpAuth)
@@ -123,6 +124,7 @@ func RegisterAdminRoutes(
 
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
+		registerScheduledQuestionTestRoutes(admin, h)
 
 		// 渠道管理
 		registerChannelRoutes(admin, h)
@@ -459,6 +461,8 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.POST("/batch-refresh-tier", h.Admin.Account.BatchRefreshTier)
 		accounts.POST("/bulk-update", h.Admin.Account.BulkUpdate)
 		accounts.POST("/batch-delete", h.Admin.Account.BatchDelete)
+		accounts.POST("/batch-test", h.Admin.AccountBatchTest.Test)
+		accounts.POST("/model-intersection", h.Admin.AccountModelIntersection.Get)
 		accounts.POST("/batch-clear-error", h.Admin.Account.BatchClearError)
 		accounts.POST("/batch-refresh", h.Admin.Account.BatchRefresh)
 
@@ -797,6 +801,26 @@ func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Hand
 		profiles.PUT("/:id", h.Admin.TLSFingerprintProfile.Update)
 		profiles.DELETE("/:id", h.Admin.TLSFingerprintProfile.Delete)
 	}
+}
+
+func registerAccountTestQuestionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	questions := admin.Group("/account-test-questions")
+	questions.GET("", h.Admin.AccountTestQuestion.List)
+	questions.GET("/:id", h.Admin.AccountTestQuestion.GetByID)
+	questions.POST("", h.Admin.AccountTestQuestion.Create)
+	questions.PUT("/:id", h.Admin.AccountTestQuestion.Update)
+	questions.DELETE("/:id", h.Admin.AccountTestQuestion.Delete)
+}
+
+func registerScheduledQuestionTestRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	plans := admin.Group("/scheduled-question-tests")
+	plans.GET("", h.Admin.ScheduledQuestionTest.List)
+	plans.GET("/:id", h.Admin.ScheduledQuestionTest.GetByID)
+	plans.POST("", h.Admin.ScheduledQuestionTest.Create)
+	plans.PUT("/:id", h.Admin.ScheduledQuestionTest.Update)
+	plans.DELETE("/:id", h.Admin.ScheduledQuestionTest.Delete)
+	plans.GET("/:id/runs", h.Admin.ScheduledQuestionTest.ListRuns)
+	plans.POST("/:id/run-now", h.Admin.ScheduledQuestionTest.RunNow)
 }
 
 func registerPluginRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {

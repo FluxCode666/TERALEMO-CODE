@@ -1440,5 +1440,58 @@ export default {
       loadFailed: 'Failed to load profiles',
       saveFailed: 'Failed to save profile',
       deleteFailed: 'Failed to delete profile'
+    },
+
+    accountTestQuestions: {
+      title: 'Test Questions',
+      description: 'Manage account test prompts, expected answer patterns, enabled states, and display order',
+      createQuestion: 'New Question',
+      editQuestion: 'Edit Question',
+      deleteQuestion: 'Delete Question',
+      noQuestions: 'No test questions configured',
+      createFirstQuestion: 'Create your first test question to verify account responses',
+      toggleLabel: 'Toggle enabled state for question "{name}"',
+
+      columns: {
+        name: 'Name',
+        content: 'Prompt Summary',
+        patterns: 'Expected Answer Patterns',
+        enabled: 'Enabled',
+        sortOrder: 'Sort Order',
+        actions: 'Actions'
+      },
+
+      form: {
+        name: 'Question Name',
+        namePlaceholder: 'e.g., Identity Check',
+        content: 'Prompt',
+        contentPlaceholder: 'Enter the complete test prompt to send to the model...',
+        patterns: 'Expected Answer Patterns (optional)',
+        patternsPlaceholder: 'One RE2 pattern per line, for example:\n(?i)claude\n(?i)anthropic',
+        patternsHint: 'Use Go RE2 syntax, one pattern per line; any match passes. (?i) ignores case and (?s) lets . match newlines',
+        enabled: 'Enable this question',
+        sortOrder: 'Sort Order',
+        sortOrderHint: 'Lower values appear first; ties use creation order'
+      },
+
+      validation: {
+        nameRequired: 'Please enter a question name',
+        nameLength: 'Question name must be at most 100 characters after trimming',
+        contentRequired: 'Please enter a prompt',
+        contentLength: 'Prompt must be at most 20000 characters after trimming',
+        patternCount: 'At most 20 expected answer patterns are allowed',
+        patternLength: 'Each expected answer pattern must be at most 500 characters',
+        sortOrderInvalid: 'Sort order must be an integer',
+        sortOrderRange: 'Sort order must be between -2147483648 and 2147483647'
+      },
+
+      deleteConfirm: 'Are you sure you want to delete question "{name}"? This action cannot be undone.',
+      createSuccess: 'Question created successfully',
+      updateSuccess: 'Question updated successfully',
+      deleteSuccess: 'Question deleted successfully',
+      loadFailed: 'Failed to load test questions',
+      saveFailed: 'Failed to save test question',
+      deleteFailed: 'Failed to delete test question',
+      toggleFailed: 'Failed to toggle question enabled state'
     }
 }
