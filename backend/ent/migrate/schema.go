@@ -259,6 +259,30 @@ var (
 			},
 		},
 	}
+	// AccountTestQuestionsColumns holds the columns for the "account_test_questions" table.
+	AccountTestQuestionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "name", Type: field.TypeString, Unique: true, Size: 100},
+		{Name: "content", Type: field.TypeString, Size: 20000, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "answer_patterns", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+	}
+	// AccountTestQuestionsTable holds the schema information for the "account_test_questions" table.
+	AccountTestQuestionsTable = &schema.Table{
+		Name:       "account_test_questions",
+		Columns:    AccountTestQuestionsColumns,
+		PrimaryKey: []*schema.Column{AccountTestQuestionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "account_test_questions_sort_order_id_idx",
+				Unique:  false,
+				Columns: []*schema.Column{AccountTestQuestionsColumns[7], AccountTestQuestionsColumns[0]},
+			},
+		},
+	}
 	// AnnouncementsColumns holds the columns for the "announcements" table.
 	AnnouncementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2470,6 +2494,7 @@ var (
 		APIKeysTable,
 		AccountsTable,
 		AccountGroupsTable,
+		AccountTestQuestionsTable,
 		AnnouncementsTable,
 		AnnouncementReadsTable,
 		AuthIdentitiesTable,
@@ -2533,6 +2558,9 @@ func init() {
 	AccountGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	AccountGroupsTable.Annotation = &entsql.Annotation{
 		Table: "account_groups",
+	}
+	AccountTestQuestionsTable.Annotation = &entsql.Annotation{
+		Table: "account_test_questions",
 	}
 	AnnouncementsTable.Annotation = &entsql.Annotation{
 		Table: "announcements",

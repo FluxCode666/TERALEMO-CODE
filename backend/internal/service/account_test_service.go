@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/model"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -70,6 +71,7 @@ type TestEvent struct {
 type AccountTestOptions struct {
 	ImageDataURL string
 	AudioDataURL string
+	Question     *model.AccountTestQuestion
 }
 
 func firstAccountTestOptions(opts []AccountTestOptions) AccountTestOptions {
@@ -365,10 +367,30 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 
 	// Get account
 	account, err := s.accountRepo.GetByID(ctx, accountID)
-	if err != nil {
+	if err != nil || account == nil {
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
 	bindAccountTestPlatform(c, account)
+	if testOpts.Question != nil {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("X-Accel-Buffering", "no")
+		if account.Platform == PlatformVideo || account.IsTypeSafe() {
+			return s.sendErrorAndEnd(c, "Test questions are not supported for this account")
+		}
+		if questionRequiresTextModel(modelID) {
+			return s.sendErrorAndEnd(c, "Test questions require a text model")
+		}
+		state := &accountTestQuestionState{question: testOpts.Question}
+		c.Request = c.Request.WithContext(context.WithValue(ctx, accountTestQuestionContextKey{}, state))
+		prompt = testOpts.Question.Content
+		mode = AccountTestModeDefault
+		if account.Platform == PlatformGrok {
+			mode = AccountTestModeGrokText
+		}
+		testOpts.ImageDataURL = ""
+		testOpts.AudioDataURL = ""
+	}
 	if account.Platform == PlatformVideo {
 		return s.testVideoAccountConnection(c, account, modelID, prompt, testOpts)
 	}
@@ -447,6 +469,9 @@ func (s *AccountTestService) testModelRoutedAccountConnection(c *gin.Context, ac
 		testModelID = openai.DefaultTestModel
 	}
 	testModelID = account.GetMappedModel(testModelID)
+	if accountTestQuestionFromContext(c.Request.Context()) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(testModelID) {
 		return fmt.Errorf("model %q is not supported on OpenCode standard gateway (gemini models require Google SDK endpoint, jev models require System One endpoint)", testModelID)
 	}
@@ -517,6 +542,9 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	if account.Type == "apikey" {
 		testModelID = account.GetMappedModel(testModelID)
 	}
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 
 	// Bedrock accounts use a separate test path
 	if account.IsBedrock() {
@@ -567,6 +595,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
 	}
+	applyAccountTestQuestion(c, payload, "messages")
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event
@@ -634,6 +663,9 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 	} else {
 		testModelID = normalizeVertexAnthropicModelID(claude.NormalizeModelID(testModelID))
 	}
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -645,6 +677,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
 	}
+	applyAccountTestQuestion(c, payload, "messages")
 	payloadBytes, _ := json.Marshal(payload)
 	vertexBody, err := buildVertexAnthropicRequestBody(payloadBytes)
 	if err != nil {
@@ -713,21 +746,10 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 	c.Writer.Flush()
 
 	// Create a minimal Bedrock-compatible payload (no stream, no cache_control)
-	bedrockPayload := map[string]any{
-		"anthropic_version": "bedrock-2023-05-31",
-		"messages": []map[string]any{
-			{
-				"role": "user",
-				"content": []map[string]any{
-					{
-						"type": "text",
-						"text": "hi",
-					},
-				},
-			},
-		},
-		"max_tokens":  256,
-		"temperature": 1,
+	bedrockPayload := createBedrockTestPayload()
+	applyAccountTestQuestion(c, bedrockPayload, "messages")
+	if accountTestQuestionFromContext(ctx) != nil {
+		bedrockPayload["max_tokens"] = 1024
 	}
 	bedrockBody, _ := json.Marshal(bedrockPayload)
 
@@ -799,6 +821,25 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 	return nil
 }
 
+func createBedrockTestPayload() map[string]any {
+	return map[string]any{
+		"anthropic_version": "bedrock-2023-05-31",
+		"messages": []map[string]any{
+			{
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type": "text",
+						"text": "hi",
+					},
+				},
+			},
+		},
+		"max_tokens":  256,
+		"temperature": 1,
+	}
+}
+
 // testOpenAIAccountConnection tests an OpenAI account's connection
 func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account *Account, modelID string, prompt string, mode string) error {
 	ctx := c.Request.Context()
@@ -815,6 +856,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	// /responses wire and does NOT apply the legacy compact-only mapping
 	// (post-#5641 semantics: compact_model_mapping is /responses/compact-only).
 	testModelID = account.GetMappedModel(testModelID)
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	if mode == AccountTestModeCompact {
 		return s.testOpenAICompactConnection(c, account, testModelID)
 	}
@@ -894,6 +938,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		upstreamTestModelID = normalizeOpenAIModelForUpstream(credentialAccount, testModelID)
 	}
 	payload := createOpenAITestPayload(upstreamTestModelID, isOAuth)
+	applyAccountTestQuestion(c, payload, "input")
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -1249,6 +1294,9 @@ func (s *AccountTestService) observeGrokTestResponse(ctx context.Context, accoun
 }
 
 func (s *AccountTestService) testGrokResponsesConnection(c *gin.Context, ctx context.Context, account *Account, authToken, testModelID string) error {
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	apiURL, err := buildGrokResponsesURL(account, s.cfg, s.settingService)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Grok base URL: %s", err.Error()))
@@ -1259,6 +1307,11 @@ func (s *AccountTestService) testGrokResponsesConnection(c *gin.Context, ctx con
 	payloadBytes, err := buildGrokQuotaProbeBody(testModelID)
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create Grok test payload")
+	}
+	if state := accountTestQuestionFromContext(ctx); state != nil {
+		payloadBytes, _ = json.Marshal(map[string]any{
+			"model": strings.TrimSpace(testModelID), "input": state.question.Content, "stream": true,
+		})
 	}
 
 	if !agentIdentityTaskRecoveryWasTried(ctx) {
@@ -2128,6 +2181,9 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 ) error {
 	ctx := c.Request.Context()
 	apiURL := buildOpenAIChatCompletionsURL(normalizedBaseURL)
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -2413,6 +2469,9 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 	c.Writer.Flush()
 
 	// Create test payload (Gemini format)
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(testModelID) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
+	}
 	payload := createGeminiTestPayload(testModelID, prompt)
 
 	// Build request based on account type
@@ -2479,6 +2538,9 @@ func (s *AccountTestService) testAntigravityAccountConnection(c *gin.Context, ac
 
 	if s.antigravityGatewayService == nil {
 		return s.sendErrorAndEnd(c, "Antigravity gateway service not configured")
+	}
+	if accountTestQuestionFromContext(ctx) != nil && questionRequiresTextModel(s.antigravityGatewayService.getMappedModel(account, testModelID)) {
+		return s.sendErrorAndEnd(c, "Test questions require a text model")
 	}
 
 	// Set SSE headers
@@ -3279,7 +3341,36 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 			}
 		}
 	}
+	var state *accountTestQuestionState
+	if c.Request != nil {
+		state = accountTestQuestionFromContext(c.Request.Context())
+	}
+	if state != nil {
+		switch event.Type {
+		case "content":
+			_, _ = state.answer.WriteString(event.Text)
+		case "error":
+			state.failed = true
+		case "test_complete":
+			if event.Success && !state.failed && !state.complete {
+				state.complete = true
+				result, success := state.result()
+				s.sendEvent(c, TestEvent{Type: "question_result", Success: success, Data: result})
+				if !success {
+					event.Success = false
+					event.Error = "Answer did not match any expected pattern"
+				}
+			}
+		}
+	}
 	eventJSON, _ := json.Marshal(event)
+	if state != nil && (event.Type == "question_result" || event.Type == "test_complete") {
+		// Legacy events omit false. Question clients require an explicit verdict.
+		eventJSON, _ = json.Marshal(struct {
+			TestEvent
+			Success bool `json:"success"`
+		}{TestEvent: event, Success: event.Success})
+	}
 	if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
 		log.Printf("failed to write SSE event: %v", err)
 		return
@@ -3287,10 +3378,15 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 	c.Writer.Flush()
 }
 
+// SendErrorEvent lets handlers use the same SSE encoding for preflight errors.
+func (s *AccountTestService) SendErrorEvent(c *gin.Context, errorMsg string) {
+	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
+}
+
 // sendErrorAndEnd sends an error event and ends the stream
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
 	logAccountTestError(c, errorMsg)
-	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
+	s.SendErrorEvent(c, errorMsg)
 	return fmt.Errorf("%s", errorMsg)
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accounttestquestion"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -275,6 +276,69 @@ func init() {
 	accountgroupDescCreatedAt := accountgroupFields[3].Descriptor()
 	// accountgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
 	accountgroup.DefaultCreatedAt = accountgroupDescCreatedAt.Default.(func() time.Time)
+	accounttestquestionMixin := schema.AccountTestQuestion{}.Mixin()
+	accounttestquestionMixinFields0 := accounttestquestionMixin[0].Fields()
+	_ = accounttestquestionMixinFields0
+	accounttestquestionFields := schema.AccountTestQuestion{}.Fields()
+	_ = accounttestquestionFields
+	// accounttestquestionDescCreatedAt is the schema descriptor for created_at field.
+	accounttestquestionDescCreatedAt := accounttestquestionMixinFields0[0].Descriptor()
+	// accounttestquestion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	accounttestquestion.DefaultCreatedAt = accounttestquestionDescCreatedAt.Default.(func() time.Time)
+	// accounttestquestionDescUpdatedAt is the schema descriptor for updated_at field.
+	accounttestquestionDescUpdatedAt := accounttestquestionMixinFields0[1].Descriptor()
+	// accounttestquestion.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	accounttestquestion.DefaultUpdatedAt = accounttestquestionDescUpdatedAt.Default.(func() time.Time)
+	// accounttestquestion.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	accounttestquestion.UpdateDefaultUpdatedAt = accounttestquestionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// accounttestquestionDescName is the schema descriptor for name field.
+	accounttestquestionDescName := accounttestquestionFields[0].Descriptor()
+	// accounttestquestion.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	accounttestquestion.NameValidator = func() func(string) error {
+		validators := accounttestquestionDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// accounttestquestionDescContent is the schema descriptor for content field.
+	accounttestquestionDescContent := accounttestquestionFields[1].Descriptor()
+	// accounttestquestion.ContentValidator is a validator for the "content" field. It is called by the builders before save.
+	accounttestquestion.ContentValidator = func() func(string) error {
+		validators := accounttestquestionDescContent.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(content string) error {
+			for _, fn := range fns {
+				if err := fn(content); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// accounttestquestionDescAnswerPatterns is the schema descriptor for answer_patterns field.
+	accounttestquestionDescAnswerPatterns := accounttestquestionFields[2].Descriptor()
+	// accounttestquestion.DefaultAnswerPatterns holds the default value on creation for the answer_patterns field.
+	accounttestquestion.DefaultAnswerPatterns = accounttestquestionDescAnswerPatterns.Default.([]string)
+	// accounttestquestionDescEnabled is the schema descriptor for enabled field.
+	accounttestquestionDescEnabled := accounttestquestionFields[3].Descriptor()
+	// accounttestquestion.DefaultEnabled holds the default value on creation for the enabled field.
+	accounttestquestion.DefaultEnabled = accounttestquestionDescEnabled.Default.(bool)
+	// accounttestquestionDescSortOrder is the schema descriptor for sort_order field.
+	accounttestquestionDescSortOrder := accounttestquestionFields[4].Descriptor()
+	// accounttestquestion.DefaultSortOrder holds the default value on creation for the sort_order field.
+	accounttestquestion.DefaultSortOrder = accounttestquestionDescSortOrder.Default.(int)
 	announcementFields := schema.Announcement{}.Fields()
 	_ = announcementFields
 	// announcementDescTitle is the schema descriptor for title field.

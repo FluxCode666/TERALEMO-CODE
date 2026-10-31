@@ -398,6 +398,9 @@ func (s *AntigravityGatewayService) TestConnectionWithPrompt(ctx context.Context
 	} else {
 		requestBody, err = s.buildClaudeTestRequest(projectID, mappedModel)
 	}
+	if err == nil {
+		requestBody, err = applyAntigravityTestQuestion(ctx, requestBody)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("构建请求失败: %w", err)
 	}

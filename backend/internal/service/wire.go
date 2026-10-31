@@ -694,6 +694,13 @@ func ProvideScheduledTestService(
 	return NewScheduledTestService(planRepo, resultRepo)
 }
 
+// ProvideScheduledQuestionTestRunnerService starts the independent question-test schedule.
+func ProvideScheduledQuestionTestRunnerService(repo ScheduledQuestionTestRepository, scheduled *ScheduledQuestionTestService, cfg *config.Config) *ScheduledQuestionTestRunnerService {
+	svc := NewScheduledQuestionTestRunnerService(repo, scheduled, cfg)
+	svc.Start()
+	return svc
+}
+
 // ProvideScheduledTestRunnerService creates and starts ScheduledTestRunnerService.
 func ProvideScheduledTestRunnerService(
 	planRepo ScheduledTestPlanRepository,
@@ -1016,6 +1023,11 @@ var ProviderSet = wire.NewSet(
 	NewTotpService,
 	NewErrorPassthroughService,
 	NewTLSFingerprintProfileService,
+	NewAccountTestQuestionService,
+	NewAccountBatchTestService,
+	NewAccountModelCatalogService,
+	NewScheduledQuestionTestService,
+	ProvideScheduledQuestionTestRunnerService,
 	ProvidePluginManager,
 	NewDigestSessionStore,
 	ProvideIdempotencyCoordinator,

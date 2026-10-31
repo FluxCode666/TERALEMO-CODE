@@ -17,6 +17,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accounttestquestion"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -78,6 +79,8 @@ type Client struct {
 	Account *AccountClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
 	AccountGroup *AccountGroupClient
+	// AccountTestQuestion is the client for interacting with the AccountTestQuestion builders.
+	AccountTestQuestion *AccountTestQuestionClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -182,6 +185,7 @@ func (c *Client) init() {
 	c.APIKey = NewAPIKeyClient(c.config)
 	c.Account = NewAccountClient(c.config)
 	c.AccountGroup = NewAccountGroupClient(c.config)
+	c.AccountTestQuestion = NewAccountTestQuestionClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.AuthIdentity = NewAuthIdentityClient(c.config)
@@ -322,6 +326,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		AccountTestQuestion:           NewAccountTestQuestionClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -389,6 +394,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		AccountTestQuestion:           NewAccountTestQuestionClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -463,19 +469,20 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
-		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
-		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
-		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
-		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
-		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.AccountTestQuestion, c.Announcement,
+		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
+		c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.Enterprise,
+		c.EnterpriseAllowedGroup, c.EnterpriseAuditLog, c.EnterpriseBalanceLog,
+		c.EnterpriseDepartment, c.EnterpriseGroupWhitelist,
+		c.EnterpriseGroupWhitelistScope, c.EnterpriseMember, c.EnterpriseQuota,
+		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
+		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
+		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -486,19 +493,20 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.Enterprise, c.EnterpriseAllowedGroup,
-		c.EnterpriseAuditLog, c.EnterpriseBalanceLog, c.EnterpriseDepartment,
-		c.EnterpriseGroupWhitelist, c.EnterpriseGroupWhitelistScope,
-		c.EnterpriseMember, c.EnterpriseQuota, c.ErrorPassthroughRule, c.Group,
-		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
-		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.AccountTestQuestion, c.Announcement,
+		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
+		c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.Enterprise,
+		c.EnterpriseAllowedGroup, c.EnterpriseAuditLog, c.EnterpriseBalanceLog,
+		c.EnterpriseDepartment, c.EnterpriseGroupWhitelist,
+		c.EnterpriseGroupWhitelistScope, c.EnterpriseMember, c.EnterpriseQuota,
+		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
+		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
+		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
+		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
+		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -514,6 +522,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Account.mutate(ctx, m)
 	case *AccountGroupMutation:
 		return c.AccountGroup.mutate(ctx, m)
+	case *AccountTestQuestionMutation:
+		return c.AccountTestQuestion.mutate(ctx, m)
 	case *AnnouncementMutation:
 		return c.Announcement.mutate(ctx, m)
 	case *AnnouncementReadMutation:
@@ -1136,6 +1146,139 @@ func (c *AccountGroupClient) mutate(ctx context.Context, m *AccountGroupMutation
 		return (&AccountGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AccountGroup mutation op: %q", m.Op())
+	}
+}
+
+// AccountTestQuestionClient is a client for the AccountTestQuestion schema.
+type AccountTestQuestionClient struct {
+	config
+}
+
+// NewAccountTestQuestionClient returns a client for the AccountTestQuestion from the given config.
+func NewAccountTestQuestionClient(c config) *AccountTestQuestionClient {
+	return &AccountTestQuestionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accounttestquestion.Hooks(f(g(h())))`.
+func (c *AccountTestQuestionClient) Use(hooks ...Hook) {
+	c.hooks.AccountTestQuestion = append(c.hooks.AccountTestQuestion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accounttestquestion.Intercept(f(g(h())))`.
+func (c *AccountTestQuestionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountTestQuestion = append(c.inters.AccountTestQuestion, interceptors...)
+}
+
+// Create returns a builder for creating a AccountTestQuestion entity.
+func (c *AccountTestQuestionClient) Create() *AccountTestQuestionCreate {
+	mutation := newAccountTestQuestionMutation(c.config, OpCreate)
+	return &AccountTestQuestionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountTestQuestion entities.
+func (c *AccountTestQuestionClient) CreateBulk(builders ...*AccountTestQuestionCreate) *AccountTestQuestionCreateBulk {
+	return &AccountTestQuestionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountTestQuestionClient) MapCreateBulk(slice any, setFunc func(*AccountTestQuestionCreate, int)) *AccountTestQuestionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountTestQuestionCreateBulk{err: fmt.Errorf("calling to AccountTestQuestionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountTestQuestionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountTestQuestionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountTestQuestion.
+func (c *AccountTestQuestionClient) Update() *AccountTestQuestionUpdate {
+	mutation := newAccountTestQuestionMutation(c.config, OpUpdate)
+	return &AccountTestQuestionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountTestQuestionClient) UpdateOne(_m *AccountTestQuestion) *AccountTestQuestionUpdateOne {
+	mutation := newAccountTestQuestionMutation(c.config, OpUpdateOne, withAccountTestQuestion(_m))
+	return &AccountTestQuestionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountTestQuestionClient) UpdateOneID(id int64) *AccountTestQuestionUpdateOne {
+	mutation := newAccountTestQuestionMutation(c.config, OpUpdateOne, withAccountTestQuestionID(id))
+	return &AccountTestQuestionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountTestQuestion.
+func (c *AccountTestQuestionClient) Delete() *AccountTestQuestionDelete {
+	mutation := newAccountTestQuestionMutation(c.config, OpDelete)
+	return &AccountTestQuestionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountTestQuestionClient) DeleteOne(_m *AccountTestQuestion) *AccountTestQuestionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountTestQuestionClient) DeleteOneID(id int64) *AccountTestQuestionDeleteOne {
+	builder := c.Delete().Where(accounttestquestion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountTestQuestionDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountTestQuestion.
+func (c *AccountTestQuestionClient) Query() *AccountTestQuestionQuery {
+	return &AccountTestQuestionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountTestQuestion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountTestQuestion entity by its id.
+func (c *AccountTestQuestionClient) Get(ctx context.Context, id int64) (*AccountTestQuestion, error) {
+	return c.Query().Where(accounttestquestion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountTestQuestionClient) GetX(ctx context.Context, id int64) *AccountTestQuestion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AccountTestQuestionClient) Hooks() []Hook {
+	return c.hooks.AccountTestQuestion
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountTestQuestionClient) Interceptors() []Interceptor {
+	return c.inters.AccountTestQuestion
+}
+
+func (c *AccountTestQuestionClient) mutate(ctx context.Context, m *AccountTestQuestionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountTestQuestionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountTestQuestionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountTestQuestionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountTestQuestionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountTestQuestion mutation op: %q", m.Op())
 	}
 }
 
@@ -8283,11 +8426,11 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
-		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
+		APIKey, Account, AccountGroup, AccountTestQuestion, Announcement,
+		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
+		BatchImageItem, BatchImageJob, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
+		Enterprise, EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
 		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
 		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
 		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
@@ -8297,11 +8440,11 @@ type (
 		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute, Enterprise,
-		EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
+		APIKey, Account, AccountGroup, AccountTestQuestion, Announcement,
+		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
+		BatchImageItem, BatchImageJob, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
+		Enterprise, EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
 		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
 		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
 		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
