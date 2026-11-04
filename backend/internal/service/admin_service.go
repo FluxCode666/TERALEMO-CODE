@@ -447,6 +447,7 @@ type UpdateAccountInput struct {
 	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor            *int
 	Status                string
+	Schedulable           *bool
 	GroupIDs              *[]int64
 	ExpiresAt             *int64
 	AutoPauseOnExpired    *bool

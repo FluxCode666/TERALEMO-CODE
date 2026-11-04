@@ -133,6 +133,7 @@ var auditBodySensitiveExactKeys = func() map[string]struct{} {
 		// custom_key 为用户自设的平台 API Key 明文，
 		// session 为 Ollama Cloud 用量的浏览器会话 Cookie 明文。
 		"proxy_key", "custom_key", "session",
+		"feishu_webhook_url", "webhook_url", "feishu_secret", "secret",
 	}
 	set := make(map[string]struct{}, len(builtin)+len(SensitiveCredentialKeys)+16)
 	for _, k := range builtin {
@@ -205,6 +206,18 @@ func RedactAuditBody(raw []byte, contentType string) string {
 		out = out[:auditRequestBodyMaxBytes] + "...<truncated>"
 	}
 	return out
+}
+
+func redactStoredAuditLog(entry *AuditLog) *AuditLog {
+	if entry == nil {
+		return nil
+	}
+	copy := *entry
+	if copy.RequestBody != "" && !strings.HasPrefix(copy.RequestBody, "<") {
+		// Historical bodies may predate a sensitive key, or contain truncated JSON.
+		copy.RequestBody = RedactAuditBody([]byte(copy.RequestBody), "application/json")
+	}
+	return &copy
 }
 
 const auditRedactMaxDepth = 24

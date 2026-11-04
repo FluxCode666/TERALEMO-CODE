@@ -30,25 +30,28 @@ type scheduledQuestionEmailSender interface {
 
 // ScheduledQuestionTestService reuses batch tests and persists account alert transitions.
 type ScheduledQuestionTestService struct {
-	repo      ScheduledQuestionTestRepository
-	accounts  AccountRepository
-	questions *AccountTestQuestionService
-	batch     scheduledQuestionBatchTester
-	settings  SettingRepository
-	email     scheduledQuestionEmailSender
-	now       func() time.Time
-	mu        sync.Mutex
-	running   map[int64]bool
-	baseCtx   context.Context
-	cancel    context.CancelFunc
-	stopped   bool
-	active    sync.WaitGroup
+	repo                    ScheduledQuestionTestRepository
+	accounts                AccountRepository
+	questions               *AccountTestQuestionService
+	batch                   scheduledQuestionBatchTester
+	settings                SettingRepository
+	email                   scheduledQuestionEmailSender
+	feishu                  scheduledQuestionFeishuNotifier
+	notificationTimeouts    scheduledQuestionNotificationTimeouts
+	ownershipRefreshTimeout time.Duration
+	now                     func() time.Time
+	mu                      sync.Mutex
+	running                 map[int64]bool
+	baseCtx                 context.Context
+	cancel                  context.CancelFunc
+	stopped                 bool
+	active                  sync.WaitGroup
 }
 
 func NewScheduledQuestionTestService(repo ScheduledQuestionTestRepository, accounts AccountRepository, questions *AccountTestQuestionService, batch *AccountBatchTestService, settings SettingRepository, email *EmailService) *ScheduledQuestionTestService {
 	svc := &ScheduledQuestionTestService{
 		repo: repo, accounts: accounts, questions: questions, batch: batch, settings: settings,
-		now: time.Now, running: make(map[int64]bool),
+		now: time.Now, running: make(map[int64]bool), feishu: newFeishuWebhookNotifier(),
 	}
 	if email != nil {
 		svc.email = email
@@ -81,6 +84,7 @@ func (s *ScheduledQuestionTestService) Stop() {
 
 func (s *ScheduledQuestionTestService) withRunning(plan *ScheduledQuestionTestPlan) *ScheduledQuestionTestPlan {
 	copy := *plan
+	PopulateScheduledQuestionTestPlanNotificationConfig(&copy)
 	s.mu.Lock()
 	copy.Running = s.running[plan.ID]
 	s.mu.Unlock()
@@ -115,6 +119,9 @@ func applyScheduledQuestionTestInput(plan *ScheduledQuestionTestPlan, input Sche
 		Name: input.Name != nil, AccountIDs: input.AccountIDs != nil, QuestionIDs: input.QuestionIDs != nil,
 		ModelID: input.ModelID != nil, CronExpression: input.CronExpression != nil, Enabled: input.Enabled != nil,
 		MinPassRatio: input.MinPassRatio != nil, CooldownMinutes: input.CooldownMinutes != nil, NotifyEnabled: input.NotifyEnabled != nil,
+		ReportEnabled: input.ReportEnabled != nil, EmailEnabled: input.EmailEnabled != nil, FeishuEnabled: input.FeishuEnabled != nil,
+		FeishuWebhookURL: input.FeishuWebhookURL != nil, FeishuSecret: input.FeishuSecret != nil,
+		AutoPauseEnabled: input.AutoPauseEnabled != nil, AutoResumeEnabled: input.AutoResumeEnabled != nil,
 	}
 	if input.Name != nil {
 		plan.Name = *input.Name
@@ -143,6 +150,27 @@ func applyScheduledQuestionTestInput(plan *ScheduledQuestionTestPlan, input Sche
 	if input.NotifyEnabled != nil {
 		plan.NotifyEnabled = *input.NotifyEnabled
 	}
+	if input.ReportEnabled != nil {
+		plan.ReportEnabled = *input.ReportEnabled
+	}
+	if input.EmailEnabled != nil {
+		plan.EmailEnabled = *input.EmailEnabled
+	}
+	if input.FeishuEnabled != nil {
+		plan.FeishuEnabled = *input.FeishuEnabled
+	}
+	if input.FeishuWebhookURL != nil {
+		plan.FeishuWebhookURL = strings.TrimSpace(*input.FeishuWebhookURL)
+	}
+	if input.FeishuSecret != nil {
+		plan.FeishuSecret = strings.TrimSpace(*input.FeishuSecret)
+	}
+	if input.AutoPauseEnabled != nil {
+		plan.AutoPauseEnabled = *input.AutoPauseEnabled
+	}
+	if input.AutoResumeEnabled != nil {
+		plan.AutoResumeEnabled = *input.AutoResumeEnabled
+	}
 	return mask
 }
 
@@ -163,6 +191,15 @@ func (s *ScheduledQuestionTestService) validatePlanFields(plan *ScheduledQuestio
 	}
 	if plan.CooldownMinutes < 0 || plan.CooldownMinutes > 10080 {
 		return scheduledQuestionValidation("cooldown_minutes", "cooldown_minutes must be between 0 and 10080")
+	}
+	if err := validateScheduledQuestionFeishuWebhook(plan.FeishuWebhookURL); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(plan.FeishuSecret) > 200 {
+		return scheduledQuestionValidation("feishu_secret", "feishu_secret must contain at most 200 characters")
+	}
+	if plan.FeishuEnabled && plan.FeishuWebhookURL == "" {
+		return scheduledQuestionValidation("feishu_webhook_url", "feishu webhook is required when the channel is enabled")
 	}
 	if utf8.RuneCountInString(plan.CronExpression) > 100 {
 		return scheduledQuestionValidation("cron_expression", "cron_expression must contain at most 100 characters")
@@ -207,7 +244,7 @@ func (s *ScheduledQuestionTestService) validatePlanDependencies(ctx context.Cont
 }
 
 func (s *ScheduledQuestionTestService) Create(ctx context.Context, input ScheduledQuestionTestPlanInput) (*ScheduledQuestionTestPlan, error) {
-	plan := &ScheduledQuestionTestPlan{Enabled: true, MinPassRatio: 80, CooldownMinutes: 360, NotifyEnabled: true}
+	plan := &ScheduledQuestionTestPlan{Enabled: true, MinPassRatio: 80, CooldownMinutes: 360, NotifyEnabled: true, ReportEnabled: true, EmailEnabled: true}
 	applyScheduledQuestionTestInput(plan, input)
 	if err := s.validatePlanFields(plan); err != nil {
 		return nil, err
@@ -220,7 +257,11 @@ func (s *ScheduledQuestionTestService) Create(ctx context.Context, input Schedul
 		return nil, err
 	}
 	plan.NextRunAt = &next
-	return s.repo.Create(ctx, plan)
+	created, err := s.repo.Create(ctx, plan)
+	if err != nil {
+		return nil, err
+	}
+	return s.withRunning(created), nil
 }
 
 func (s *ScheduledQuestionTestService) Update(ctx context.Context, id int64, input ScheduledQuestionTestPlanInput) (*ScheduledQuestionTestPlan, error) {
@@ -245,7 +286,11 @@ func (s *ScheduledQuestionTestService) Update(ctx context.Context, id int64, inp
 		}
 		plan.NextRunAt, mask.NextRunAt = &next, true
 	}
-	return s.repo.Update(ctx, &plan, mask)
+	updated, err := s.repo.Update(ctx, &plan, mask)
+	if err != nil {
+		return nil, err
+	}
+	return s.withRunning(updated), nil
 }
 
 func (s *ScheduledQuestionTestService) Delete(ctx context.Context, id int64) error {
@@ -253,13 +298,23 @@ func (s *ScheduledQuestionTestService) Delete(ctx context.Context, id int64) err
 }
 
 func (s *ScheduledQuestionTestService) ListRuns(ctx context.Context, id int64, limit int) ([]*ScheduledQuestionTestRun, error) {
-	if _, err := s.GetByID(ctx, id); err != nil {
+	plan, err := s.GetByID(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 	if limit <= 0 {
 		limit = 50
 	}
-	return s.repo.ListRuns(ctx, id, min(limit, 200))
+	runs, err := s.repo.ListRuns(ctx, id, min(limit, 200))
+	for _, run := range runs {
+		if run.NotificationResults == nil {
+			run.NotificationResults = []ScheduledQuestionTestNotificationResult{}
+		}
+		for i := range run.Summary {
+			run.Summary[i].Error = sanitizeScheduledQuestionErrorText(run.Summary[i].Error, plan, 500)
+		}
+	}
+	return runs, err
 }
 
 func (s *ScheduledQuestionTestService) RunNow(ctx context.Context, id int64) (*ScheduledQuestionTestAccepted, error) {
@@ -340,6 +395,7 @@ func (s *ScheduledQuestionTestService) runPlan(parent context.Context, plan *Sch
 		PlanID: plan.ID, CronExpression: plan.CronExpression, PlanUpdatedAt: plan.UpdatedAt,
 		Status: "success", StartedAt: s.now(), TotalAccounts: len(plan.AccountIDs),
 		NotificationsSuppressed: !plan.Enabled || !plan.NotifyEnabled,
+		NotificationResults:     []ScheduledQuestionTestNotificationResult{},
 	}
 	items := make([]AccountBatchTestItemResult, 0, len(plan.AccountIDs)*len(plan.QuestionIDs))
 	batchPlan, runErr := s.batch.Prepare(ctx, AccountBatchTestInput{AccountIDs: plan.AccountIDs, QuestionIDs: plan.QuestionIDs, ModelID: plan.ModelID})
@@ -369,13 +425,11 @@ func (s *ScheduledQuestionTestService) runPlan(parent context.Context, plan *Sch
 	// A cancelled/expired round still records its outcome without losing cancellation to upstreams.
 	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
 	defer persistCancel()
-	notificationPlan := *plan
-	if ctx.Err() != nil {
-		notificationPlan.NotifyEnabled = false
-	}
-	states, err := s.updateAlertStates(persistCtx, &notificationPlan, run)
+	run.FinishedAt = s.now()
+	states, err := s.updateAlertStates(persistCtx, plan, run, ctx)
 	if err != nil {
 		run.Status = "failed"
+		run.NotificationsSuppressed = true
 		if run.ErrorMessage != "" {
 			run.ErrorMessage += "; "
 		}
@@ -389,8 +443,32 @@ func (s *ScheduledQuestionTestService) runPlan(parent context.Context, plan *Sch
 	if err != nil {
 		return nil, err
 	}
-	// Slow SMTP must not consume the deadline reserved for storing the round.
+	if states != nil {
+		refreshTimeout := s.ownershipRefreshTimeout
+		if refreshTimeout <= 0 {
+			refreshTimeout = 10 * time.Second
+		}
+		refreshCtx, refreshCancel := context.WithTimeout(context.WithoutCancel(parent), refreshTimeout)
+		s.refreshScheduledQuestionSummaryOwnership(refreshCtx, plan.ID, run)
+		refreshCancel()
+	}
+	// Summary refresh is best-effort and must not consume the persistence budget.
 	finishCtx, finishCancel := context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
 	defer finishCancel()
 	return s.repo.FinishRun(finishCtx, run, states, next)
+}
+
+func (s *ScheduledQuestionTestService) refreshScheduledQuestionSummaryOwnership(ctx context.Context, planID int64, run *ScheduledQuestionTestRun) {
+	states, err := s.repo.ListStates(ctx, planID)
+	if err != nil {
+		slog.Warn("scheduled_question_test_summary_ownership_refresh_failed", "plan_id", planID)
+		return
+	}
+	byID := make(map[int64]bool, len(states))
+	for _, state := range states {
+		byID[state.AccountID] = state.AutoPaused
+	}
+	for i := range run.Summary {
+		run.Summary[i].AutoPaused = byID[run.Summary[i].AccountID]
+	}
 }

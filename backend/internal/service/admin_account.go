@@ -839,6 +839,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if input.Status != "" {
 		account.Status = input.Status
 	}
+	if input.Schedulable != nil {
+		account.Schedulable = *input.Schedulable
+	}
 	if input.ExpiresAt != nil {
 		if *input.ExpiresAt <= 0 {
 			account.ExpiresAt = nil
@@ -892,6 +895,13 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if err := s.accountRepo.Update(ctx, account); err != nil {
 			return nil, err
 		}
+	}
+	if input.Schedulable != nil || input.Status == StatusError {
+		if err := clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, id); err != nil {
+			return nil, err
+		}
+	}
+	if !billingSettingsAppliedAtomically {
 		if (requestedProbeEnabledUpdate != nil || requestedRateSyncEnabledUpdate != nil) &&
 			isUpstreamBillingProbeAccount(account) {
 			settings := make(map[string]any, 2)
@@ -1200,6 +1210,14 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if _, err := s.accountRepo.BulkUpdate(ctx, input.AccountIDs, repoUpdates); err != nil {
 		return nil, err
 	}
+	clearPauseErrors := make(map[int64]error)
+	if input.Schedulable != nil {
+		for _, accountID := range input.AccountIDs {
+			if err := clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, accountID); err != nil {
+				clearPauseErrors[accountID] = err
+			}
+		}
+	}
 	if _, changingURL := input.Credentials["base_url"]; changingURL {
 		for _, target := range cachedTargets {
 			if target != nil {
@@ -1226,6 +1244,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// Handle group bindings per account (requires individual operations).
 	for _, accountID := range input.AccountIDs {
 		entry := BulkUpdateAccountResult{AccountID: accountID}
+		if err := clearPauseErrors[accountID]; err != nil {
+			entry.Error = err.Error()
+			result.Failed++
+			result.FailedIDs = append(result.FailedIDs, accountID)
+			result.Results = append(result.Results, entry)
+			continue
+		}
 
 		if input.GroupIDs != nil {
 			if err := s.accountRepo.BindGroups(ctx, accountID, *input.GroupIDs); err != nil {
@@ -1370,11 +1395,17 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorMsg string) error {
-	return s.accountRepo.SetError(ctx, id, errorMsg)
+	if err := s.accountRepo.SetError(ctx, id, errorMsg); err != nil {
+		return err
+	}
+	return clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, id)
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
 	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
+		return nil, err
+	}
+	if err := clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, id); err != nil {
 		return nil, err
 	}
 	updated, err := s.accountRepo.GetByID(ctx, id)
@@ -1382,6 +1413,21 @@ func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, 
 		return nil, err
 	}
 	return updated, nil
+}
+
+type scheduledQuestionAutoPauseClearer interface {
+	ClearScheduledQuestionAutoPause(context.Context, int64) error
+}
+
+func clearManualScheduledQuestionAutoPause(ctx context.Context, repo AccountRepository, accountID int64) error {
+	clearer, ok := repo.(scheduledQuestionAutoPauseClearer)
+	if !ok {
+		return nil
+	}
+	if err := clearer.ClearScheduledQuestionAutoPause(ctx, accountID); err != nil {
+		return fmt.Errorf("account scheduling updated but failed to clear scheduled question auto-pause ownership: %w", err)
+	}
+	return nil
 }
 
 func (s *adminServiceImpl) RevertAccountProxyFallback(ctx context.Context, id int64) error {

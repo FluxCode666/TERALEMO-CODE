@@ -19,6 +19,7 @@ type scheduledQuestionTestHandlerService interface {
 	Delete(context.Context, int64) error
 	ListRuns(context.Context, int64, int) ([]*service.ScheduledQuestionTestRun, error)
 	RunNow(context.Context, int64) (*service.ScheduledQuestionTestAccepted, error)
+	TestFeishu(context.Context, service.ScheduledQuestionTestFeishuTestInput) error
 }
 
 // ScheduledQuestionTestHandler handles scheduled question plans and run history.
@@ -31,15 +32,22 @@ func NewScheduledQuestionTestHandler(svc *service.ScheduledQuestionTestService) 
 }
 
 type scheduledQuestionTestPlanRequest struct {
-	Name            *string  `json:"name"`
-	AccountIDs      *[]int64 `json:"account_ids"`
-	QuestionIDs     *[]int64 `json:"question_ids"`
-	ModelID         *string  `json:"model_id"`
-	CronExpression  *string  `json:"cron_expression"`
-	Enabled         *bool    `json:"enabled"`
-	MinPassRatio    *int     `json:"min_pass_ratio"`
-	CooldownMinutes *int     `json:"cooldown_minutes"`
-	NotifyEnabled   *bool    `json:"notify_enabled"`
+	Name              *string  `json:"name"`
+	AccountIDs        *[]int64 `json:"account_ids"`
+	QuestionIDs       *[]int64 `json:"question_ids"`
+	ModelID           *string  `json:"model_id"`
+	CronExpression    *string  `json:"cron_expression"`
+	Enabled           *bool    `json:"enabled"`
+	MinPassRatio      *int     `json:"min_pass_ratio"`
+	CooldownMinutes   *int     `json:"cooldown_minutes"`
+	NotifyEnabled     *bool    `json:"notify_enabled"`
+	ReportEnabled     *bool    `json:"report_enabled"`
+	EmailEnabled      *bool    `json:"email_enabled"`
+	FeishuEnabled     *bool    `json:"feishu_enabled"`
+	FeishuWebhookURL  *string  `json:"feishu_webhook_url"`
+	FeishuSecret      *string  `json:"feishu_secret"`
+	AutoPauseEnabled  *bool    `json:"auto_pause_enabled"`
+	AutoResumeEnabled *bool    `json:"auto_resume_enabled"`
 }
 
 func (r scheduledQuestionTestPlanRequest) input() service.ScheduledQuestionTestPlanInput {
@@ -47,7 +55,10 @@ func (r scheduledQuestionTestPlanRequest) input() service.ScheduledQuestionTestP
 		Name: r.Name, AccountIDs: r.AccountIDs, QuestionIDs: r.QuestionIDs,
 		ModelID: r.ModelID, CronExpression: r.CronExpression, Enabled: r.Enabled,
 		MinPassRatio: r.MinPassRatio, CooldownMinutes: r.CooldownMinutes,
-		NotifyEnabled: r.NotifyEnabled,
+		NotifyEnabled: r.NotifyEnabled, ReportEnabled: r.ReportEnabled,
+		EmailEnabled: r.EmailEnabled, FeishuEnabled: r.FeishuEnabled,
+		FeishuWebhookURL: r.FeishuWebhookURL, FeishuSecret: r.FeishuSecret,
+		AutoPauseEnabled: r.AutoPauseEnabled, AutoResumeEnabled: r.AutoResumeEnabled,
 	}
 }
 
@@ -161,6 +172,19 @@ func (h *ScheduledQuestionTestHandler) RunNow(c *gin.Context) {
 		return
 	}
 	response.Accepted(c, accepted)
+}
+
+func (h *ScheduledQuestionTestHandler) TestFeishu(c *gin.Context) {
+	var input service.ScheduledQuestionTestFeishuTestInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := h.service.TestFeishu(c.Request.Context(), input); err != nil {
+		writeScheduledQuestionTestError(c, err)
+		return
+	}
+	response.Success(c, gin.H{"success": true})
 }
 
 func parseScheduledQuestionTestID(c *gin.Context) (int64, bool) {

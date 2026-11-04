@@ -1,5 +1,7 @@
 import { apiClient } from '../client'
 
+export type ScheduledQuestionTestScheduleAction = 'paused' | 'resumed' | 'pause_failed' | 'resume_failed' | ''
+
 export interface ScheduledQuestionTestSummary {
   account_id: number
   account_name: string
@@ -11,6 +13,19 @@ export interface ScheduledQuestionTestSummary {
   alerting: boolean
   state_after: 'ok' | 'alert'
   error: string
+  /** True when the account did not get a result for every question in this round. */
+  incomplete?: boolean
+  /** Scheduling action applied to the account at the end of this round. */
+  schedule_action?: ScheduledQuestionTestScheduleAction
+  /** True when the account is currently paused by this plan's auto-pause. */
+  auto_paused: boolean
+}
+
+export interface ScheduledQuestionTestNotificationResult {
+  kind: 'alert' | 'recovered' | 'report'
+  channel: 'email' | 'feishu'
+  success: boolean
+  detail: string
 }
 
 export interface ScheduledQuestionTestPlan {
@@ -24,6 +39,15 @@ export interface ScheduledQuestionTestPlan {
   min_pass_ratio: number
   cooldown_minutes: number
   notify_enabled: boolean
+  report_enabled: boolean
+  email_enabled: boolean
+  feishu_enabled: boolean
+  /** The raw webhook URL is never returned by the API. */
+  feishu_webhook_configured: boolean
+  feishu_webhook_hint: string
+  feishu_secret_configured: boolean
+  auto_pause_enabled: boolean
+  auto_resume_enabled: boolean
   running: boolean
   last_run_at: string | null
   next_run_at: string | null
@@ -45,6 +69,10 @@ export interface ScheduledQuestionTestRun {
   error_message: string
   summary: ScheduledQuestionTestSummary[] | null
   notifications_suppressed: boolean
+  paused_accounts: number
+  resumed_accounts: number
+  auto_pause_skipped: boolean
+  notification_results: ScheduledQuestionTestNotificationResult[]
 }
 
 export interface ScheduledQuestionTestAccepted {
@@ -62,6 +90,26 @@ export interface ScheduledQuestionTestRequest {
   min_pass_ratio?: number
   cooldown_minutes?: number
   notify_enabled?: boolean
+  report_enabled?: boolean
+  email_enabled?: boolean
+  feishu_enabled?: boolean
+  /** Omit to keep the stored webhook, send '' to clear it. */
+  feishu_webhook_url?: string
+  /** Omit to keep the stored secret, send '' to clear it. */
+  feishu_secret?: string
+  auto_pause_enabled?: boolean
+  auto_resume_enabled?: boolean
+}
+
+export interface ScheduledQuestionTestFeishuTestRequest {
+  plan_id?: number
+  webhook_url?: string
+  /** Omitted/null uses the stored secret of plan_id; '' clears it for this test. */
+  secret?: string | null
+}
+
+export interface ScheduledQuestionTestFeishuTestResult {
+  success: boolean
 }
 
 export async function list(): Promise<ScheduledQuestionTestPlan[]> {
@@ -93,5 +141,10 @@ export async function runNow(id: number): Promise<ScheduledQuestionTestAccepted>
   return data
 }
 
-export const scheduledQuestionTestsAPI = { list, create, update, delete: remove, listRuns, runNow }
+export async function testFeishu(request: ScheduledQuestionTestFeishuTestRequest = {}): Promise<ScheduledQuestionTestFeishuTestResult> {
+  const { data } = await apiClient.post<ScheduledQuestionTestFeishuTestResult>('/admin/scheduled-question-tests/feishu-test', request)
+  return data ?? { success: false }
+}
+
+export const scheduledQuestionTestsAPI = { list, create, update, delete: remove, listRuns, runNow, testFeishu }
 export default scheduledQuestionTestsAPI

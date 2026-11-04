@@ -2,11 +2,7 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"html"
-	"log/slog"
 	"math"
-	"strings"
 	"time"
 )
 
@@ -38,6 +34,7 @@ func summarizeScheduledQuestionTests(plan *ScheduledQuestionTestPlan, items []Ac
 		}
 		if missing := summary.Total - len(accountItems); missing > 0 {
 			errors += missing
+			summary.Incomplete = true
 			summary.Error = roundError
 			if summary.Error == "" {
 				summary.Error = "Account test did not complete"
@@ -57,6 +54,7 @@ func summarizeScheduledQuestionTests(plan *ScheduledQuestionTestPlan, items []Ac
 		if summary.Alerting {
 			summary.StateAfter = "alert"
 		}
+		summary.Error = sanitizeScheduledQuestionErrorText(summary.Error, plan, 500)
 		result = append(result, summary)
 	}
 	return result
@@ -82,8 +80,12 @@ func scheduledQuestionAlertTransition(previous *ScheduledQuestionTestAccountStat
 	return next, notification
 }
 
-func (s *ScheduledQuestionTestService) updateAlertStates(ctx context.Context, plan *ScheduledQuestionTestPlan, run *ScheduledQuestionTestRun) ([]*ScheduledQuestionTestAccountState, error) {
-	previous, err := s.repo.ListStates(ctx, plan.ID)
+func (s *ScheduledQuestionTestService) updateAlertStates(persistCtx context.Context, plan *ScheduledQuestionTestPlan, run *ScheduledQuestionTestRun, roundContexts ...context.Context) ([]*ScheduledQuestionTestAccountState, error) {
+	roundCtx := persistCtx
+	if len(roundContexts) > 0 {
+		roundCtx = roundContexts[0]
+	}
+	previous, err := s.repo.ListStates(persistCtx, plan.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,89 +100,61 @@ func (s *ScheduledQuestionTestService) updateAlertStates(ctx context.Context, pl
 		next, notification := scheduledQuestionAlertTransition(byID[summary.AccountID], summary.Alerting, now, time.Duration(plan.CooldownMinutes)*time.Minute)
 		next.PlanID, next.AccountID = plan.ID, summary.AccountID
 		states = append(states, &next)
+		run.Summary[i].AutoPaused = next.AutoPaused
 		if notification != "" {
 			notifications[notification] = append(notifications[notification], i)
 		}
 	}
-	if !plan.Enabled || !plan.NotifyEnabled {
-		run.NotificationsSuppressed = true
-		return states, nil
-	}
-	current, err := s.GetByID(ctx, plan.ID)
+	current, err := s.GetByID(persistCtx, plan.ID)
 	if err != nil {
 		return nil, err
 	}
-	if !current.Enabled || !current.NotifyEnabled {
+	if !current.Enabled || roundCtx.Err() != nil {
 		run.NotificationsSuppressed = true
 		return states, nil
 	}
-	for _, kind := range []string{"alert", "recovered"} {
-		indices := notifications[kind]
-		if len(indices) == 0 {
-			continue
-		}
-		if s.sendScheduledQuestionNotification(ctx, plan, run, kind, indices) && kind == "alert" {
-			for _, i := range indices {
-				sentAt := now
-				states[i].LastAlertAt = &sentAt
+	run.NotificationsSuppressed = !current.NotifyEnabled
+	// Cooldown and channels also honor edits made while the upstream round was running.
+	if current.CooldownMinutes != plan.CooldownMinutes {
+		notifications = map[string][]int{"alert": {}, "recovered": {}}
+		for i, summary := range run.Summary {
+			_, kind := scheduledQuestionAlertTransition(byID[summary.AccountID], summary.Alerting, now, time.Duration(current.CooldownMinutes)*time.Minute)
+			if kind != "" {
+				notifications[kind] = append(notifications[kind], i)
 			}
 		}
 	}
+	s.applyScheduledQuestionScheduling(persistCtx, roundCtx, current, run, states, now)
+	// Notification delivery owns a separate budget and still stops with the round/service.
+	stageTimeout := s.notificationTimeouts.Stage
+	if stageTimeout <= 0 {
+		stageTimeout = 3 * time.Minute
+	}
+	notifyCtx, cancelNotify := context.WithTimeout(roundCtx, stageTimeout)
+	defer cancelNotify()
+	if s.baseCtx != nil {
+		stopCancel := context.AfterFunc(s.baseCtx, cancelNotify)
+		defer stopCancel()
+		if s.baseCtx.Err() != nil {
+			cancelNotify()
+		}
+	}
+	if current.NotifyEnabled {
+		for _, kind := range []string{"alert", "recovered"} {
+			indices := notifications[kind]
+			if len(indices) == 0 {
+				continue
+			}
+			if s.sendScheduledQuestionNotification(notifyCtx, current, run, kind, indices) && kind == "alert" {
+				for _, i := range indices {
+					sentAt := now
+					states[i].LastAlertAt = &sentAt
+				}
+			}
+		}
+	}
+	if current.ReportEnabled {
+		s.sendScheduledQuestionNotification(notifyCtx, current, run, "report", nil)
+	}
 	return states, nil
-}
-
-func (s *ScheduledQuestionTestService) sendScheduledQuestionNotification(ctx context.Context, plan *ScheduledQuestionTestPlan, run *ScheduledQuestionTestRun, kind string, indices []int) bool {
-	if s.settings == nil || s.email == nil {
-		slog.Warn("scheduled_question_test_notification_unavailable", "plan_id", plan.ID)
-		return false
-	}
-	raw, err := s.settings.GetValue(ctx, SettingKeyAccountQuotaNotifyEmails)
-	if err != nil {
-		slog.Warn("scheduled_question_test_recipients_failed", "plan_id", plan.ID, "error", err)
-		return false
-	}
-	recipients := filterVerifiedEmails(ParseNotifyEmails(raw))
-	if len(recipients) == 0 {
-		slog.Warn("scheduled_question_test_no_recipients", "plan_id", plan.ID)
-		return false
-	}
-	siteName, err := s.settings.GetValue(ctx, SettingKeySiteName)
-	if err != nil || strings.TrimSpace(siteName) == "" {
-		siteName = defaultSiteName
-	}
-	label := "定时测试告警 / Scheduled test alert"
-	if kind == "recovered" {
-		label = "定时测试已恢复 / Scheduled test recovered"
-	}
-	subject := fmt.Sprintf("[%s] %s: %s", siteName, label, plan.Name)
-	var body strings.Builder
-	_, _ = fmt.Fprintf(&body, "<h2>%s</h2><p>Plan: %s<br>Round: %s<br>Threshold: %d%%</p><ul>", html.EscapeString(label), html.EscapeString(plan.Name), run.StartedAt.Format(time.RFC3339), plan.MinPassRatio)
-	for _, i := range indices {
-		summary := run.Summary[i]
-		ratio := "unjudged"
-		if summary.Ratio != nil {
-			ratio = fmt.Sprintf("%d%%", *summary.Ratio)
-		}
-		// Upstream errors may contain provider response bodies; do not include them in mail.
-		_, _ = fmt.Fprintf(&body, "<li>%s (ID %d): %d/%d judged passed, %s; threshold %d%%</li>", html.EscapeString(summary.AccountName), summary.AccountID, summary.Passed, summary.Judged, ratio, plan.MinPassRatio)
-	}
-	_, _ = body.WriteString("</ul>")
-	sent := false
-	for _, recipient := range recipients {
-		for _, i := range indices {
-			slog.Info("scheduled_question_test_notification_attempt", "plan_id", plan.ID, "account_id", run.Summary[i].AccountID, "kind", kind)
-		}
-		mailCtx, cancel := context.WithTimeout(ctx, emailSendTimeout)
-		err := s.email.SendEmail(mailCtx, recipient, subject, body.String())
-		cancel()
-		for _, i := range indices {
-			slog.Info("scheduled_question_test_notification_sent", "plan_id", plan.ID, "account_id", run.Summary[i].AccountID, "kind", kind, "success", err == nil)
-		}
-		if err != nil {
-			slog.Warn("scheduled_question_test_email_failed", "plan_id", plan.ID, "error", err)
-			continue
-		}
-		sent = true
-	}
-	return sent
 }

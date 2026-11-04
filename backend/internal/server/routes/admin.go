@@ -817,6 +817,7 @@ func registerScheduledQuestionTestRoutes(admin *gin.RouterGroup, h *handler.Hand
 	plans.GET("", h.Admin.ScheduledQuestionTest.List)
 	plans.GET("/:id", h.Admin.ScheduledQuestionTest.GetByID)
 	plans.POST("", h.Admin.ScheduledQuestionTest.Create)
+	plans.POST("/feishu-test", h.Admin.ScheduledQuestionTest.TestFeishu)
 	plans.PUT("/:id", h.Admin.ScheduledQuestionTest.Update)
 	plans.DELETE("/:id", h.Admin.ScheduledQuestionTest.Delete)
 	plans.GET("/:id/runs", h.Admin.ScheduledQuestionTest.ListRuns)

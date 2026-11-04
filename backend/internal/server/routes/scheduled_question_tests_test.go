@@ -34,6 +34,7 @@ func TestScheduledQuestionRoutesAndModelIntersectionRequireAdmin(t *testing.T) {
 			{http.MethodGet, "/scheduled-question-tests"},
 			{http.MethodGet, "/scheduled-question-tests/1"},
 			{http.MethodPost, "/scheduled-question-tests"},
+			{http.MethodPost, "/scheduled-question-tests/feishu-test"},
 			{http.MethodPut, "/scheduled-question-tests/1"},
 			{http.MethodDelete, "/scheduled-question-tests/1"},
 			{http.MethodGet, "/scheduled-question-tests/1/runs"},
@@ -53,10 +54,20 @@ func TestScheduledQuestionRoutesAndModelIntersectionRequireAdmin(t *testing.T) {
 func TestScheduledQuestionRoutesRegisteredWithoutConflict(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	registerScheduledQuestionTestRoutes(router.Group("/api/v1/admin"), &handler.Handlers{Admin: &handler.AdminHandlers{
+	admin := router.Group("/api/v1/admin")
+	admin.Use(func(c *gin.Context) {
+		// Verify full path matching without invoking a nil test service.
+		c.Header("X-Matched-Route", c.FullPath())
+		if c.FullPath() == "/api/v1/admin/scheduled-question-tests/:id/run-now" && c.Param("id") == "12" {
+			c.AbortWithStatus(http.StatusAccepted)
+			return
+		}
+		c.Next()
+	})
+	registerScheduledQuestionTestRoutes(admin, &handler.Handlers{Admin: &handler.AdminHandlers{
 		ScheduledQuestionTest: adminhandler.NewScheduledQuestionTestHandler(nil),
 	}})
-	require.Len(t, router.Routes(), 7)
+	require.Len(t, router.Routes(), 8)
 	for _, route := range router.Routes() {
 		require.Contains(t, route.Path, "/api/v1/admin/scheduled-question-tests")
 	}
@@ -64,4 +75,11 @@ func TestScheduledQuestionRoutesRegisteredWithoutConflict(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	recorder = requestAccountTestQuestionRoute(router, http.MethodPost, "/api/v1/admin/scheduled-question-tests/not-an-id/run-now", "", service.RoleAdmin)
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	recorder = requestAccountTestQuestionRoute(router, http.MethodPost, "/api/v1/admin/scheduled-question-tests/feishu-test", `{"secret":1}`, service.RoleAdmin)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "Invalid request")
+	require.Equal(t, "/api/v1/admin/scheduled-question-tests/feishu-test", recorder.Header().Get("X-Matched-Route"))
+	recorder = requestAccountTestQuestionRoute(router, http.MethodPost, "/api/v1/admin/scheduled-question-tests/12/run-now", "", service.RoleAdmin)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	require.Equal(t, "/api/v1/admin/scheduled-question-tests/:id/run-now", recorder.Header().Get("X-Matched-Route"))
 }

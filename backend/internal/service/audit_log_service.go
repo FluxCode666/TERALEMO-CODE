@@ -89,12 +89,25 @@ func (s *AuditLogService) Record(entry *AuditLog) {
 
 // List 分页查询审计日志。
 func (s *AuditLogService) List(ctx context.Context, filter *AuditLogFilter) (*AuditLogList, error) {
-	return s.repo.List(ctx, filter)
+	result, err := s.repo.List(ctx, filter)
+	if err != nil || result == nil {
+		return result, err
+	}
+	copy := *result
+	copy.Logs = make([]*AuditLog, len(result.Logs))
+	for i, entry := range result.Logs {
+		copy.Logs[i] = redactStoredAuditLog(entry)
+	}
+	return &copy, nil
 }
 
 // GetByID 查询单条详情。
 func (s *AuditLogService) GetByID(ctx context.Context, id int64) (*AuditLog, error) {
-	return s.repo.GetByID(ctx, id)
+	entry, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return redactStoredAuditLog(entry), nil
 }
 
 // ClearAll 全量清空审计日志并写入留痕记录。

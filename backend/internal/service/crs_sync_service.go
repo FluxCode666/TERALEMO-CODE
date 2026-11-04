@@ -430,9 +430,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = concurrency
 		existing.Priority = priority
 		existing.Status = status
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -559,9 +560,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = concurrency
 		existing.Priority = priority
 		existing.Status = status
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -709,9 +711,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = concurrency
 		existing.Priority = priority
 		existing.Status = status
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -866,9 +869,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = concurrency
 		existing.Priority = priority
 		existing.Status = status
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -998,9 +1002,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = 3
 		existing.Priority = clampPriority(src.Priority)
 		existing.Status = mapCRSStatus(src.IsActive, src.Status)
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, mapCRSStatus(src.IsActive, src.Status))
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -1125,9 +1130,10 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Concurrency = 3
 		existing.Priority = clampPriority(src.Priority)
 		existing.Status = mapCRSStatus(src.IsActive, src.Status)
+		schedulableChanged := existing.Schedulable != effectiveCRSSchedulable(src.Schedulable, mapCRSStatus(src.IsActive, src.Status))
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingCRSAccount(ctx, existing, schedulableChanged); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -1141,6 +1147,20 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 	}
 
 	return result, nil
+}
+
+func (s *CRSSyncService) updateExistingCRSAccount(ctx context.Context, account *Account, schedulableChanged bool) error {
+	if err := s.accountRepo.Update(ctx, account); err != nil {
+		return err
+	}
+	if schedulableChanged {
+		return clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, account.ID)
+	}
+	return nil
+}
+
+func effectiveCRSSchedulable(requested bool, status string) bool {
+	return requested && status != StatusError
 }
 
 func mergeMap(existing map[string]any, updates map[string]any) map[string]any {
