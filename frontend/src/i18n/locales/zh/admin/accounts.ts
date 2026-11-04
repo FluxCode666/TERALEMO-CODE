@@ -1839,7 +1839,14 @@ export default {
       stateOk: '正常',
       title: '定时测试', create: '新建定时测试', edit: '编辑定时测试', empty: '暂无定时测试计划', loadFailed: '加载定时测试失败', saveFailed: '保存定时测试失败', deleteConfirm: '确定删除此计划吗？', runNow: '立即执行', history: '历史记录', yes: '是', no: '否', alerting: '告警', ok: '正常', noRuns: '暂无运行记录', crossPlatform: '批量测试只支持同一平台的账号，请重新选择', noCommonModels: '所选账号没有共同的可用模型，请改用默认模型', modelsLoadFailed: '共同模型加载失败，可继续使用各账号默认模型', validation: '请填写有效的名称、账号、题目、五段 cron，并确认阈值和冷却范围',
       recentRun: '通过 {passed}/{total} · 告警 {alerted}', noDetails: '无明细', running: '执行中…', runFailed: '执行计划失败', deleteFailed: '删除计划失败', historyFailed: '加载运行历史失败', columns: { name: '名称', accounts: '账号数', questions: '题目数', cron: 'Cron', threshold: '阈值', enabled: '启用', lastRun: '最近一轮', nextRun: '下次执行', actions: '操作' },
-      form: { name: '名称', accountIds: '账号 ID', accountIdsHint: '已选 {count} 个账号，使用逗号或空格分隔', questions: '测试题目', noQuestions: '暂无启用题目', model: '模型', defaultModel: '各账号默认模型', customModel: '指定模型', cron: 'Cron 表达式', cronHint: '示例：*/30 * * * *（每 30 分钟）', threshold: '通过率阈值（0~100）', cooldown: '告警冷却分钟（0~10080）', enabled: '启用', notify: '发送告警通知' }
+      scheduleLink: '调度联动', autoPauseBadge: '自动暂停', autoResumeBadge: '自动恢复', feishuBadge: '飞书', reportBadge: '报告',
+      pausedCount: '暂停 {count}', resumedCount: '恢复 {count}', autoPauseSkipped: '本轮所有账号同时出错，疑似系统/网络故障，已跳过自动暂停',
+      autoPausedMarker: '由本计划暂停中', incompleteMarker: '本轮未跑完',
+      scheduleActions: { paused: '已暂停', resumed: '已恢复', pauseFailed: '暂停失败', resumeFailed: '恢复失败' },
+      notifications: '通知结果', notificationSuccess: '成功', notificationFailed: '失败',
+      notifyKinds: { alert: '告警', recovered: '恢复', report: '报告' }, notifyChannels: { email: '邮件', feishu: '飞书' },
+      feishuTestSuccess: '测试消息已发送', feishuTestFailed: '发送测试消息失败',
+      form: { name: '名称', accountIds: '账号 ID', accountIdsHint: '已选 {count} 个账号，使用逗号或空格分隔', questions: '测试题目', noQuestions: '暂无启用题目', model: '模型', defaultModel: '各账号默认模型', customModel: '指定模型', cron: 'Cron 表达式', cronHint: '示例：*/30 * * * *（每 30 分钟）', threshold: '通过率阈值（0~100）', cooldown: '告警冷却分钟（0~10080）', enabled: '启用', notify: '告警/恢复通知', report: '每轮测试报告', autoPause: '测试未通过时自动暂停账号调度', autoResume: '测试通过后自动恢复账号调度', autoPauseHint: '测试未通过（通过率低于阈值或全部出错）时自动关闭账号调度', autoResumeHint: '只恢复被本计划自动暂停的账号，手动暂停的不会被恢复', allFailedHint: '所有账号同时出错时视为系统/网络故障，不自动暂停', channelEmail: '邮件通知', channelEmailHint: '发送到 系统设置 → 管理员通知邮箱', channelFeishu: '飞书机器人', channels: '通知渠道', noChannelHint: '未选择通知渠道，不会发送通知', feishuWebhook: '飞书 Webhook', feishuWebhookPlaceholder: 'https://open.feishu.cn/open-apis/bot/v2/hook/…', feishuWebhookKeep: '已配置 {hint}，留空保持不变', feishuSecret: '签名密钥（可选）', feishuSecretPlaceholder: '已配置，留空保持不变', clear: '清除', feishuTest: '发送测试消息', feishuTesting: '发送中…', feishuWebhookRequired: '已启用飞书通知，请填写 Webhook 地址' }
     },
 
     // Scheduled Tests

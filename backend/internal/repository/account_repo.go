@@ -2689,6 +2689,87 @@ func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedu
 	return nil
 }
 
+// ClearScheduledQuestionAutoPause releases every plan's ownership after a manual
+// scheduling edit. Automatic SetSchedulable callers intentionally do not use it.
+func (r *accountRepository) ClearScheduledQuestionAutoPause(ctx context.Context, accountID int64) error {
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		return clearScheduledQuestionAutoPauseInTx(ctx, tx, accountID)
+	}
+	switch tx := r.sql.(type) {
+	case *sql.Tx:
+		return clearScheduledQuestionAutoPauseInTx(ctx, tx, accountID)
+	case *dbent.Tx:
+		return clearScheduledQuestionAutoPauseInTx(ctx, tx, accountID)
+	}
+	if db, ok := r.sql.(interface {
+		BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+	}); ok {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := clearScheduledQuestionAutoPauseInTx(ctx, tx, accountID); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	if r.client == nil {
+		return errors.New("scheduled question auto-pause clear requires a transaction")
+	}
+	tx, err := r.client.Tx(ctx)
+	if errors.Is(err, dbent.ErrTxStarted) {
+		return clearScheduledQuestionAutoPauseInTx(ctx, r.client, accountID)
+	}
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := clearScheduledQuestionAutoPauseInTx(ctx, tx, accountID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func clearScheduledQuestionAutoPauseInTx(ctx context.Context, exec sqlExecutor, accountID int64) error {
+	if tx, ok := exec.(*sql.Tx); ok {
+		if _, err := lockScheduledQuestionAutoPauseStates(ctx, tx, accountID); err != nil {
+			return err
+		}
+	} else {
+		// Ent transactions expose the SQL executor, but not the underlying *sql.Tx.
+		if _, err := exec.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('scheduled-question-auto-pause:' || $1::text, 0))`, accountID); err != nil {
+			return err
+		}
+		rows, err := exec.QueryContext(ctx, `SELECT plan_id, auto_paused FROM scheduled_question_test_account_states
+			WHERE account_id = $1 ORDER BY plan_id FOR UPDATE`, accountID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var planID int64
+			var paused bool
+			if err := rows.Scan(&planID, &paused); err != nil {
+				_ = rows.Close()
+				return err
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+	}
+	_, err := exec.ExecContext(ctx, `
+		UPDATE scheduled_question_test_account_states
+		SET auto_paused = false, auto_paused_at = NULL, updated_at = NOW()
+		WHERE account_id = $1 AND (auto_paused = true OR auto_paused_at IS NOT NULL)
+	`, accountID)
+	return err
+}
+
 func (r *accountRepository) AutoPauseExpiredAccounts(ctx context.Context, now time.Time) (int64, error) {
 	rows, err := r.sql.QueryContext(ctx, `
 		UPDATE accounts

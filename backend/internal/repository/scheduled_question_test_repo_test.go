@@ -6,28 +6,34 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/internal/model"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
 var scheduledQuestionTestPlanTestColumns = []string{
 	"id", "name", "account_ids", "question_ids", "model_id", "cron_expression", "enabled",
 	"min_pass_ratio", "cooldown_minutes", "notify_enabled", "last_run_at", "next_run_at",
-	"created_at", "updated_at", "last_status", "passed_accounts", "total_accounts", "alerted_accounts",
+	"created_at", "updated_at", "report_enabled", "email_enabled", "feishu_enabled", "feishu_webhook_url",
+	"feishu_secret", "auto_pause_enabled", "auto_resume_enabled", "last_status", "passed_accounts", "total_accounts", "alerted_accounts",
 }
 
 var scheduledQuestionTestRunTestColumns = []string{
 	"id", "plan_id", "status", "started_at", "finished_at", "total_accounts", "passed_accounts",
 	"alerted_accounts", "notifications_suppressed", "error_message", "summary", "created_at",
+	"paused_accounts", "resumed_accounts", "auto_pause_skipped", "notification_results",
 }
 
-var scheduledQuestionTestStateTestColumns = []string{"id", "plan_id", "account_id", "state", "last_alert_at", "updated_at"}
+var scheduledQuestionTestStateTestColumns = []string{"id", "plan_id", "account_id", "state", "last_alert_at", "updated_at", "auto_paused", "auto_paused_at"}
 
 func newScheduledQuestionTestTestRepository(t *testing.T) (service.ScheduledQuestionTestRepository, sqlmock.Sqlmock) {
 	t.Helper()
@@ -43,12 +49,12 @@ func newScheduledQuestionTestTestRepository(t *testing.T) (service.ScheduledQues
 func scheduledQuestionTestPlanTestValues(now time.Time, nextRunAt driver.Value) []driver.Value {
 	return []driver.Value{
 		int64(7), "plan", []byte(`[3,1]`), []byte(`[4,2]`), "model", "*/30 * * * *", true,
-		80, 360, true, nil, nextRunAt, now, now, "success", 1, 2, 1,
+		80, 360, true, nil, nextRunAt, now, now, false, true, false, "", "", false, false, "success", 1, 2, 1,
 	}
 }
 
 func scheduledQuestionTestRunTestValues(now time.Time, summary string) []driver.Value {
-	return []driver.Value{int64(9), int64(7), "success", now, now, 2, 1, 1, false, "", []byte(summary), now}
+	return []driver.Value{int64(9), int64(7), "success", now, now, 2, 1, 1, false, "", []byte(summary), now, 0, 0, false, []byte("[]")}
 }
 
 func TestScheduledQuestionTestRepositoryCreate(t *testing.T) {
@@ -58,10 +64,17 @@ func TestScheduledQuestionTestRepositoryCreate(t *testing.T) {
 	plan := &service.ScheduledQuestionTestPlan{
 		Name: "plan", AccountIDs: []int64{3, 1}, QuestionIDs: []int64{4, 2}, ModelID: "model",
 		CronExpression: "*/30 * * * *", Enabled: true, MinPassRatio: 80, CooldownMinutes: 360, NotifyEnabled: true, NextRunAt: &next,
+		ReportEnabled: true, EmailEnabled: false, FeishuEnabled: true,
+		FeishuWebhookURL: "https://open.feishu.cn/open-apis/bot/v2/hook/abcd1234", FeishuSecret: "test-secret",
+		AutoPauseEnabled: true, AutoResumeEnabled: true,
 	}
+	planValues := scheduledQuestionTestPlanTestValues(now, next)
+	planValues[14], planValues[15], planValues[16] = true, false, true
+	planValues[17], planValues[18], planValues[19], planValues[20] = "https://open.feishu.cn/open-apis/bot/v2/hook/abcd1234", "test-secret", true, true
 	mock.ExpectQuery(`INSERT INTO scheduled_question_test_plans AS p .* RETURNING`).
-		WithArgs("plan", "[3,1]", "[4,2]", "model", "*/30 * * * *", true, 80, 360, true, next).
-		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(scheduledQuestionTestPlanTestValues(now, next)...))
+		WithArgs("plan", "[3,1]", "[4,2]", "model", "*/30 * * * *", true, 80, 360, true, true, false, true,
+			"https://open.feishu.cn/open-apis/bot/v2/hook/abcd1234", "test-secret", true, true, next).
+		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(planValues...))
 	created, err := repo.Create(context.Background(), plan)
 	require.NoError(t, err)
 	require.Equal(t, int64(7), created.ID)
@@ -70,6 +83,17 @@ func TestScheduledQuestionTestRepositoryCreate(t *testing.T) {
 	require.Equal(t, plan.CronExpression, created.CronExpression)
 	require.Equal(t, &next, created.NextRunAt)
 	require.Nil(t, created.LastRunAt)
+	require.True(t, created.ReportEnabled)
+	require.False(t, created.EmailEnabled)
+	require.True(t, created.FeishuEnabled)
+	require.True(t, created.FeishuWebhookConfigured)
+	require.True(t, created.FeishuSecretConfigured)
+	require.True(t, created.AutoPauseEnabled)
+	require.True(t, created.AutoResumeEnabled)
+	encoded, err := json.Marshal(created)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "abcd1234")
+	require.NotContains(t, string(encoded), "test-secret")
 }
 
 func TestScheduledQuestionTestRepositoryGetAndListLatestRun(t *testing.T) {
@@ -117,9 +141,10 @@ func TestScheduledQuestionTestRepositoryDueIncludesNullSchedule(t *testing.T) {
 func TestScheduledQuestionTestRepositoryUpdateMask(t *testing.T) {
 	repo, mock := newScheduledQuestionTestTestRepository(t)
 	now := time.Now().UTC()
-	stale := &service.ScheduledQuestionTestPlan{ID: 7, Name: "stale", AccountIDs: []int64{99}, Enabled: false}
+	stale := &service.ScheduledQuestionTestPlan{ID: 7, Name: "stale", AccountIDs: []int64{99}, Enabled: false, FeishuWebhookURL: "stale", FeishuSecret: "stale"}
 	values := scheduledQuestionTestPlanTestValues(now, nil)
 	values[1], values[6] = "concurrent name", false
+	values[17], values[18] = "https://open.feishu.cn/open-apis/bot/v2/hook/current-token", "current-secret"
 	query := `WITH updated AS (
 		UPDATE scheduled_question_test_plans SET updated_at = NOW(), enabled = $2 WHERE id = $1 RETURNING *
 	) SELECT ` + scheduledQuestionTestPlanColumns + `, ` + scheduledQuestionTestLatestColumns + `
@@ -131,6 +156,47 @@ func TestScheduledQuestionTestRepositoryUpdateMask(t *testing.T) {
 	require.False(t, updated.Enabled)
 	require.Equal(t, "concurrent name", updated.Name)
 	require.Equal(t, []int64{3, 1}, updated.AccountIDs)
+	require.Equal(t, "https://open.feishu.cn/open-apis/bot/v2/hook/current-token", updated.FeishuWebhookURL)
+	require.Equal(t, "current-secret", updated.FeishuSecret)
+}
+
+func TestScheduledQuestionTestRepositoryNotificationProjection(t *testing.T) {
+	for _, method := range []string{"get", "list", "due", "update"} {
+		t.Run(method, func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			now := time.Now().UTC()
+			values := scheduledQuestionTestPlanTestValues(now, nil)
+			values[16], values[17], values[18] = true, "https://open.feishu.cn/open-apis/bot/v2/hook/test-token-abcd1234", "secret-value"
+			mock.ExpectQuery(`.*`).WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(values...)).RowsWillBeClosed()
+			var plan *service.ScheduledQuestionTestPlan
+			var err error
+			switch method {
+			case "get":
+				plan, err = repo.GetByID(context.Background(), 7)
+			case "update":
+				plan, err = repo.Update(context.Background(), &service.ScheduledQuestionTestPlan{ID: 7}, service.ScheduledQuestionTestPlanUpdateMask{})
+			default:
+				var plans []*service.ScheduledQuestionTestPlan
+				if method == "list" {
+					plans, err = repo.List(context.Background())
+				} else {
+					plans, err = repo.ListDue(context.Background(), now)
+				}
+				require.NoError(t, err)
+				require.Len(t, plans, 1)
+				plan = plans[0]
+			}
+			require.NoError(t, err)
+			require.True(t, plan.FeishuWebhookConfigured)
+			require.True(t, plan.FeishuSecretConfigured)
+			require.Contains(t, plan.FeishuWebhookHint, "****1234")
+			encoded, err := json.Marshal(plan)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "test-token-abcd1234")
+			require.NotContains(t, string(encoded), "secret-value")
+			require.NotContains(t, string(encoded), "https://open.feishu.cn")
+		})
+	}
 }
 
 func TestScheduledQuestionTestRepositoryEnablePreservesConcurrentCronSchedule(t *testing.T) {
@@ -161,15 +227,16 @@ func TestScheduledQuestionTestRepositoryUpdateAllFieldsAndExplicitZero(t *testin
 		ID: 7, Name: "changed", AccountIDs: []int64{1}, QuestionIDs: []int64{2}, CronExpression: "0 * * * *",
 	}
 	query := `WITH updated AS (
-		UPDATE scheduled_question_test_plans SET updated_at = NOW(), name = $2, account_ids = $3::jsonb, question_ids = $4::jsonb, model_id = $5, cron_expression = $6, enabled = $7, min_pass_ratio = $8, cooldown_minutes = $9, notify_enabled = $10, next_run_at = $11 WHERE id = $1 RETURNING *
+		UPDATE scheduled_question_test_plans SET updated_at = NOW(), name = $2, account_ids = $3::jsonb, question_ids = $4::jsonb, model_id = $5, cron_expression = $6, enabled = $7, min_pass_ratio = $8, cooldown_minutes = $9, notify_enabled = $10, report_enabled = $11, email_enabled = $12, feishu_enabled = $13, feishu_webhook_url = $14, feishu_secret = $15, auto_pause_enabled = $16, auto_resume_enabled = $17, next_run_at = $18 WHERE id = $1 RETURNING *
 	) SELECT ` + scheduledQuestionTestPlanColumns + `, ` + scheduledQuestionTestLatestColumns + `
 		FROM updated p ` + scheduledQuestionTestLatestJoin
 	mock.ExpectQuery("^"+regexp.QuoteMeta(query)+"$").
-		WithArgs(int64(7), "changed", "[1]", "[2]", "", "0 * * * *", false, 0, 0, false, nil).
+		WithArgs(int64(7), "changed", "[1]", "[2]", "", "0 * * * *", false, 0, 0, false, false, false, false, "", "", false, false, nil).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(scheduledQuestionTestPlanTestValues(now, nil)...))
 	_, err := repo.Update(context.Background(), plan, service.ScheduledQuestionTestPlanUpdateMask{
 		Name: true, AccountIDs: true, QuestionIDs: true, ModelID: true, CronExpression: true,
-		Enabled: true, MinPassRatio: true, CooldownMinutes: true, NotifyEnabled: true, NextRunAt: true,
+		Enabled: true, MinPassRatio: true, CooldownMinutes: true, NotifyEnabled: true, ReportEnabled: true, EmailEnabled: true,
+		FeishuEnabled: true, FeishuWebhookURL: true, FeishuSecret: true, AutoPauseEnabled: true, AutoResumeEnabled: true, NextRunAt: true,
 	})
 	require.NoError(t, err)
 }
@@ -206,13 +273,267 @@ func TestScheduledQuestionTestRepositoryRunsAndStates(t *testing.T) {
 
 	mock.ExpectQuery(`FROM scheduled_question_test_account_states WHERE plan_id = \$1 ORDER BY account_id ASC`).
 		WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows(scheduledQuestionTestStateTestColumns).
-		AddRow(int64(1), int64(7), int64(1), "ok", nil, now).
-		AddRow(int64(2), int64(7), int64(3), "alert", now, now)).RowsWillBeClosed()
+		AddRow(int64(1), int64(7), int64(1), "ok", nil, now, false, nil).
+		AddRow(int64(2), int64(7), int64(3), "alert", now, now, true, now)).RowsWillBeClosed()
 	states, err := repo.ListStates(context.Background(), 7)
 	require.NoError(t, err)
 	require.Len(t, states, 2)
 	require.Nil(t, states[0].LastAlertAt)
 	require.Equal(t, &now, states[1].LastAlertAt)
+	require.False(t, states[0].AutoPaused)
+	require.Nil(t, states[0].AutoPausedAt)
+	require.True(t, states[1].AutoPaused)
+	require.Equal(t, &now, states[1].AutoPausedAt)
+}
+
+func TestScheduledQuestionTestRepositoryRunNullArrays(t *testing.T) {
+	repo, mock := newScheduledQuestionTestTestRepository(t)
+	values := scheduledQuestionTestRunTestValues(time.Now().UTC(), "null")
+	values[15] = []byte("null")
+	mock.ExpectQuery(`FROM scheduled_question_test_runs`).
+		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...)).RowsWillBeClosed()
+	runs, err := repo.ListRuns(context.Background(), 7, 50)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, []service.ScheduledQuestionTestAccountSummary{}, runs[0].Summary)
+	require.Equal(t, []service.ScheduledQuestionTestNotificationResult{}, runs[0].NotificationResults)
+	encoded, err := json.Marshal(runs[0])
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"notification_results":[]`)
+}
+
+const scheduledQuestionAutoPauseTestLock = `SELECT pg_advisory_xact_lock(hashtextextended('scheduled-question-auto-pause:' || $1::text, 0))`
+
+const scheduledQuestionAutoPauseTestStates = `SELECT plan_id, auto_paused FROM scheduled_question_test_account_states
+		WHERE account_id = $1 ORDER BY plan_id FOR UPDATE`
+
+func expectScheduledQuestionAutoPauseLocks(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
+	mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3)).WillReturnRows(rows).RowsWillBeClosed()
+}
+
+func TestScheduledQuestionTestRepositoryReleaseAutoPause(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		holder  bool
+		missing bool
+		others  int
+		resume  bool
+	}{
+		{"missing", false, true, 0, false},
+		{"not_held", false, false, 0, false},
+		{"other_owner", true, false, 1, false},
+		{"last_owner", true, false, 0, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			mock.ExpectBegin()
+			rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
+			if !test.missing {
+				rows.AddRow(int64(7), test.holder)
+			}
+			expectScheduledQuestionAutoPauseLocks(mock, rows)
+			if test.holder {
+				mock.ExpectExec(`UPDATE scheduled_question_test_account_states SET auto_paused = false, auto_paused_at = NULL WHERE plan_id = \$1 AND account_id = \$2`).
+					WithArgs(int64(7), int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectQuery(`SELECT COUNT\(\*\) FROM scheduled_question_test_account_states WHERE account_id = \$1 AND plan_id <> \$2 AND auto_paused = true`).
+					WithArgs(int64(3), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(test.others))
+			}
+			mock.ExpectCommit()
+			resume, err := repo.ReleaseAutoPause(context.Background(), 7, 3)
+			require.NoError(t, err)
+			require.Equal(t, test.resume, resume)
+		})
+	}
+}
+
+func TestScheduledQuestionTestRepositorySetAutoPaused(t *testing.T) {
+	query := `INSERT INTO scheduled_question_test_account_states
+		(plan_id, account_id, state, auto_paused, auto_paused_at) VALUES ($1, $2, 'alert', $3, $4)
+		ON CONFLICT (plan_id, account_id) DO UPDATE SET
+		auto_paused = EXCLUDED.auto_paused, auto_paused_at = EXCLUDED.auto_paused_at`
+	now := time.Now().UTC()
+	for _, paused := range []bool{false, true} {
+		t.Run(fmt.Sprint(paused), func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			var expectedAt driver.Value
+			if paused {
+				expectedAt = now
+			}
+			mock.ExpectBegin()
+			expectScheduledQuestionAutoPauseLocks(mock, sqlmock.NewRows([]string{"plan_id", "auto_paused"}))
+			mock.ExpectExec("^"+regexp.QuoteMeta(query)+"$").WithArgs(int64(7), int64(3), paused, expectedAt).WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+			require.NoError(t, repo.SetAutoPaused(context.Background(), 7, 3, paused, &now))
+		})
+	}
+}
+
+func TestScheduledQuestionTestRepositoryClaimAutoPauseIfOtherHeld(t *testing.T) {
+	query := `INSERT INTO scheduled_question_test_account_states
+		(plan_id, account_id, state, auto_paused, auto_paused_at) VALUES ($1, $2, 'alert', true, $3)
+		ON CONFLICT (plan_id, account_id) DO UPDATE SET
+		auto_paused = EXCLUDED.auto_paused, auto_paused_at = EXCLUDED.auto_paused_at`
+	for _, test := range []struct {
+		name    string
+		states  map[int64]bool
+		write   bool
+		claimed bool
+	}{
+		{"no_states", nil, false, false},
+		{"inactive_other", map[int64]bool{8: false}, false, false},
+		{"already_held", map[int64]bool{7: true}, false, true},
+		{"other_held", map[int64]bool{7: false, 8: true}, true, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			now := time.Now().UTC()
+			rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
+			for planID, paused := range test.states {
+				rows.AddRow(planID, paused)
+			}
+			mock.ExpectBegin()
+			expectScheduledQuestionAutoPauseLocks(mock, rows)
+			if test.write {
+				mock.ExpectExec("^"+regexp.QuoteMeta(query)+"$").WithArgs(int64(7), int64(3), now).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+			mock.ExpectCommit()
+			claimed, err := repo.ClaimAutoPauseIfOtherHeld(context.Background(), 7, 3, &now)
+			require.NoError(t, err)
+			require.Equal(t, test.claimed, claimed)
+		})
+	}
+}
+
+func TestScheduledQuestionTestRepositoryAutoPauseTransactionFailures(t *testing.T) {
+	for _, method := range []string{"claim", "release", "join"} {
+		stages := []string{"begin", "advisory", "query", "scan", "rows", "write", "commit"}
+		if method != "release" {
+			stages = append(stages, "zero_affected", "rows_affected")
+		} else {
+			stages = append(stages, "count")
+		}
+		for _, stage := range stages {
+			t.Run(method+"_"+stage, func(t *testing.T) {
+				repo, mock := newScheduledQuestionTestTestRepository(t)
+				failure := errors.New("ownership transaction unavailable")
+				begin := mock.ExpectBegin()
+				if stage == "begin" {
+					begin.WillReturnError(failure)
+				} else {
+					lock := mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(int64(3))
+					if stage == "advisory" {
+						lock.WillReturnError(failure)
+					} else {
+						lock.WillReturnResult(sqlmock.NewResult(0, 1))
+						query := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3))
+						if stage == "query" {
+							query.WillReturnError(failure)
+						} else {
+							rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
+							if stage == "scan" {
+								rows.AddRow("invalid id", true)
+							} else {
+								if method == "join" {
+									rows.AddRow(int64(8), true)
+								} else {
+									rows.AddRow(int64(7), true)
+								}
+							}
+							if stage == "rows" {
+								rows.RowError(0, failure)
+							}
+							query.WillReturnRows(rows).RowsWillBeClosed()
+							if stage != "scan" && stage != "rows" {
+								write := mock.ExpectExec(`(INSERT INTO|UPDATE) scheduled_question_test_account_states`)
+								switch stage {
+								case "write":
+									write.WillReturnError(failure)
+								case "zero_affected":
+									write.WillReturnResult(sqlmock.NewResult(0, 0))
+								case "rows_affected":
+									write.WillReturnResult(sqlmock.NewErrorResult(failure))
+								default:
+									write.WillReturnResult(sqlmock.NewResult(0, 1))
+									if method == "release" {
+										count := mock.ExpectQuery(`SELECT COUNT\(\*\)`)
+										if stage == "count" {
+											count.WillReturnError(failure)
+										} else {
+											count.WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+										}
+									}
+								}
+							}
+						}
+					}
+					if stage == "commit" {
+						mock.ExpectCommit().WillReturnError(failure)
+					} else {
+						mock.ExpectRollback()
+					}
+				}
+				var err error
+				if method == "join" {
+					now := time.Now()
+					var claimed bool
+					claimed, err = repo.ClaimAutoPauseIfOtherHeld(context.Background(), 7, 3, &now)
+					require.False(t, claimed)
+				} else if method == "claim" {
+					now := time.Now()
+					err = repo.SetAutoPaused(context.Background(), 7, 3, true, &now)
+				} else {
+					var resume bool
+					resume, err = repo.ReleaseAutoPause(context.Background(), 7, 3)
+					require.False(t, resume)
+				}
+				if stage == "scan" {
+					require.Error(t, err)
+				} else if stage == "zero_affected" {
+					require.ErrorIs(t, err, service.ErrScheduledQuestionTestNotFound)
+				} else {
+					require.ErrorIs(t, err, failure)
+				}
+			})
+		}
+	}
+}
+
+func TestScheduledQuestionTestRepositoryFeishuRequiredConstraint(t *testing.T) {
+	for _, method := range []string{"create", "update"} {
+		for _, test := range []struct {
+			name       string
+			failure    error
+			validation bool
+		}{
+			{"required", &pq.Error{Code: "23514", Constraint: scheduledQuestionTestFeishuWebhookRequiredConstraint, Detail: "private database row"}, true},
+			{"wrapped", fmt.Errorf("write: %w", &pq.Error{Code: "23514", Constraint: scheduledQuestionTestFeishuWebhookRequiredConstraint}), true},
+			{"other_check", &pq.Error{Code: "23514", Constraint: "different_check"}, false},
+			{"other_code", &pq.Error{Code: "23505", Constraint: scheduledQuestionTestFeishuWebhookRequiredConstraint}, false},
+			{"generic", errors.New("database unavailable"), false},
+		} {
+			t.Run(method+"_"+test.name, func(t *testing.T) {
+				repo, mock := newScheduledQuestionTestTestRepository(t)
+				mock.ExpectQuery(`.*`).WillReturnError(test.failure)
+				plan := &service.ScheduledQuestionTestPlan{ID: 7, FeishuEnabled: true}
+				var err error
+				if method == "create" {
+					_, err = repo.Create(context.Background(), plan)
+				} else {
+					_, err = repo.Update(context.Background(), plan, service.ScheduledQuestionTestPlanUpdateMask{FeishuEnabled: true})
+				}
+				if test.validation {
+					var validation *model.ValidationError
+					require.ErrorAs(t, err, &validation)
+					require.Equal(t, "feishu_webhook_url", validation.Field)
+					require.NotContains(t, err.Error(), "private database row")
+				} else {
+					require.ErrorIs(t, err, test.failure)
+				}
+			})
+		}
+	}
 }
 
 func TestScheduledQuestionTestRepositoryFinishRunAtomic(t *testing.T) {
@@ -223,16 +544,25 @@ func TestScheduledQuestionTestRepositoryFinishRunAtomic(t *testing.T) {
 	run := &service.ScheduledQuestionTestRun{
 		PlanID: 7, Status: "success", StartedAt: now, FinishedAt: now, TotalAccounts: 2, PassedAccounts: 1, AlertedAccounts: 1,
 		CronExpression: "0 * * * *", PlanUpdatedAt: now,
-		Summary: []service.ScheduledQuestionTestAccountSummary{{AccountID: 3, Total: 1, Ratio: &ratio, Alerting: true, StateAfter: "alert", Error: "all failed"}},
+		PausedAccounts: 1, ResumedAccounts: 1, AutoPauseSkipped: true,
+		NotificationResults: []service.ScheduledQuestionTestNotificationResult{{Kind: "report", Channel: "feishu", Success: true, Detail: "sent"}},
+		Summary:             []service.ScheduledQuestionTestAccountSummary{{AccountID: 3, Total: 1, Ratio: &ratio, Alerting: true, StateAfter: "alert", Error: "all failed", ScheduleAction: "paused", AutoPaused: true}},
 	}
-	summary := `[{"account_id":3,"account_name":"","platform":"","passed":0,"total":1,"judged":0,"ratio":0,"alerting":true,"state_after":"alert","error":"all failed"}]`
+	summary := `[{"account_id":3,"account_name":"","platform":"","passed":0,"total":1,"judged":0,"ratio":0,"alerting":true,"state_after":"alert","error":"all failed","schedule_action":"paused","auto_paused":true}]`
+	notifications := `[{"kind":"report","channel":"feishu","success":true,"detail":"sent"}]`
+	values := scheduledQuestionTestRunTestValues(now, summary)
+	values[12], values[13], values[14], values[15] = 1, 1, true, []byte(notifications)
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans WHERE id = \$1 FOR UPDATE`).WithArgs(int64(7)).
+	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans WHERE id = \$1 FOR NO KEY UPDATE`).WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(7)))
 	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs`).
-		WithArgs(int64(7), "success", now, now, 2, 1, 1, false, "", summary).
-		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(scheduledQuestionTestRunTestValues(now, summary)...))
-	mock.ExpectExec(`INSERT INTO scheduled_question_test_account_states .* ON CONFLICT \(plan_id, account_id\) DO UPDATE SET state = EXCLUDED.state, last_alert_at = EXCLUDED.last_alert_at, updated_at = NOW\(\)`).
+		WithArgs(int64(7), "success", now, now, 2, 1, 1, false, "", summary, 1, 1, true, notifications).
+		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...))
+	stateQuery := `INSERT INTO scheduled_question_test_account_states
+			(plan_id, account_id, state, last_alert_at, updated_at) VALUES ($1, $2, $3, $4, NOW())
+			ON CONFLICT (plan_id, account_id) DO UPDATE SET
+			state = EXCLUDED.state, last_alert_at = EXCLUDED.last_alert_at, updated_at = NOW()`
+	mock.ExpectExec("^"+regexp.QuoteMeta(stateQuery)+"$").
 		WithArgs(int64(7), int64(3), "alert", now).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO scheduled_question_test_account_states`).
 		WithArgs(int64(7), int64(1), "ok", nil).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -245,12 +575,17 @@ func TestScheduledQuestionTestRepositoryFinishRunAtomic(t *testing.T) {
 		WithArgs(int64(7), now, next, "0 * * * *", now).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	created, err := repo.FinishRun(context.Background(), run, []*service.ScheduledQuestionTestAccountState{
-		{PlanID: 7, AccountID: 3, State: "alert", LastAlertAt: &now},
+		{PlanID: 7, AccountID: 3, State: "alert", LastAlertAt: &now, AutoPaused: true, AutoPausedAt: &now},
 		{PlanID: 7, AccountID: 1, State: "ok", LastAlertAt: nil},
 	}, next)
 	require.NoError(t, err)
 	require.Equal(t, int64(9), created.ID)
 	require.Equal(t, run.Summary, created.Summary)
+	require.Equal(t, run.NotificationResults, created.NotificationResults)
+	require.Equal(t, run.PausedAccounts, created.PausedAccounts)
+	require.Equal(t, run.ResumedAccounts, created.ResumedAccounts)
+	require.True(t, created.AutoPauseSkipped)
+	require.True(t, created.Summary[0].AutoPaused)
 }
 
 func TestScheduledQuestionTestRepositoryNotificationsSuppressedPersists(t *testing.T) {
@@ -263,16 +598,17 @@ func TestScheduledQuestionTestRepositoryNotificationsSuppressedPersists(t *testi
 	values := scheduledQuestionTestRunTestValues(now, "[]")
 	values[2], values[8] = "failed", true
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR UPDATE`).WithArgs(int64(7)).
+	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR NO KEY UPDATE`).WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(7)))
-	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs .* notifications_suppressed, error_message, summary, created_at`).
-		WithArgs(int64(7), "failed", now, now, 0, 0, 0, true, "", "[]").
+	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs .* notifications_suppressed, error_message, summary, paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, created_at`).
+		WithArgs(int64(7), "failed", now, now, 0, 0, 0, true, "", "[]", 0, 0, false, "[]").
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...))
 	mock.ExpectExec(`UPDATE scheduled_question_test_plans`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	created, err := repo.FinishRun(context.Background(), run, nil, now.Add(time.Hour))
 	require.NoError(t, err)
 	require.True(t, created.NotificationsSuppressed)
+	require.Equal(t, []service.ScheduledQuestionTestNotificationResult{}, created.NotificationResults)
 
 	mock.ExpectQuery(`FROM scheduled_question_test_runs WHERE plan_id = \$1`).WithArgs(int64(7), 50).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...))
@@ -290,7 +626,7 @@ func TestScheduledQuestionTestRepositoryFinishRunRollback(t *testing.T) {
 			run := &service.ScheduledQuestionTestRun{PlanID: 7, Status: "success", StartedAt: now, FinishedAt: now}
 			failure := errors.New("database unavailable")
 			mock.ExpectBegin()
-			lock := mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR UPDATE`)
+			lock := mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR NO KEY UPDATE`)
 			switch stage {
 			case "lock":
 				lock.WillReturnError(failure)
@@ -301,7 +637,7 @@ func TestScheduledQuestionTestRepositoryFinishRunRollback(t *testing.T) {
 			}
 			if stage != "lock" && stage != "missing" {
 				insert := mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs`).
-					WithArgs(int64(7), "success", now, now, 0, 0, 0, false, "", "[]")
+					WithArgs(int64(7), "success", now, now, 0, 0, 0, false, "", "[]", 0, 0, false, "[]")
 				if stage == "insert" {
 					insert.WillReturnError(failure)
 				} else {
@@ -403,12 +739,14 @@ func TestScheduledQuestionTestRepositoryScanAndRowErrors(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
-	for _, invalid := range []string{"summary", "scan", "rows"} {
+	for _, invalid := range []string{"summary", "notifications", "scan", "rows"} {
 		t.Run("run_"+invalid, func(t *testing.T) {
 			repo, mock := newScheduledQuestionTestTestRepository(t)
 			values := scheduledQuestionTestRunTestValues(time.Now(), "[]")
 			if invalid == "summary" {
 				values[10] = []byte("invalid json")
+			} else if invalid == "notifications" {
+				values[15] = []byte("invalid json")
 			} else if invalid == "scan" {
 				values[0] = "invalid id"
 			}
@@ -424,7 +762,7 @@ func TestScheduledQuestionTestRepositoryScanAndRowErrors(t *testing.T) {
 	for _, invalid := range []string{"scan", "rows"} {
 		t.Run("state_"+invalid, func(t *testing.T) {
 			repo, mock := newScheduledQuestionTestTestRepository(t)
-			values := []driver.Value{int64(1), int64(7), int64(3), "ok", nil, time.Now()}
+			values := []driver.Value{int64(1), int64(7), int64(3), "ok", nil, time.Now(), false, nil}
 			if invalid == "scan" {
 				values[0] = "invalid id"
 			}

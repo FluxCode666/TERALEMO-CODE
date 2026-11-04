@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/model"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -26,11 +27,12 @@ type scheduledQuestionTestHandlerStub struct {
 	accepted *service.ScheduledQuestionTestAccepted
 	err      error
 
-	ctx    context.Context
-	method string
-	id     int64
-	limit  int
-	input  service.ScheduledQuestionTestPlanInput
+	ctx         context.Context
+	method      string
+	id          int64
+	limit       int
+	input       service.ScheduledQuestionTestPlanInput
+	feishuInput service.ScheduledQuestionTestFeishuTestInput
 }
 
 func (s *scheduledQuestionTestHandlerStub) List(ctx context.Context) ([]*service.ScheduledQuestionTestPlan, error) {
@@ -68,6 +70,11 @@ func (s *scheduledQuestionTestHandlerStub) RunNow(ctx context.Context, id int64)
 	return s.accepted, s.err
 }
 
+func (s *scheduledQuestionTestHandlerStub) TestFeishu(ctx context.Context, input service.ScheduledQuestionTestFeishuTestInput) error {
+	s.ctx, s.method, s.feishuInput = ctx, "TestFeishu", input
+	return s.err
+}
+
 func newScheduledQuestionTestHandlerRouter(stub *scheduledQuestionTestHandlerStub) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	handler := &ScheduledQuestionTestHandler{service: stub}
@@ -75,6 +82,7 @@ func newScheduledQuestionTestHandlerRouter(stub *scheduledQuestionTestHandlerStu
 	router.GET("/plans", handler.List)
 	router.GET("/plans/:id", handler.GetByID)
 	router.POST("/plans", handler.Create)
+	router.POST("/plans/feishu-test", handler.TestFeishu)
 	router.PUT("/plans/:id", handler.Update)
 	router.DELETE("/plans/:id", handler.Delete)
 	router.GET("/plans/:id/runs", handler.ListRuns)
@@ -144,6 +152,136 @@ func TestScheduledQuestionTestHandlerCRUDEnvelope(t *testing.T) {
 	require.JSONEq(t, `{"message":"Scheduled question test plan deleted successfully"}`, string(scheduledQuestionTestResponseData(t, recorder)))
 	require.Equal(t, "Delete", stub.method)
 	require.Equal(t, int64(12), stub.id)
+}
+
+func TestScheduledQuestionTestHandlerDoesNotExposeFeishuCredentials(t *testing.T) {
+	plan := &service.ScheduledQuestionTestPlan{
+		ID:                      12,
+		Name:                    "Daily questions",
+		FeishuWebhookURL:        "https://open.feishu.cn/open-apis/bot/v2/hook/verysecretTOKEN123",
+		FeishuSecret:            "signing-secret-value",
+		FeishuWebhookConfigured: true,
+		FeishuWebhookHint:       "open.feishu.cn/…/hook/****N123",
+		FeishuSecretConfigured:  true,
+	}
+	stub := &scheduledQuestionTestHandlerStub{plan: plan, plans: []*service.ScheduledQuestionTestPlan{plan}}
+	router := newScheduledQuestionTestHandlerRouter(stub)
+	for _, request := range []struct{ method, path, body string }{
+		{http.MethodGet, "/plans", ""},
+		{http.MethodGet, "/plans/12", ""},
+		{http.MethodPost, "/plans", `{}`},
+		{http.MethodPut, "/plans/12", `{}`},
+	} {
+		recorder := requestScheduledQuestionTest(router, request.method, request.path, request.body)
+		scheduledQuestionTestResponseData(t, recorder)
+		for _, secret := range []string{plan.FeishuWebhookURL, "verysecretTOKEN123", plan.FeishuSecret} {
+			require.NotContains(t, recorder.Body.String(), secret)
+		}
+		require.Contains(t, recorder.Body.String(), `"feishu_webhook_configured":true`)
+		require.Contains(t, recorder.Body.String(), `"feishu_secret_configured":true`)
+		require.NotContains(t, recorder.Body.String(), `"feishu_webhook_url":`)
+		require.NotContains(t, recorder.Body.String(), `"feishu_secret":`)
+	}
+}
+
+func TestScheduledQuestionTestHandlerPlanInputPresenceForNewFields(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		t.Run(method, func(t *testing.T) {
+			stub := &scheduledQuestionTestHandlerStub{plan: &service.ScheduledQuestionTestPlan{ID: 12}}
+			path := "/plans"
+			if method == http.MethodPut {
+				path += "/12"
+			}
+			recorder := requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), method, path, `{
+				"report_enabled":false,"email_enabled":false,"feishu_enabled":true,
+				"feishu_webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/example-token",
+				"feishu_secret":"","auto_pause_enabled":true,"auto_resume_enabled":false
+			}`)
+			scheduledQuestionTestResponseData(t, recorder)
+			require.NotNil(t, stub.input.ReportEnabled)
+			require.False(t, *stub.input.ReportEnabled)
+			require.NotNil(t, stub.input.EmailEnabled)
+			require.False(t, *stub.input.EmailEnabled)
+			require.NotNil(t, stub.input.FeishuEnabled)
+			require.True(t, *stub.input.FeishuEnabled)
+			require.NotNil(t, stub.input.FeishuWebhookURL)
+			require.Equal(t, "https://open.feishu.cn/open-apis/bot/v2/hook/example-token", *stub.input.FeishuWebhookURL)
+			require.NotNil(t, stub.input.FeishuSecret)
+			require.Empty(t, *stub.input.FeishuSecret)
+			require.NotNil(t, stub.input.AutoPauseEnabled)
+			require.True(t, *stub.input.AutoPauseEnabled)
+			require.NotNil(t, stub.input.AutoResumeEnabled)
+			require.False(t, *stub.input.AutoResumeEnabled)
+		})
+	}
+
+	stub := &scheduledQuestionTestHandlerStub{plan: &service.ScheduledQuestionTestPlan{ID: 12}}
+	recorder := requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), http.MethodPut, "/plans/12", `{}`)
+	scheduledQuestionTestResponseData(t, recorder)
+	require.Nil(t, stub.input.ReportEnabled)
+	require.Nil(t, stub.input.EmailEnabled)
+	require.Nil(t, stub.input.FeishuEnabled)
+	require.Nil(t, stub.input.FeishuWebhookURL)
+	require.Nil(t, stub.input.FeishuSecret)
+	require.Nil(t, stub.input.AutoPauseEnabled)
+	require.Nil(t, stub.input.AutoResumeEnabled)
+
+	recorder = requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), http.MethodPut, "/plans/12", `{"feishu_webhook_url":"","feishu_secret":"configured-secret"}`)
+	scheduledQuestionTestResponseData(t, recorder)
+	require.NotNil(t, stub.input.FeishuWebhookURL)
+	require.Empty(t, *stub.input.FeishuWebhookURL)
+	require.NotNil(t, stub.input.FeishuSecret)
+	require.Equal(t, "configured-secret", *stub.input.FeishuSecret)
+}
+
+func TestScheduledQuestionTestHandlerTestFeishu(t *testing.T) {
+	emptySecret, secret := "", "configured-secret"
+	for _, test := range []struct {
+		name string
+		body string
+		want service.ScheduledQuestionTestFeishuTestInput
+	}{
+		{
+			name: "null secret",
+			body: `{"plan_id":12,"webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/token","secret":null}`,
+			want: service.ScheduledQuestionTestFeishuTestInput{PlanID: 12, WebhookURL: "https://open.feishu.cn/open-apis/bot/v2/hook/token"},
+		},
+		{name: "explicit empty secret", body: `{"plan_id":12,"secret":""}`, want: service.ScheduledQuestionTestFeishuTestInput{PlanID: 12, Secret: &emptySecret}},
+		{name: "omitted secret", body: `{"plan_id":12}`, want: service.ScheduledQuestionTestFeishuTestInput{PlanID: 12}},
+		{
+			name: "new webhook and secret",
+			body: `{"webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/token","secret":"configured-secret"}`,
+			want: service.ScheduledQuestionTestFeishuTestInput{WebhookURL: "https://open.feishu.cn/open-apis/bot/v2/hook/token", Secret: &secret},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stub := &scheduledQuestionTestHandlerStub{}
+			recorder := requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), http.MethodPost, "/plans/feishu-test", test.body)
+			require.Equal(t, http.StatusOK, recorder.Code)
+			require.JSONEq(t, `{"code":0,"message":"success","data":{"success":true}}`, recorder.Body.String())
+			require.Equal(t, "TestFeishu", stub.method)
+			require.Equal(t, test.want, stub.feishuInput)
+		})
+	}
+}
+
+func TestScheduledQuestionTestHandlerTestFeishuMapsSanitizedServiceError(t *testing.T) {
+	stub := &scheduledQuestionTestHandlerStub{err: infraerrors.New(http.StatusBadGateway, "FEISHU_TEST_FAILED", "connection refused")}
+	recorder := requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), http.MethodPost, "/plans/feishu-test", `{"plan_id":12}`)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "connection refused")
+	require.NotContains(t, recorder.Body.String(), `"data":`)
+}
+
+func TestScheduledQuestionTestHandlerTestFeishuRejectsInvalidJSON(t *testing.T) {
+	for _, body := range []string{"", `{`, `{"plan_id":"12"}`, `{"secret":1}`} {
+		t.Run(body, func(t *testing.T) {
+			stub := &scheduledQuestionTestHandlerStub{}
+			recorder := requestScheduledQuestionTest(newScheduledQuestionTestHandlerRouter(stub), http.MethodPost, "/plans/feishu-test", body)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			require.Empty(t, stub.method)
+		})
+	}
 }
 
 func TestScheduledQuestionTestHandlerRunningJSON(t *testing.T) {
@@ -236,6 +374,9 @@ func TestScheduledQuestionTestHandlerRejectsInvalidJSON(t *testing.T) {
 			`{"question_ids":["1"]}`, `{"model_id":false}`, `{"cron_expression":0}`,
 			`{"enabled":"false"}`, `{"min_pass_ratio":0.5}`, `{"cooldown_minutes":"1"}`,
 			`{"notify_enabled":1}`, `{"min_pass_ratio":9223372036854775808}`,
+			`{"report_enabled":1}`, `{"email_enabled":"false"}`, `{"feishu_enabled":[]}`,
+			`{"feishu_webhook_url":true}`, `{"feishu_secret":{}}`,
+			`{"auto_pause_enabled":"true"}`, `{"auto_resume_enabled":0}`,
 		} {
 			t.Run(method+"/"+body, func(t *testing.T) {
 				stub := &scheduledQuestionTestHandlerStub{}
@@ -372,6 +513,7 @@ func TestScheduledQuestionTestHandlerErrors(t *testing.T) {
 		{http.MethodPost, "/plans"}, {http.MethodPut, "/plans/12"},
 		{http.MethodDelete, "/plans/12"}, {http.MethodGet, "/plans/12/runs"},
 		{http.MethodPost, "/plans/12/run-now"},
+		{http.MethodPost, "/plans/feishu-test"},
 	} {
 		for _, failure := range []struct {
 			name    string
@@ -409,6 +551,7 @@ func TestScheduledQuestionTestHandlerPropagatesRequestContext(t *testing.T) {
 		{http.MethodPost, "/plans"}, {http.MethodPut, "/plans/12"},
 		{http.MethodDelete, "/plans/12"}, {http.MethodGet, "/plans/12/runs"},
 		{http.MethodPost, "/plans/12/run-now"},
+		{http.MethodPost, "/plans/feishu-test"},
 	} {
 		t.Run(request.method+request.path, func(t *testing.T) {
 			stub := &scheduledQuestionTestHandlerStub{

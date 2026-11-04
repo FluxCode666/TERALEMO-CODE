@@ -22,26 +22,110 @@ import (
 
 type scheduledQuestionRepoStub struct {
 	ScheduledQuestionTestRepository
-	mu           sync.Mutex
-	plans        map[int64]*ScheduledQuestionTestPlan
-	states       []*ScheduledQuestionTestAccountState
-	runs         []*ScheduledQuestionTestRun
-	due          []*ScheduledQuestionTestPlan
-	created      int
-	updated      int
-	deleted      int64
-	mask         ScheduledQuestionTestPlanUpdateMask
-	runLimit     int
-	finished     []*ScheduledQuestionTestRun
-	finishState  []*ScheduledQuestionTestAccountState
-	nextRun      time.Time
-	finishCtx    context.Context
-	dueCalls     int
-	getErr       error
-	stateErr     error
-	finishErr    error
-	dueErr       error
-	beforeFinish func(context.Context, *ScheduledQuestionTestRun)
+	mu               sync.Mutex
+	plans            map[int64]*ScheduledQuestionTestPlan
+	states           []*ScheduledQuestionTestAccountState
+	runs             []*ScheduledQuestionTestRun
+	due              []*ScheduledQuestionTestPlan
+	created          int
+	updated          int
+	deleted          int64
+	mask             ScheduledQuestionTestPlanUpdateMask
+	runLimit         int
+	finished         []*ScheduledQuestionTestRun
+	finishState      []*ScheduledQuestionTestAccountState
+	nextRun          time.Time
+	finishCtx        context.Context
+	dueCalls         int
+	getErr           error
+	stateErr         error
+	finishErr        error
+	dueErr           error
+	beforeFinish     func(context.Context, *ScheduledQuestionTestRun)
+	otherOwner       bool
+	ownerErr         error
+	setOwnerErr      error
+	rollbackOwnerErr error
+	ownerChanges     []bool
+}
+
+func (r *scheduledQuestionRepoStub) ClaimAutoPauseIfOtherHeld(ctx context.Context, planID, accountID int64, at *time.Time) (bool, error) {
+	r.mu.Lock()
+	if r.ownerErr != nil {
+		r.mu.Unlock()
+		return false, r.ownerErr
+	}
+	owned, other := false, r.otherOwner
+	for _, state := range r.states {
+		if state.AccountID == accountID && state.AutoPaused {
+			if state.PlanID == planID {
+				owned = true
+			} else {
+				other = true
+			}
+		}
+	}
+	r.mu.Unlock()
+	if owned {
+		return true, nil
+	}
+	if !other {
+		return false, nil
+	}
+	if err := r.SetAutoPaused(ctx, planID, accountID, true, at); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *scheduledQuestionRepoStub) ReleaseAutoPause(_ context.Context, planID, accountID int64) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ownerErr != nil {
+		return false, r.ownerErr
+	}
+	owned, other := false, r.otherOwner
+	for _, state := range r.states {
+		if state.AccountID == accountID && state.AutoPaused {
+			if state.PlanID == planID {
+				owned = true
+			} else {
+				other = true
+			}
+		}
+	}
+	if owned {
+		for i, state := range r.states {
+			if state.PlanID == planID && state.AccountID == accountID {
+				copy := *state
+				copy.AutoPaused, copy.AutoPausedAt = false, nil
+				r.states[i] = &copy
+			}
+		}
+	}
+	return owned && !other, nil
+}
+
+func (r *scheduledQuestionRepoStub) SetAutoPaused(_ context.Context, planID, accountID int64, paused bool, at *time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ownerChanges = append(r.ownerChanges, paused)
+	if paused && r.setOwnerErr != nil {
+		return r.setOwnerErr
+	}
+	if !paused && r.rollbackOwnerErr != nil {
+		return r.rollbackOwnerErr
+	}
+	for i, state := range r.states {
+		if state.PlanID == planID && state.AccountID == accountID {
+			copy := *state
+			copy.AutoPaused, copy.AutoPausedAt = paused, at
+			r.states[i] = &copy
+			return nil
+		}
+	}
+	r.states = append(r.states, &ScheduledQuestionTestAccountState{PlanID: planID, AccountID: accountID, State: "alert", AutoPaused: paused, AutoPausedAt: at})
+	return nil
 }
 
 func (r *scheduledQuestionRepoStub) GetByID(_ context.Context, id int64) (*ScheduledQuestionTestPlan, error) {
@@ -98,10 +182,16 @@ func (r *scheduledQuestionRepoStub) ListDue(ctx context.Context, _ time.Time) ([
 	return r.due, r.dueErr
 }
 
-func (r *scheduledQuestionRepoStub) ListStates(_ context.Context, _ int64) ([]*ScheduledQuestionTestAccountState, error) {
+func (r *scheduledQuestionRepoStub) ListStates(_ context.Context, planID int64) ([]*ScheduledQuestionTestAccountState, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return append([]*ScheduledQuestionTestAccountState{}, r.states...), r.stateErr
+	states := make([]*ScheduledQuestionTestAccountState, 0, len(r.states))
+	for _, state := range r.states {
+		if state.PlanID == planID || state.PlanID == 0 {
+			states = append(states, state)
+		}
+	}
+	return states, r.stateErr
 }
 
 func (r *scheduledQuestionRepoStub) FinishRun(ctx context.Context, run *ScheduledQuestionTestRun, states []*ScheduledQuestionTestAccountState, next time.Time) (*ScheduledQuestionTestRun, error) {
@@ -215,7 +305,7 @@ func scheduledQuestionValidInput() ScheduledQuestionTestPlanInput {
 func scheduledQuestionValidPlan(id int64) *ScheduledQuestionTestPlan {
 	return &ScheduledQuestionTestPlan{
 		ID: id, Name: "identity test", AccountIDs: []int64{2, 1}, QuestionIDs: []int64{2, 1},
-		CronExpression: "*/5 * * * *", Enabled: true, NotifyEnabled: false, MinPassRatio: 80, CooldownMinutes: 360,
+		CronExpression: "*/5 * * * *", Enabled: true, NotifyEnabled: false, EmailEnabled: true, MinPassRatio: 80, CooldownMinutes: 360,
 	}
 }
 
