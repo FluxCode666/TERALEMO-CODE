@@ -36,6 +36,7 @@ type ScheduledQuestionTestPlan struct {
 	PassedAccounts          int        `json:"passed_accounts"`
 	TotalAccounts           int        `json:"total_accounts"`
 	AlertedAccounts         int        `json:"alerted_accounts"`
+	SkippedAccounts         int        `json:"skipped_accounts"`
 	Running                 bool       `json:"running"`
 }
 
@@ -45,19 +46,24 @@ type ScheduledQuestionTestAccepted struct {
 }
 
 type ScheduledQuestionTestAccountSummary struct {
-	AccountID      int64  `json:"account_id"`
-	AccountName    string `json:"account_name"`
-	Platform       string `json:"platform"`
-	Passed         int    `json:"passed"`
-	Total          int    `json:"total"`
-	Judged         int    `json:"judged"`
-	Ratio          *int   `json:"ratio"`
-	Alerting       bool   `json:"alerting"`
-	StateAfter     string `json:"state_after"`
-	Error          string `json:"error"`
-	Incomplete     bool   `json:"incomplete,omitempty"`
-	ScheduleAction string `json:"schedule_action,omitempty"`
-	AutoPaused     bool   `json:"auto_paused"`
+	AccountID         int64      `json:"account_id"`
+	AccountName       string     `json:"account_name"`
+	Platform          string     `json:"platform"`
+	Passed            int        `json:"passed"`
+	Total             int        `json:"total"`
+	Judged            int        `json:"judged"`
+	Ratio             *int       `json:"ratio"`
+	Alerting          bool       `json:"alerting"`
+	StateAfter        string     `json:"state_after"`
+	Error             string     `json:"error"`
+	Incomplete        bool       `json:"incomplete,omitempty"`
+	ScheduleAction    string     `json:"schedule_action,omitempty"`
+	AutoPaused        bool       `json:"auto_paused"`
+	Result            string     `json:"result,omitempty"`
+	SkipReason        string     `json:"skip_reason,omitempty"`
+	SkipResetAt       *time.Time `json:"skip_reset_at"`
+	SchedulableBefore *bool      `json:"schedulable_before"`
+	SchedulableAfter  *bool      `json:"schedulable_after"`
 }
 
 type ScheduledQuestionTestNotificationResult struct {
@@ -78,6 +84,7 @@ type ScheduledQuestionTestRun struct {
 	TotalAccounts           int                                       `json:"total_accounts"`
 	PassedAccounts          int                                       `json:"passed_accounts"`
 	AlertedAccounts         int                                       `json:"alerted_accounts"`
+	SkippedAccounts         int                                       `json:"skipped_accounts"`
 	ErrorMessage            string                                    `json:"error_message"`
 	NotificationsSuppressed bool                                      `json:"notifications_suppressed"`
 	PausedAccounts          int                                       `json:"paused_accounts"`
@@ -164,8 +171,7 @@ type ScheduledQuestionTestRepository interface {
 	Delete(ctx context.Context, id int64) error
 	ListRuns(ctx context.Context, planID int64, limit int) ([]*ScheduledQuestionTestRun, error)
 	ListStates(ctx context.Context, planID int64) ([]*ScheduledQuestionTestAccountState, error)
-	ReleaseAutoPause(ctx context.Context, planID, accountID int64) (bool, error)
 	SetAutoPaused(ctx context.Context, planID, accountID int64, paused bool, at *time.Time) error
-	ClaimAutoPauseIfOtherHeld(ctx context.Context, planID, accountID int64, at *time.Time) (bool, error)
+	ApplyAccountVerdict(ctx context.Context, planID, accountID int64, state string, pause, resume bool, at time.Time, setSchedulable func(context.Context, bool) error) (string, error)
 	FinishRun(ctx context.Context, run *ScheduledQuestionTestRun, states []*ScheduledQuestionTestAccountState, nextRunAt time.Time) (*ScheduledQuestionTestRun, error)
 }

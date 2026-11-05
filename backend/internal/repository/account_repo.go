@@ -2673,6 +2673,9 @@ func (r *accountRepository) UpdateSessionWindowEnd(ctx context.Context, id int64
 }
 
 func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
+	if transaction, ok := ctx.Value(scheduledQuestionSchedulingTxKey{}).(*scheduledQuestionSchedulingTransaction); ok {
+		return r.setScheduledQuestionSchedulable(ctx, transaction, id, schedulable)
+	}
 	_, err := r.client.Account.Update().
 		Where(dbaccount.IDEQ(id)).
 		SetSchedulable(schedulable).

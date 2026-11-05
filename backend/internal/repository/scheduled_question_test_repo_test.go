@@ -24,13 +24,13 @@ var scheduledQuestionTestPlanTestColumns = []string{
 	"id", "name", "account_ids", "question_ids", "model_id", "cron_expression", "enabled",
 	"min_pass_ratio", "cooldown_minutes", "notify_enabled", "last_run_at", "next_run_at",
 	"created_at", "updated_at", "report_enabled", "email_enabled", "feishu_enabled", "feishu_webhook_url",
-	"feishu_secret", "auto_pause_enabled", "auto_resume_enabled", "last_status", "passed_accounts", "total_accounts", "alerted_accounts",
+	"feishu_secret", "auto_pause_enabled", "auto_resume_enabled", "last_status", "passed_accounts", "total_accounts", "alerted_accounts", "skipped_accounts",
 }
 
 var scheduledQuestionTestRunTestColumns = []string{
 	"id", "plan_id", "status", "started_at", "finished_at", "total_accounts", "passed_accounts",
 	"alerted_accounts", "notifications_suppressed", "error_message", "summary", "created_at",
-	"paused_accounts", "resumed_accounts", "auto_pause_skipped", "notification_results",
+	"paused_accounts", "resumed_accounts", "auto_pause_skipped", "notification_results", "skipped_accounts",
 }
 
 var scheduledQuestionTestStateTestColumns = []string{"id", "plan_id", "account_id", "state", "last_alert_at", "updated_at", "auto_paused", "auto_paused_at"}
@@ -49,12 +49,12 @@ func newScheduledQuestionTestTestRepository(t *testing.T) (service.ScheduledQues
 func scheduledQuestionTestPlanTestValues(now time.Time, nextRunAt driver.Value) []driver.Value {
 	return []driver.Value{
 		int64(7), "plan", []byte(`[3,1]`), []byte(`[4,2]`), "model", "*/30 * * * *", true,
-		80, 360, true, nil, nextRunAt, now, now, false, true, false, "", "", false, false, "success", 1, 2, 1,
+		80, 360, true, nil, nextRunAt, now, now, false, true, false, "", "", false, false, "success", 1, 2, 1, 1,
 	}
 }
 
 func scheduledQuestionTestRunTestValues(now time.Time, summary string) []driver.Value {
-	return []driver.Value{int64(9), int64(7), "success", now, now, 2, 1, 1, false, "", []byte(summary), now, 0, 0, false, []byte("[]")}
+	return []driver.Value{int64(9), int64(7), "success", now, now, 2, 1, 1, false, "", []byte(summary), now, 0, 0, false, []byte("[]"), 0}
 }
 
 func TestScheduledQuestionTestRepositoryCreate(t *testing.T) {
@@ -99,7 +99,7 @@ func TestScheduledQuestionTestRepositoryCreate(t *testing.T) {
 func TestScheduledQuestionTestRepositoryGetAndListLatestRun(t *testing.T) {
 	repo, mock := newScheduledQuestionTestTestRepository(t)
 	now := time.Now().UTC()
-	query := `SELECT .* FROM scheduled_question_test_plans p LEFT JOIN LATERAL \( SELECT status, passed_accounts, total_accounts, alerted_accounts FROM scheduled_question_test_runs WHERE plan_id = p.id ORDER BY started_at DESC, id DESC LIMIT 1 \) latest ON true`
+	query := `SELECT .* FROM scheduled_question_test_plans p LEFT JOIN LATERAL \( SELECT status, passed_accounts, total_accounts, alerted_accounts, skipped_accounts FROM scheduled_question_test_runs WHERE plan_id = p.id ORDER BY started_at DESC, id DESC LIMIT 1 \) latest ON true`
 	mock.ExpectQuery(query + ` WHERE p.id = \$1`).WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(scheduledQuestionTestPlanTestValues(now, nil)...)).RowsWillBeClosed()
 	plan, err := repo.GetByID(context.Background(), 7)
@@ -108,6 +108,7 @@ func TestScheduledQuestionTestRepositoryGetAndListLatestRun(t *testing.T) {
 	require.Equal(t, 1, plan.PassedAccounts)
 	require.Equal(t, 2, plan.TotalAccounts)
 	require.Equal(t, 1, plan.AlertedAccounts)
+	require.Equal(t, 1, plan.SkippedAccounts)
 
 	mock.ExpectQuery(query + ` ORDER BY p.id DESC`).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns).AddRow(scheduledQuestionTestPlanTestValues(now, nil)...)).RowsWillBeClosed()
@@ -249,13 +250,99 @@ func TestScheduledQuestionTestRepositoryNotFound(t *testing.T) {
 	mock.ExpectQuery(`WITH updated AS`).WillReturnRows(sqlmock.NewRows(scheduledQuestionTestPlanTestColumns))
 	_, err = repo.Update(context.Background(), &service.ScheduledQuestionTestPlan{ID: 999}, service.ScheduledQuestionTestPlanUpdateMask{})
 	require.ErrorIs(t, err, service.ErrScheduledQuestionTestNotFound)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT account_id FROM`).WithArgs(int64(999)).WillReturnRows(sqlmock.NewRows([]string{"account_id"}))
 	mock.ExpectExec(`DELETE FROM scheduled_question_test_plans WHERE id = \$1`).WithArgs(int64(999)).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
 	require.ErrorIs(t, repo.Delete(context.Background(), 999), service.ErrScheduledQuestionTestNotFound)
 
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT account_id FROM`).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"account_id"}))
 	mock.ExpectExec(`DELETE FROM scheduled_question_test_plans WHERE id = \$1`).WithArgs(int64(7)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 	require.NoError(t, repo.Delete(context.Background(), 7))
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT account_id FROM`).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"account_id"}))
 	mock.ExpectExec(`DELETE FROM scheduled_question_test_plans`).WillReturnResult(sqlmock.NewErrorResult(errors.New("rows affected unavailable")))
+	mock.ExpectRollback()
 	require.EqualError(t, repo.Delete(context.Background(), 7), "rows affected unavailable")
+}
+
+const scheduledQuestionDeleteAccountIDsTestQuery = `SELECT account_id FROM (
+		SELECT value::bigint AS account_id FROM scheduled_question_test_plans p,
+		jsonb_array_elements_text(p.account_ids) AS ids(value) WHERE p.id = $1
+		UNION SELECT account_id FROM scheduled_question_test_account_states WHERE plan_id = $1
+	) accounts ORDER BY account_id`
+
+func TestScheduledQuestionTestRepositoryDeleteAccountLocks(t *testing.T) {
+	repo, mock := newScheduledQuestionTestTestRepository(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionDeleteAccountIDsTestQuery) + "$").WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"account_id"}).AddRow(int64(3)).AddRow(int64(1)).AddRow(int64(3))).RowsWillBeClosed()
+	expectScheduledQuestionMultiAccountLocks(mock, 1, 3)
+	mock.ExpectExec(`DELETE FROM scheduled_question_test_plans WHERE id = \$1`).WithArgs(int64(7)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	require.NoError(t, repo.Delete(context.Background(), 7))
+}
+
+func TestScheduledQuestionTestRepositoryDeleteTransactionFailures(t *testing.T) {
+	for _, stage := range []string{"begin", "query", "scan", "rows", "advisory", "states", "delete", "commit"} {
+		t.Run(stage, func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			failure := errors.New("delete unavailable")
+			begin := mock.ExpectBegin()
+			if stage == "begin" {
+				begin.WillReturnError(failure)
+			} else {
+				query := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionDeleteAccountIDsTestQuery) + "$").WithArgs(int64(7))
+				if stage == "query" {
+					query.WillReturnError(failure)
+				} else {
+					rows := sqlmock.NewRows([]string{"account_id"})
+					if stage == "scan" {
+						rows.AddRow("invalid id")
+					} else {
+						rows.AddRow(int64(3))
+					}
+					if stage == "rows" {
+						rows.RowError(0, failure)
+					}
+					query.WillReturnRows(rows).RowsWillBeClosed()
+					if stage != "scan" && stage != "rows" {
+						advisory := mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(int64(3))
+						if stage == "advisory" {
+							advisory.WillReturnError(failure)
+						} else {
+							advisory.WillReturnResult(sqlmock.NewResult(0, 1))
+							stateQuery := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3))
+							if stage == "states" {
+								stateQuery.WillReturnError(failure)
+							} else {
+								stateQuery.WillReturnRows(sqlmock.NewRows([]string{"plan_id", "auto_paused"})).RowsWillBeClosed()
+								del := mock.ExpectExec(`DELETE FROM scheduled_question_test_plans WHERE id = \$1`).WithArgs(int64(7))
+								if stage == "delete" {
+									del.WillReturnError(failure)
+								} else {
+									del.WillReturnResult(sqlmock.NewResult(0, 1))
+								}
+							}
+						}
+					}
+				}
+				if stage == "commit" {
+					mock.ExpectCommit().WillReturnError(failure)
+				} else {
+					mock.ExpectRollback()
+				}
+			}
+			err := repo.Delete(context.Background(), 7)
+			if stage == "scan" {
+				require.Error(t, err)
+			} else {
+				require.ErrorIs(t, err, failure)
+			}
+		})
+	}
 }
 
 func TestScheduledQuestionTestRepositoryRunsAndStates(t *testing.T) {
@@ -308,42 +395,21 @@ const scheduledQuestionAutoPauseTestStates = `SELECT plan_id, auto_paused FROM s
 		WHERE account_id = $1 ORDER BY plan_id FOR UPDATE`
 
 func expectScheduledQuestionAutoPauseLocks(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
-	mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3)).WillReturnRows(rows).RowsWillBeClosed()
+	expectScheduledQuestionAutoPauseLocksForAccount(mock, 3, rows)
 }
 
-func TestScheduledQuestionTestRepositoryReleaseAutoPause(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		holder  bool
-		missing bool
-		others  int
-		resume  bool
-	}{
-		{"missing", false, true, 0, false},
-		{"not_held", false, false, 0, false},
-		{"other_owner", true, false, 1, false},
-		{"last_owner", true, false, 0, true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			repo, mock := newScheduledQuestionTestTestRepository(t)
-			mock.ExpectBegin()
-			rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
-			if !test.missing {
-				rows.AddRow(int64(7), test.holder)
-			}
-			expectScheduledQuestionAutoPauseLocks(mock, rows)
-			if test.holder {
-				mock.ExpectExec(`UPDATE scheduled_question_test_account_states SET auto_paused = false, auto_paused_at = NULL WHERE plan_id = \$1 AND account_id = \$2`).
-					WithArgs(int64(7), int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
-				mock.ExpectQuery(`SELECT COUNT\(\*\) FROM scheduled_question_test_account_states WHERE account_id = \$1 AND plan_id <> \$2 AND auto_paused = true`).
-					WithArgs(int64(3), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(test.others))
-			}
-			mock.ExpectCommit()
-			resume, err := repo.ReleaseAutoPause(context.Background(), 7, 3)
-			require.NoError(t, err)
-			require.Equal(t, test.resume, resume)
-		})
+func expectScheduledQuestionAutoPauseLocksForAccount(mock sqlmock.Sqlmock, accountID int64, rows *sqlmock.Rows) {
+	mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(accountID).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(accountID).WillReturnRows(rows).RowsWillBeClosed()
+}
+
+func expectScheduledQuestionMultiAccountLocks(mock sqlmock.Sqlmock, accountIDs ...int64) {
+	for _, accountID := range accountIDs {
+		mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(accountID).WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	for _, accountID := range accountIDs {
+		mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(accountID).
+			WillReturnRows(sqlmock.NewRows([]string{"plan_id", "auto_paused"})).RowsWillBeClosed()
 	}
 }
 
@@ -369,129 +435,162 @@ func TestScheduledQuestionTestRepositorySetAutoPaused(t *testing.T) {
 	}
 }
 
-func TestScheduledQuestionTestRepositoryClaimAutoPauseIfOtherHeld(t *testing.T) {
-	query := `INSERT INTO scheduled_question_test_account_states
-		(plan_id, account_id, state, auto_paused, auto_paused_at) VALUES ($1, $2, 'alert', true, $3)
-		ON CONFLICT (plan_id, account_id) DO UPDATE SET
-		auto_paused = EXCLUDED.auto_paused, auto_paused_at = EXCLUDED.auto_paused_at`
+const scheduledQuestionVerdictStateTestQuery = `INSERT INTO scheduled_question_test_account_states
+		(plan_id, account_id, state) VALUES ($1, $2, $3)
+		ON CONFLICT (plan_id, account_id) DO UPDATE SET state = EXCLUDED.state`
+
+const scheduledQuestionCurrentSchedulingTestQuery = `SELECT schedulable FROM accounts WHERE id = $1 AND deleted_at IS NULL`
+
+const scheduledQuestionResumeCheckTestQuery = `SELECT EXISTS (
+		SELECT 1 FROM scheduled_question_test_account_states s
+		JOIN scheduled_question_test_plans p ON p.id = s.plan_id
+		WHERE s.account_id = $1 AND s.plan_id <> $2 AND s.state = 'alert'
+		AND p.enabled = true AND p.auto_pause_enabled = true
+	)`
+
+const scheduledQuestionResumeClearTestQuery = `UPDATE scheduled_question_test_account_states
+		SET auto_paused = false, auto_paused_at = NULL WHERE account_id = $1`
+
+const scheduledQuestionPauseMarkerTestQuery = `UPDATE scheduled_question_test_account_states
+			SET auto_paused = true, auto_paused_at = $3 WHERE plan_id = $1 AND account_id = $2`
+
+func TestScheduledQuestionTestRepositoryApplyAccountVerdict(t *testing.T) {
 	for _, test := range []struct {
-		name    string
-		states  map[int64]bool
-		write   bool
-		claimed bool
+		name, state, action                      string
+		current, pause, resume, blocked, missing bool
 	}{
-		{"no_states", nil, false, false},
-		{"inactive_other", map[int64]bool{8: false}, false, false},
-		{"already_held", map[int64]bool{7: true}, false, true},
-		{"other_held", map[int64]bool{7: false, 8: true}, true, true},
+		{"pause", "alert", "paused", true, true, false, false, false},
+		{"resume", "ok", "resumed", false, false, true, false, false},
+		{"blocked", "ok", "resume_blocked", false, false, true, true, false},
+		{"closed_failure_publishes", "alert", "", false, true, false, false, false},
+		{"open_passing_publishes", "ok", "", true, false, true, false, false},
+		{"switches_off_publishes", "alert", "", true, false, false, false, false},
+		{"missing_account_publishes", "alert", "", false, true, false, false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			repo, mock := newScheduledQuestionTestTestRepository(t)
 			now := time.Now().UTC()
-			rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
-			for planID, paused := range test.states {
-				rows.AddRow(planID, paused)
-			}
 			mock.ExpectBegin()
-			expectScheduledQuestionAutoPauseLocks(mock, rows)
-			if test.write {
-				mock.ExpectExec("^"+regexp.QuoteMeta(query)+"$").WithArgs(int64(7), int64(3), now).
-					WillReturnResult(sqlmock.NewResult(0, 1))
+			expectScheduledQuestionAutoPauseLocks(mock, sqlmock.NewRows([]string{"plan_id", "auto_paused"}))
+			mock.ExpectExec("^"+regexp.QuoteMeta(scheduledQuestionVerdictStateTestQuery)+"$").WithArgs(int64(7), int64(3), test.state).WillReturnResult(sqlmock.NewResult(0, 1))
+			query := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionCurrentSchedulingTestQuery) + "$").WithArgs(int64(3))
+			if test.missing {
+				query.WillReturnError(sql.ErrNoRows)
+			} else {
+				query.WillReturnRows(sqlmock.NewRows([]string{"schedulable"}).AddRow(test.current))
+			}
+			if test.resume && !test.current && !test.missing {
+				mock.ExpectQuery("^"+regexp.QuoteMeta(scheduledQuestionResumeCheckTestQuery)+"$").WithArgs(int64(3), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(test.blocked))
+			}
+			if test.action == "paused" {
+				mock.ExpectExec("^"+regexp.QuoteMeta(scheduledQuestionPauseMarkerTestQuery)+"$").WithArgs(int64(7), int64(3), now).WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+			if test.action == "resumed" {
+				mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionResumeClearTestQuery) + "$").WithArgs(int64(3)).WillReturnResult(sqlmock.NewResult(0, 2))
 			}
 			mock.ExpectCommit()
-			claimed, err := repo.ClaimAutoPauseIfOtherHeld(context.Background(), 7, 3, &now)
+			called := false
+			action, err := repo.ApplyAccountVerdict(context.Background(), 7, 3, test.state, test.pause, test.resume, now, func(ctx context.Context, value bool) error {
+				require.NoError(t, ctx.Err())
+				called = true
+				require.Equal(t, test.action == "resumed", value)
+				return nil
+			})
 			require.NoError(t, err)
-			require.Equal(t, test.claimed, claimed)
+			require.Equal(t, test.action, action)
+			require.Equal(t, test.action == "paused" || test.action == "resumed", called)
 		})
 	}
 }
 
-func TestScheduledQuestionTestRepositoryAutoPauseTransactionFailures(t *testing.T) {
-	for _, method := range []string{"claim", "release", "join"} {
-		stages := []string{"begin", "advisory", "query", "scan", "rows", "write", "commit"}
-		if method != "release" {
-			stages = append(stages, "zero_affected", "rows_affected")
-		} else {
-			stages = append(stages, "count")
-		}
-		for _, stage := range stages {
+func TestScheduledQuestionTestRepositoryApplyAccountVerdictFailures(t *testing.T) {
+	for _, method := range []string{"pause", "resume"} {
+		for _, stage := range []string{"begin", "advisory", "rows_query", "rows_scan", "rows_error", "state", "account", "check", "callback", "marker", "commit"} {
+			if method == "pause" && stage == "check" {
+				continue
+			}
 			t.Run(method+"_"+stage, func(t *testing.T) {
 				repo, mock := newScheduledQuestionTestTestRepository(t)
-				failure := errors.New("ownership transaction unavailable")
-				begin := mock.ExpectBegin()
-				if stage == "begin" {
-					begin.WillReturnError(failure)
-				} else {
+				failure := errors.New("verdict transaction failed")
+				setup := func() {
+					begin := mock.ExpectBegin()
+					if stage == "begin" {
+						begin.WillReturnError(failure)
+						return
+					}
 					lock := mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").WithArgs(int64(3))
 					if stage == "advisory" {
 						lock.WillReturnError(failure)
+						return
+					}
+					lock.WillReturnResult(sqlmock.NewResult(0, 1))
+					rowsQuery := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3))
+					if stage == "rows_query" {
+						rowsQuery.WillReturnError(failure)
+						return
+					}
+					rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
+					if stage == "rows_scan" {
+						rows.AddRow("invalid", true)
 					} else {
-						lock.WillReturnResult(sqlmock.NewResult(0, 1))
-						query := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").WithArgs(int64(3))
-						if stage == "query" {
-							query.WillReturnError(failure)
-						} else {
-							rows := sqlmock.NewRows([]string{"plan_id", "auto_paused"})
-							if stage == "scan" {
-								rows.AddRow("invalid id", true)
-							} else {
-								if method == "join" {
-									rows.AddRow(int64(8), true)
-								} else {
-									rows.AddRow(int64(7), true)
-								}
-							}
-							if stage == "rows" {
-								rows.RowError(0, failure)
-							}
-							query.WillReturnRows(rows).RowsWillBeClosed()
-							if stage != "scan" && stage != "rows" {
-								write := mock.ExpectExec(`(INSERT INTO|UPDATE) scheduled_question_test_account_states`)
-								switch stage {
-								case "write":
-									write.WillReturnError(failure)
-								case "zero_affected":
-									write.WillReturnResult(sqlmock.NewResult(0, 0))
-								case "rows_affected":
-									write.WillReturnResult(sqlmock.NewErrorResult(failure))
-								default:
-									write.WillReturnResult(sqlmock.NewResult(0, 1))
-									if method == "release" {
-										count := mock.ExpectQuery(`SELECT COUNT\(\*\)`)
-										if stage == "count" {
-											count.WillReturnError(failure)
-										} else {
-											count.WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-										}
-									}
-								}
-							}
+						rows.AddRow(int64(7), true)
+					}
+					if stage == "rows_error" {
+						rows.RowError(0, failure)
+					}
+					rowsQuery.WillReturnRows(rows).RowsWillBeClosed()
+					if stage == "rows_scan" || stage == "rows_error" {
+						return
+					}
+					state := mock.ExpectExec(`INSERT INTO scheduled_question_test_account_states`)
+					if stage == "state" {
+						state.WillReturnError(failure)
+						return
+					}
+					state.WillReturnResult(sqlmock.NewResult(0, 1))
+					account := mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionCurrentSchedulingTestQuery) + "$")
+					if stage == "account" {
+						account.WillReturnError(failure)
+						return
+					}
+					account.WillReturnRows(sqlmock.NewRows([]string{"schedulable"}).AddRow(method == "pause"))
+					if method == "resume" {
+						check := mock.ExpectQuery(`SELECT EXISTS`)
+						if stage == "check" {
+							check.WillReturnError(failure)
+							return
 						}
+						check.WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 					}
-					if stage == "commit" {
-						mock.ExpectCommit().WillReturnError(failure)
-					} else {
-						mock.ExpectRollback()
+					if stage == "callback" {
+						return
 					}
+					marker := mock.ExpectExec(`UPDATE scheduled_question_test_account_states`)
+					if stage == "marker" {
+						marker.WillReturnError(failure)
+						return
+					}
+					marker.WillReturnResult(sqlmock.NewResult(0, 1))
 				}
-				var err error
-				if method == "join" {
-					now := time.Now()
-					var claimed bool
-					claimed, err = repo.ClaimAutoPauseIfOtherHeld(context.Background(), 7, 3, &now)
-					require.False(t, claimed)
-				} else if method == "claim" {
-					now := time.Now()
-					err = repo.SetAutoPaused(context.Background(), 7, 3, true, &now)
-				} else {
-					var resume bool
-					resume, err = repo.ReleaseAutoPause(context.Background(), 7, 3)
-					require.False(t, resume)
+				setup()
+				if stage == "commit" {
+					mock.ExpectCommit().WillReturnError(failure)
+				} else if stage != "begin" {
+					mock.ExpectRollback()
 				}
-				if stage == "scan" {
+				state := "ok"
+				if method == "pause" {
+					state = "alert"
+				}
+				action, err := repo.ApplyAccountVerdict(context.Background(), 7, 3, state, method == "pause", method == "resume", time.Now(), func(context.Context, bool) error {
+					if stage == "callback" {
+						return failure
+					}
+					return nil
+				})
+				require.Empty(t, action)
+				if stage == "rows_scan" {
 					require.Error(t, err)
-				} else if stage == "zero_affected" {
-					require.ErrorIs(t, err, service.ErrScheduledQuestionTestNotFound)
 				} else {
 					require.ErrorIs(t, err, failure)
 				}
@@ -544,19 +643,22 @@ func TestScheduledQuestionTestRepositoryFinishRunAtomic(t *testing.T) {
 	run := &service.ScheduledQuestionTestRun{
 		PlanID: 7, Status: "success", StartedAt: now, FinishedAt: now, TotalAccounts: 2, PassedAccounts: 1, AlertedAccounts: 1,
 		CronExpression: "0 * * * *", PlanUpdatedAt: now,
-		PausedAccounts: 1, ResumedAccounts: 1, AutoPauseSkipped: true,
+		PausedAccounts: 1, ResumedAccounts: 1, AutoPauseSkipped: true, SkippedAccounts: 1,
 		NotificationResults: []service.ScheduledQuestionTestNotificationResult{{Kind: "report", Channel: "feishu", Success: true, Detail: "sent"}},
 		Summary:             []service.ScheduledQuestionTestAccountSummary{{AccountID: 3, Total: 1, Ratio: &ratio, Alerting: true, StateAfter: "alert", Error: "all failed", ScheduleAction: "paused", AutoPaused: true}},
 	}
-	summary := `[{"account_id":3,"account_name":"","platform":"","passed":0,"total":1,"judged":0,"ratio":0,"alerting":true,"state_after":"alert","error":"all failed","schedule_action":"paused","auto_paused":true}]`
+	summaryData, err := json.Marshal(run.Summary)
+	require.NoError(t, err)
+	summary := string(summaryData)
 	notifications := `[{"kind":"report","channel":"feishu","success":true,"detail":"sent"}]`
 	values := scheduledQuestionTestRunTestValues(now, summary)
-	values[12], values[13], values[14], values[15] = 1, 1, true, []byte(notifications)
+	values[12], values[13], values[14], values[15], values[16] = 1, 1, true, []byte(notifications), 1
 	mock.ExpectBegin()
+	expectScheduledQuestionMultiAccountLocks(mock, 1, 3)
 	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans WHERE id = \$1 FOR NO KEY UPDATE`).WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(7)))
 	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs`).
-		WithArgs(int64(7), "success", now, now, 2, 1, 1, false, "", summary, 1, 1, true, notifications).
+		WithArgs(int64(7), "success", now, now, 2, 1, 1, false, "", summary, 1, 1, true, notifications, 1).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...))
 	stateQuery := `INSERT INTO scheduled_question_test_account_states
 			(plan_id, account_id, state, last_alert_at, updated_at) VALUES ($1, $2, $3, $4, NOW())
@@ -585,6 +687,7 @@ func TestScheduledQuestionTestRepositoryFinishRunAtomic(t *testing.T) {
 	require.Equal(t, run.PausedAccounts, created.PausedAccounts)
 	require.Equal(t, run.ResumedAccounts, created.ResumedAccounts)
 	require.True(t, created.AutoPauseSkipped)
+	require.Equal(t, 1, created.SkippedAccounts)
 	require.True(t, created.Summary[0].AutoPaused)
 }
 
@@ -600,8 +703,8 @@ func TestScheduledQuestionTestRepositoryNotificationsSuppressedPersists(t *testi
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR NO KEY UPDATE`).WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(7)))
-	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs .* notifications_suppressed, error_message, summary, paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, created_at`).
-		WithArgs(int64(7), "failed", now, now, 0, 0, 0, true, "", "[]", 0, 0, false, "[]").
+	mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs .* notifications_suppressed, error_message, summary, paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, skipped_accounts, created_at`).
+		WithArgs(int64(7), "failed", now, now, 0, 0, 0, true, "", "[]", 0, 0, false, "[]", 0).
 		WillReturnRows(sqlmock.NewRows(scheduledQuestionTestRunTestColumns).AddRow(values...))
 	mock.ExpectExec(`UPDATE scheduled_question_test_plans`).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -626,6 +729,7 @@ func TestScheduledQuestionTestRepositoryFinishRunRollback(t *testing.T) {
 			run := &service.ScheduledQuestionTestRun{PlanID: 7, Status: "success", StartedAt: now, FinishedAt: now}
 			failure := errors.New("database unavailable")
 			mock.ExpectBegin()
+			expectScheduledQuestionAutoPauseLocks(mock, sqlmock.NewRows([]string{"plan_id", "auto_paused"}))
 			lock := mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR NO KEY UPDATE`)
 			switch stage {
 			case "lock":
@@ -637,7 +741,7 @@ func TestScheduledQuestionTestRepositoryFinishRunRollback(t *testing.T) {
 			}
 			if stage != "lock" && stage != "missing" {
 				insert := mock.ExpectQuery(`INSERT INTO scheduled_question_test_runs`).
-					WithArgs(int64(7), "success", now, now, 0, 0, 0, false, "", "[]", 0, 0, false, "[]")
+					WithArgs(int64(7), "success", now, now, 0, 0, 0, false, "", "[]", 0, 0, false, "[]", 0)
 				if stage == "insert" {
 					insert.WillReturnError(failure)
 				} else {
@@ -679,6 +783,34 @@ func TestScheduledQuestionTestRepositoryFinishRunRollback(t *testing.T) {
 	}
 }
 
+func TestScheduledQuestionTestRepositoryFinishRunAccountLocks(t *testing.T) {
+	for _, stage := range []string{"advisory", "states", "deduplicate"} {
+		t.Run(stage, func(t *testing.T) {
+			repo, mock := newScheduledQuestionTestTestRepository(t)
+			failure := errors.New("account lock unavailable")
+			mock.ExpectBegin()
+			if stage == "advisory" {
+				mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").
+					WithArgs(int64(1)).WillReturnError(failure)
+			} else if stage == "states" {
+				mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").
+					WithArgs(int64(1)).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestLock) + "$").
+					WithArgs(int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectQuery("^" + regexp.QuoteMeta(scheduledQuestionAutoPauseTestStates) + "$").
+					WithArgs(int64(1)).WillReturnError(failure)
+			} else {
+				expectScheduledQuestionMultiAccountLocks(mock, 1, 3)
+				mock.ExpectQuery(`SELECT id FROM scheduled_question_test_plans .* FOR NO KEY UPDATE`).WillReturnError(failure)
+			}
+			mock.ExpectRollback()
+			_, err := repo.FinishRun(context.Background(), &service.ScheduledQuestionTestRun{PlanID: 7},
+				[]*service.ScheduledQuestionTestAccountState{{AccountID: 3}, {AccountID: 1}, {AccountID: 3}}, time.Now())
+			require.ErrorIs(t, err, failure)
+		})
+	}
+}
+
 func TestScheduledQuestionTestRepositoryQueryErrors(t *testing.T) {
 	for _, method := range []string{"create", "get", "list", "due", "update", "delete", "runs", "states", "begin"} {
 		t.Run(method, func(t *testing.T) {
@@ -688,7 +820,9 @@ func TestScheduledQuestionTestRepositoryQueryErrors(t *testing.T) {
 			var err error
 			switch method {
 			case "delete":
-				mock.ExpectExec(`DELETE`).WillReturnError(failure)
+				mock.ExpectBegin()
+				mock.ExpectQuery(`SELECT account_id FROM`).WillReturnError(failure)
+				mock.ExpectRollback()
 				err = repo.Delete(ctx, 7)
 			case "begin":
 				mock.ExpectBegin().WillReturnError(failure)

@@ -31,18 +31,20 @@ func NewAccountBatchTestService(accountRepo AccountRepository, accountTest *Acco
 }
 
 type AccountBatchTestInput struct {
-	AccountIDs  []int64
-	QuestionIDs []int64
-	ModelID     string
-	Concurrency *int
+	AccountIDs    []int64
+	QuestionIDs   []int64
+	ModelID       string
+	Concurrency   *int
+	captureStatus bool
 }
 
 // AccountBatchTestPlan is validated before the handler starts its SSE response.
 type AccountBatchTestPlan struct {
-	accountIDs  []int64
-	questions   []*model.AccountTestQuestion
-	modelID     string
-	concurrency int
+	accountIDs    []int64
+	questions     []*model.AccountTestQuestion
+	modelID       string
+	concurrency   int
+	captureStatus bool
 }
 
 type AccountBatchTestEvent struct {
@@ -72,6 +74,7 @@ type AccountBatchTestItemResult struct {
 	Answer          string   `json:"answer"`
 	Error           string   `json:"error"`
 	LatencyMs       int64    `json:"latency_ms"`
+	StatusCode      int      `json:"-"`
 }
 
 type AccountBatchTestSummary struct {
@@ -96,7 +99,7 @@ func (s *AccountBatchTestService) Prepare(ctx context.Context, input AccountBatc
 	if input.Concurrency != nil {
 		concurrency = max(1, min(5, *input.Concurrency))
 	}
-	plan := &AccountBatchTestPlan{accountIDs: accountIDs, modelID: input.ModelID, concurrency: concurrency}
+	plan := &AccountBatchTestPlan{accountIDs: accountIDs, modelID: input.ModelID, concurrency: concurrency, captureStatus: input.captureStatus}
 	for _, id := range questionIDs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -253,7 +256,7 @@ func (s *AccountBatchTestService) runAccount(ctx context.Context, plan *AccountB
 		if lookupErr != nil || account == nil {
 			item.Error = "Account not found"
 		} else {
-			connected := s.runQuestion(ctx, accountID, question, &item)
+			connected := s.runQuestion(ctx, accountID, question, &item, plan.captureStatus)
 			if connected && !recovered && s.rateLimit != nil && ctx.Err() == nil {
 				recovered = true
 				if _, err := s.rateLimit.RecoverAccountAfterSuccessfulTest(ctx, accountID); err != nil {
@@ -272,7 +275,10 @@ func (s *AccountBatchTestService) runAccount(ctx context.Context, plan *AccountB
 	}
 }
 
-func (s *AccountBatchTestService) runQuestion(ctx context.Context, accountID int64, question *model.AccountTestQuestion, item *AccountBatchTestItemResult) bool {
+func (s *AccountBatchTestService) runQuestion(ctx context.Context, accountID int64, question *model.AccountTestQuestion, item *AccountBatchTestItemResult, captureStatus bool) bool {
+	if captureStatus {
+		ctx = context.WithValue(ctx, accountTestStatusContextKey{}, &item.StatusCode)
+	}
 	startedAt := time.Now()
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)

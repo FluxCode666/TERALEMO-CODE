@@ -379,21 +379,23 @@ func TestScheduledQuestionReportContentsAndOrdering(t *testing.T) {
 	require.Contains(t, body, "Duration: 2m0s")
 	require.Contains(t, body, "Status: failed")
 	require.Contains(t, body, "Threshold: 80%")
-	require.Contains(t, body, "Passed: 2 · 告警 / Alerting: 2 · 需人工 / Manual: 1 · 总账号 / Total: 5")
+	require.Contains(t, body, "Passed: 2 · 未通过 / Failed: 1 · 需人工 / Manual: 1 · 出错 / Errors: 1 · 跳过 / Skipped: 0 · 未完成 / Incomplete: 0 · 总账号 / Total: 5")
 	require.Contains(t, body, "Paused: 1 · 自动恢复 / Resumed: 1 · 暂停/恢复失败 / Action failures: 1")
 	require.Contains(t, body, "Auto-pause skipped")
 	require.Contains(t, body, "Round error: "+truncateScheduledQuestionText(run.ErrorMessage, 300))
 	require.NotContains(t, body, strings.Repeat("轮次失败", 76))
 	require.NotContains(t, body, "unsafe account upstream response")
-	rows := notification.Lines[notification.DetailStart:]
+	rows := notification.Rows
 	require.Len(t, rows, 5)
-	require.Contains(t, rows[0], "paused (3)")
-	require.Contains(t, rows[0], "出错 · 已暂停")
-	require.Contains(t, rows[1], "resume failed (5)")
-	require.Contains(t, rows[1], "恢复失败")
-	require.Contains(t, rows[2], "alerting (2)")
-	require.Contains(t, rows[3], "passing (1)")
-	require.Contains(t, rows[4], "manual (4)")
+	require.Equal(t, "paused (3)", rows[0].Account)
+	require.Equal(t, "出错", rows[0].Result)
+	require.Equal(t, "已暂停", rows[0].Action)
+	require.Equal(t, "出错", rows[0].Note)
+	require.Equal(t, "resume failed (5)", rows[1].Account)
+	require.Equal(t, "恢复失败", rows[1].Action)
+	require.Equal(t, "alerting (2)", rows[2].Account)
+	require.Equal(t, "passing (1)", rows[3].Account)
+	require.Equal(t, "manual (4)", rows[4].Account)
 	require.Equal(t, int64(1), run.Summary[0].AccountID, "sorting must preserve persisted account order")
 }
 
@@ -438,7 +440,10 @@ func TestScheduledQuestionReportEmailListsAllWhileFeishuCapsDetails(t *testing.T
 	require.NoError(t, err)
 	var message scheduledQuestionFeishuMessage
 	require.NoError(t, json.Unmarshal(data, &message))
-	require.Len(t, message.Card.Elements, notification.DetailStart+51)
+	require.Len(t, message.Card.Elements, notification.DetailStart+2)
+	table := message.Card.Elements[notification.DetailStart]
+	require.Equal(t, "table", table.Tag)
+	require.Len(t, table.Rows, 50)
 	require.Equal(t, "另有 15 个账号未列出", message.Card.Elements[len(message.Card.Elements)-1].Text.Content)
 	require.NotContains(t, string(data), "account-65")
 }
@@ -455,4 +460,50 @@ func TestScheduledQuestionNotificationSiteNameFallback(t *testing.T) {
 	}
 	svc := &ScheduledQuestionTestService{settings: &scheduledQuestionSettingsStub{values: map[string]string{SettingKeySiteName: " Example "}}}
 	require.Equal(t, "Example", svc.notificationSiteName(context.Background()))
+}
+
+func TestScheduledQuestionAllSkippedReportNoticeAppearsInEmailAndFeishu(t *testing.T) {
+	const notice = "本轮所有账号额度已用尽，未执行测试"
+	svc, _, _, _ := newScheduledQuestionFixture()
+	defer svc.Stop()
+	svc.settings = &scheduledQuestionSettingsStub{values: map[string]string{
+		SettingKeyAccountQuotaNotifyEmails: `[{"email":"admin@example.com","verified":true}]`,
+	}}
+	mail := &scheduledQuestionEmailStub{}
+	feishu := &scheduledQuestionFeishuNotificationStub{success: true, detail: "sent"}
+	svc.email, svc.feishu = mail, feishu
+	plan := scheduledQuestionValidPlan(1)
+	plan.EmailEnabled, plan.FeishuEnabled, plan.FeishuWebhookURL = true, true, scheduledQuestionTestWebhook
+	run := &ScheduledQuestionTestRun{
+		StartedAt: svc.now(), TotalAccounts: 2, SkippedAccounts: 2,
+		Summary: []ScheduledQuestionTestAccountSummary{
+			{AccountID: 1, Result: "skipped", SkipReason: "quota_exceeded"},
+			{AccountID: 2, Result: "skipped", SkipReason: "rate_limited"},
+		},
+	}
+	require.True(t, svc.sendScheduledQuestionNotification(context.Background(), plan, run, "report", nil))
+	require.Len(t, mail.mails, 1)
+	require.Contains(t, mail.mails[0].body, notice)
+	require.Less(t, strings.Index(mail.mails[0].body, notice), strings.Index(mail.mails[0].body, "通过 / Passed:"))
+	require.Contains(t, mail.mails[0].body, "<table")
+	require.Len(t, feishu.calls, 1)
+	data, err := scheduledQuestionFeishuPayload(feishu.calls[0].notification, "", svc.now())
+	require.NoError(t, err)
+	var message scheduledQuestionFeishuMessage
+	require.NoError(t, json.Unmarshal(data, &message))
+	noticeIndex, statsIndex := -1, -1
+	for i, element := range message.Card.Elements {
+		if element.Tag != "div" {
+			continue
+		}
+		if element.Text.Content == notice {
+			noticeIndex = i
+		}
+		if strings.HasPrefix(element.Text.Content, "通过 / Passed:") {
+			statsIndex = i
+		}
+	}
+	require.GreaterOrEqual(t, noticeIndex, 0)
+	require.Greater(t, statsIndex, noticeIndex)
+	require.Len(t, message.Card.Elements[len(message.Card.Elements)-1].Rows, 2)
 }

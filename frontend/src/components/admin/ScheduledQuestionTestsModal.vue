@@ -17,7 +17,7 @@
               <td class="px-3 py-2 text-sm font-medium"><div>{{ plan.name }}</div><div v-if="planBadges(plan).length" class="mt-1 flex flex-wrap gap-1" data-test="plan-badges"><span v-for="badge in planBadges(plan)" :key="badge" class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-normal text-gray-600 dark:bg-dark-600 dark:text-gray-300">{{ t(`admin.scheduledQuestionTests.${badge}`) }}</span></div></td><td class="px-3 py-2 text-sm">{{ plan.account_ids.length }}</td><td class="px-3 py-2 text-sm">{{ plan.question_ids.length }}</td>
               <td class="px-3 py-2 font-mono text-xs">{{ plan.cron_expression }}</td><td class="px-3 py-2 text-sm">{{ plan.min_pass_ratio }}%</td>
               <td class="px-3 py-2 text-sm"><span :class="plan.enabled ? 'text-green-600' : 'text-gray-400'">{{ plan.enabled ? t('admin.scheduledQuestionTests.yes') : t('admin.scheduledQuestionTests.no') }}</span></td>
-              <td class="px-3 py-2 text-xs">{{ plan.last_status ? t('admin.scheduledQuestionTests.recentRun', { passed: plan.passed_accounts ?? 0, total: plan.total_accounts ?? 0, alerted: plan.alerted_accounts ?? 0 }) : '—' }}</td>
+              <td class="px-3 py-2 text-xs"><template v-if="plan.last_status"><template v-if="(plan.skipped_accounts ?? 0) > 0">{{ t('admin.scheduledQuestionTests.recentRunSkipped', { passed: plan.passed_accounts ?? 0, total: plan.total_accounts ?? 0, alerted: plan.alerted_accounts ?? 0, skipped: plan.skipped_accounts }) }}</template><template v-else>{{ t('admin.scheduledQuestionTests.recentRun', { passed: plan.passed_accounts ?? 0, total: plan.total_accounts ?? 0, alerted: plan.alerted_accounts ?? 0 }) }}</template></template><template v-else>—</template></td>
               <td class="px-3 py-2 text-xs">{{ plan.next_run_at || '—' }}</td>
               <td class="px-3 py-2"><div class="flex gap-1"><button type="button" data-test="edit-plan" class="btn btn-secondary btn-sm" @click="openEdit(plan)">{{ t('common.edit') }}</button><button type="button" data-test="run-plan" class="btn btn-secondary btn-sm" :disabled="plan.running || runningPlanId !== null" @click="runPlan(plan)">{{ plan.running || runningPlanId === plan.id ? t('admin.scheduledQuestionTests.running') : t('admin.scheduledQuestionTests.runNow') }}</button><button type="button" data-test="history-plan" class="btn btn-secondary btn-sm" @click="openHistory(plan)">{{ t('admin.scheduledQuestionTests.history') }}</button><button type="button" data-test="delete-plan" class="btn btn-danger btn-sm" @click="deletePlan(plan)">{{ t('common.delete') }}</button></div></td>
             </tr>
@@ -40,6 +40,7 @@
             <div class="mt-1 space-y-1"><label class="block"><input v-model="form.auto_pause_enabled" type="checkbox" data-test="auto-pause" /> {{ t('admin.scheduledQuestionTests.form.autoPause') }}</label><span class="block pl-5 text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.autoPauseHint') }}</span></div>
             <div class="mt-2 space-y-1"><label class="block"><input v-model="form.auto_resume_enabled" type="checkbox" data-test="auto-resume" /> {{ t('admin.scheduledQuestionTests.form.autoResume') }}</label><span class="block pl-5 text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.autoResumeHint') }}</span></div>
             <span class="mt-2 block text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.allFailedHint') }}</span>
+            <span class="mt-1 block text-xs text-gray-500" data-test="quota-skip-hint">{{ t('admin.scheduledQuestionTests.form.quotaSkipHint') }}</span>
           </fieldset>
           <fieldset class="text-sm md:col-span-2" data-test="notification-section"><legend>{{ t('admin.scheduledQuestionTests.form.channels') }}</legend>
             <div class="mt-1 flex flex-wrap items-center gap-4"><label><input v-model="form.notify_enabled" type="checkbox" data-test="notify" /> {{ t('admin.scheduledQuestionTests.form.notify') }}</label><label><input v-model="form.report_enabled" type="checkbox" data-test="report" /> {{ t('admin.scheduledQuestionTests.form.report') }}</label><label><input v-model="form.email_enabled" type="checkbox" data-test="channel-email" /> {{ t('admin.scheduledQuestionTests.form.channelEmail') }}</label><span class="text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.channelEmailHint') }}</span><label><input v-model="form.feishu_enabled" type="checkbox" data-test="channel-feishu" /> {{ t('admin.scheduledQuestionTests.form.channelFeishu') }}</label></div>
@@ -72,23 +73,53 @@
               <span v-if="run.auto_pause_skipped" class="ml-2 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300" data-test="run-auto-pause-skipped">{{ t('admin.scheduledQuestionTests.autoPauseSkipped') }}</span>
               <span v-if="run.notifications_suppressed" class="ml-2 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.scheduledQuestionTests.notificationsSuppressed') }}</span>
             </span>
-            <span>{{ t('admin.scheduledQuestionTests.recentRun', { passed: run.passed_accounts, total: run.total_accounts, alerted: run.alerted_accounts }) }}</span>
+            <span>{{ t('admin.scheduledQuestionTests.runSummary', { passed: run.passed_accounts, alerted: run.alerted_accounts, skipped: run.skipped_accounts ?? 0, total: run.total_accounts }) }}</span>
           </button>
-          <div v-if="expandedRuns.has(run.id)" class="mt-2 space-y-1 pl-3 text-xs">
+          <div v-if="expandedRuns.has(run.id)" class="mt-2 space-y-2 pl-3 text-xs">
             <div v-if="!run.summary?.length" class="text-gray-500">{{ t('admin.scheduledQuestionTests.noDetails') }}</div>
-            <div v-for="item in run.summary ?? []" :key="item.account_id" :data-test="`run-account-${item.account_id}`">
-              {{ item.account_name }}: {{ item.passed }}/{{ item.total }} ({{ item.ratio ?? '—' }}%) · {{ item.alerting ? t('admin.scheduledQuestionTests.alerting') : t('admin.scheduledQuestionTests.ok') }}
-              · {{ t('admin.scheduledQuestionTests.stateAfter', { state: item.state_after === 'alert' ? t('admin.scheduledQuestionTests.stateAlert') : t('admin.scheduledQuestionTests.stateOk') }) }}
-              <span v-if="item.incomplete" class="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.scheduledQuestionTests.incompleteMarker') }}</span>
-              <span v-if="item.schedule_action" :data-test="`run-account-action-${item.account_id}`" class="ml-1 rounded px-1.5 py-0.5" :class="scheduleActionClass(item.schedule_action)">{{ scheduleActionLabel(item.schedule_action) }}</span>
-              <span v-if="item.auto_paused" :data-test="`run-account-auto-paused-${item.account_id}`" class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-dark-600 dark:text-gray-300">{{ t('admin.scheduledQuestionTests.autoPausedMarker') }}</span>
-              <span v-if="item.error"> · {{ item.error }}</span>
+            <div v-else class="overflow-auto">
+              <table :data-test="`run-table-${run.id}`" class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+                <thead class="bg-gray-50 dark:bg-dark-700"><tr>
+                  <th v-for="column in runTableColumns" :key="column" class="px-2 py-1 text-left font-medium text-gray-500">{{ t(`admin.scheduledQuestionTests.runTable.${column}`) }}</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+                  <tr v-for="item in sortedRunRows(run)" :key="item.account_id" :data-test="`run-account-${item.account_id}`">
+                    <td class="px-2 py-1 whitespace-nowrap">{{ item.account_name }} ({{ item.account_id }})</td>
+                    <td class="px-2 py-1"><span :data-test="`run-account-result-${item.account_id}`" class="whitespace-nowrap rounded px-1.5 py-0.5" :class="resultBadgeClass(runResultOf(item))">{{ t(`admin.scheduledQuestionTests.results.${runResultOf(item)}`) }}</span></td>
+                    <td class="px-2 py-1 whitespace-nowrap">{{ passedJudgedLabel(item) }}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">{{ schedulableLabel(item.schedulable_before) }}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">{{ schedulableLabel(item.schedulable_after) }}</td>
+                    <td class="px-2 py-1">
+                      <span v-if="item.schedule_action" :data-test="`run-account-action-${item.account_id}`" class="whitespace-nowrap rounded px-1.5 py-0.5" :class="scheduleActionClass(item.schedule_action)">{{ scheduleActionLabel(item.schedule_action) }}</span>
+                      <span v-else>{{ t('admin.scheduledQuestionTests.none') }}</span>
+                    </td>
+                    <td class="px-2 py-1">
+                      <div class="space-y-0.5">
+                        <span v-if="item.incomplete" class="mr-1 rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.scheduledQuestionTests.incompleteMarker') }}</span>
+                        <span v-if="item.auto_paused" :data-test="`run-account-auto-paused-${item.account_id}`" class="mr-1 rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-dark-600 dark:text-gray-300">{{ t('admin.scheduledQuestionTests.autoPausedMarker') }}</span>
+                        <span v-if="runResultOf(item) === 'skipped'" :data-test="`run-account-skip-${item.account_id}`" class="block">{{ skipDetailLabel(item) }}</span>
+                        <span v-if="item.error" :data-test="`run-account-error-${item.account_id}`" class="block break-words text-red-600 dark:text-red-400" :title="item.error">{{ truncateText(item.error) }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <div v-if="run.notification_results?.length" class="mt-2 space-y-0.5" data-test="run-notifications">
-              <div class="text-gray-500">{{ t('admin.scheduledQuestionTests.notifications') }}</div>
-              <div v-for="(result, index) in run.notification_results" :key="`${result.kind}-${result.channel}-${index}`" data-test="run-notification">
-                {{ notifyKindLabel(result.kind) }} · {{ notifyChannelLabel(result.channel) }} · {{ result.success ? t('admin.scheduledQuestionTests.notificationSuccess') : t('admin.scheduledQuestionTests.notificationFailed') }}<span v-if="result.detail"> · {{ result.detail }}</span>
-              </div>
+            <div v-if="run.notification_results?.length" data-test="run-notifications">
+              <div class="mb-1 text-gray-500">{{ t('admin.scheduledQuestionTests.notifications') }}</div>
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+                <thead class="bg-gray-50 dark:bg-dark-700"><tr>
+                  <th v-for="column in notifyTableColumns" :key="column" class="px-2 py-1 text-left font-medium text-gray-500">{{ t(`admin.scheduledQuestionTests.notifyTable.${column}`) }}</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
+                  <tr v-for="(result, index) in run.notification_results" :key="`${result.kind}-${result.channel}-${index}`" data-test="run-notification">
+                    <td class="px-2 py-1 whitespace-nowrap">{{ notifyKindLabel(result.kind) }}</td>
+                    <td class="px-2 py-1 whitespace-nowrap">{{ notifyChannelLabel(result.channel) }}</td>
+                    <td class="px-2 py-1"><span class="whitespace-nowrap rounded px-1.5 py-0.5" :class="result.success ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'">{{ result.success ? t('admin.scheduledQuestionTests.notificationSuccess') : t('admin.scheduledQuestionTests.notificationFailed') }}</span></td>
+                    <td class="px-2 py-1 break-words">{{ result.detail }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -103,7 +134,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import { adminAPI } from '@/api/admin'
-import type { ScheduledQuestionTestFeishuTestRequest, ScheduledQuestionTestNotificationResult, ScheduledQuestionTestPlan, ScheduledQuestionTestRequest, ScheduledQuestionTestRun, ScheduledQuestionTestScheduleAction } from '@/api/admin/scheduledQuestionTests'
+import type { ScheduledQuestionTestFeishuTestRequest, ScheduledQuestionTestNotificationResult, ScheduledQuestionTestPlan, ScheduledQuestionTestRequest, ScheduledQuestionTestResult, ScheduledQuestionTestRun, ScheduledQuestionTestScheduleAction, ScheduledQuestionTestSummary } from '@/api/admin/scheduledQuestionTests'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { isSamePlatformModelIntersectionError } from '@/utils/modelIntersectionError'
@@ -272,7 +303,61 @@ const testFeishu = async () => {
     if (version === feishuTestVersion) feishuTesting.value = false
   }
 }
-const SCHEDULE_ACTION_KEYS: Record<string, string> = { paused: 'paused', resumed: 'resumed', pause_failed: 'pauseFailed', resume_failed: 'resumeFailed' }
+const SCHEDULE_ACTION_KEYS: Record<string, string> = { paused: 'paused', resumed: 'resumed', pause_failed: 'pauseFailed', resume_failed: 'resumeFailed', resume_blocked: 'resumeBlocked' }
+const runTableColumns = ['account', 'result', 'passedJudged', 'schedulableBefore', 'schedulableAfter', 'action', 'detail']
+const notifyTableColumns = ['kind', 'channel', 'result', 'detail']
+const BADGE_GREEN = 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+const BADGE_RED = 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+const BADGE_AMBER = 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+const BADGE_GRAY = 'bg-gray-100 text-gray-600 dark:bg-dark-600 dark:text-gray-300'
+const RESULT_BADGE_CLASSES: Record<ScheduledQuestionTestResult, string> = {
+  passed: BADGE_GREEN, failed: BADGE_RED, error: BADGE_RED, unjudged: BADGE_AMBER, incomplete: BADGE_AMBER, skipped: BADGE_GRAY
+}
+const SCHEDULE_ACTION_BADGE_CLASSES: Record<string, string> = {
+  paused: BADGE_RED, resumed: BADGE_GREEN, pause_failed: BADGE_AMBER, resume_failed: BADGE_AMBER, resume_blocked: BADGE_GRAY
+}
+// Runs recorded before v0.3.8 have no `result`; derive it from the legacy fields (contract §4.2 order).
+const runResultOf = (item: ScheduledQuestionTestSummary): ScheduledQuestionTestResult => {
+  if (item.result) return item.result
+  if (item.incomplete) return 'incomplete'
+  if (item.judged === 0 && item.error) return 'error'
+  if (item.ratio === null || item.ratio === undefined) return 'unjudged'
+  return item.alerting ? 'failed' : 'passed'
+}
+const resultBadgeClass = (result: ScheduledQuestionTestResult) => RESULT_BADGE_CLASSES[result] ?? BADGE_GRAY
+const RUN_ROW_GROUPS: Record<ScheduledQuestionTestResult, number> = { passed: 3, failed: 1, error: 1, skipped: 2, unjudged: 3, incomplete: 3 }
+const runRowGroup = (item: ScheduledQuestionTestSummary) => (item.schedule_action ? 0 : RUN_ROW_GROUPS[runResultOf(item)])
+// Order: accounts with a scheduling action → failed/error → skipped → the rest; ties by account ID (contract §5.1).
+const sortedRunRows = (run: ScheduledQuestionTestRun) => [...(run.summary ?? [])].sort((left, right) => runRowGroup(left) - runRowGroup(right) || left.account_id - right.account_id)
+const passedJudgedLabel = (item: ScheduledQuestionTestSummary) => {
+  if (runResultOf(item) === 'skipped' || !item.judged) return t('admin.scheduledQuestionTests.none')
+  return item.ratio === null || item.ratio === undefined
+    ? `${item.passed}/${item.judged}`
+    : `${item.passed}/${item.judged} (${item.ratio}%)`
+}
+const schedulableLabel = (value?: boolean | null) => value === true
+  ? t('admin.scheduledQuestionTests.schedulableOn')
+  : value === false ? t('admin.scheduledQuestionTests.schedulableOff') : t('admin.scheduledQuestionTests.none')
+const formatSkipResetAt = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+const skipDetailLabel = (item: ScheduledQuestionTestSummary) => {
+  const reason = item.skip_reason ? t(`admin.scheduledQuestionTests.skipReasons.${item.skip_reason}`) : ''
+  const resetAt = formatSkipResetAt(item.skip_reset_at)
+  // Only an exhausted quota needs an admin to act. An unknown rate-limit / window-cost recovery time just
+  // means the next round retries, so we must not tell the admin to change the quota there (contract v1.1 U3).
+  const recovery = resetAt
+    ? t('admin.scheduledQuestionTests.skipResetAt', { time: resetAt })
+    : item.skip_reason === 'quota_exceeded'
+      ? t('admin.scheduledQuestionTests.skipNeedsAdmin')
+      : t('admin.scheduledQuestionTests.skipResetUnknown')
+  return reason ? `${reason} · ${recovery}` : recovery
+}
+const truncateText = (value: string, limit = 120) => value.length > limit ? `${value.slice(0, limit)}…` : value
 const planBadges = (plan: ScheduledQuestionTestPlan) => [
   plan.auto_pause_enabled ? 'autoPauseBadge' : '',
   plan.auto_resume_enabled ? 'autoResumeBadge' : '',
@@ -280,9 +365,7 @@ const planBadges = (plan: ScheduledQuestionTestPlan) => [
   plan.report_enabled ? 'reportBadge' : ''
 ].filter(Boolean)
 const scheduleActionLabel = (action: ScheduledQuestionTestScheduleAction) => action ? t(`admin.scheduledQuestionTests.scheduleActions.${SCHEDULE_ACTION_KEYS[action] ?? action}`) : ''
-const scheduleActionClass = (action: ScheduledQuestionTestScheduleAction) => action === 'paused' || action === 'pause_failed'
-  ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
-  : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+const scheduleActionClass = (action: ScheduledQuestionTestScheduleAction) => SCHEDULE_ACTION_BADGE_CLASSES[action] ?? BADGE_GRAY
 const notifyKindLabel = (kind: ScheduledQuestionTestNotificationResult['kind']) => t(`admin.scheduledQuestionTests.notifyKinds.${kind}`)
 const notifyChannelLabel = (channel: ScheduledQuestionTestNotificationResult['channel']) => t(`admin.scheduledQuestionTests.notifyChannels.${channel}`)
 const savePlan = async () => {

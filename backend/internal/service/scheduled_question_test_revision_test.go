@@ -12,16 +12,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScheduledQuestionResumeRespectsOtherPlanOwnership(t *testing.T) {
+func TestScheduledQuestionResumeRespectsOtherEnabledAutoPauseAlerts(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		other    bool
-		queryErr error
-		action   string
-		owned    bool
+		name                      string
+		enabled, autoPause, alert bool
+		queryErr                  error
+		action                    string
+		owned                     bool
 	}{
-		{"other owner only releases this plan", true, nil, "", false},
-		{"query failure preserves ownership", false, errors.New("database unavailable"), "resume_failed", true},
+		{name: "enabled auto-pause alert blocks", enabled: true, autoPause: true, alert: true, action: "resume_blocked", owned: true},
+		{name: "disabled alert does not block", autoPause: true, alert: true, action: "resumed"},
+		{name: "auto-pause disabled does not block", enabled: true, alert: true, action: "resumed"},
+		{name: "passing other plan does not block", enabled: true, autoPause: true, action: "resumed"},
+		{name: "query failure preserves ownership", queryErr: errors.New("database unavailable"), action: "resume_failed", owned: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc, repo, accounts, _ := newScheduledQuestionFixture()
@@ -29,55 +32,57 @@ func TestScheduledQuestionResumeRespectsOtherPlanOwnership(t *testing.T) {
 			plan := scheduledQuestionValidPlan(1)
 			plan.AutoResumeEnabled = true
 			repo.plans[1] = plan
-			repo.states = []*ScheduledQuestionTestAccountState{{PlanID: 1, AccountID: 2, AutoPaused: true, State: "alert", AutoPausedAt: scheduledQuestionPtr(svc.now())}}
-			repo.otherOwner, repo.ownerErr = tc.other, tc.queryErr
+			other := scheduledQuestionValidPlan(2)
+			other.Enabled, other.AutoPauseEnabled = tc.enabled, tc.autoPause
+			repo.plans[2] = other
+			otherState := "ok"
+			if tc.alert {
+				otherState = "alert"
+			}
+			repo.states = []*ScheduledQuestionTestAccountState{
+				{PlanID: 1, AccountID: 2, AutoPaused: true, State: "alert", AutoPausedAt: scheduledQuestionPtr(svc.now())},
+				{PlanID: 2, AccountID: 2, AutoPaused: true, State: otherState, AutoPausedAt: scheduledQuestionPtr(svc.now())},
+			}
+			repo.ownerErr = tc.queryErr
 			scheduling := &scheduledQuestionSchedulingRepo{scheduledQuestionAccountRepoStub: accounts}
 			svc.accounts = scheduling
 			run := &ScheduledQuestionTestRun{Summary: []ScheduledQuestionTestAccountSummary{{AccountID: 2, Ratio: scheduledQuestionPtr(100), Judged: 2, Total: 2}}}
 			states, err := svc.updateAlertStates(context.Background(), plan, run)
-			require.NoError(t, err)
-			require.Empty(t, scheduling.actions)
-			require.False(t, accounts.accounts[2].Schedulable)
+			if tc.queryErr != nil {
+				require.ErrorIs(t, err, tc.queryErr)
+				require.Nil(t, states)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.owned, states[0].AutoPaused)
+			}
+			resumed := tc.action == "resumed"
+			if resumed {
+				require.Equal(t, []bool{true}, scheduling.actions)
+				require.Equal(t, 1, run.ResumedAccounts)
+			} else {
+				require.Empty(t, scheduling.actions)
+				require.Zero(t, run.ResumedAccounts)
+			}
+			require.Equal(t, resumed, accounts.accounts[2].Schedulable)
 			require.Equal(t, tc.action, run.Summary[0].ScheduleAction)
-			require.Equal(t, tc.owned, states[0].AutoPaused)
 			require.Equal(t, tc.owned, run.Summary[0].AutoPaused)
-			require.Zero(t, run.ResumedAccounts)
+			for _, state := range repo.states {
+				require.Equal(t, tc.owned, state.AutoPaused, "successful resume clears flags across all plans")
+			}
 		})
 	}
 }
 
-type scheduledQuestionPersistBeforeActionRepo struct {
-	*scheduledQuestionSchedulingRepo
-	states *scheduledQuestionRepoStub
-	t      *testing.T
-}
-
-func (r *scheduledQuestionPersistBeforeActionRepo) SetSchedulable(ctx context.Context, id int64, enabled bool) error {
-	if !enabled {
-		r.states.mu.Lock()
-		owned := false
-		for _, state := range r.states.states {
-			if state.AccountID == id && state.AutoPaused {
-				owned = true
-			}
-		}
-		r.states.mu.Unlock()
-		require.True(r.t, owned, "pause ownership must already be durable when SetSchedulable is invoked")
-	}
-	return r.scheduledQuestionSchedulingRepo.SetSchedulable(ctx, id, enabled)
-}
-
-func TestScheduledQuestionPauseOwnershipPersistenceAndRollback(t *testing.T) {
+func TestScheduledQuestionPauseLockPersistenceAndRollback(t *testing.T) {
 	for _, tc := range []struct {
-		name                            string
-		persistErr, setErr, rollbackErr error
-		calls                           int
-		changes                         []bool
+		name               string
+		persistErr, setErr error
+		calls              int
+		changes            []bool
 	}{
-		{"persist before pause", nil, nil, nil, 1, []bool{true}},
-		{"persistence failure skips pause", errors.New("database unavailable"), nil, nil, 0, []bool{true}},
-		{"pause failure rolls ownership back", nil, errors.New("scheduler unavailable"), nil, 1, []bool{true, false}},
-		{"rollback failure is recorded", nil, errors.New("scheduler unavailable"), errors.New("rollback unavailable"), 1, []bool{true, false}},
+		{"successful locked pause persists marker", nil, nil, 1, []bool{true}},
+		{"lock failure skips pause", errors.New("database unavailable"), nil, 0, nil},
+		{"pause failure rolls transaction back", nil, errors.New("scheduler unavailable"), 1, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc, repo, accounts, _ := newScheduledQuestionFixture()
@@ -85,19 +90,22 @@ func TestScheduledQuestionPauseOwnershipPersistenceAndRollback(t *testing.T) {
 			plan := scheduledQuestionValidPlan(1)
 			plan.AutoPauseEnabled = true
 			repo.plans[1] = plan
-			repo.setOwnerErr, repo.rollbackOwnerErr = tc.persistErr, tc.rollbackErr
+			repo.setOwnerErr = tc.persistErr
 			accounts.accounts[2].Schedulable = true
 			scheduling := &scheduledQuestionSchedulingRepo{scheduledQuestionAccountRepoStub: accounts, setErr: tc.setErr}
-			svc.accounts = &scheduledQuestionPersistBeforeActionRepo{scheduledQuestionSchedulingRepo: scheduling, states: repo, t: t}
+			svc.accounts = scheduling
 			run := &ScheduledQuestionTestRun{Summary: []ScheduledQuestionTestAccountSummary{{AccountID: 2, Alerting: true, Ratio: scheduledQuestionPtr(0), Total: 2, Judged: 2}}}
 			states, err := svc.updateAlertStates(context.Background(), plan, run)
-			require.NoError(t, err)
 			require.Len(t, scheduling.actions, tc.calls)
 			require.Equal(t, tc.changes, repo.ownerChanges)
 			if tc.persistErr != nil || tc.setErr != nil {
+				require.Error(t, err)
+				require.Nil(t, states)
 				require.Equal(t, "pause_failed", run.Summary[0].ScheduleAction)
-				require.False(t, states[0].AutoPaused)
+				require.False(t, run.Summary[0].AutoPaused)
+				require.True(t, accounts.accounts[2].Schedulable)
 			} else {
+				require.NoError(t, err)
 				require.Equal(t, "paused", run.Summary[0].ScheduleAction)
 				require.True(t, states[0].AutoPaused)
 			}
@@ -114,7 +122,7 @@ func TestScheduledQuestionPauseSurvivesFinishRunFailureAndRecovers(t *testing.T)
 	repo.plans[1] = plan
 	accounts.accounts[2].Schedulable = true
 	scheduling := &scheduledQuestionSchedulingRepo{scheduledQuestionAccountRepoStub: accounts}
-	svc.accounts = &scheduledQuestionPersistBeforeActionRepo{scheduledQuestionSchedulingRepo: scheduling, states: repo, t: t}
+	svc.accounts = scheduling
 	status := "failed"
 	svc.batch = &scheduledQuestionBatchStub{run: func(_ context.Context, _ *AccountBatchTestPlan, emit func(AccountBatchTestEvent) error) error {
 		return emit(AccountBatchTestEvent{Type: "item_result", Data: AccountBatchTestItemResult{AccountID: 2, QuestionID: 1, Status: status, Judged: true}})
@@ -134,7 +142,7 @@ func TestScheduledQuestionPauseSurvivesFinishRunFailureAndRecovers(t *testing.T)
 	require.False(t, repo.finishState[0].AutoPaused)
 }
 
-func TestScheduledQuestionManualReleaseDuringRoundCannotBeRestored(t *testing.T) {
+func TestScheduledQuestionManualReleaseDuringRoundStillResumesPassingAccount(t *testing.T) {
 	svc, repo, accounts, _ := newScheduledQuestionFixture()
 	defer svc.Stop()
 	plan := scheduledQuestionValidPlan(1)
@@ -146,35 +154,15 @@ func TestScheduledQuestionManualReleaseDuringRoundCannotBeRestored(t *testing.T)
 	svc.accounts = scheduling
 	// The round already captured the old state before an administrator clears ownership.
 	states := []*ScheduledQuestionTestAccountState{scheduledQuestionPtr(*old)}
+	states[0].State = "ok"
 	require.NoError(t, repo.SetAutoPaused(context.Background(), 1, 2, false, nil))
-	run := &ScheduledQuestionTestRun{Summary: []ScheduledQuestionTestAccountSummary{{AccountID: 2, Ratio: scheduledQuestionPtr(100), AutoPaused: true}}}
-	svc.applyScheduledQuestionScheduling(context.Background(), context.Background(), plan, run, states, svc.now())
-	require.Empty(t, scheduling.actions)
+	run := &ScheduledQuestionTestRun{Summary: []ScheduledQuestionTestAccountSummary{{AccountID: 2, Ratio: scheduledQuestionPtr(100), Judged: 1, Total: 1, AutoPaused: true}}}
+	require.NoError(t, svc.applyScheduledQuestionScheduling(context.Background(), context.Background(), plan, run, states, svc.now()))
+	require.Equal(t, []bool{true}, scheduling.actions)
 	require.False(t, states[0].AutoPaused)
 	require.False(t, run.Summary[0].AutoPaused)
-	require.False(t, accounts.accounts[2].Schedulable)
-	require.Zero(t, run.ResumedAccounts)
-}
-
-func TestScheduledQuestionConcurrentPlanReleaseResumesExactlyOnce(t *testing.T) {
-	repo := &scheduledQuestionRepoStub{states: []*ScheduledQuestionTestAccountState{
-		{PlanID: 1, AccountID: 2, State: "alert", AutoPaused: true},
-		{PlanID: 2, AccountID: 2, State: "alert", AutoPaused: true},
-	}}
-	results := make(chan bool, 2)
-	for _, id := range []int64{1, 2} {
-		go func() {
-			resume, err := repo.ReleaseAutoPause(context.Background(), id, 2)
-			results <- err == nil && resume
-		}()
-	}
-	count := 0
-	for range 2 {
-		if <-results {
-			count++
-		}
-	}
-	require.Equal(t, 1, count)
+	require.True(t, accounts.accounts[2].Schedulable)
+	require.Equal(t, 1, run.ResumedAccounts)
 }
 
 func TestScheduledQuestionSummaryErrorSanitizesBeforeTruncation(t *testing.T) {

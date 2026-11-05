@@ -1,6 +1,7 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScheduledQuestionTestsModal from '../ScheduledQuestionTestsModal.vue'
+import type { ScheduledQuestionTestRun } from '@/api/admin/scheduledQuestionTests'
 
 const mocks = vi.hoisted(() => ({
   listPlans: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), listRuns: vi.fn(), runNow: vi.fn(), testFeishu: vi.fn(),
@@ -83,7 +84,10 @@ describe('ScheduledQuestionTestsModal', () => {
     expect(mocks.listRuns).toHaveBeenCalledWith(1, 50)
     expect(wrapper.text()).toContain('2026-10-31T00:00:00Z')
     await wrapper.findAll('button').find(button => button.text().includes('2026-10-31'))?.trigger('click')
-    expect(wrapper.text()).toContain('A: 1/1')
+    expect(wrapper.find('[data-test="run-table-20"]').exists()).toBe(true)
+    const row = wrapper.get('[data-test="run-account-1"]').text()
+    expect(row).toContain('A (1)')
+    expect(row).toContain('1/1 (100%)')
   })
 
   it('clears cross-platform errors after correcting the account IDs', async () => {
@@ -447,12 +451,220 @@ describe('ScheduledQuestionTestsModal', () => {
     await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="run-20"]').text()).toContain('admin.scheduledQuestionTests.notificationsSuppressed')
     await wrapper.get('[data-test="run-20"]').trigger('click')
+    expect(wrapper.get('[data-test="run-account-result-1"]').text()).toBe('admin.scheduledQuestionTests.results.passed')
+    expect(wrapper.get('[data-test="run-account-result-2"]').text()).toBe('admin.scheduledQuestionTests.results.failed')
+    expect(wrapper.get('[data-test="run-account-result-1"]').classes().join(' ')).toContain('text-green-700')
+    expect(wrapper.get('[data-test="run-account-result-2"]').classes().join(' ')).toContain('text-red-700')
+  })
+
+  it('renders the account detail table with scheduling columns and action badges', async () => {
+    mocks.listRuns.mockResolvedValue([{ ...run, skipped_accounts: 1, summary: [
+      { ...run.summary[0], result: 'passed', schedulable_before: true, schedulable_after: false, schedule_action: 'paused', auto_paused: true, skip_reason: '', skip_reset_at: null },
+      { ...run.summary[0], account_id: 2, account_name: 'B', result: 'failed', ratio: 40, passed: 2, judged: 5, alerting: true, schedulable_before: false, schedulable_after: false, schedule_action: 'resume_blocked', auto_paused: false, skip_reason: '', skip_reset_at: null }
+    ] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    const table = wrapper.get('[data-test="run-table-20"]')
+    expect(table.findAll('thead th').map(th => th.text())).toEqual([
+      'admin.scheduledQuestionTests.runTable.account', 'admin.scheduledQuestionTests.runTable.result', 'admin.scheduledQuestionTests.runTable.passedJudged',
+      'admin.scheduledQuestionTests.runTable.schedulableBefore', 'admin.scheduledQuestionTests.runTable.schedulableAfter', 'admin.scheduledQuestionTests.runTable.action', 'admin.scheduledQuestionTests.runTable.detail'
+    ])
     const first = wrapper.get('[data-test="run-account-1"]').text()
+    expect(first).toContain('A (1)')
+    expect(first).toContain('admin.scheduledQuestionTests.results.passed')
+    expect(first).toContain('1/1 (100%)')
+    expect(first).toContain('admin.scheduledQuestionTests.schedulableOn')
+    expect(first).toContain('admin.scheduledQuestionTests.schedulableOff')
+    expect(first).toContain('admin.scheduledQuestionTests.scheduleActions.paused')
+    expect(first).toContain('admin.scheduledQuestionTests.autoPausedMarker')
     const second = wrapper.get('[data-test="run-account-2"]').text()
-    expect(first).toContain('admin.scheduledQuestionTests.ok')
-    expect(first).toContain('admin.scheduledQuestionTests.stateAfter:{"state":"admin.scheduledQuestionTests.stateAlert"}')
-    expect(second).toContain('admin.scheduledQuestionTests.alerting')
-    expect(second).toContain('admin.scheduledQuestionTests.stateAfter:{"state":"admin.scheduledQuestionTests.stateOk"}')
+    expect(second).toContain('2/5 (40%)')
+    expect(second).toContain('admin.scheduledQuestionTests.scheduleActions.resumeBlocked')
+    expect(wrapper.get('[data-test="run-account-action-2"]').classes().join(' ')).toContain('text-gray-600')
+  })
+
+  it('derives results and hides scheduling flags for runs recorded before the new fields', async () => {
+    const legacyRow = (overrides: Record<string, unknown>) => ({ ...run.summary[0], ...overrides })
+    mocks.listRuns.mockResolvedValue([{ ...run, skipped_accounts: undefined, summary: [
+      legacyRow({ account_id: 1, account_name: 'Pass', alerting: false, ratio: 100, judged: 2, passed: 2, error: '', incomplete: false }),
+      legacyRow({ account_id: 2, account_name: 'Fail', alerting: true, ratio: 50, judged: 2, passed: 1, error: '', incomplete: false }),
+      legacyRow({ account_id: 3, account_name: 'Manual', alerting: false, ratio: null, judged: 0, passed: 0, error: '', incomplete: false }),
+      legacyRow({ account_id: 4, account_name: 'Broken', alerting: true, ratio: null, judged: 0, passed: 0, error: 'upstream failed', incomplete: false }),
+      legacyRow({ account_id: 5, account_name: 'Partial', alerting: false, ratio: 100, judged: 1, passed: 1, error: '', incomplete: true })
+    ] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    expect(wrapper.get('[data-test="run-account-result-1"]').text()).toBe('admin.scheduledQuestionTests.results.passed')
+    expect(wrapper.get('[data-test="run-account-result-2"]').text()).toBe('admin.scheduledQuestionTests.results.failed')
+    expect(wrapper.get('[data-test="run-account-result-3"]').text()).toBe('admin.scheduledQuestionTests.results.unjudged')
+    expect(wrapper.get('[data-test="run-account-result-4"]').text()).toBe('admin.scheduledQuestionTests.results.error')
+    expect(wrapper.get('[data-test="run-account-result-5"]').text()).toBe('admin.scheduledQuestionTests.results.incomplete')
+    const manual = wrapper.get('[data-test="run-account-3"]').text()
+    expect(manual).toContain('admin.scheduledQuestionTests.none')
+    expect(manual).not.toContain('upstream failed')
+    expect(wrapper.get('[data-test="run-account-4"]').text()).toContain('upstream failed')
+    expect(wrapper.find('[data-test="run-account-skip-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="run-account-action-1"]').exists()).toBe(false)
+  })
+
+  it.each([
+    { label: 'quota_exceeded with a reset time', reason: 'quota_exceeded', resetAt: '2026-11-05T09:30:00Z', hint: 'skipResetAt' },
+    { label: 'quota_exceeded without a reset time', reason: 'quota_exceeded', resetAt: null, hint: 'skipNeedsAdmin' },
+    { label: 'rate_limited without a reset time', reason: 'rate_limited', resetAt: null, hint: 'skipResetUnknown' },
+    { label: 'rate_limited with a reset time', reason: 'rate_limited', resetAt: '2026-11-05T06:30:00Z', hint: 'skipResetAt' },
+    { label: 'window_cost_exceeded without a reset time', reason: 'window_cost_exceeded', resetAt: null, hint: 'skipResetUnknown' }
+  ])('renders the skip recovery hint for $label', async ({ reason, resetAt, hint }) => {
+    const localStamp = (iso: string) => {
+      const date = new Date(iso)
+      const pad = (part: number) => String(part).padStart(2, '0')
+      return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    }
+    const skippedRow = (overrides: Record<string, unknown>) => ({ ...run.summary[0], result: 'skipped', alerting: false, ratio: null, judged: 0, passed: 0, error: '', auto_paused: false, ...overrides })
+    mocks.listRuns.mockResolvedValue([{ ...run, skipped_accounts: 1, summary: [
+      skippedRow({ account_id: 1, account_name: 'Skipped', skip_reason: reason, skip_reset_at: resetAt })
+    ] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    const detail = wrapper.get('[data-test="run-account-skip-1"]').text()
+    expect(detail).toContain(`admin.scheduledQuestionTests.skipReasons.${reason}`)
+    const expectedHint = hint === 'skipResetAt'
+      ? `admin.scheduledQuestionTests.skipResetAt:{"time":"${localStamp(resetAt as string)}"}`
+      : `admin.scheduledQuestionTests.${hint}`
+    expect(detail).toContain(expectedHint)
+    // An unknown rate-limit / window-cost recovery must never be reported as an admin quota problem.
+    if (hint !== 'skipNeedsAdmin') expect(detail).not.toContain('admin.scheduledQuestionTests.skipNeedsAdmin')
+    if (hint !== 'skipResetUnknown') expect(detail).not.toContain('admin.scheduledQuestionTests.skipResetUnknown')
+    expect(wrapper.get('[data-test="run-account-1"]').text()).toContain('admin.scheduledQuestionTests.results.skipped')
+  })
+
+  it('renders a real skipped run payload assembled exactly as the API returns it', async () => {
+    // Mirrors the wire shape of a round where 2 of 3 accounts were skipped: `state_after` is "" for
+    // skipped accounts (no alert transition) and `skip_reset_at` may be null (see v1.1 U3/U4).
+    const skippedPayload = {
+      id: 42, plan_id: 1, status: 'success', started_at: '2026-11-05T01:00:00Z', finished_at: '2026-11-05T01:00:20Z',
+      total_accounts: 4, passed_accounts: 1, alerted_accounts: 0, skipped_accounts: 3, error_message: '',
+      notifications_suppressed: false, paused_accounts: 0, resumed_accounts: 1, auto_pause_skipped: false,
+      notification_results: [{ kind: 'report', channel: 'feishu', success: true, detail: 'sent 1/1' }],
+      summary: [
+        {
+          account_id: 82, account_name: 'Claude OAuth', platform: 'anthropic', passed: 0, total: 5, judged: 0, ratio: null,
+          alerting: false, state_after: '', error: '', auto_paused: false, result: 'skipped', skip_reason: 'rate_limited',
+          skip_reset_at: null, schedulable_before: true, schedulable_after: true, schedule_action: ''
+        },
+        {
+          account_id: 111, account_name: 'Quota Key', platform: 'openai', passed: 0, total: 5, judged: 0, ratio: null,
+          alerting: false, state_after: '', error: '', auto_paused: false, result: 'skipped', skip_reason: 'quota_exceeded',
+          skip_reset_at: '2026-11-06T00:00:00Z', schedulable_before: false, schedulable_after: false, schedule_action: ''
+        },
+        {
+          account_id: 137, account_name: 'Expired Key', platform: 'openai', passed: 0, total: 5, judged: 0, ratio: null,
+          alerting: false, state_after: '', error: '', auto_paused: false, result: 'skipped', skip_reason: 'quota_exceeded',
+          skip_reset_at: null, schedulable_before: true, schedulable_after: true, schedule_action: ''
+        },
+        {
+          account_id: 115, account_name: 'Healthy', platform: 'anthropic', passed: 5, total: 5, judged: 5, ratio: 100,
+          alerting: false, state_after: 'ok', error: '', auto_paused: false, result: 'passed', skip_reason: '',
+          skip_reset_at: null, schedulable_before: false, schedulable_after: true, schedule_action: 'resumed'
+        }
+      ]
+    } satisfies ScheduledQuestionTestRun
+    // Round-trip through JSON so the component sees the same plain objects axios would hand it.
+    mocks.listRuns.mockResolvedValue([JSON.parse(JSON.stringify(skippedPayload)) as ScheduledQuestionTestRun])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="run-42"]').text()).toContain('admin.scheduledQuestionTests.runSummary:{"passed":1,"alerted":0,"skipped":3,"total":4}')
+    await wrapper.get('[data-test="run-42"]').trigger('click')
+    // Rows with a scheduling action come first, then skipped rows, then the rest — all by account ID.
+    const ids = wrapper.get('[data-test="run-table-42"]').findAll('tbody tr').map(tr => tr.attributes('data-test'))
+    expect(ids).toEqual(['run-account-115', 'run-account-82', 'run-account-111', 'run-account-137'])
+    // rate_limited + null reset => unknown recovery, never an admin quota problem.
+    expect(wrapper.get('[data-test="run-account-82"]').text()).toContain('admin.scheduledQuestionTests.skipResetUnknown')
+    expect(wrapper.get('[data-test="run-account-82"]').text()).not.toContain('admin.scheduledQuestionTests.skipNeedsAdmin')
+    // quota_exceeded keeps the timestamp hint when the backend can compute one...
+    expect(wrapper.get('[data-test="run-account-111"]').text()).toContain('admin.scheduledQuestionTests.skipResetAt:')
+    expect(wrapper.get('[data-test="run-account-111"]').text()).not.toContain('admin.scheduledQuestionTests.skipNeedsAdmin')
+    // ...and only falls back to the admin hint when there is no automatic reset at all.
+    expect(wrapper.get('[data-test="run-account-137"]').text()).toContain('admin.scheduledQuestionTests.skipNeedsAdmin')
+    expect(wrapper.get('[data-test="run-account-137"]').text()).toContain('admin.scheduledQuestionTests.results.skipped')
+    expect(wrapper.get('[data-test="run-account-115"]').text()).toContain('admin.scheduledQuestionTests.results.passed')
+    expect(wrapper.get('[data-test="run-account-115"]').text()).toContain('admin.scheduledQuestionTests.scheduleActions.resumed')
+  })
+
+  it('truncates long sanitized errors and exposes the full text as a tooltip', async () => {
+    const longError = `upstream failed: ${'x'.repeat(200)}`
+    mocks.listRuns.mockResolvedValue([{ ...run, summary: [{ ...run.summary[0], result: 'error', alerting: true, ratio: null, judged: 0, passed: 0, error: longError, auto_paused: false }] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    const errorCell = wrapper.get('[data-test="run-account-error-1"]')
+    expect(errorCell.attributes('title')).toBe(longError)
+    expect(errorCell.text().length).toBeLessThan(longError.length)
+    expect(errorCell.text().endsWith('…')).toBe(true)
+  })
+
+  it('sorts rows by action, failure, skip, then account id', async () => {
+    const row = (account_id: number, overrides: Record<string, unknown>) => ({ ...run.summary[0], account_id, account_name: `A${account_id}`, ...overrides })
+    mocks.listRuns.mockResolvedValue([{ ...run, summary: [
+      row(9, { result: 'passed', alerting: false }),
+      row(7, { result: 'skipped', skip_reason: 'rate_limited', skip_reset_at: null }),
+      row(5, { result: 'error', alerting: true, judged: 0, ratio: null, error: 'boom' }),
+      row(3, { result: 'failed', alerting: true, ratio: 10 }),
+      row(4, { result: 'passed', alerting: false, schedule_action: 'resumed' }),
+      row(8, { result: 'passed', alerting: false })
+    ] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    const ids = wrapper.get('[data-test="run-table-20"]').findAll('tbody tr').map(tr => tr.attributes('data-test'))
+    expect(ids).toEqual(['run-account-4', 'run-account-3', 'run-account-5', 'run-account-7', 'run-account-8', 'run-account-9'])
+  })
+
+  it('renders notification results as a table with a colored outcome badge', async () => {
+    mocks.listRuns.mockResolvedValue([{ ...run, notification_results: [
+      { kind: 'alert', channel: 'email', success: true, detail: 'sent 1/1 recipients' },
+      { kind: 'report', channel: 'feishu', success: false, detail: 'feishu code=19001 msg=param invalid' }
+    ] }])
+    const wrapper = await open()
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="run-20"]').trigger('click')
+    const table = wrapper.get('[data-test="run-notifications"]')
+    expect(table.findAll('thead th').map(th => th.text())).toEqual([
+      'admin.scheduledQuestionTests.notifyTable.kind', 'admin.scheduledQuestionTests.notifyTable.channel',
+      'admin.scheduledQuestionTests.notifyTable.result', 'admin.scheduledQuestionTests.notifyTable.detail'
+    ])
+    const rows = table.findAll('tbody tr')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].text()).toContain('admin.scheduledQuestionTests.notifyKinds.alert')
+    expect(rows[0].text()).toContain('admin.scheduledQuestionTests.notifyChannels.email')
+    expect(rows[0].text()).toContain('admin.scheduledQuestionTests.notificationSuccess')
+    expect(rows[0].text()).toContain('sent 1/1 recipients')
+    expect(rows[1].text()).toContain('admin.scheduledQuestionTests.notifyChannels.feishu')
+    expect(rows[1].text()).toContain('admin.scheduledQuestionTests.notificationFailed')
+    expect(rows[1].text()).toContain('feishu code=19001 msg=param invalid')
+  })
+
+  it('shows the skipped count in the run summary and the latest-run cell', async () => {
+    mocks.listPlans.mockResolvedValue([{ ...plan, skipped_accounts: 4 }])
+    mocks.listRuns.mockResolvedValue([{ ...run, skipped_accounts: 4 }])
+    const wrapper = await open()
+    expect(wrapper.get('tbody').text()).toContain('admin.scheduledQuestionTests.recentRunSkipped:{"passed":2,"total":2,"alerted":0,"skipped":4}')
+    await wrapper.get('[data-test="history-plan"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="run-20"]').text()).toContain('admin.scheduledQuestionTests.runSummary:{"passed":2,"alerted":0,"skipped":4,"total":2}')
+  })
+
+  it('omits the skipped count from the latest-run cell when nothing was skipped', async () => {
+    const wrapper = await open()
+    expect(wrapper.get('tbody').text()).toContain('admin.scheduledQuestionTests.recentRun:{"passed":2,"total":2,"alerted":0}')
+    expect(wrapper.get('tbody').text()).not.toContain('recentRunSkipped')
+  })
+
+  it('renders the updated auto-resume and quota-skip form hints', async () => {
+    const wrapper = await open(); await wrapper.get('[data-test="create-plan"]').trigger('click'); await flushPromises()
+    expect(wrapper.text()).toContain('admin.scheduledQuestionTests.form.autoResumeHint')
+    expect(wrapper.get('[data-test="quota-skip-hint"]').text()).toBe('admin.scheduledQuestionTests.form.quotaSkipHint')
   })
 
   it('handles null history details and omits the suppression marker when false', async () => {

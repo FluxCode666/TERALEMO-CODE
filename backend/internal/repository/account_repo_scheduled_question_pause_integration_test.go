@@ -118,7 +118,7 @@ func TestAccountRepositoryManualPauseClearWaitsForUncommittedFirstClaim(t *testi
 	require.Nil(t, pausedAt)
 }
 
-func TestAccountRepositoryManualPauseClearAndReleaseReversePhysicalRowsDoNotDeadlock(t *testing.T) {
+func TestAccountRepositoryManualPauseClearAndResumeReversePhysicalRowsDoNotDeadlock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	repo, first := newScheduledQuestionTestIntegrationPlan(t)
@@ -146,12 +146,12 @@ func TestAccountRepositoryManualPauseClearAndReleaseReversePhysicalRowsDoNotDead
 		}()
 		go func() {
 			<-start
-			_, err := repo.ReleaseAutoPause(ctx, first.ID, accountID)
+			_, err := repo.ApplyAccountVerdict(ctx, first.ID, accountID, "ok", false, true, time.Now(), func(context.Context, bool) error { return nil })
 			done <- err
 		}()
 		close(start)
 		for range 2 {
-			require.NoError(t, <-done, fmt.Sprintf("reverse-order release/clear iteration %d", iteration))
+			require.NoError(t, <-done, fmt.Sprintf("reverse-order resume/clear iteration %d", iteration))
 		}
 		var remaining int
 		require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM scheduled_question_test_account_states

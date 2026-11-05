@@ -31,6 +31,7 @@ type scheduledQuestionNotification struct {
 	Color       string
 	Lines       []string
 	DetailStart int
+	Rows        []scheduledQuestionNotificationRow
 }
 
 type feishuWebhookNotifier struct {
@@ -86,8 +87,45 @@ type scheduledQuestionFeishuText struct {
 }
 
 type scheduledQuestionFeishuElement struct {
-	Tag  string                      `json:"tag"`
-	Text scheduledQuestionFeishuText `json:"text"`
+	Tag               string                              `json:"tag"`
+	Text              *scheduledQuestionFeishuText        `json:"text,omitempty"`
+	PageSize          int                                 `json:"page_size,omitempty"`
+	RowHeight         string                              `json:"row_height,omitempty"`
+	FreezeFirstColumn bool                                `json:"freeze_first_column,omitempty"`
+	HeaderStyle       *scheduledQuestionFeishuHeaderStyle `json:"header_style,omitempty"`
+	Columns           []scheduledQuestionFeishuColumn     `json:"columns,omitempty"`
+	Rows              []scheduledQuestionFeishuRow        `json:"rows,omitempty"`
+}
+
+type scheduledQuestionFeishuHeaderStyle struct {
+	TextAlign       string `json:"text_align"`
+	TextSize        string `json:"text_size"`
+	BackgroundStyle string `json:"background_style"`
+	TextColor       string `json:"text_color"`
+	Bold            bool   `json:"bold"`
+	Lines           int    `json:"lines"`
+}
+
+type scheduledQuestionFeishuColumn struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	DataType    string `json:"data_type"`
+	Width       string `json:"width"`
+}
+
+type scheduledQuestionFeishuOption struct {
+	Text  string `json:"text"`
+	Color string `json:"color"`
+}
+
+type scheduledQuestionFeishuRow struct {
+	Account string                          `json:"account"`
+	Result  []scheduledQuestionFeishuOption `json:"result"`
+	Ratio   string                          `json:"ratio"`
+	Before  string                          `json:"before"`
+	After   string                          `json:"after"`
+	Action  []scheduledQuestionFeishuOption `json:"action"`
+	Note    string                          `json:"note"`
 }
 
 type scheduledQuestionFeishuMessage struct {
@@ -112,20 +150,21 @@ func scheduledQuestionFeishuPayload(notification scheduledQuestionNotification, 
 	payload.Card.Header.Title = scheduledQuestionFeishuText{Tag: "plain_text", Content: notification.Title}
 	payload.Card.Header.Template = notification.Color
 	lines := append([]string{}, notification.Lines...)
-	detailStart := max(0, min(notification.DetailStart, len(lines)))
-	details := min(50, len(lines)-detailStart)
-	omitted := len(lines) - detailStart - details
-	lines = lines[:detailStart+details]
+	details := min(50, len(notification.Rows))
+	omitted := len(notification.Rows) - details
 	for {
-		payload.Card.Elements = make([]scheduledQuestionFeishuElement, 0, len(lines)+1)
+		payload.Card.Elements = make([]scheduledQuestionFeishuElement, 0, len(lines)+2)
 		for _, line := range lines {
 			payload.Card.Elements = append(payload.Card.Elements, scheduledQuestionFeishuElement{
-				Tag: "div", Text: scheduledQuestionFeishuText{Tag: "plain_text", Content: line},
+				Tag: "div", Text: &scheduledQuestionFeishuText{Tag: "plain_text", Content: line},
 			})
+		}
+		if details > 0 {
+			payload.Card.Elements = append(payload.Card.Elements, scheduledQuestionFeishuTable(notification.Rows[:details]))
 		}
 		if omitted > 0 {
 			payload.Card.Elements = append(payload.Card.Elements, scheduledQuestionFeishuElement{
-				Tag: "div", Text: scheduledQuestionFeishuText{Tag: "plain_text", Content: fmt.Sprintf("另有 %d 个账号未列出", omitted)},
+				Tag: "div", Text: &scheduledQuestionFeishuText{Tag: "plain_text", Content: fmt.Sprintf("另有 %d 个账号未列出", omitted)},
 			})
 		}
 		data, err := json.Marshal(payload)
@@ -138,7 +177,6 @@ func scheduledQuestionFeishuPayload(notification scheduledQuestionNotification, 
 		if details > 0 {
 			details--
 			omitted++
-			lines = lines[:detailStart+details]
 			continue
 		}
 		// Site names and round-level errors can also be large; keep the card bounded.
@@ -157,6 +195,32 @@ func scheduledQuestionFeishuPayload(notification scheduledQuestionNotification, 
 			lines[longest] = truncateScheduledQuestionText(lines[longest], length/2)
 		}
 	}
+}
+
+func scheduledQuestionFeishuTable(rows []scheduledQuestionNotificationRow) scheduledQuestionFeishuElement {
+	// JSON 1.0 table schema: https://open.feishu.cn/document/feishu-cards/card-components/content-components/table
+	table := scheduledQuestionFeishuElement{
+		Tag: "table", PageSize: 10, RowHeight: "middle", FreezeFirstColumn: true,
+		HeaderStyle: &scheduledQuestionFeishuHeaderStyle{TextAlign: "left", TextSize: "normal", BackgroundStyle: "grey", TextColor: "default", Bold: true, Lines: 1},
+		Columns: []scheduledQuestionFeishuColumn{
+			{Name: "account", DisplayName: "账号", DataType: "text", Width: "160px"},
+			{Name: "result", DisplayName: "结果", DataType: "options", Width: "100px"},
+			{Name: "ratio", DisplayName: "通过/判定", DataType: "text", Width: "120px"},
+			{Name: "before", DisplayName: "测试前调度", DataType: "text", Width: "100px"},
+			{Name: "after", DisplayName: "测试后调度", DataType: "text", Width: "100px"},
+			{Name: "action", DisplayName: "本轮动作", DataType: "options", Width: "220px"},
+			{Name: "note", DisplayName: "说明", DataType: "text", Width: "280px"},
+		},
+		Rows: make([]scheduledQuestionFeishuRow, 0, len(rows)),
+	}
+	for _, row := range rows {
+		table.Rows = append(table.Rows, scheduledQuestionFeishuRow{
+			Account: row.Account, Result: []scheduledQuestionFeishuOption{{Text: row.Result, Color: row.ResultColor}},
+			Ratio: row.Ratio, Before: row.Before, After: row.After,
+			Action: []scheduledQuestionFeishuOption{{Text: row.Action, Color: row.ActionColor}}, Note: row.Note,
+		})
+	}
+	return table
 }
 
 func (n *feishuWebhookNotifier) Send(ctx context.Context, webhook, secret string, notification scheduledQuestionNotification) (bool, string) {

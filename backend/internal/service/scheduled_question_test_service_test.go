@@ -47,63 +47,84 @@ type scheduledQuestionRepoStub struct {
 	setOwnerErr      error
 	rollbackOwnerErr error
 	ownerChanges     []bool
+	accounts         *scheduledQuestionAccountRepoStub
+	verdictErr       error
+	verdictCalls     []ScheduledQuestionTestAccountState
 }
 
-func (r *scheduledQuestionRepoStub) ClaimAutoPauseIfOtherHeld(ctx context.Context, planID, accountID int64, at *time.Time) (bool, error) {
-	r.mu.Lock()
-	if r.ownerErr != nil {
-		r.mu.Unlock()
-		return false, r.ownerErr
-	}
-	owned, other := false, r.otherOwner
-	for _, state := range r.states {
-		if state.AccountID == accountID && state.AutoPaused {
-			if state.PlanID == planID {
-				owned = true
-			} else {
-				other = true
-			}
-		}
-	}
-	r.mu.Unlock()
-	if owned {
-		return true, nil
-	}
-	if !other {
-		return false, nil
-	}
-	if err := r.SetAutoPaused(ctx, planID, accountID, true, at); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (r *scheduledQuestionRepoStub) ReleaseAutoPause(_ context.Context, planID, accountID int64) (bool, error) {
+func (r *scheduledQuestionRepoStub) ApplyAccountVerdict(ctx context.Context, planID, accountID int64, verdict string, pause, resume bool, at time.Time, setSchedulable func(context.Context, bool) error) (action string, resultErr error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.verdictCalls = append(r.verdictCalls, ScheduledQuestionTestAccountState{PlanID: planID, AccountID: accountID, State: verdict})
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if r.verdictErr != nil {
+		return "", r.verdictErr
+	}
+	previous := r.states
+	r.states = make([]*ScheduledQuestionTestAccountState, 0, len(previous)+1)
+	var current *ScheduledQuestionTestAccountState
+	for _, state := range previous {
+		copy := *state
+		if state.PlanID == planID && state.AccountID == accountID {
+			copy.State = verdict
+			current = &copy
+		}
+		r.states = append(r.states, &copy)
+	}
+	if current == nil {
+		current = &ScheduledQuestionTestAccountState{PlanID: planID, AccountID: accountID, State: verdict}
+		r.states = append(r.states, current)
+	}
+	defer func() {
+		if resultErr != nil {
+			r.states = previous
+		}
+	}()
+	var account *Account
+	if r.accounts != nil {
+		account = r.accounts.accounts[accountID]
+	}
+	if account == nil {
+		return "", nil
+	}
+	if pause && account.Schedulable {
+		if r.setOwnerErr != nil {
+			return "", r.setOwnerErr
+		}
+		if err := setSchedulable(ctx, false); err != nil {
+			return "", err
+		}
+		current.AutoPaused, current.AutoPausedAt = true, &at
+		r.ownerChanges = append(r.ownerChanges, true)
+		return "paused", nil
+	}
+	if !resume || account.Schedulable {
+		return "", nil
+	}
 	if r.ownerErr != nil {
-		return false, r.ownerErr
+		return "", r.ownerErr
 	}
-	owned, other := false, r.otherOwner
+	blocked := r.otherOwner
 	for _, state := range r.states {
-		if state.AccountID == accountID && state.AutoPaused {
-			if state.PlanID == planID {
-				owned = true
-			} else {
-				other = true
-			}
+		plan := r.plans[state.PlanID]
+		if state.AccountID == accountID && state.PlanID != planID && state.State == "alert" && plan != nil && plan.Enabled && plan.AutoPauseEnabled {
+			blocked = true
 		}
 	}
-	if owned {
-		for i, state := range r.states {
-			if state.PlanID == planID && state.AccountID == accountID {
-				copy := *state
-				copy.AutoPaused, copy.AutoPausedAt = false, nil
-				r.states[i] = &copy
-			}
+	if blocked {
+		return "resume_blocked", nil
+	}
+	if err := setSchedulable(ctx, true); err != nil {
+		return "", err
+	}
+	for _, state := range r.states {
+		if state.AccountID == accountID {
+			state.AutoPaused, state.AutoPausedAt = false, nil
 		}
 	}
-	return owned && !other, nil
+	return "resumed", nil
 }
 
 func (r *scheduledQuestionRepoStub) SetAutoPaused(_ context.Context, planID, accountID int64, paused bool, at *time.Time) error {
@@ -289,7 +310,8 @@ func newScheduledQuestionFixture() (*ScheduledQuestionTestService, *scheduledQue
 	for id := int64(1); id <= 20; id++ {
 		questions.questions[id] = &model.AccountTestQuestion{ID: id, Enabled: true}
 	}
-	svc := NewScheduledQuestionTestService(repo, accounts, NewAccountTestQuestionService(questions), nil, nil, nil)
+	repo.accounts = accounts
+	svc := NewScheduledQuestionTestService(repo, accounts, NewAccountTestQuestionService(questions), nil, nil, nil, nil, nil)
 	svc.batch = &scheduledQuestionBatchStub{}
 	svc.now = func() time.Time { return time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC) }
 	return svc, repo, accounts, questions
@@ -514,7 +536,7 @@ func TestScheduledQuestionNotificationEscapesAndOmitsCredentials(t *testing.T) {
 		require.NotContains(t, message.body, "<img")
 		require.NotContains(t, message.body, "sk-secret-password")
 		require.NotContains(t, message.body, "Authorization")
-		require.Contains(t, message.body, "2/3 judged passed")
+		require.Contains(t, message.body, "2/3 (67%)")
 		require.Contains(t, message.body, "67%")
 		require.Contains(t, message.body, "80%")
 		require.Contains(t, message.body, svc.now().Format(time.RFC3339))

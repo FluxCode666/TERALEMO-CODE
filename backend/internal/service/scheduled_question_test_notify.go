@@ -136,6 +136,7 @@ func (s *ScheduledQuestionTestService) sendScheduledQuestionEmail(ctx context.Co
 	for _, line := range notification.Lines {
 		_, _ = fmt.Fprintf(&body, "<p>%s</p>", html.EscapeString(line))
 	}
+	writeScheduledQuestionNotificationTable(&body, notification.Rows)
 	sent := 0
 	failure := ""
 	for _, recipient := range recipients {
@@ -221,24 +222,8 @@ func buildScheduledQuestionNotification(siteName string, plan *ScheduledQuestion
 		}
 	}
 	notification := scheduledQuestionNotification{
-		Title: fmt.Sprintf("[%s] %s: %s", siteName, label, plan.Name), Color: color,
-		Lines: []string{fmt.Sprintf("Plan: %s", plan.Name)},
-	}
-	if kind != "report" {
-		notification.Lines = append(notification.Lines,
-			"Round: "+run.StartedAt.Format(time.RFC3339),
-			fmt.Sprintf("Threshold: %d%%", plan.MinPassRatio),
-		)
-		notification.DetailStart = len(notification.Lines)
-		for _, i := range indices {
-			if i < 0 || i >= len(run.Summary) {
-				continue
-			}
-			summary := run.Summary[i]
-			notification.Lines = append(notification.Lines, fmt.Sprintf("%s (ID %d): %d/%d judged passed, %s; threshold %d%%",
-				summary.AccountName, summary.AccountID, summary.Passed, summary.Judged, scheduledQuestionSummaryRatio(summary), plan.MinPassRatio))
-		}
-		return notification
+		Title: scheduledQuestionNotificationText(fmt.Sprintf("[%s] %s: %s", siteName, label, plan.Name), plan), Color: color,
+		Lines: []string{fmt.Sprintf("计划 / Plan: %s", scheduledQuestionNotificationText(plan.Name, plan))},
 	}
 	finishedAt := run.FinishedAt
 	if finishedAt.IsZero() {
@@ -249,6 +234,7 @@ func buildScheduledQuestionNotification(siteName string, plan *ScheduledQuestion
 		duration = 0
 	}
 	notification.Lines = append(notification.Lines,
+		"本轮时间 / Round: "+run.StartedAt.Format(time.RFC3339),
 		"开始时间 / Started: "+run.StartedAt.In(time.Local).Format("2006-01-02 15:04:05 -07:00"),
 		"耗时 / Duration: "+duration.Round(time.Millisecond).String(),
 		"轮次状态 / Status: "+run.Status,
@@ -258,79 +244,45 @@ func buildScheduledQuestionNotification(siteName string, plan *ScheduledQuestion
 		detail := sanitizeScheduledQuestionErrorText(run.ErrorMessage, plan, 300)
 		notification.Lines = append(notification.Lines, "轮次错误 / Round error: "+detail)
 	}
-	manual, actionFailures := 0, 0
+	counts := make(map[string]int)
+	actionFailures := 0
 	for _, summary := range run.Summary {
-		if summary.Ratio == nil && summary.Error == "" {
-			manual++
-		}
+		counts[scheduledQuestionAccountResult(summary)]++
 		if summary.ScheduleAction == "pause_failed" || summary.ScheduleAction == "resume_failed" {
 			actionFailures++
 		}
 	}
+	if kind == "report" && run.TotalAccounts > 0 && run.SkippedAccounts == run.TotalAccounts {
+		notification.Lines = append(notification.Lines, "本轮所有账号额度已用尽，未执行测试")
+	}
 	notification.Lines = append(notification.Lines,
-		fmt.Sprintf("通过账号 / Passed: %d · 告警 / Alerting: %d · 需人工 / Manual: %d · 总账号 / Total: %d", run.PassedAccounts, run.AlertedAccounts, manual, run.TotalAccounts),
+		fmt.Sprintf("通过 / Passed: %d · 未通过 / Failed: %d · 需人工 / Manual: %d · 出错 / Errors: %d · 跳过 / Skipped: %d · 未完成 / Incomplete: %d · 总账号 / Total: %d",
+			counts["passed"], counts["failed"], counts["unjudged"], counts["error"], counts["skipped"], counts["incomplete"], run.TotalAccounts),
 		fmt.Sprintf("自动暂停 / Paused: %d · 自动恢复 / Resumed: %d · 暂停/恢复失败 / Action failures: %d", run.PausedAccounts, run.ResumedAccounts, actionFailures),
 	)
 	if run.AutoPauseSkipped {
 		notification.Lines = append(notification.Lines, "所有账号全部题目出错，疑似系统/网络故障，已跳过自动暂停 / Auto-pause skipped: all accounts errored; suspected system/network failure")
 	}
-	ordered := append([]ScheduledQuestionTestAccountSummary{}, run.Summary...)
-	rank := func(summary ScheduledQuestionTestAccountSummary) int {
-		if summary.ScheduleAction != "" {
-			return 0
+	ordered := make([]ScheduledQuestionTestAccountSummary, 0, len(run.Summary))
+	if kind == "report" {
+		ordered = append(ordered, run.Summary...)
+	} else {
+		for _, i := range indices {
+			if i >= 0 && i < len(run.Summary) && scheduledQuestionAccountResult(run.Summary[i]) != "skipped" {
+				ordered = append(ordered, run.Summary[i])
+			}
 		}
-		if summary.Alerting {
-			return 1
-		}
-		return 2
 	}
-	sort.SliceStable(ordered, func(i, j int) bool { return rank(ordered[i]) < rank(ordered[j]) })
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left, right := scheduledQuestionNotificationRank(ordered[i]), scheduledQuestionNotificationRank(ordered[j])
+		if left != right {
+			return left < right
+		}
+		return ordered[i].AccountID < ordered[j].AccountID
+	})
 	notification.DetailStart = len(notification.Lines)
 	for _, summary := range ordered {
-		notification.Lines = append(notification.Lines, fmt.Sprintf("%s (%d) · 通过 %d/已判定 %d · %s · %s · %s",
-			summary.AccountName, summary.AccountID, summary.Passed, summary.Judged,
-			scheduledQuestionSummaryRatio(summary), scheduledQuestionSummaryStatus(summary), scheduledQuestionSummaryAction(summary)))
+		notification.Rows = append(notification.Rows, scheduledQuestionNotificationAccountRow(summary, plan))
 	}
 	return notification
-}
-
-func scheduledQuestionSummaryRatio(summary ScheduledQuestionTestAccountSummary) string {
-	if summary.Ratio != nil {
-		return fmt.Sprintf("%d%%", *summary.Ratio)
-	}
-	return "unjudged"
-}
-
-func scheduledQuestionSummaryStatus(summary ScheduledQuestionTestAccountSummary) string {
-	if summary.Incomplete {
-		return "未完成"
-	}
-	if summary.Error != "" {
-		return "出错"
-	}
-	if summary.Alerting {
-		return "告警"
-	}
-	if summary.Ratio == nil {
-		return "需人工"
-	}
-	return "通过"
-}
-
-func scheduledQuestionSummaryAction(summary ScheduledQuestionTestAccountSummary) string {
-	switch summary.ScheduleAction {
-	case "paused":
-		return "已暂停"
-	case "resumed":
-		return "已恢复"
-	case "pause_failed":
-		return "暂停失败"
-	case "resume_failed":
-		return "恢复失败"
-	default:
-		if summary.AutoPaused {
-			return "由本计划暂停中"
-		}
-		return "无调度动作"
-	}
 }

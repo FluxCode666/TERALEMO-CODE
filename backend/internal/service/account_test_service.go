@@ -640,6 +640,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -716,6 +717,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -791,6 +793,7 @@ func (s *AccountTestService) testBedrockAccountConnection(c *gin.Context, ctx co
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -1004,6 +1007,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	if isOAuth && s.accountRepo != nil {
 		if updates, err := extractOpenAICodexProbeUpdates(resp); err == nil && len(updates) > 0 {
@@ -1329,6 +1333,7 @@ func (s *AccountTestService) testGrokResponsesConnection(c *gin.Context, ctx con
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok Responses API request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	s.observeGrokTestResponse(withGrokTeamRateLimitModel(ctx, testModelID), account, resp)
 
@@ -1421,6 +1426,7 @@ func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context
 		}
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 	s.observeGrokTestResponse(ctx, account, resp)
 
 	body, err := io.ReadAll(resp.Body)
@@ -1508,6 +1514,7 @@ func (s *AccountTestService) testGrokVideoGeneration(c *gin.Context, ctx context
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 	s.observeGrokTestResponse(ctx, account, resp)
 
 	body, err := io.ReadAll(resp.Body)
@@ -1606,6 +1613,7 @@ func (s *AccountTestService) emitGrokVideoResult(c *gin.Context, ctx context.Con
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content download failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap for admin preview
 	if resp.StatusCode != http.StatusOK {
 		// Fall back to status URL when binary content is unavailable.
@@ -1678,6 +1686,7 @@ User query:
 		return s.sendErrorAndEnd(c, fmt.Sprintf("standalone web_search probe failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 	s.observeGrokTestResponse(withGrokTeamRateLimitModel(ctx, grokDefaultResponsesModel), account, resp)
 
 	body, _ := io.ReadAll(resp.Body)
@@ -1850,6 +1859,7 @@ func (s *AccountTestService) testGrokSTT(c *gin.Context, ctx context.Context, ac
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok STT failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 	s.observeGrokTestResponse(ctx, account, resp)
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
@@ -2223,6 +2233,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Chat Completions API (/v1/chat/completions) request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -2361,6 +2372,7 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	body = redactAgentIdentitySensitiveBodyForAccount(ctx, s.accountRepo, credentialAccount, body)
@@ -2507,6 +2519,7 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -3140,6 +3153,7 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	recordAccountTestUpstreamStatus(ctx, resp.StatusCode)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
