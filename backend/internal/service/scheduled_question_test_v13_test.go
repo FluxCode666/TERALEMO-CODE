@@ -4,7 +4,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -119,70 +118,5 @@ func TestScheduledQuestionDecodedURLSanitizationReachesAllSurfaces(t *testing.T)
 			}
 		}
 		svc.Stop()
-	}
-}
-
-type scheduledQuestionResumeRaceRepo struct {
-	*scheduledQuestionRepoStub
-	account *Account
-	resume  bool
-}
-
-func (r *scheduledQuestionResumeRaceRepo) ClaimAutoPauseIfOtherHeld(ctx context.Context, planID, accountID int64, at *time.Time) (bool, error) {
-	claimed, err := r.scheduledQuestionRepoStub.ClaimAutoPauseIfOtherHeld(ctx, planID, accountID, at)
-	if err == nil && !claimed && r.resume {
-		r.account.Schedulable = true
-	}
-	return claimed, err
-}
-
-func TestScheduledQuestionJoinRechecksSchedulabilityAfterNoHolder(t *testing.T) {
-	for _, tc := range []struct {
-		name         string
-		resume, fail bool
-	}{
-		{name: "completed other resume", resume: true},
-		{name: "manual remains paused"},
-		{name: "repause fails", resume: true, fail: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			svc, repo, accounts, _ := newScheduledQuestionFixture()
-			defer svc.Stop()
-			plan := scheduledQuestionValidPlan(2)
-			plan.AutoPauseEnabled = true
-			repo.plans[plan.ID] = plan
-			account := accounts.accounts[2]
-			account.Schedulable = false
-			racingRepo := &scheduledQuestionResumeRaceRepo{scheduledQuestionRepoStub: repo, account: account, resume: tc.resume}
-			svc.repo = racingRepo
-			scheduling := &scheduledQuestionSchedulingRepo{scheduledQuestionAccountRepoStub: accounts}
-			if tc.fail {
-				scheduling.setErr = errors.New("injected scheduling failure")
-			}
-			svc.accounts = scheduling
-			run := &ScheduledQuestionTestRun{Summary: []ScheduledQuestionTestAccountSummary{{
-				AccountID: account.ID, Alerting: true, Ratio: scheduledQuestionPtr(0), Judged: 1, Total: 1,
-			}}}
-			states, err := svc.updateAlertStates(context.Background(), plan, run)
-			require.NoError(t, err)
-			if !tc.resume {
-				require.Empty(t, scheduling.actions)
-				require.Empty(t, run.Summary[0].ScheduleAction)
-				require.False(t, states[0].AutoPaused)
-				return
-			}
-			require.Equal(t, []bool{false}, scheduling.actions)
-			if tc.fail {
-				require.True(t, account.Schedulable)
-				require.Equal(t, "pause_failed", run.Summary[0].ScheduleAction)
-				require.False(t, states[0].AutoPaused)
-				require.Equal(t, []bool{true, false}, repo.ownerChanges)
-				return
-			}
-			require.False(t, account.Schedulable)
-			require.Equal(t, "paused", run.Summary[0].ScheduleAction)
-			require.True(t, states[0].AutoPaused)
-			require.Equal(t, 1, run.PausedAccounts)
-		})
 	}
 }

@@ -1,6 +1,12 @@
 import { apiClient } from '../client'
 
-export type ScheduledQuestionTestScheduleAction = 'paused' | 'resumed' | 'pause_failed' | 'resume_failed' | ''
+export type ScheduledQuestionTestScheduleAction = 'paused' | 'resumed' | 'pause_failed' | 'resume_failed' | 'resume_blocked' | ''
+
+/** Backend-computed outcome of one account in one round (contract §4.2). */
+export type ScheduledQuestionTestResult = 'passed' | 'failed' | 'unjudged' | 'error' | 'incomplete' | 'skipped'
+
+/** Why an account was skipped because it ran out of quota / hit a rate limit. */
+export type ScheduledQuestionTestSkipReason = 'quota_exceeded' | 'window_cost_exceeded' | 'rate_limited' | ''
 
 export interface ScheduledQuestionTestSummary {
   account_id: number
@@ -11,7 +17,11 @@ export interface ScheduledQuestionTestSummary {
   judged: number
   ratio: number | null
   alerting: boolean
-  state_after: 'ok' | 'alert'
+  /**
+   * Alert state carried by the account. Empty string for skipped accounts: a skip never runs a test,
+   * so no alert transition is published and the backend leaves this field blank (it is not omitted).
+   */
+  state_after: 'ok' | 'alert' | ''
   error: string
   /** True when the account did not get a result for every question in this round. */
   incomplete?: boolean
@@ -19,6 +29,20 @@ export interface ScheduledQuestionTestSummary {
   schedule_action?: ScheduledQuestionTestScheduleAction
   /** True when the account is currently paused by this plan's auto-pause. */
   auto_paused: boolean
+  /** Backend-computed result. Absent on runs recorded before v0.3.8 (derive from alerting/ratio/error). */
+  result?: ScheduledQuestionTestResult
+  /** Reason the round skipped this account; empty when it was tested. */
+  skip_reason?: ScheduledQuestionTestSkipReason
+  /**
+   * RFC3339 timestamp when a skipped account is expected back, or null when no automatic reset is known.
+   * A null value means different things per reason: `quota_exceeded` needs an admin quota change, while
+   * `rate_limited` / `window_cost_exceeded` simply have an unknown recovery time and are retried next round.
+   */
+  skip_reset_at?: string | null
+  /** Account schedulable flag at the start of the round; null when the account no longer exists. */
+  schedulable_before?: boolean | null
+  /** Account schedulable flag after this round's scheduling action; null when the account no longer exists. */
+  schedulable_after?: boolean | null
 }
 
 export interface ScheduledQuestionTestNotificationResult {
@@ -55,6 +79,8 @@ export interface ScheduledQuestionTestPlan {
   passed_accounts?: number
   total_accounts?: number
   alerted_accounts?: number
+  /** Accounts skipped because they ran out of quota in the latest round. */
+  skipped_accounts?: number
 }
 
 export interface ScheduledQuestionTestRun {
@@ -73,6 +99,8 @@ export interface ScheduledQuestionTestRun {
   resumed_accounts: number
   auto_pause_skipped: boolean
   notification_results: ScheduledQuestionTestNotificationResult[]
+  /** Accounts skipped because they ran out of quota; absent on runs recorded before v0.3.8. */
+  skipped_accounts?: number
 }
 
 export interface ScheduledQuestionTestAccepted {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -10,110 +11,64 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
-func (s *ScheduledQuestionTestService) applyScheduledQuestionScheduling(ctx, roundCtx context.Context, plan *ScheduledQuestionTestPlan, run *ScheduledQuestionTestRun, states []*ScheduledQuestionTestAccountState, now time.Time) {
-	allErrors := len(run.Summary) >= 2
+func (s *ScheduledQuestionTestService) applyScheduledQuestionScheduling(ctx, roundCtx context.Context, plan *ScheduledQuestionTestPlan, run *ScheduledQuestionTestRun, states []*ScheduledQuestionTestAccountState, now time.Time) error {
+	active, allErrors := 0, true
 	for _, summary := range run.Summary {
+		if summary.Result == "skipped" {
+			continue
+		}
+		active++
 		if summary.Incomplete || summary.Judged != 0 || summary.Ratio == nil || !summary.Alerting || summary.Total == 0 {
 			allErrors = false
-			break
 		}
 	}
-	run.AutoPauseSkipped = plan.AutoPauseEnabled && allErrors
+	run.AutoPauseSkipped = plan.AutoPauseEnabled && active >= 2 && allErrors
+	byID := make(map[int64]*ScheduledQuestionTestAccountState, len(states))
+	for _, state := range states {
+		byID[state.AccountID] = state
+	}
+	var failures []error
 	for i := range run.Summary {
-		summary, state := &run.Summary[i], states[i]
-		if roundCtx.Err() != nil || ctx.Err() != nil {
-			run.NotificationsSuppressed = true
-			return
-		}
-		pause := plan.AutoPauseEnabled && !allErrors && summary.Alerting && !summary.Incomplete
-		resume := plan.AutoResumeEnabled && state.AutoPaused && !summary.Alerting && summary.Ratio != nil && !summary.Incomplete
-		if !pause && !resume {
-			continue
-		}
-		account, err := s.accounts.GetByID(ctx, summary.AccountID)
-		if err != nil || account == nil {
+		summary := &run.Summary[i]
+		state := byID[summary.AccountID]
+		if summary.Result == "skipped" || state == nil {
 			continue
 		}
 		if roundCtx.Err() != nil || ctx.Err() != nil {
 			run.NotificationsSuppressed = true
-			return
+			return errors.Join(append(failures, roundCtx.Err(), ctx.Err())...)
 		}
-		wasSchedulable := account.Schedulable
-		if pause && !wasSchedulable {
-			claimed, err := s.repo.ClaimAutoPauseIfOtherHeld(ctx, plan.ID, account.ID, &now)
-			if err != nil {
+		pause := plan.AutoPauseEnabled && !run.AutoPauseSkipped && summary.Alerting && !summary.Incomplete
+		resume := plan.AutoResumeEnabled && scheduledQuestionAccountResult(*summary) == "passed"
+		action, err := s.repo.ApplyAccountVerdict(ctx, plan.ID, summary.AccountID, state.State, pause, resume, now, func(actionCtx context.Context, value bool) error {
+			if err := roundCtx.Err(); err != nil {
+				return err
+			}
+			return s.accounts.SetSchedulable(actionCtx, summary.AccountID, value)
+		})
+		if err != nil {
+			failures = append(failures, err)
+			switch {
+			case pause:
 				summary.ScheduleAction = "pause_failed"
-				slog.Warn("scheduled_question_test_pause_join_failed", "plan_id", plan.ID, "account_id", account.ID)
-			} else if claimed {
-				state.AutoPaused, state.AutoPausedAt = true, &now
-			} else {
-				latest, err := s.accounts.GetByID(ctx, account.ID)
-				if err == nil && latest != nil {
-					account, wasSchedulable = latest, latest.Schedulable
-				}
-			}
-		}
-		if pause && wasSchedulable {
-			if roundCtx.Err() != nil || ctx.Err() != nil {
-				run.NotificationsSuppressed = true
-				return
-			}
-			if err := s.repo.SetAutoPaused(ctx, plan.ID, account.ID, true, &now); err != nil {
-				summary.ScheduleAction = "pause_failed"
-				slog.Warn("scheduled_question_test_pause_ownership_failed", "plan_id", plan.ID, "account_id", account.ID)
-				continue
-			}
-			if roundCtx.Err() != nil {
-				run.NotificationsSuppressed = true
-				if rollbackErr := s.repo.SetAutoPaused(ctx, plan.ID, account.ID, false, nil); rollbackErr != nil {
-					slog.Warn("scheduled_question_test_pause_ownership_rollback_failed", "plan_id", plan.ID, "account_id", account.ID)
-				}
-				return
-			}
-			if err := s.accounts.SetSchedulable(ctx, account.ID, false); err != nil {
-				summary.ScheduleAction = "pause_failed"
-				slog.Warn("scheduled_question_test_pause_failed", "plan_id", plan.ID, "account_id", account.ID)
-				state.AutoPaused, state.AutoPausedAt = false, nil
-				if rollbackErr := s.repo.SetAutoPaused(ctx, plan.ID, account.ID, false, nil); rollbackErr != nil {
-					slog.Warn("scheduled_question_test_pause_ownership_rollback_failed", "plan_id", plan.ID, "account_id", account.ID)
-				}
-			} else {
-				state.AutoPaused, state.AutoPausedAt = true, &now
-				summary.ScheduleAction = "paused"
-				run.PausedAccounts++
-			}
-		}
-		if resume {
-			shouldResume, err := s.repo.ReleaseAutoPause(ctx, plan.ID, account.ID)
-			if err != nil {
+			case resume:
 				summary.ScheduleAction = "resume_failed"
-				slog.Warn("scheduled_question_test_resume_ownership_failed", "plan_id", plan.ID, "account_id", account.ID)
-				continue
 			}
+			slog.Warn("scheduled_question_test_verdict_failed", "plan_id", plan.ID, "account_id", summary.AccountID)
+			continue
+		}
+		summary.ScheduleAction = action
+		switch action {
+		case "paused":
+			state.AutoPaused, state.AutoPausedAt = true, &now
+			run.PausedAccounts++
+		case "resumed":
 			state.AutoPaused, state.AutoPausedAt = false, nil
-			summary.AutoPaused = false
-			if !shouldResume {
-				continue
-			}
-			if !account.Schedulable {
-				if err := s.accounts.SetSchedulable(ctx, account.ID, true); err != nil {
-					summary.ScheduleAction = "resume_failed"
-					slog.Warn("scheduled_question_test_resume_failed", "plan_id", plan.ID, "account_id", account.ID)
-					if claimErr := s.repo.SetAutoPaused(ctx, plan.ID, account.ID, true, &now); claimErr != nil {
-						slog.Warn("scheduled_question_test_resume_reclaim_failed", "plan_id", plan.ID, "account_id", account.ID)
-					} else {
-						state.AutoPaused, state.AutoPausedAt = true, &now
-					}
-					summary.AutoPaused = state.AutoPaused
-					continue
-				}
-				summary.ScheduleAction = "resumed"
-				run.ResumedAccounts++
-			}
-			state.AutoPaused, state.AutoPausedAt = false, nil
+			run.ResumedAccounts++
 		}
 		summary.AutoPaused = state.AutoPaused
 	}
+	return errors.Join(failures...)
 }
 
 func (s *ScheduledQuestionTestService) TestFeishu(ctx context.Context, input ScheduledQuestionTestFeishuTestInput) error {
@@ -145,10 +100,8 @@ func (s *ScheduledQuestionTestService) TestFeishu(ctx context.Context, input Sch
 	if s.feishu == nil {
 		return infraerrors.New(502, "FEISHU_TEST_FAILED", "feishu service unavailable")
 	}
-	success, detail := s.feishu.Send(ctx, webhook, secret, scheduledQuestionNotification{
-		Title: "定时测试通知测试 / Test notification", Color: "blue",
-		Lines: []string{s.notificationSiteName(ctx), s.now().In(time.Local).Format("2006-01-02 15:04:05 -07:00")}, DetailStart: 2,
-	})
+	siteName := sanitizeScheduledQuestionErrorText(s.notificationSiteName(ctx), &ScheduledQuestionTestPlan{FeishuWebhookURL: webhook, FeishuSecret: secret}, 120)
+	success, detail := s.feishu.Send(ctx, webhook, secret, scheduledQuestionFeishuTestNotification(siteName, s.now()))
 	if !success {
 		return infraerrors.New(502, "FEISHU_TEST_FAILED", sanitizeScheduledQuestionNotificationDetail(detail, webhook, secret))
 	}

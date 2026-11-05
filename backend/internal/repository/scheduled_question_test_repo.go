@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,17 +23,17 @@ const scheduledQuestionTestPlanColumns = `p.id, p.name, p.account_ids, p.questio
 	p.feishu_enabled, p.feishu_webhook_url, p.feishu_secret, p.auto_pause_enabled, p.auto_resume_enabled`
 
 const scheduledQuestionTestLatestColumns = `COALESCE(latest.status, ''), COALESCE(latest.passed_accounts, 0),
-	COALESCE(latest.total_accounts, 0), COALESCE(latest.alerted_accounts, 0)`
+	COALESCE(latest.total_accounts, 0), COALESCE(latest.alerted_accounts, 0), COALESCE(latest.skipped_accounts, 0)`
 
 const scheduledQuestionTestLatestJoin = `LEFT JOIN LATERAL (
-	SELECT status, passed_accounts, total_accounts, alerted_accounts
+	SELECT status, passed_accounts, total_accounts, alerted_accounts, skipped_accounts
 	FROM scheduled_question_test_runs WHERE plan_id = p.id
 	ORDER BY started_at DESC, id DESC LIMIT 1
 ) latest ON true`
 
 const scheduledQuestionTestRunColumns = `id, plan_id, status, started_at, finished_at,
 	total_accounts, passed_accounts, alerted_accounts, notifications_suppressed, error_message, summary, created_at,
-	paused_accounts, resumed_accounts, auto_pause_skipped, notification_results`
+	paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, skipped_accounts`
 
 type scheduledQuestionTestRepository struct {
 	db *sql.DB
@@ -55,7 +56,7 @@ func (r *scheduledQuestionTestRepository) Create(ctx context.Context, plan *serv
 		INSERT INTO scheduled_question_test_plans AS p
 		(name, account_ids, question_ids, model_id, cron_expression, enabled, min_pass_ratio, cooldown_minutes, notify_enabled, report_enabled, email_enabled, feishu_enabled, feishu_webhook_url, feishu_secret, auto_pause_enabled, auto_resume_enabled, next_run_at, created_at, updated_at)
 		VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
-		RETURNING `+scheduledQuestionTestPlanColumns+`, '' AS last_status, 0 AS passed_accounts, 0 AS total_accounts, 0 AS alerted_accounts`,
+		RETURNING `+scheduledQuestionTestPlanColumns+`, '' AS last_status, 0 AS passed_accounts, 0 AS total_accounts, 0 AS alerted_accounts, 0 AS skipped_accounts`,
 		plan.Name, string(accountIDs), string(questionIDs), plan.ModelID, plan.CronExpression,
 		plan.Enabled, plan.MinPassRatio, plan.CooldownMinutes, plan.NotifyEnabled, plan.ReportEnabled, plan.EmailEnabled,
 		plan.FeishuEnabled, plan.FeishuWebhookURL, plan.FeishuSecret, plan.AutoPauseEnabled, plan.AutoResumeEnabled, plan.NextRunAt)
@@ -180,11 +181,46 @@ func scheduledQuestionTestPlanWriteError(err error) error {
 }
 
 func (r *scheduledQuestionTestRepository) Delete(ctx context.Context, id int64) error {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM scheduled_question_test_plans WHERE id = $1`, id)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	return checkScheduledQuestionTestAffected(result)
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(ctx, `SELECT account_id FROM (
+		SELECT value::bigint AS account_id FROM scheduled_question_test_plans p,
+		jsonb_array_elements_text(p.account_ids) AS ids(value) WHERE p.id = $1
+		UNION SELECT account_id FROM scheduled_question_test_account_states WHERE plan_id = $1
+	) accounts ORDER BY account_id`, id)
+	if err != nil {
+		return err
+	}
+	var accountIDs []int64
+	for rows.Next() {
+		var accountID int64
+		if err := rows.Scan(&accountID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		accountIDs = append(accountIDs, accountID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := lockScheduledQuestionAutoPauseAccounts(ctx, tx, accountIDs); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM scheduled_question_test_plans WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if err := checkScheduledQuestionTestAffected(result); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *scheduledQuestionTestRepository) ListRuns(ctx context.Context, planID int64, limit int) ([]*service.ScheduledQuestionTestRun, error) {
@@ -224,10 +260,19 @@ func (r *scheduledQuestionTestRepository) ListStates(ctx context.Context, planID
 }
 
 func lockScheduledQuestionAutoPauseStates(ctx context.Context, tx *sql.Tx, accountID int64) (map[int64]bool, error) {
-	// Serialize even when this account has no states yet; row locks alone miss new claims.
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('scheduled-question-auto-pause:' || $1::text, 0))`, accountID); err != nil {
+	if err := lockScheduledQuestionAutoPauseAdvisory(ctx, tx, accountID); err != nil {
 		return nil, err
 	}
+	return lockScheduledQuestionAutoPauseStateRows(ctx, tx, accountID)
+}
+
+func lockScheduledQuestionAutoPauseAdvisory(ctx context.Context, tx *sql.Tx, accountID int64) error {
+	// Serialize even when this account has no states yet; row locks alone miss new claims.
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('scheduled-question-auto-pause:' || $1::text, 0))`, accountID)
+	return err
+}
+
+func lockScheduledQuestionAutoPauseStateRows(ctx context.Context, tx *sql.Tx, accountID int64) (map[int64]bool, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT plan_id, auto_paused FROM scheduled_question_test_account_states
 		WHERE account_id = $1 ORDER BY plan_id FOR UPDATE`, accountID)
 	if err != nil {
@@ -246,74 +291,89 @@ func lockScheduledQuestionAutoPauseStates(ctx context.Context, tx *sql.Tx, accou
 	return states, rows.Err()
 }
 
-func (r *scheduledQuestionTestRepository) ReleaseAutoPause(ctx context.Context, planID, accountID int64) (bool, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
+func lockScheduledQuestionAutoPauseAccounts(ctx context.Context, tx *sql.Tx, accountIDs []int64) error {
+	sort.Slice(accountIDs, func(i, j int) bool { return accountIDs[i] < accountIDs[j] })
+	// Multi-account operations take every advisory lock before any state row lock.
+	for i, accountID := range accountIDs {
+		if i > 0 && accountID == accountIDs[i-1] {
+			continue
+		}
+		if err := lockScheduledQuestionAutoPauseAdvisory(ctx, tx, accountID); err != nil {
+			return err
+		}
 	}
-	defer func() { _ = tx.Rollback() }()
-	states, err := lockScheduledQuestionAutoPauseStates(ctx, tx, accountID)
-	if err != nil {
-		return false, err
+	for i, accountID := range accountIDs {
+		if i > 0 && accountID == accountIDs[i-1] {
+			continue
+		}
+		if _, err := lockScheduledQuestionAutoPauseStateRows(ctx, tx, accountID); err != nil {
+			return err
+		}
 	}
-	if !states[planID] {
-		return false, tx.Commit()
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE scheduled_question_test_account_states
-		SET auto_paused = false, auto_paused_at = NULL WHERE plan_id = $1 AND account_id = $2`, planID, accountID); err != nil {
-		return false, err
-	}
-	var others int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM scheduled_question_test_account_states
-		WHERE account_id = $1 AND plan_id <> $2 AND auto_paused = true`, accountID, planID).Scan(&others); err != nil {
-		return false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
-	return others == 0, nil
+	return nil
 }
 
-func (r *scheduledQuestionTestRepository) ClaimAutoPauseIfOtherHeld(ctx context.Context, planID, accountID int64, at *time.Time) (bool, error) {
+// ApplyAccountVerdict publishes every tested account's verdict before notifications,
+// and makes scheduling, marker, and outbox writes in the same transaction.
+func (r *scheduledQuestionTestRepository) ApplyAccountVerdict(ctx context.Context, planID, accountID int64, state string, pause, resume bool, at time.Time, setSchedulable func(context.Context, bool) error) (string, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer func() { _ = tx.Rollback() }()
-	states, err := lockScheduledQuestionAutoPauseStates(ctx, tx, accountID)
-	if err != nil {
-		return false, err
+	if _, err := lockScheduledQuestionAutoPauseStates(ctx, tx, accountID); err != nil {
+		return "", err
 	}
-	if states[planID] {
-		if err := tx.Commit(); err != nil {
-			return false, err
+	if _, err := tx.ExecContext(ctx, `INSERT INTO scheduled_question_test_account_states
+		(plan_id, account_id, state) VALUES ($1, $2, $3)
+		ON CONFLICT (plan_id, account_id) DO UPDATE SET state = EXCLUDED.state`, planID, accountID, state); err != nil {
+		return "", err
+	}
+	var schedulable bool
+	err = tx.QueryRowContext(ctx, `SELECT schedulable FROM accounts WHERE id = $1 AND deleted_at IS NULL`, accountID).Scan(&schedulable)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	actionCtx := scheduledQuestionSchedulingTxContext(ctx, tx)
+	action := ""
+	switch {
+	case err == nil && schedulable && pause:
+		if err := setSchedulable(actionCtx, false); err != nil {
+			return "", err
 		}
-		return true, nil
-	}
-	otherHeld := false
-	for otherPlanID, held := range states {
-		if otherPlanID != planID && held {
-			otherHeld = true
-			break
+		if _, err := tx.ExecContext(ctx, `UPDATE scheduled_question_test_account_states
+			SET auto_paused = true, auto_paused_at = $3 WHERE plan_id = $1 AND account_id = $2`, planID, accountID, at); err != nil {
+			return "", err
 		}
-	}
-	if !otherHeld {
-		return false, tx.Commit()
-	}
-	result, err := tx.ExecContext(ctx, `INSERT INTO scheduled_question_test_account_states
-		(plan_id, account_id, state, auto_paused, auto_paused_at) VALUES ($1, $2, 'alert', true, $3)
-		ON CONFLICT (plan_id, account_id) DO UPDATE SET
-		auto_paused = EXCLUDED.auto_paused, auto_paused_at = EXCLUDED.auto_paused_at`, planID, accountID, at)
-	if err != nil {
-		return false, err
-	}
-	if err := checkScheduledQuestionTestAffected(result); err != nil {
-		return false, err
+		action = "paused"
+	case err == nil && !schedulable && resume:
+		var blocked bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM scheduled_question_test_account_states s
+		JOIN scheduled_question_test_plans p ON p.id = s.plan_id
+		WHERE s.account_id = $1 AND s.plan_id <> $2 AND s.state = 'alert'
+		AND p.enabled = true AND p.auto_pause_enabled = true
+	)`, accountID, planID).Scan(&blocked); err != nil {
+			return "", err
+		}
+		if blocked {
+			action = "resume_blocked"
+		} else {
+			if err := setSchedulable(actionCtx, true); err != nil {
+				return "", err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE scheduled_question_test_account_states
+		SET auto_paused = false, auto_paused_at = NULL WHERE account_id = $1`, accountID); err != nil {
+				return "", err
+			}
+			action = "resumed"
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return false, err
+		return "", err
 	}
-	return true, nil
+	runScheduledQuestionSchedulingAfterCommit(actionCtx)
+	return action, nil
 }
 
 func (r *scheduledQuestionTestRepository) SetAutoPaused(ctx context.Context, planID, accountID int64, paused bool, at *time.Time) error {
@@ -365,7 +425,15 @@ func (r *scheduledQuestionTestRepository) FinishRun(ctx context.Context, run *se
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Serialize persistence with plan deletion/edits, not with the upstream calls.
+	// Lock accounts first, in global order, before touching parent plans. This is
+	// the same order used by scheduling actions and avoids parent/FK lock cycles.
+	accountIDs := make([]int64, 0, len(states))
+	for _, state := range states {
+		accountIDs = append(accountIDs, state.AccountID)
+	}
+	if err := lockScheduledQuestionAutoPauseAccounts(ctx, tx, accountIDs); err != nil {
+		return nil, err
+	}
 	var planID int64
 	if err := tx.QueryRowContext(ctx, `SELECT id FROM scheduled_question_test_plans WHERE id = $1 FOR NO KEY UPDATE`, run.PlanID).Scan(&planID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -374,11 +442,11 @@ func (r *scheduledQuestionTestRepository) FinishRun(ctx context.Context, run *se
 		return nil, err
 	}
 	row := tx.QueryRowContext(ctx, `INSERT INTO scheduled_question_test_runs
-		(plan_id, status, started_at, finished_at, total_accounts, passed_accounts, alerted_accounts, notifications_suppressed, error_message, summary, paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb, NOW()) RETURNING `+scheduledQuestionTestRunColumns,
+		(plan_id, status, started_at, finished_at, total_accounts, passed_accounts, alerted_accounts, notifications_suppressed, error_message, summary, paused_accounts, resumed_accounts, auto_pause_skipped, notification_results, skipped_accounts, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14::jsonb, $15, NOW()) RETURNING `+scheduledQuestionTestRunColumns,
 		run.PlanID, run.Status, run.StartedAt, run.FinishedAt, run.TotalAccounts,
 		run.PassedAccounts, run.AlertedAccounts, run.NotificationsSuppressed, run.ErrorMessage, string(data),
-		run.PausedAccounts, run.ResumedAccounts, run.AutoPauseSkipped, string(notificationData))
+		run.PausedAccounts, run.ResumedAccounts, run.AutoPauseSkipped, string(notificationData), run.SkippedAccounts)
 	created, err := scanScheduledQuestionTestRun(row)
 	if err != nil {
 		return nil, err
@@ -433,7 +501,7 @@ func scanScheduledQuestionTestPlan(row scannable) (*service.ScheduledQuestionTes
 		&plan.LastRunAt, &plan.NextRunAt, &plan.CreatedAt, &plan.UpdatedAt,
 		&plan.ReportEnabled, &plan.EmailEnabled, &plan.FeishuEnabled, &plan.FeishuWebhookURL, &plan.FeishuSecret,
 		&plan.AutoPauseEnabled, &plan.AutoResumeEnabled,
-		&plan.LastStatus, &plan.PassedAccounts, &plan.TotalAccounts, &plan.AlertedAccounts); err != nil {
+		&plan.LastStatus, &plan.PassedAccounts, &plan.TotalAccounts, &plan.AlertedAccounts, &plan.SkippedAccounts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, service.ErrScheduledQuestionTestNotFound
 		}
@@ -466,7 +534,7 @@ func scanScheduledQuestionTestRun(row scannable) (*service.ScheduledQuestionTest
 	var summary, notificationResults []byte
 	if err := row.Scan(&run.ID, &run.PlanID, &run.Status, &run.StartedAt, &run.FinishedAt,
 		&run.TotalAccounts, &run.PassedAccounts, &run.AlertedAccounts, &run.NotificationsSuppressed, &run.ErrorMessage, &summary, &run.CreatedAt,
-		&run.PausedAccounts, &run.ResumedAccounts, &run.AutoPauseSkipped, &notificationResults); err != nil {
+		&run.PausedAccounts, &run.ResumedAccounts, &run.AutoPauseSkipped, &notificationResults, &run.SkippedAccounts); err != nil {
 		return nil, err
 	}
 	if err := json.Unmarshal(summary, &run.Summary); err != nil {

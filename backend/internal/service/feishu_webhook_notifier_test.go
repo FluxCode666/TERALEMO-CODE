@@ -120,7 +120,9 @@ func TestScheduledQuestionFeishuPayloadBounds(t *testing.T) {
 				notification.Title, notification.Lines[0] = tc.text, tc.text
 			}
 			for i := 0; i < tc.count; i++ {
-				notification.Lines = append(notification.Lines, tc.text)
+				notification.Rows = append(notification.Rows, scheduledQuestionNotificationRow{
+					Account: tc.text, Result: "通过", ResultColor: "green", Ratio: "1/1 (100%)", Before: "开", After: "开", Action: "—", ActionColor: "neutral",
+				})
 			}
 			data, err := scheduledQuestionFeishuPayload(notification, "secret", time.Unix(1, 0))
 			require.NoError(t, err)
@@ -129,13 +131,56 @@ func TestScheduledQuestionFeishuPayloadBounds(t *testing.T) {
 			var message scheduledQuestionFeishuMessage
 			require.NoError(t, json.Unmarshal(data, &message))
 			if tc.count == 75 {
-				require.Len(t, message.Card.Elements, 52)
-				require.Equal(t, "另有 25 个账号未列出", message.Card.Elements[51].Text.Content)
+				require.Len(t, message.Card.Elements, 3)
+				require.Equal(t, "table", message.Card.Elements[1].Tag)
+				require.Len(t, message.Card.Elements[1].Rows, 50)
+				require.Equal(t, "另有 25 个账号未列出", message.Card.Elements[2].Text.Content)
 			}
 			if tc.count == 20 {
 				require.Contains(t, message.Card.Elements[len(message.Card.Elements)-1].Text.Content, "个账号未列出")
 			}
 		})
+	}
+}
+
+func TestScheduledQuestionFeishuTableSchemaAndOptions(t *testing.T) {
+	unsafe := `<at id=all> **[account](https://evil.test)**`
+	rows := []scheduledQuestionNotificationRow{
+		{Account: unsafe, Result: "通过", ResultColor: "green", Ratio: "1/1 (100%)", Before: "关", After: "开", Action: "已恢复", ActionColor: "green", Note: unsafe},
+		{Result: "未通过", ResultColor: "red", Action: "已暂停", ActionColor: "red"},
+		{Result: "需人工", ResultColor: "orange", Action: "其它计划未通过，未恢复", ActionColor: "orange"},
+		{Result: "已跳过", ResultColor: "neutral", Action: "—", ActionColor: "neutral"},
+	}
+	data, err := scheduledQuestionFeishuPayload(scheduledQuestionNotification{Title: "report", Color: "green", Rows: rows}, "secret", time.Unix(1, 0))
+	require.NoError(t, err)
+	var message scheduledQuestionFeishuMessage
+	require.NoError(t, json.Unmarshal(data, &message))
+	require.Len(t, message.Card.Elements, 1)
+	table := message.Card.Elements[0]
+	require.Equal(t, "table", table.Tag)
+	require.Nil(t, table.Text, "table must not contain a div text field")
+	require.Equal(t, 10, table.PageSize)
+	require.Equal(t, "middle", table.RowHeight)
+	require.True(t, table.FreezeFirstColumn)
+	require.Equal(t, "grey", table.HeaderStyle.BackgroundStyle)
+	require.True(t, table.HeaderStyle.Bold)
+	require.Equal(t, 1, table.HeaderStyle.Lines)
+	require.Len(t, table.Columns, 7)
+	for i, column := range table.Columns {
+		if i == 1 || i == 5 {
+			require.Equal(t, "options", column.DataType)
+		} else {
+			require.Equal(t, "text", column.DataType)
+		}
+	}
+	require.NotContains(t, string(data), "lark_md")
+	require.NotContains(t, string(data), `"data_type":"markdown"`)
+	require.Equal(t, unsafe, table.Rows[0].Account)
+	require.Equal(t, unsafe, table.Rows[0].Note)
+	for i, color := range []string{"green", "red", "orange", "neutral"} {
+		require.Equal(t, color, table.Rows[i].Result[0].Color)
+		require.Equal(t, rows[i].Result, table.Rows[i].Result[0].Text)
+		require.Equal(t, color, table.Rows[i].Action[0].Color)
 	}
 }
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -39,6 +40,8 @@ type ScheduledQuestionTestService struct {
 	feishu                  scheduledQuestionFeishuNotifier
 	notificationTimeouts    scheduledQuestionNotificationTimeouts
 	ownershipRefreshTimeout time.Duration
+	usageLogRepo            UsageLogRepository
+	sessionLimitCache       SessionLimitCache
 	now                     func() time.Time
 	mu                      sync.Mutex
 	running                 map[int64]bool
@@ -48,10 +51,10 @@ type ScheduledQuestionTestService struct {
 	active                  sync.WaitGroup
 }
 
-func NewScheduledQuestionTestService(repo ScheduledQuestionTestRepository, accounts AccountRepository, questions *AccountTestQuestionService, batch *AccountBatchTestService, settings SettingRepository, email *EmailService) *ScheduledQuestionTestService {
+func NewScheduledQuestionTestService(repo ScheduledQuestionTestRepository, accounts AccountRepository, questions *AccountTestQuestionService, batch *AccountBatchTestService, settings SettingRepository, email *EmailService, usageLogRepo UsageLogRepository, sessionLimitCache SessionLimitCache) *ScheduledQuestionTestService {
 	svc := &ScheduledQuestionTestService{
 		repo: repo, accounts: accounts, questions: questions, batch: batch, settings: settings,
-		now: time.Now, running: make(map[int64]bool), feishu: newFeishuWebhookNotifier(),
+		now: time.Now, running: make(map[int64]bool), feishu: newFeishuWebhookNotifier(), usageLogRepo: usageLogRepo, sessionLimitCache: sessionLimitCache,
 	}
 	if email != nil {
 		svc.email = email
@@ -294,6 +297,10 @@ func (s *ScheduledQuestionTestService) Update(ctx context.Context, id int64, inp
 }
 
 func (s *ScheduledQuestionTestService) Delete(ctx context.Context, id int64) error {
+	if _, err := s.acquireExecution(id); err != nil {
+		return err
+	}
+	defer s.releaseExecution(id)
 	return s.repo.Delete(ctx, id)
 }
 
@@ -398,28 +405,78 @@ func (s *ScheduledQuestionTestService) runPlan(parent context.Context, plan *Sch
 		NotificationResults:     []ScheduledQuestionTestNotificationResult{},
 	}
 	items := make([]AccountBatchTestItemResult, 0, len(plan.AccountIDs)*len(plan.QuestionIDs))
-	batchPlan, runErr := s.batch.Prepare(ctx, AccountBatchTestInput{AccountIDs: plan.AccountIDs, QuestionIDs: plan.QuestionIDs, ModelID: plan.ModelID})
-	if runErr == nil {
-		runErr = s.batch.Run(ctx, batchPlan, func(event AccountBatchTestEvent) error {
-			if event.Type == "item_result" {
-				item, ok := event.Data.(AccountBatchTestItemResult)
-				if !ok {
-					return fmt.Errorf("unexpected batch item result type")
-				}
-				items = append(items, item)
+	activePlan := *plan
+	activePlan.AccountIDs = nil
+	before := make(map[int64]*bool, len(plan.AccountIDs))
+	skipped := make(map[int64]ScheduledQuestionTestAccountSummary)
+	for _, id := range plan.AccountIDs {
+		account, err := s.accounts.GetByID(ctx, id)
+		if err == nil && account != nil {
+			schedulable := account.Schedulable
+			before[id] = &schedulable
+			reason, resetAt := s.scheduledQuestionSkipReason(ctx, account, plan.ModelID)
+			if reason != "" {
+				skipped[id] = ScheduledQuestionTestAccountSummary{AccountID: id, AccountName: account.Name, Platform: account.Platform, Total: len(plan.QuestionIDs), Result: "skipped", SkipReason: reason, SkipResetAt: resetAt, SchedulableBefore: &schedulable, SchedulableAfter: &schedulable}
+				continue
 			}
-			return nil
-		})
+		}
+		activePlan.AccountIDs = append(activePlan.AccountIDs, id)
+	}
+	var runErr error
+	if len(activePlan.AccountIDs) > 0 {
+		var batchPlan *AccountBatchTestPlan
+		batchPlan, runErr = s.batch.Prepare(ctx, AccountBatchTestInput{AccountIDs: activePlan.AccountIDs, QuestionIDs: plan.QuestionIDs, ModelID: plan.ModelID, captureStatus: true})
+		if runErr == nil {
+			runErr = s.batch.Run(ctx, batchPlan, func(event AccountBatchTestEvent) error {
+				if event.Type == "item_result" {
+					item, ok := event.Data.(AccountBatchTestItemResult)
+					if !ok {
+						return fmt.Errorf("unexpected batch item result type")
+					}
+					items = append(items, item)
+				}
+				return nil
+			})
+		}
 	}
 	if runErr != nil {
 		run.Status, run.ErrorMessage = "failed", runErr.Error()
 	}
-	run.Summary = summarizeScheduledQuestionTests(plan, items, run.ErrorMessage)
-	for _, summary := range run.Summary {
-		if summary.Alerting {
-			run.AlertedAccounts++
-		} else if summary.Ratio != nil {
+	activeSummaries := summarizeScheduledQuestionTests(&activePlan, items, run.ErrorMessage)
+	byID := make(map[int64]ScheduledQuestionTestAccountSummary, len(plan.AccountIDs))
+	for _, summary := range activeSummaries {
+		if !summary.Incomplete && scheduledQuestionAllErrors(summary.AccountID, len(plan.QuestionIDs), items) {
+			account, err := s.accounts.GetByID(ctx, summary.AccountID)
+			reason, resetAt := "", (*time.Time)(nil)
+			if err == nil && account != nil {
+				reason, resetAt = s.scheduledQuestionSkipReason(ctx, account, plan.ModelID)
+			}
+			if reason == "" && scheduledQuestionAllErrorsRateLimited(summary.AccountID, len(plan.QuestionIDs), items) {
+				reason = "rate_limited"
+			}
+			if reason != "" {
+				summary.Result, summary.SkipReason, summary.SkipResetAt = "skipped", reason, resetAt
+				summary.Alerting, summary.Error, summary.Ratio, summary.StateAfter = false, "", nil, ""
+			}
+		}
+		summary.SchedulableBefore = before[summary.AccountID]
+		byID[summary.AccountID] = summary
+	}
+	for id, summary := range skipped {
+		byID[id] = summary
+	}
+	for _, id := range plan.AccountIDs {
+		summary := byID[id]
+		run.Summary = append(run.Summary, summary)
+		switch summary.Result {
+		case "skipped":
+			run.SkippedAccounts++
+		case "passed":
 			run.PassedAccounts++
+		default:
+			if summary.Alerting {
+				run.AlertedAccounts++
+			}
 		}
 	}
 	// A cancelled/expired round still records its outcome without losing cancellation to upstreams.
@@ -437,7 +494,7 @@ func (s *ScheduledQuestionTestService) runPlan(parent context.Context, plan *Sch
 		// A failed state read must not erase the round or overwrite old states.
 		states = nil
 	}
-	persistCancel()
+	s.refreshScheduledQuestionSchedulability(persistCtx, run)
 	run.FinishedAt = s.now()
 	next, err := computeNextRun(plan.CronExpression, run.FinishedAt)
 	if err != nil {
@@ -471,4 +528,42 @@ func (s *ScheduledQuestionTestService) refreshScheduledQuestionSummaryOwnership(
 	for i := range run.Summary {
 		run.Summary[i].AutoPaused = byID[run.Summary[i].AccountID]
 	}
+}
+
+func (s *ScheduledQuestionTestService) refreshScheduledQuestionSchedulability(ctx context.Context, run *ScheduledQuestionTestRun) {
+	for i := range run.Summary {
+		summary := &run.Summary[i]
+		account, err := s.accounts.GetByID(ctx, summary.AccountID)
+		if (err == nil && account == nil) || errors.Is(err, ErrAccountNotFound) {
+			summary.SchedulableAfter = nil
+			continue
+		}
+		if err == nil && account != nil {
+			value := account.Schedulable
+			summary.SchedulableAfter = &value
+			continue
+		}
+		summary.SchedulableAfter = summary.SchedulableBefore
+		if summary.ScheduleAction == "paused" || summary.ScheduleAction == "resumed" {
+			value := summary.ScheduleAction == "resumed"
+			summary.SchedulableAfter = &value
+		}
+	}
+}
+
+func scheduledQuestionAllErrors(accountID int64, questionCount int, items []AccountBatchTestItemResult) bool {
+	if questionCount <= 0 {
+		return false
+	}
+	count := 0
+	for _, item := range items {
+		if item.AccountID != accountID {
+			continue
+		}
+		if item.Status != "error" || item.Judged {
+			return false
+		}
+		count++
+	}
+	return count == questionCount
 }

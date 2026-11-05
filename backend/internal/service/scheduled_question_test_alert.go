@@ -55,9 +55,29 @@ func summarizeScheduledQuestionTests(plan *ScheduledQuestionTestPlan, items []Ac
 			summary.StateAfter = "alert"
 		}
 		summary.Error = sanitizeScheduledQuestionErrorText(summary.Error, plan, 500)
+		summary.Result = scheduledQuestionAccountResult(summary)
 		result = append(result, summary)
 	}
 	return result
+}
+
+func scheduledQuestionAccountResult(summary ScheduledQuestionTestAccountSummary) string {
+	if summary.Result != "" {
+		return summary.Result
+	}
+	if summary.Incomplete {
+		return "incomplete"
+	}
+	if summary.Judged == 0 && summary.Error != "" {
+		return "error"
+	}
+	if summary.Ratio == nil {
+		return "unjudged"
+	}
+	if summary.Alerting {
+		return "failed"
+	}
+	return "passed"
 }
 
 // scheduledQuestionAlertTransition decides notification intent without advancing the send timestamp.
@@ -97,6 +117,9 @@ func (s *ScheduledQuestionTestService) updateAlertStates(persistCtx context.Cont
 	states := make([]*ScheduledQuestionTestAccountState, 0, len(run.Summary))
 	notifications := map[string][]int{"alert": {}, "recovered": {}}
 	for i, summary := range run.Summary {
+		if summary.Result == "skipped" {
+			continue
+		}
 		next, notification := scheduledQuestionAlertTransition(byID[summary.AccountID], summary.Alerting, now, time.Duration(plan.CooldownMinutes)*time.Minute)
 		next.PlanID, next.AccountID = plan.ID, summary.AccountID
 		states = append(states, &next)
@@ -118,13 +141,20 @@ func (s *ScheduledQuestionTestService) updateAlertStates(persistCtx context.Cont
 	if current.CooldownMinutes != plan.CooldownMinutes {
 		notifications = map[string][]int{"alert": {}, "recovered": {}}
 		for i, summary := range run.Summary {
+			if summary.Result == "skipped" {
+				continue
+			}
 			_, kind := scheduledQuestionAlertTransition(byID[summary.AccountID], summary.Alerting, now, time.Duration(current.CooldownMinutes)*time.Minute)
 			if kind != "" {
 				notifications[kind] = append(notifications[kind], i)
 			}
 		}
 	}
-	s.applyScheduledQuestionScheduling(persistCtx, roundCtx, current, run, states, now)
+	if err := s.applyScheduledQuestionScheduling(persistCtx, roundCtx, current, run, states, now); err != nil {
+		run.NotificationsSuppressed = true
+		return nil, err
+	}
+	s.refreshScheduledQuestionSchedulability(persistCtx, run)
 	// Notification delivery owns a separate budget and still stops with the round/service.
 	stageTimeout := s.notificationTimeouts.Stage
 	if stageTimeout <= 0 {
@@ -148,7 +178,12 @@ func (s *ScheduledQuestionTestService) updateAlertStates(persistCtx context.Cont
 			if s.sendScheduledQuestionNotification(notifyCtx, current, run, kind, indices) && kind == "alert" {
 				for _, i := range indices {
 					sentAt := now
-					states[i].LastAlertAt = &sentAt
+					for _, state := range states {
+						if state.AccountID == run.Summary[i].AccountID {
+							state.LastAlertAt = &sentAt
+							break
+						}
+					}
 				}
 			}
 		}

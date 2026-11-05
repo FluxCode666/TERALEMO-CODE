@@ -284,7 +284,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	scheduledTestService := service.ProvideScheduledTestService(scheduledTestPlanRepository, scheduledTestResultRepository)
 	scheduledTestHandler := admin.NewScheduledTestHandler(scheduledTestService)
 	scheduledQuestionTestRepository := repository.NewScheduledQuestionTestRepository(db)
-	scheduledQuestionTestService := service.NewScheduledQuestionTestService(scheduledQuestionTestRepository, accountRepository, accountTestQuestionService, accountBatchTestService, settingRepository, emailService)
+	scheduledQuestionTestService := service.NewScheduledQuestionTestService(scheduledQuestionTestRepository, accountRepository, accountTestQuestionService, accountBatchTestService, settingRepository, emailService, usageLogRepository, sessionLimitCache)
 	scheduledQuestionTestHandler := admin.NewScheduledQuestionTestHandler(scheduledQuestionTestService)
 	channelHandler := admin.NewChannelHandler(channelService, billingService, pricingService)
 	channelMonitorHandler := admin.NewChannelMonitorHandler(channelMonitorService)

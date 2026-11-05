@@ -167,12 +167,13 @@ func TestScheduledQuestionSchedulingContinuesAfterAccountFailure(t *testing.T) {
 		{AccountID: 1, Alerting: true, Judged: 2, Total: 2, Ratio: scheduledQuestionPtr(0)},
 	}}
 	states, err := svc.updateAlertStates(context.Background(), plan, run)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, scheduling.setErr)
+	require.Nil(t, states, "a failed verdict batch must not be persisted by FinishRun")
 	require.Len(t, scheduling.actions, 2)
 	require.Zero(t, run.PausedAccounts)
-	for i, summary := range run.Summary {
+	for _, summary := range run.Summary {
 		require.Equal(t, "pause_failed", summary.ScheduleAction)
-		require.False(t, states[i].AutoPaused)
+		require.False(t, summary.AutoPaused)
 	}
 }
 
@@ -185,7 +186,7 @@ func (r *scheduledQuestionSchedulingRepo) SetSchedulable(ctx context.Context, id
 	return r.setErr
 }
 
-func TestScheduledQuestionSchedulingOwnership(t *testing.T) {
+func TestScheduledQuestionSchedulingPauseAndPassResumeRules(t *testing.T) {
 	for _, tc := range []struct {
 		name                                                                          string
 		pause, resume, owned, schedulable, alert, incomplete, unjudged, missing, fail bool
@@ -195,9 +196,9 @@ func TestScheduledQuestionSchedulingOwnership(t *testing.T) {
 	}{
 		{name: "pause schedulable failure", pause: true, schedulable: true, alert: true, action: "paused", ownedAfter: true, calls: 1},
 		{name: "manual pause never claimed", pause: true, alert: true},
-		{name: "other plan pause never resumed", resume: true},
+		{name: "manual pause resumes after pass", resume: true, action: "resumed", calls: 1},
 		{name: "resume owned", resume: true, owned: true, action: "resumed", calls: 1},
-		{name: "manual resume clears ownership", resume: true, owned: true, schedulable: true},
+		{name: "already schedulable has no action", resume: true, owned: true, schedulable: true, ownedAfter: true},
 		{name: "resume off preserves ownership", owned: true, ownedAfter: true},
 		{name: "unjudged preserves ownership", resume: true, owned: true, unjudged: true, ownedAfter: true},
 		{name: "incomplete cannot pause", pause: true, schedulable: true, alert: true, incomplete: true},
@@ -235,9 +236,14 @@ func TestScheduledQuestionSchedulingOwnership(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			states, err := svc.updateAlertStates(ctx, plan, run)
-			require.NoError(t, err)
+			if tc.fail {
+				require.ErrorIs(t, err, scheduling.setErr)
+				require.Nil(t, states)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.ownedAfter, states[0].AutoPaused)
+			}
 			require.Equal(t, tc.action, run.Summary[0].ScheduleAction)
-			require.Equal(t, tc.ownedAfter, states[0].AutoPaused)
 			require.Equal(t, tc.ownedAfter, run.Summary[0].AutoPaused)
 			require.Equal(t, tc.owned, previous.AutoPaused, "do not mutate previous snapshot")
 			require.Len(t, scheduling.actions, tc.calls)
@@ -336,6 +342,10 @@ func TestScheduledQuestionIncompleteAndSuppression(t *testing.T) {
 			require.Empty(t, scheduling.actions)
 			if reason != "incomplete" && reason != "current pause off" {
 				require.Empty(t, mail.mails)
+				require.Empty(t, repo.verdictCalls, "suppressed rounds must not publish account verdicts")
+				require.Empty(t, repo.states)
+			} else {
+				require.NotEmpty(t, repo.verdictCalls, "no scheduling action still publishes current verdicts")
 			}
 			if reason == "incomplete" {
 				require.True(t, run.Summary[0].Incomplete)
