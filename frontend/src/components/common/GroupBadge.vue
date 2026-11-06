@@ -11,14 +11,7 @@
     <span :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
     <!-- Right side label -->
     <span v-if="showLabel" :class="labelClass">
-      <template v-if="hasCustomRate">
-        <!-- 原倍率删除线 + 专属倍率高亮 -->
-        <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
-        <span class="font-bold">{{ userRateMultiplier }}x</span>
-      </template>
-      <template v-else>
-        {{ labelText }}
-      </template>
+      {{ labelText }}
     </span>
     <span v-if="hasPeakRate" :class="peakRateClass" :title="peakRateTitle">
       {{ peakRateText }}
@@ -80,6 +73,11 @@ const hasCustomRate = computed(() => {
   )
 })
 
+// 生效倍率：有专属倍率（个人或企业改价）时只展示专属倍率，不展示分组原倍率
+const effectiveRate = computed(() => {
+  return hasCustomRate.value ? props.userRateMultiplier : props.rateMultiplier
+})
+
 const appStore = useAppStore()
 
 const hasPeakRate = computed(() => {
@@ -108,13 +106,15 @@ const showLabel = computed(() => {
   // 订阅类型：显示天数或"订阅"
   if (isSubscription.value) return true
   // 标准类型：显示倍率（包括专属倍率）
-  return props.rateMultiplier !== undefined || hasCustomRate.value
+  return effectiveRate.value !== undefined && effectiveRate.value !== null
 })
 
 // Label text
 const labelText = computed(() => {
-  const rateLabel = props.rateMultiplier !== undefined ? `${props.rateMultiplier}x` : ''
-  if (isSubscription.value && !props.alwaysShowRate) {
+  const rateLabel =
+    effectiveRate.value !== undefined && effectiveRate.value !== null ? `${effectiveRate.value}x` : ''
+  // 有专属倍率时与改动前一致：订阅分组也展示倍率而非剩余天数
+  if (isSubscription.value && !props.alwaysShowRate && !hasCustomRate.value) {
     // 如果有剩余天数，显示天数
     if (props.daysRemaining !== null && props.daysRemaining !== undefined) {
       if (props.daysRemaining <= 0) {

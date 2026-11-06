@@ -148,17 +148,16 @@ describe('PlazaModelPricingTable', () => {
     expect(text).toContain('0.5x')
   })
 
-  it('用户专属倍率覆盖分组倍率,并划线展示原倍率', () => {
-    const wrapper = mountTable([tokenModel()], 1, 0.8)
+  it('用户专属倍率覆盖分组倍率,倍率列只展示专属倍率、不展示原倍率', () => {
+    const wrapper = mountTable([tokenModel()], 1.5, 0.8)
     const text = wrapper.text()
     // 实付按 0.8:3 × 0.8 = 2.4
     expect(text).toContain('$2.40')
     expect(text).toContain('$12.00')
-    // 倍率列:原倍率划线 + 专属倍率
-    const struck = wrapper.find('td .line-through')
-    expect(struck.exists()).toBe(true)
-    expect(struck.text()).toBe('1x')
+    // 倍率列:只有专属倍率,没有划线原倍率
+    expect(wrapper.find('td .line-through').exists()).toBe(false)
     expect(text).toContain('0.8x')
+    expect(text).not.toContain('1.5x')
   })
 
   it('模型按官方输出价从高到低排序,无官方价的排最后', () => {

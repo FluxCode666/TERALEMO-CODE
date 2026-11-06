@@ -42,3 +42,25 @@ describe('GroupOptionItem description layout', () => {
     expect(wrapper.find('[title]').attributes('title')).toBe(description)
   })
 })
+
+describe('GroupOptionItem rate pill', () => {
+  const mountItem = (props: Record<string, unknown>) =>
+    mount(GroupOptionItem, {
+      props: { name: 'Example group', platform: 'openai', ...props },
+      global: { stubs: { GroupBadge: true } },
+    })
+
+  it('专属倍率只展示专属倍率,不展示划线的原倍率', () => {
+    const wrapper = mountItem({ rateMultiplier: 1.5, userRateMultiplier: 0.8 })
+
+    expect(wrapper.find('.line-through').exists()).toBe(false)
+    expect(wrapper.text()).toContain('0.8x admin.groups.rateLabel')
+    expect(wrapper.text()).not.toContain('1.5x')
+  })
+
+  it('无专属倍率时展示分组倍率', () => {
+    const wrapper = mountItem({ rateMultiplier: 1.5, userRateMultiplier: null })
+
+    expect(wrapper.text()).toContain('1.5x admin.groups.rateLabel')
+  })
+})

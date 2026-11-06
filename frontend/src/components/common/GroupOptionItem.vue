@@ -27,13 +27,7 @@
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
         <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-          <template v-if="hasCustomRate">
-            <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
-            <span class="font-bold">{{ userRateMultiplier }}x</span>
-          </template>
-          <template v-else>
-            {{ rateMultiplier }}x {{ t('admin.groups.rateLabel') }}
-          </template>
+          {{ effectiveRate }}x {{ t('admin.groups.rateLabel') }}
         </span>
         <span
           v-if="hasPeakRate"
@@ -91,15 +85,8 @@ const props = withDefaults(defineProps<Props>(), {
   peakRateEnabled: false
 })
 
-// Whether user has a custom rate different from default
-const hasCustomRate = computed(() => {
-  return (
-    props.userRateMultiplier !== null &&
-    props.userRateMultiplier !== undefined &&
-    props.rateMultiplier !== undefined &&
-    props.userRateMultiplier !== props.rateMultiplier
-  )
-})
+// 生效倍率：有专属倍率（个人或企业改价）时只展示专属倍率，不展示分组原倍率
+const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
 
 const appStore = useAppStore()
 
