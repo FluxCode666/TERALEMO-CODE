@@ -698,7 +698,14 @@ func TestScheduledQuestionCRUDValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, update := range []bool{false, true} {
 				svc, repo, accounts, questions := newScheduledQuestionFixture()
-				repo.plans[1] = scheduledQuestionValidPlan(1)
+				stored := scheduledQuestionValidPlan(1)
+				if update {
+					// Update revalidates only the dependency sets that actually changed,
+					// so store a different set: the submitted ids below then count as an
+					// edit and the dependency cases still exercise the check.
+					stored.AccountIDs, stored.QuestionIDs = []int64{8, 9}, []int64{8, 9}
+				}
+				repo.plans[1] = stored
 				input := scheduledQuestionValidInput()
 				tc.change(&input, accounts, questions)
 				var err error
