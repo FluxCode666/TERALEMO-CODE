@@ -33,6 +33,90 @@ type ImageStorage interface {
 	Save(ctx context.Context, key, contentType string, data []byte) (url string, err error)
 }
 
+// ImageStorageReader 是对象存储的可选读取能力。需要内联字节的调用方（创作页的
+// Gemini 首帧与生图编辑）必须经它读回对象，不得用 HTTP 客户端下载自己发出的链接：
+// 现有图片下载客户端会拒绝私网与回环地址，自建 MinIO 会因此失败。
+//
+// 返回的 contentType 由存储实现决定（通常取自对象元数据），调用方可再嗅探纠正。
+// 实现必须在读出超过 maxBytes 时返回错误，绝不截断后当作成功。
+type ImageStorageReader interface {
+	Read(ctx context.Context, key string, maxBytes int64) (data []byte, contentType string, err error)
+}
+
+// ImageStorageLinkPolicy 是对象存储的可选链接策略声明：permanent 表示返回的链接
+// 是公开直链（不会过期），否则 ttl 是 presigned 链接的有效期。
+// 上传记录的有效期按它计算：min(24h, ttl)，permanent 时为 24h。
+type ImageStorageLinkPolicy interface {
+	LinkPolicy() (permanent bool, ttl time.Duration)
+}
+
+// defaultImageStorageLinkTTL 是存储未声明链接策略时假定的 presigned 有效期，
+// 与 S3 实现的默认 presign_expiry_hours 一致。
+const defaultImageStorageLinkTTL = 24 * time.Hour
+
+var (
+	// ErrImageStorageUnavailable 表示当前没有生效的对象存储绑定。
+	ErrImageStorageUnavailable = errors.New("object storage is not available")
+	// ErrImageStorageReadUnsupported 表示当前存储实现没有读取能力。
+	ErrImageStorageReadUnsupported = errors.New("object storage does not support reading objects")
+)
+
+// SaveObject 把 data 写入 prefix + relKey，并返回可下载链接。
+// relKey 是相对 key（不含已配置的 prefix），与 ImageResultUploader.Rewrite 拼接方式一致。
+func (u *ImageResultUploader) SaveObject(ctx context.Context, relKey, contentType string, data []byte) (string, error) {
+	if u == nil || u.storage == nil {
+		return "", ErrImageStorageUnavailable
+	}
+	key := strings.TrimSpace(relKey)
+	if key == "" {
+		return "", errors.New("object storage key is empty")
+	}
+	if contentType = strings.TrimSpace(contentType); contentType == "" {
+		contentType = detectImageContentType(data)
+	}
+	url, err := u.storage.Save(ctx, u.prefix+key, contentType, data)
+	if err != nil {
+		return "", err
+	}
+	return url, nil
+}
+
+// ReadObject 从 prefix + relKey 读回对象字节；存储未实现 ImageStorageReader 时返回
+// ErrImageStorageReadUnsupported，由调用方映射成明确的错误响应。
+func (u *ImageResultUploader) ReadObject(ctx context.Context, relKey string, maxBytes int64) ([]byte, string, error) {
+	if u == nil || u.storage == nil {
+		return nil, "", ErrImageStorageUnavailable
+	}
+	reader, ok := u.storage.(ImageStorageReader)
+	if !ok {
+		return nil, "", ErrImageStorageReadUnsupported
+	}
+	key := strings.TrimSpace(relKey)
+	if key == "" {
+		return nil, "", errors.New("object storage key is empty")
+	}
+	if maxBytes <= 0 {
+		maxBytes = u.maxDownloadBytes
+	}
+	return reader.Read(ctx, u.prefix+key, maxBytes)
+}
+
+// LinkPolicy 透传存储声明的链接策略；未实现时按 presigned + 24h 处理。
+func (u *ImageResultUploader) LinkPolicy() (bool, time.Duration) {
+	if u == nil || u.storage == nil {
+		return false, defaultImageStorageLinkTTL
+	}
+	policy, ok := u.storage.(ImageStorageLinkPolicy)
+	if !ok {
+		return false, defaultImageStorageLinkTTL
+	}
+	permanent, ttl := policy.LinkPolicy()
+	if ttl <= 0 {
+		ttl = defaultImageStorageLinkTTL
+	}
+	return permanent, ttl
+}
+
 // ImageResultUploader 是 ImageStorage 的上层编排器（与具体厂商无关）：
 // 把上游生图响应里的每张图片（b64_json 解码 / url 下载）转存到对象存储，
 // 并把响应结果改写为只含短链接的紧凑 JSON，从而避免大 base64 落 Redis。

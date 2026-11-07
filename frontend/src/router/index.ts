@@ -190,6 +190,18 @@ const routes: RouteRecordRaw[] = [
 
   // ==================== User Routes ====================
   {
+    path: '/creation',
+    name: 'CreationStudio',
+    component: () => import('@/views/user/CreationStudioView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Creation studio',
+      titleKey: 'creationStudio.title',
+      descriptionKey: 'creationStudio.description',
+    },
+  },
+  {
     path: '/async-tasks',
     name: 'AsyncTasks',
     component: () => import('@/views/user/AsyncTasksView.vue'),

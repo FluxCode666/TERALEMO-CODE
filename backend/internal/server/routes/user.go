@@ -47,6 +47,14 @@ func RegisterUserRoutes(
 			user.POST("/async-tasks/:id/refresh", h.AsyncImage.RefreshUserTask)
 			user.GET("/async-tasks/:id/content", h.AsyncImage.DownloadUserTask)
 
+			// 创作页（contract docs/CREATION_STUDIO.md §1.1）：正文可能含提示词与图片，
+			// 故 body limit 与 Heavy 限流跟着路由注册。设计时已约定这四条与 /async-tasks
+			// 共用同一套 jwtAuth / BackendModeUserGuard / Global 限流 / auditLog。
+			user.GET("/creation/options", h.CreationStudio.Options)
+			user.POST("/creation/estimate", h.CreationStudio.Estimate)
+			user.POST("/creation/uploads", middleware.RequestBodyLimit(11<<20), panelRateLimiter.Heavy(), h.CreationStudio.Upload)
+			user.POST("/creation/tasks", middleware.RequestBodyLimit(1<<20), h.CreationStudio.Submit)
+
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")
 			{

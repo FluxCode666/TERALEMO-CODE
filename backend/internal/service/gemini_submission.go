@@ -165,6 +165,39 @@ func NormalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 	return prepared, info, err
 }
 
+// geminiVideoModelFamily classifies a mapped upstream model into the Veo family
+// whose billing capabilities apply. Values are unchanged from the previously
+// inlined switch inside normalizeGeminiVideoSubmission.
+func geminiVideoModelFamily(mappedModel string) string {
+	mappedModel = strings.TrimPrefix(strings.TrimSpace(mappedModel), "models/")
+	switch {
+	case strings.HasPrefix(mappedModel, "veo-2.0-"):
+		return "2"
+	case strings.HasPrefix(mappedModel, "veo-3.0-"):
+		return "3"
+	case strings.HasPrefix(mappedModel, "veo-3.1-"):
+		return "3.1"
+	}
+	return "unknown"
+}
+
+// geminiVideoModelLimits returns the official (pre account-override) capability
+// table of a mapped Gemini video model. The creation studio descriptors and the
+// submission normalizer must read the same table, so it lives in one place.
+func geminiVideoModelLimits(mappedModel string) videoModelLimits {
+	official := videoModelLimits{Resolutions: []string{VideoBillingResolution720P}, MinDuration: 8, MaxDuration: 8}
+	switch geminiVideoModelFamily(mappedModel) {
+	case "2":
+		official.MinDuration = 5
+	case "3":
+		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
+	case "3.1":
+		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
+		official.MinDuration, official.Durations = 4, []int{4, 6, 8}
+	}
+	return official
+}
+
 func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, GrokMediaRequestInfo, string, error) {
 	info, err := parseGeminiVideoSchedulingRequest(body)
 	if err != nil {
@@ -190,16 +223,8 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 	if references.Exists() && (!references.IsArray() || len(references.Array()) > 3) {
 		return nil, info, "", fmt.Errorf("referenceImages must be an array of at most three images")
 	}
-	family := "unknown"
-	switch {
-	case strings.HasPrefix(upstreamModel, "veo-2.0-"):
-		family = "2"
-	case strings.HasPrefix(upstreamModel, "veo-3.0-"):
-		family = "3"
-	case strings.HasPrefix(upstreamModel, "veo-3.1-"):
-		family = "3.1"
-	}
-	official := videoModelLimits{Resolutions: []string{VideoBillingResolution720P}, MinDuration: 8, MaxDuration: 8}
+	family := geminiVideoModelFamily(upstreamModel)
+	official := geminiVideoModelLimits(upstreamModel)
 	switch family {
 	case "2":
 		// Google's Veo 2 cookbook prose documents 1-2 (some code comments say
@@ -207,7 +232,6 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		if info.N > 2 {
 			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 2 requires 1-2 videos")
 		}
-		official.MinDuration = 5
 		if len(references.Array()) > 0 {
 			return nil, info, "", fmt.Errorf("referenceImages requires Gemini Veo 3.1")
 		}
@@ -215,7 +239,6 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		if info.N != 1 {
 			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 3 requires one video")
 		}
-		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
 		if len(references.Array()) > 0 {
 			return nil, info, "", fmt.Errorf("referenceImages requires Gemini Veo 3.1")
 		}
@@ -223,8 +246,6 @@ func normalizeGeminiVideoSubmission(body []byte, account *Account) ([]byte, Grok
 		if info.N != 1 {
 			return nil, info, "", fmt.Errorf("invalid video request: Gemini Veo 3.1 requires one video")
 		}
-		official.Resolutions = []string{VideoBillingResolution720P, VideoBillingResolution1080P}
-		official.MinDuration, official.Durations = 4, []int{4, 6, 8}
 	default:
 		// Private names retain conservative defaults unless the administrator
 		// declares the compatible relay's duration and resolution capabilities.

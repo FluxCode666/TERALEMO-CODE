@@ -132,6 +132,8 @@ var auditActionOverrides = map[string]string{
 	"POST /api/v1/auth/register":                              service.AuditActionRegister,
 	"POST /api/v1/auth/refresh":                               service.AuditActionTokenRefresh,
 	"POST /api/v1/user/totp/step-up":                          service.AuditActionStepUpVerify,
+	"POST /api/v1/user/creation/uploads":                      "user.creation.upload",
+	"POST /api/v1/user/creation/tasks":                        "user.creation.submit",
 	"POST /api/v1/admin/audit-logs/clear":                     service.AuditActionAuditLogClear,
 	"POST /api/v1/admin/accounts/data":                        "admin.accounts.import",
 	"POST /api/v1/admin/backups":                              "admin.backups.create",
@@ -161,6 +163,10 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 	"POST /api/v1/admin/prompt-audit/events/batch-delete":       {},
 	"POST /api/v1/admin/prompt-audit/events/delete-preview":     {},
 	"POST /api/v1/admin/prompt-audit/events/delete-by-filter":   {},
+	// 创作页：正文是提示词、表单参数与 multipart 图片，键级脱敏无法覆盖。
+	"POST /api/v1/user/creation/estimate": {},
+	"POST /api/v1/user/creation/uploads":  {},
+	"POST /api/v1/user/creation/tasks":    {},
 }
 
 // NewAuditLogMiddleware 创建审计中间件。

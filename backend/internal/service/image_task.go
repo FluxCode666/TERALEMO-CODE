@@ -153,6 +153,14 @@ func (s *ImageTaskService) ExecutionTimeout() time.Duration {
 	return s.executionTimeout
 }
 
+// CurrentUploader exposes the currently effective result uploader together with
+// the enablement flag. Creation studio uploads reuse the same object storage
+// binding (same switch, same client, same prefix) through this accessor instead
+// of wiring a second storage dependency.
+func (s *ImageTaskService) CurrentUploader() (*ImageResultUploader, bool) {
+	return s.current()
+}
+
 func (s *ImageTaskService) Create(ctx context.Context, owner ImageTaskOwner) (*ImageTask, error) {
 	return s.CreateWithMetadata(ctx, owner, "", "", nil)
 }

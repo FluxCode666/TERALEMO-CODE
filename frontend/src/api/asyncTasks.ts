@@ -10,6 +10,7 @@ export interface AsyncTask {
   api_key_id: number
   group_id?: number
   result_url?: string
+  result_urls?: string[]
   error?: string
   created_at: number
   completed_at?: number

@@ -47,6 +47,7 @@ export default {
     "refreshFailed": "Some tasks could not be refreshed from the upstream. Try again later.",
     "loadFailed": "Failed to load tasks. Please retry.",
     "viewResult": "View result",
+    "resultIndex": "Result {index}",
     "download": "Download video",
     "downloadFailed": "Failed to download the video. Please retry later."
   },

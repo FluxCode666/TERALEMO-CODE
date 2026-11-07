@@ -485,11 +485,18 @@ func IsGPTImageGenerationModel(model string) bool {
 	return strings.HasPrefix(model, "gpt-image-")
 }
 
-func isGrokImageGenerationModel(model string) bool {
+// IsGrokImageGenerationModel identifies the Grok image-generation model family.
+// Exported so the creation studio catalog reuses this predicate instead of
+// maintaining a second copy of the model family list.
+func IsGrokImageGenerationModel(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
 	return model == "grok-imagine" ||
 		model == "grok-imagine-edit" ||
 		strings.HasPrefix(model, "grok-imagine-image")
+}
+
+func isGrokImageGenerationModel(model string) bool {
+	return IsGrokImageGenerationModel(model)
 }
 
 func validateOpenAIImagesModel(model string) error {

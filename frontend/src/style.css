@@ -1,4 +1,5 @@
 @import './styles/shadcn.css';
+@import './styles/creation-studio.css';
 
 @tailwind base;
 @tailwind components;

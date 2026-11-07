@@ -144,4 +144,20 @@ describe('Admin AsyncTasksView', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('asyncTasks.loadFailed')
     wrapper.unmount()
   })
+
+  it('renders every safe image result as a thumbnail and lists them all in the detail dialog', async () => {
+    const imageTask: AdminAsyncTask = { ...task, kind: 'image', status: 'completed',
+      result_url: 'https://cdn.example/a.png', result_urls: ['https://cdn.example/a.png', 'https://cdn.example/b.png', 'javascript:alert(1)'] }
+    vi.mocked(adminAsyncTasksAPI.list).mockResolvedValue({ items: [imageTask], total: 1, page: 1, page_size: 20 })
+    vi.mocked(adminAsyncTasksAPI.get).mockResolvedValue(imageTask)
+    const wrapper = mount(AsyncTasksView)
+    await flushPromises()
+    expect(wrapper.findAll('img').map(img => img.attributes('src'))).toEqual(['https://cdn.example/a.png', 'https://cdn.example/b.png'])
+    expect(wrapper.find('[href^="javascript:"], [src^="javascript:"]').exists()).toBe(false)
+    await wrapper.findAll('button').find(button => button.text() === 'adminAsyncTasks.details')!.trigger('click')
+    await flushPromises()
+    const dialogLinks = wrapper.get('[role="dialog"]').findAll('a')
+    expect(dialogLinks.map(link => link.attributes('href'))).toEqual(['https://cdn.example/a.png', 'https://cdn.example/b.png'])
+    wrapper.unmount()
+  })
 })

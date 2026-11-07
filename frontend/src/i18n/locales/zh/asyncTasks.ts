@@ -47,6 +47,7 @@ export default {
     "refreshFailed": "部分任务暂时无法从上游刷新，请稍后重试。",
     "loadFailed": "任务加载失败，请重试。",
     "viewResult": "查看结果",
+    "resultIndex": "结果 {index}",
     "download": "下载视频",
     "downloadFailed": "视频下载失败，请稍后重试。"
   },

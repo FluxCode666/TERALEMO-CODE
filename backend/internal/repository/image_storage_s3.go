@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ type S3ImageStorage struct {
 }
 
 var _ service.ImageStorage = (*S3ImageStorage)(nil)
+var _ service.ImageStorageReader = (*S3ImageStorage)(nil)
+var _ service.ImageStorageLinkPolicy = (*S3ImageStorage)(nil)
 
 // NewS3ImageStorage 依据配置构造 S3 图片存储（调用方应先确认 cfg.Active()）。
 func NewS3ImageStorage(ctx context.Context, cfg *config.ImageStorageConfig) (*S3ImageStorage, error) {
@@ -48,6 +51,45 @@ func NewS3ImageStorage(ctx context.Context, cfg *config.ImageStorageConfig) (*S3
 		publicBaseURL: strings.TrimRight(cfg.PublicBaseURL, "/"),
 		presignExpiry: expiry,
 	}, nil
+}
+
+// LinkPolicy reports whether Save returns a permanent public link and, when it
+// does not, the lifetime of the presigned link it hands out.
+func (s *S3ImageStorage) LinkPolicy() (permanent bool, ttl time.Duration) {
+	return s.publicBaseURL != "", s.presignExpiry
+}
+
+// Read fetches an object through GetObject. It is used when a caller needs the
+// bytes inline (Gemini first frame, image edits) and must not go through an HTTP
+// download of our own link: the shared download client rejects private hosts, so
+// a self-hosted MinIO would fail.
+func (s *S3ImageStorage) Read(ctx context.Context, key string, maxBytes int64) ([]byte, string, error) {
+	finish := servertiming.ObserveDependency(ctx, "s3")
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    &key,
+	})
+	finish()
+	if err != nil {
+		return nil, "", fmt.Errorf("S3 GetObject: %w", err)
+	}
+	defer func() { _ = out.Body.Close() }()
+	limit := maxBytes
+	if limit <= 0 {
+		limit = 32 << 20
+	}
+	data, err := io.ReadAll(io.LimitReader(out.Body, limit+1))
+	if err != nil {
+		return nil, "", fmt.Errorf("S3 GetObject body: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, "", fmt.Errorf("S3 object exceeds %d bytes", limit)
+	}
+	contentType := ""
+	if out.ContentType != nil {
+		contentType = strings.ToLower(strings.TrimSpace(strings.Split(*out.ContentType, ";")[0]))
+	}
+	return data, contentType, nil
 }
 
 // Save 上传图片字节，返回可访问 URL：配了 public_base_url 则返回公开直链，否则返回 presigned 临时链接。

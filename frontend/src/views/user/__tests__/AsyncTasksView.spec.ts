@@ -120,4 +120,28 @@ describe('AsyncTasksView', () => {
     expect(wrapper.text()).not.toContain('asyncTasks.downloadFailed')
     wrapper.unmount()
   })
+
+  it('renders every safe image result as a thumbnail and drops unsafe ones', async () => {
+    const task = { id: 'imgtask_2', task_id: 'img-2', kind: 'image' as const, protocol: 'openai', status: 'completed' as const, api_key_id: 9, created_at: 100, expires_at: 200,
+      result_url: 'https://cdn.example/1.png', result_urls: ['https://cdn.example/1.png', 'https://cdn.example/2.png', 'javascript:alert(1)'] }
+    vi.mocked(asyncTasksAPI.list).mockResolvedValue({ items: [task], total: 1, page: 1, page_size: 20 })
+    const wrapper = mount(AsyncTasksView)
+    await flushPromises()
+    expect(wrapper.findAll('img').map(img => img.attributes('src'))).toEqual(['https://cdn.example/1.png', 'https://cdn.example/2.png'])
+    // 缩略图链接（每张结果一个）；操作列的「查看结果」指向第一张，单独计数。
+    const thumbLinks = wrapper.findAll('a').filter(link => link.find('img').exists())
+    expect(thumbLinks).toHaveLength(2)
+    expect(wrapper.find('[href^="javascript:"], [src^="javascript:"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps a single image result in the actions column and falls back to result_url', async () => {
+    const task = { id: 'imgtask_3', task_id: 'img-3', kind: 'image' as const, protocol: 'openai', status: 'completed' as const, api_key_id: 9, created_at: 100, expires_at: 200, result_url: 'https://cdn.example/only.png' }
+    vi.mocked(asyncTasksAPI.list).mockResolvedValue({ items: [task], total: 1, page: 1, page_size: 20 })
+    const wrapper = mount(AsyncTasksView)
+    await flushPromises()
+    expect(wrapper.findAll('img')).toHaveLength(0)
+    expect(wrapper.get('a[href="https://cdn.example/only.png"]').text()).toBe('asyncTasks.viewResult')
+    wrapper.unmount()
+  })
 })

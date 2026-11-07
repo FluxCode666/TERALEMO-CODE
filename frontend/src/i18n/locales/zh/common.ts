@@ -172,6 +172,7 @@ export default {
 
   // Navigation
   nav: {
+    creationStudio: '创作',
     asyncTasks: '异步任务',
     apiDocs: 'API 文档',
     globalAsyncTasks: '全局异步任务',
