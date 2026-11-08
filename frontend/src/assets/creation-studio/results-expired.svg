@@ -1,0 +1,27 @@
+<!--
+  创作页 · 结果过期插画（结果链接超过保留期 / 已被清理）
+  用法：img 标签，class 为 cs-illu 再加尺寸修饰类 cs-illu sm，alt=""，aria-hidden="true"
+  说明：淡化的图片框 + 琥珀色时钟，传达「内容还在、但已经取不回来」。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="112" viewBox="0 0 160 112" fill="none" role="img" aria-hidden="true">
+  <ellipse cx="80" cy="100" rx="44" ry="4" fill="#94a3b8" fill-opacity=".14" />
+
+  <!-- 淡化的结果卡片 -->
+  <rect x="34" y="24" width="76" height="62" rx="10" fill="#94a3b8" fill-opacity=".14" />
+  <rect x="34.75" y="24.75" width="74.5" height="60.5" rx="9.25" stroke="#64748b" stroke-opacity=".3" stroke-width="1.5" />
+  <path d="M38 77.5 54 60l9.5 10 7-6.5 12.5 14z" fill="#64748b" fill-opacity=".28" />
+  <circle cx="60" cy="40" r="4" fill="#64748b" fill-opacity=".25" />
+
+  <!-- 时钟 -->
+  <circle cx="108" cy="76" r="15" fill="#f59e0b" fill-opacity=".16" stroke="#f59e0b" stroke-opacity=".8" stroke-width="2" />
+  <path d="M108 68.5V76l5 3" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- 断开的链接示意 -->
+  <g stroke="#64748b" stroke-opacity=".45" stroke-width="2" stroke-linecap="round">
+    <path d="M26 48h10" />
+    <path d="M26 56h6" />
+  </g>
+
+  <circle cx="134" cy="40" r="2" fill="#64748b" fill-opacity=".3" />
+  <circle cx="22" cy="80" r="2" fill="#64748b" fill-opacity=".25" />
+</svg>

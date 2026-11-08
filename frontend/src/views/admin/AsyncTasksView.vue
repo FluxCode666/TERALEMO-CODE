@@ -92,6 +92,26 @@
                   <div class="break-all font-mono text-xs text-gray-800 dark:text-gray-200">{{ task.task_id }}</div>
                   <div class="mt-1 break-all text-gray-500 dark:text-gray-400">{{ task.model || '—' }}</div>
                   <div class="mt-1 text-xs text-gray-500">{{ t(`asyncTasks.${task.kind}`) }} · {{ task.protocol }}</div>
+                  <!-- 生图一次可出多张：全部结果以小缩略图列出（单张仍走操作列的「查看结果」） -->
+                  <div v-if="resultThumbs(task).length" class="mt-2 flex flex-wrap gap-1.5">
+                    <a
+                      v-for="(url, index) in resultThumbs(task)"
+                      :key="url"
+                      :href="url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="block h-10 w-10 overflow-hidden rounded-md border border-gray-200 hover:border-primary-400 dark:border-dark-700 dark:hover:border-primary-500"
+                      :title="t('asyncTasks.resultIndex', { index: index + 1 })"
+                      :aria-label="t('asyncTasks.resultIndex', { index: index + 1 })"
+                    >
+                      <img
+                        :src="url"
+                        :alt="t('asyncTasks.resultIndex', { index: index + 1 })"
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </a>
+                  </div>
                 </td>
                 <td class="max-w-[220px] px-5 py-4">
                   <div class="break-all text-gray-800 dark:text-gray-200">{{ task.user_name || task.user_email || `#${task.user_id}` }}</div>
@@ -134,9 +154,20 @@
           <dt class="text-gray-500 dark:text-gray-400">{{ t('adminAsyncTasks.error') }}</dt>
           <dd class="mt-1 whitespace-pre-wrap break-words text-red-600 dark:text-red-400">{{ detail.error }}</dd>
         </div>
-        <div v-if="safeURL(detail.result_url)" class="min-w-0 sm:col-span-2">
+        <div v-if="detailResultURLs.length" class="min-w-0 sm:col-span-2">
           <dt class="text-gray-500 dark:text-gray-400">{{ t('adminAsyncTasks.resultURL') }}</dt>
-          <dd class="mt-1 break-all"><a :href="safeURL(detail.result_url)" class="text-primary-600 underline dark:text-primary-400" target="_blank" rel="noopener noreferrer">{{ detail.result_url }}</a></dd>
+          <dd class="mt-1 space-y-1 break-all">
+            <a
+              v-for="(url, index) in detailResultURLs"
+              :key="url"
+              :href="url"
+              class="block text-primary-600 underline dark:text-primary-400"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span v-if="detailResultURLs.length > 1" class="mr-1 text-gray-500 no-underline dark:text-gray-400">{{ t('asyncTasks.resultIndex', { index: index + 1 }) }}</span>{{ url }}
+            </a>
+          </dd>
         </div>
       </dl>
     </BaseDialog>
@@ -144,13 +175,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import VideoBillingReservationsPanel from '@/components/admin/asyncTasks/VideoBillingReservationsPanel.vue'
 import { adminAsyncTasksAPI, type AdminAsyncTask } from '@/api/admin/asyncTasks'
+import { safeResultURLs } from '@/features/creation-studio/safeURL'
 
 const { t } = useI18n()
 const tabs = [
@@ -178,6 +210,16 @@ function safeURL(value?: string): string | undefined {
   try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : undefined } catch { return undefined }
 }
 function formatTime(value: number) { return new Date(value * 1000).toLocaleString() }
+/** 图片任务的多张结果（>1 时才展示缩略图；视频任务保持原样）。 */
+function resultThumbs(task: AdminAsyncTask): string[] {
+  if (task.kind !== 'image') return []
+  const urls = safeResultURLs(task.result_urls, task.result_url)
+  return urls.length > 1 ? urls : []
+}
+/** 详情弹窗列出全部结果链接，同样过滤不安全协议。 */
+const detailResultURLs = computed(() =>
+  detail.value ? safeResultURLs(detail.value.result_urls, detail.value.result_url) : [],
+)
 function statusClass(value: string) {
   return ({ processing: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300', completed: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300', failed: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300', cancelled: 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-400' })[value]
 }

@@ -62,6 +62,26 @@
                 <td class="max-w-xs px-5 py-4">
                   <div class="break-all font-mono text-xs text-gray-800 dark:text-gray-200">{{ task.task_id }}</div>
                   <div class="mt-1 break-all text-gray-500 dark:text-gray-400">{{ task.model || '—' }} · Key #{{ task.api_key_id }}</div>
+                  <!-- 生图一次可出多张：全部结果以小缩略图列出（单张仍走操作列的「查看结果」） -->
+                  <div v-if="resultThumbs(task).length" class="mt-2 flex flex-wrap gap-1.5">
+                    <a
+                      v-for="(url, index) in resultThumbs(task)"
+                      :key="url"
+                      :href="url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="block h-10 w-10 overflow-hidden rounded-md border border-gray-200 hover:border-primary-400 dark:border-dark-700 dark:hover:border-primary-500"
+                      :title="t('asyncTasks.resultIndex', { index: index + 1 })"
+                      :aria-label="t('asyncTasks.resultIndex', { index: index + 1 })"
+                    >
+                      <img
+                        :src="url"
+                        :alt="t('asyncTasks.resultIndex', { index: index + 1 })"
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </a>
+                  </div>
                   <p v-if="task.error" class="mt-1 break-words text-xs text-red-600 dark:text-red-400">{{ task.error }}</p>
                 </td>
                 <td class="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">{{ t(`asyncTasks.${task.kind}`) }}<div class="mt-1 text-xs text-gray-500">{{ task.protocol || '—' }}</div></td>
@@ -90,6 +110,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { asyncTasksAPI, type AsyncTask } from '@/api/asyncTasks'
+import { safeResultURLs } from '@/features/creation-studio/safeURL'
 
 const { t } = useI18n()
 const items = ref<AsyncTask[]>([])
@@ -106,6 +127,12 @@ function safeURL(value?: string): string | undefined {
   try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : undefined } catch { return undefined }
 }
 function formatTime(value: number) { return new Date(value * 1000).toLocaleString() }
+/** 图片任务的多张结果（>1 时才展示缩略图；视频任务保持原样）。 */
+function resultThumbs(task: AsyncTask): string[] {
+  if (task.kind !== 'image') return []
+  const urls = safeResultURLs(task.result_urls, task.result_url)
+  return urls.length > 1 ? urls : []
+}
 function statusClass(value: string) {
   return ({ processing: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300', completed: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300', failed: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300', cancelled: 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-400' })[value]
 }

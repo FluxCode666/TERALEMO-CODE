@@ -31,7 +31,7 @@
           <label class="text-sm">{{ t('admin.scheduledQuestionTests.form.name') }}<input v-model="form.name" data-test="plan-name" class="input mt-1" /></label>
           <label class="text-sm">{{ t('admin.scheduledQuestionTests.form.accountIds') }}<input v-model="accountInput" data-test="account-ids" class="input mt-1" placeholder="1, 2, 3" /><span class="mt-1 block text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.accountIdsHint', { count: parsedAccountIds.length }) }}</span></label>
           <fieldset class="text-sm"><legend>{{ t('admin.scheduledQuestionTests.form.questions') }}</legend><div class="mt-1 max-h-32 overflow-auto rounded border p-2"><label v-for="question in questions" :key="question.id" class="block"><input v-model="form.question_ids" type="checkbox" :value="question.id" data-test="question-option" /> {{ question.name }}</label><span v-if="questions.length === 0" class="text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.noQuestions') }}</span></div></fieldset>
-          <div class="text-sm"><label>{{ t('admin.scheduledQuestionTests.form.model') }}</label><div class="mt-1 flex gap-3"><label><input v-model="modelMode" type="radio" value="default" /> {{ t('admin.scheduledQuestionTests.form.defaultModel') }}</label><label><input v-model="modelMode" type="radio" value="custom" :disabled="crossPlatform" /> {{ t('admin.scheduledQuestionTests.form.customModel') }}</label></div><Select v-if="modelMode === 'custom'" v-model="form.model_id" data-test="plan-model" class="mt-1" :options="modelOptions" :disabled="crossPlatform || modelLoading || modelOptions.length === 0" :loading="modelLoading" /></div>
+          <div class="text-sm"><label>{{ t('admin.scheduledQuestionTests.form.model') }}</label><div class="mt-1 flex gap-3"><label><input v-model="modelMode" type="radio" value="default" /> {{ t('admin.scheduledQuestionTests.form.defaultModel') }}</label><label><input v-model="modelMode" type="radio" value="custom" :disabled="crossPlatformBlocking" /> {{ t('admin.scheduledQuestionTests.form.customModel') }}</label></div><Select v-if="modelMode === 'custom'" v-model="form.model_id" data-test="plan-model" class="mt-1" :options="modelOptionsForForm" :disabled="crossPlatformBlocking || modelLoading || modelOptionsForForm.length === 0" :loading="modelLoading" /></div>
           <label class="text-sm">{{ t('admin.scheduledQuestionTests.form.cron') }}<input v-model="form.cron_expression" data-test="cron" class="input mt-1" placeholder="*/30 * * * *" /><span class="mt-1 block text-xs text-gray-500">{{ t('admin.scheduledQuestionTests.form.cronHint') }}</span></label>
           <label class="text-sm">{{ t('admin.scheduledQuestionTests.form.threshold') }}<input v-model.number="form.min_pass_ratio" data-test="threshold" type="number" min="0" max="100" class="input mt-1" /></label>
           <label class="text-sm">{{ t('admin.scheduledQuestionTests.form.cooldown') }}<input v-model.number="form.cooldown_minutes" data-test="cooldown" type="number" min="0" max="10080" class="input mt-1" /></label>
@@ -52,10 +52,11 @@
           </fieldset>
         </div>
         <p v-if="noNotificationChannel" role="alert" data-test="no-channel-hint" class="mt-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.scheduledQuestionTests.form.noChannelHint') }}</p>
-        <p v-if="crossPlatform" role="alert" class="mt-3 text-sm text-red-600">{{ t('admin.scheduledQuestionTests.crossPlatform') }}</p>
+        <p v-if="crossPlatformBlocking" role="alert" class="mt-3 text-sm text-red-600">{{ t('admin.scheduledQuestionTests.crossPlatform') }}</p>
+        <p v-else-if="crossPlatformHint" class="mt-3 text-sm text-amber-600">{{ t(`admin.scheduledQuestionTests.${crossPlatformHint}`) }}</p>
         <p v-else-if="modelLoadFailed" class="mt-3 text-sm text-amber-600">{{ t('admin.scheduledQuestionTests.modelsLoadFailed') }}</p>
-        <p v-else-if="modelOptions.length === 0 && modelMode === 'custom'" class="mt-3 text-sm text-amber-600">{{ t('admin.scheduledQuestionTests.noCommonModels') }}</p>
-        <div class="mt-4 flex justify-end gap-2"><button type="button" class="btn btn-secondary" @click="closeForm">{{ t('common.cancel') }}</button><button type="button" data-test="save-plan" class="btn btn-primary" :disabled="saving || crossPlatform || modelLoading" @click="savePlan">{{ t('common.save') }}</button></div>
+        <p v-else-if="modelOptionsForForm.length === 0 && modelMode === 'custom'" class="mt-3 text-sm text-amber-600">{{ t('admin.scheduledQuestionTests.noCommonModels') }}</p>
+        <div class="mt-4 flex justify-end gap-2"><button type="button" class="btn btn-secondary" @click="closeForm">{{ t('common.cancel') }}</button><button type="button" data-test="save-plan" class="btn btn-primary" :disabled="saving || crossPlatformBlocking || modelLoading" @click="savePlan">{{ t('common.save') }}</button></div>
       </div>
 
       <div v-if="historyPlan" class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
@@ -169,6 +170,41 @@ const feishuWebhookPlaceholder = computed(() => storedWebhookConfigured.value
 const feishuSecretPlaceholder = computed(() => storedSecretConfigured.value ? t('admin.scheduledQuestionTests.form.feishuSecretPlaceholder') : '')
 const noNotificationChannel = computed(() => !form.email_enabled && !form.feishu_enabled && (form.notify_enabled || form.report_enabled))
 const parsedAccountIds = computed(() => [...new Set(accountInput.value.split(/[,\s]+/).map(Number).filter(id => Number.isInteger(id) && id > 0))])
+/**
+ * 编辑时账号集合是否与计划一致（去重、忽略顺序）。
+ * 账号没变就不应该因「共同模型」重新校验失败而阻断保存（用户只改 cron 的典型场景）。
+ */
+const accountsUnchanged = computed(() => {
+  const plan = editing.value
+  if (!plan) return false
+  const original = new Set(plan.account_ids)
+  const current = parsedAccountIds.value
+  return current.length === original.size && current.every(id => original.has(id))
+})
+/**
+ * 混合平台阻断保存：只看账号是否变过，与模型模式无关。
+ * - 新建：一律阻断（后端 Create 要求同平台）；
+ * - 编辑且账号已变：阻断（后端 Update 会重新校验，提前拦住以免点完保存才报错）；
+ * - 编辑且账号未变：不阻断，只给非阻断提示。
+ */
+const crossPlatformBlocking = computed(() =>
+  crossPlatform.value && (editing.value === null || !accountsUnchanged.value),
+)
+/** 混合平台但账号未变：按当前模型模式给非阻断提示。 */
+const crossPlatformHint = computed(() => {
+  if (!crossPlatform.value || crossPlatformBlocking.value) return ''
+  return modelMode.value === 'default' ? 'defaultModePlatformHint' : 'unchangedAccountsModelKept'
+})
+/**
+ * 账号未变时把原 `model_id` 补回可选项：共同模型加载失败也能原样保存（自定义模型模式）。
+ */
+const modelOptionsForForm = computed(() => {
+  const options = modelOptions.value
+  const current = form.model_id
+  if (!current || !accountsUnchanged.value) return options
+  if (options.some(option => option.value === current)) return options
+  return [{ value: current, label: current }, ...options]
+})
 let modalActive = false
 let modalVersion = 0
 let feishuTestVersion = 0

@@ -32,10 +32,12 @@ func (s *imageTaskStore) Save(ctx context.Context, task *service.ImageTaskRecord
 	}
 	pipe := s.rdb.TxPipeline()
 	pipe.Set(ctx, imageTaskKey(task.ID), data, ttl)
+	resultURLs := imageTaskResultURLs(task.Result)
 	record := &service.AsyncTaskRecord{AsyncTask: service.AsyncTask{
 		ID: task.ID, TaskID: task.ID, Kind: "image", Protocol: task.Platform, Model: task.Model,
 		Status: task.Status, APIKeyID: task.APIKeyID, GroupID: task.GroupID,
-		ResultURL: gjson.GetBytes(task.Result, "data.0.url").String(), Error: gjson.GetBytes(task.Error, "message").String(),
+		ResultURL: gjson.GetBytes(task.Result, "data.0.url").String(), ResultURLs: resultURLs,
+		Error:     gjson.GetBytes(task.Error, "message").String(),
 		CreatedAt: task.CreatedAt, CompletedAt: task.CompletedAt, ExpiresAt: task.ExpiresAt,
 	}, UserID: task.UserID, RequestID: task.ID}
 	if err := writeAsyncTask(ctx, pipe, record); err != nil {
@@ -62,6 +64,33 @@ func (s *imageTaskStore) Get(ctx context.Context, id string) (*service.ImageTask
 
 func imageTaskKey(id string) string {
 	return imageTaskKeyPrefix + strings.TrimSpace(id)
+}
+
+// imageTaskResultURLs collects every result link of an image task, preserving
+// the upstream order, skipping blank entries and bounding the list to 10.
+func imageTaskResultURLs(result json.RawMessage) []string {
+	if len(result) == 0 {
+		return nil
+	}
+	values := gjson.GetBytes(result, "data.#.url")
+	if !values.IsArray() {
+		return nil
+	}
+	urls := make([]string, 0, len(values.Array()))
+	for _, value := range values.Array() {
+		url := strings.TrimSpace(value.String())
+		if url == "" {
+			continue
+		}
+		urls = append(urls, url)
+		if len(urls) == 10 {
+			break
+		}
+	}
+	if len(urls) == 0 {
+		return nil
+	}
+	return urls
 }
 
 func asyncTaskKey(userID int64, id string) string {
@@ -167,4 +196,62 @@ func (s *imageTaskStore) ListAsyncTasks(ctx context.Context, userID int64) ([]se
 		}
 	}
 	return items, nil
+}
+
+// creationUploadKey is the Redis key of one upload record.
+func creationUploadKey(uploadID string) string {
+	return "creation_upload:" + strings.TrimSpace(uploadID)
+}
+
+// creationUploadIndex is the per-user sorted set of live upload IDs scored by
+// expiry, used to count and prune the 24h window without scanning keys.
+func creationUploadIndex(userID int64) string {
+	return fmt.Sprintf("creation_uploads:user:%d", userID)
+}
+
+// SaveCreationUpload writes the record with a TTL equal to its remaining
+// lifetime and refreshes the user index, dropping already-expired members.
+func (s *imageTaskStore) SaveCreationUpload(ctx context.Context, rec *service.CreationUploadRecord) error {
+	if rec == nil || strings.TrimSpace(rec.UploadID) == "" || rec.UserID <= 0 {
+		return service.ErrCreationUploadNotFound
+	}
+	ttl := time.Until(time.Unix(rec.ExpiresAt, 0))
+	if ttl <= 0 {
+		return service.ErrCreationUploadNotFound
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	index := creationUploadIndex(rec.UserID)
+	pipe := s.rdb.TxPipeline()
+	pipe.Set(ctx, creationUploadKey(rec.UploadID), data, ttl)
+	pipe.ZRemRangeByScore(ctx, index, "-inf", strconv.FormatInt(time.Now().Unix(), 10))
+	pipe.ZAdd(ctx, index, redis.Z{Score: float64(rec.ExpiresAt), Member: rec.UploadID})
+	pipe.Expire(ctx, index, 48*time.Hour)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func (s *imageTaskStore) GetCreationUpload(ctx context.Context, uploadID string) (*service.CreationUploadRecord, error) {
+	data, err := s.rdb.Get(ctx, creationUploadKey(uploadID)).Bytes()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, service.ErrCreationUploadNotFound
+		}
+		return nil, err
+	}
+	var record service.CreationUploadRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (s *imageTaskStore) CountActiveCreationUploads(ctx context.Context, userID int64) (int64, error) {
+	index := creationUploadIndex(userID)
+	if err := s.rdb.ZRemRangeByScore(ctx, index, "-inf", strconv.FormatInt(time.Now().Unix(), 10)).Err(); err != nil {
+		return 0, err
+	}
+	return s.rdb.ZCard(ctx, index).Result()
 }

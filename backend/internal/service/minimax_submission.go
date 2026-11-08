@@ -41,6 +41,24 @@ func ParseMiniMaxVideoSchedulingRequest(body []byte) (GrokMediaRequestInfo, erro
 	return v2Info, nil
 }
 
+// miniMaxVideoModelLimits returns the effective capability table (official values
+// plus account overrides) for a mapped MiniMax video model. The v2/v1 shape is
+// decided by the account's base URL, exactly as before the extraction; the
+// creation studio descriptors call this function so both sides share one table.
+func miniMaxVideoModelLimits(account *Account, mappedModel string) (videoModelLimits, error) {
+	if account != nil && miniMaxVideoV2(account.VideoBaseURL()) {
+		official := videoModelLimits{Resolutions: []string{"480p", "768p", "2k"}, MinDuration: 4, MaxDuration: 15}
+		if strings.EqualFold(mappedModel, "MiniMax-H3") {
+			official.Resolutions = []string{"768p", "2k"}
+		}
+		if strings.EqualFold(mappedModel, "MiniMax-H3-Max") {
+			official.Resolutions, official.MinDuration = []string{"480p", "768p"}, 5
+		}
+		return resolveVideoAccountLimits(account, official)
+	}
+	return resolveVideoAccountLimits(account, videoModelLimits{Resolutions: videoCapabilityResolutionOrder, MinDuration: 6, MaxDuration: 10, Durations: []int{6, 10}})
+}
+
 // NormalizeMiniMaxSubmission resolves the selected account's version and mapped
 // model before the caller freezes billing metadata. It retains the public model
 // in both results so forwarding maps it exactly once. All JSON mutations copy
@@ -64,14 +82,7 @@ func NormalizeMiniMaxSubmission(body []byte, account *Account, requireV2 bool) (
 	mappedModel := account.GetMappedModel(publicModel)
 	var err error
 	if miniMaxVideoV2(account.VideoBaseURL()) {
-		official := videoModelLimits{Resolutions: []string{"480p", "768p", "2k"}, MinDuration: 4, MaxDuration: 15}
-		if strings.EqualFold(mappedModel, "MiniMax-H3") {
-			official.Resolutions = []string{"768p", "2k"}
-		}
-		if strings.EqualFold(mappedModel, "MiniMax-H3-Max") {
-			official.Resolutions, official.MinDuration = []string{"480p", "768p"}, 5
-		}
-		limits, limitErr := resolveVideoAccountLimits(account, official)
+		limits, limitErr := miniMaxVideoModelLimits(account, mappedModel)
 		if limitErr != nil {
 			return nil, info, limitErr
 		}
@@ -84,7 +95,7 @@ func NormalizeMiniMaxSubmission(body []byte, account *Account, requireV2 bool) (
 		if requireV2 || gjson.GetBytes(body, "content").Exists() || miniMaxH3Model(publicModel) || miniMaxH3Model(mappedModel) {
 			return nil, info, ErrMiniMaxVideoAccountIncompatible
 		}
-		limits, limitErr := resolveVideoAccountLimits(account, videoModelLimits{Resolutions: videoCapabilityResolutionOrder, MinDuration: 6, MaxDuration: 10, Durations: []int{6, 10}})
+		limits, limitErr := miniMaxVideoModelLimits(account, mappedModel)
 		if limitErr != nil {
 			return nil, info, limitErr
 		}

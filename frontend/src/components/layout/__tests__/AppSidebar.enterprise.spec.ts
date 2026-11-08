@@ -50,11 +50,11 @@ describe('AppSidebar 异步任务入口', () => {
     wrapper.unmount()
   })
   it.each([
-    { isAdmin: false, isSimpleMode: false, previousPath: '/usage' },
-    { isAdmin: false, isSimpleMode: true, previousPath: '/keys' },
-    { isAdmin: true, isSimpleMode: false, previousPath: '/usage' },
-    { isAdmin: true, isSimpleMode: true, previousPath: '/keys' },
-  ])('管理员=$isAdmin，简易模式=$isSimpleMode 时提供唯一且可高亮的入口', ({ isAdmin, isSimpleMode, previousPath }) => {
+    { isAdmin: false, isSimpleMode: false, creationPreviousPath: '/usage' },
+    { isAdmin: false, isSimpleMode: true, creationPreviousPath: '/keys' },
+    { isAdmin: true, isSimpleMode: false, creationPreviousPath: '/usage' },
+    { isAdmin: true, isSimpleMode: true, creationPreviousPath: '/keys' },
+  ])('管理员=$isAdmin，简易模式=$isSimpleMode 时提供唯一且可高亮的入口', ({ isAdmin, isSimpleMode, creationPreviousPath }) => {
     mocks.auth.isAdmin = isAdmin
     mocks.auth.isSimpleMode = isSimpleMode
     mocks.route.path = '/async-tasks'
@@ -65,7 +65,15 @@ describe('AppSidebar 异步任务入口', () => {
     expect(taskLinks[0]?.text()).toBe('nav.asyncTasks')
     expect(taskLinks[0]?.classes()).toContain('sidebar-link-active')
     const index = links.findIndex(link => link.attributes('href') === '/async-tasks')
-    expect(links[index - 1]?.attributes('href')).toBe(previousPath)
+    // 契约 §10.2：创作入口直接插在异步任务之前。
+    expect(links[index - 1]?.attributes('href')).toBe('/creation')
+    // 创作入口唯一，且仍紧跟在原来的前一项（普通模式 /usage，简易模式 /keys）之后。
+    const creationLinks = wrapper.findAll('a[href="/creation"]')
+    expect(creationLinks).toHaveLength(1)
+    expect(creationLinks[0]?.text()).toBe('nav.creationStudio')
+    const creationIndex = links.findIndex(link => link.attributes('href') === '/creation')
+    expect(creationIndex).toBeGreaterThan(0)
+    expect(links[creationIndex - 1]?.attributes('href')).toBe(creationPreviousPath)
     wrapper.unmount()
   })
 })

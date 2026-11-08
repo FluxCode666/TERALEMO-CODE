@@ -192,32 +192,36 @@ func TestScheduledQuestionValidationReenableRechecksDependencies(t *testing.T) {
 	})
 }
 
-func TestScheduledQuestionValidationExplicitIDArraysRecheckAllDependencies(t *testing.T) {
+// TestScheduledQuestionValidationChangedIDArraysRecheckDependencies: submitting
+// the arrays is not itself an edit. Update revalidates a dependency set only when
+// that set actually differs from the stored one (previously mere presence of the
+// field revalidated everything, which blocked cron-only saves once a referenced
+// account was deleted or a question was disabled).
+func TestScheduledQuestionValidationChangedIDArraysRecheckDependencies(t *testing.T) {
 	for _, dependency := range scheduledQuestionInvalidDependencies() {
-		for _, field := range []string{"account_ids", "question_ids"} {
-			for _, disable := range []bool{false, true} {
-				label := "unchanged enabled"
-				if disable {
-					label = "also disabling"
-				}
-				t.Run(dependency.name+"/"+field+"/"+label, func(t *testing.T) {
-					svc, repo, accounts, questions := newScheduledQuestionFixture()
-					repo.plans[1] = scheduledQuestionValidPlan(1)
-					dependency.breakDep(accounts, questions)
-					input := ScheduledQuestionTestPlanInput{}
-					if field == "account_ids" {
-						input.AccountIDs = scheduledQuestionPtr([]int64{2, 1})
-					} else {
-						input.QuestionIDs = scheduledQuestionPtr([]int64{2, 1})
-					}
-					if disable {
-						input.Enabled = scheduledQuestionPtr(false)
-					}
-					_, err := svc.Update(context.Background(), 1, input)
-					requireScheduledQuestionDependencyValidation(t, err, dependency)
-					require.Zero(t, repo.updated)
-				})
+		for _, disable := range []bool{false, true} {
+			label := "unchanged enabled"
+			if disable {
+				label = "also disabling"
 			}
+			t.Run(dependency.name+"/"+label, func(t *testing.T) {
+				svc, repo, accounts, questions := newScheduledQuestionFixture()
+				// Store ids other than the submitted ones so both sets are real edits.
+				stored := scheduledQuestionValidPlan(1)
+				stored.AccountIDs, stored.QuestionIDs = []int64{8, 9}, []int64{8, 9}
+				repo.plans[1] = stored
+				dependency.breakDep(accounts, questions)
+				input := ScheduledQuestionTestPlanInput{
+					AccountIDs:  scheduledQuestionPtr([]int64{2, 1}),
+					QuestionIDs: scheduledQuestionPtr([]int64{2, 1}),
+				}
+				if disable {
+					input.Enabled = scheduledQuestionPtr(false)
+				}
+				_, err := svc.Update(context.Background(), 1, input)
+				requireScheduledQuestionDependencyValidation(t, err, dependency)
+				require.Zero(t, repo.updated)
+			})
 		}
 	}
 }

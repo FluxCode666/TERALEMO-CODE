@@ -1,0 +1,28 @@
+<!--
+  创作页 · 暂不可用插画（无可用 API Key / 无可用模型 / 对象存储未开启）
+  用法：<img class="cs-illu" src="...setup-required.svg" alt="" aria-hidden="true" />
+  说明：占位框 + 钥匙 + 琥珀色提示角标，中性灰配一处琥珀强调色，浅/深色底均可读。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="112" viewBox="0 0 160 112" fill="none" role="img" aria-hidden="true">
+  <ellipse cx="80" cy="104" rx="48" ry="4.5" fill="#94a3b8" fill-opacity=".16" />
+
+  <!-- 虚线占位框 -->
+  <rect x="30" y="22" width="100" height="72" rx="12" fill="#94a3b8" fill-opacity=".12" />
+  <rect x="30.75" y="22.75" width="98.5" height="70.5" rx="11.25" stroke="#64748b" stroke-opacity=".45" stroke-width="1.5" stroke-dasharray="6 6" />
+
+  <!-- 钥匙 -->
+  <g transform="rotate(-32 80 58)">
+    <circle cx="68" cy="58" r="9.5" fill="none" stroke="#0d9488" stroke-opacity=".85" stroke-width="3" />
+    <rect x="76" y="56.5" width="26" height="3" rx="1.5" fill="#0d9488" fill-opacity=".85" />
+    <rect x="92" y="59.5" width="3.5" height="7" rx="1.5" fill="#0d9488" fill-opacity=".85" />
+    <rect x="99" y="59.5" width="3.5" height="5" rx="1.5" fill="#0d9488" fill-opacity=".85" />
+  </g>
+
+  <!-- 提示角标 -->
+  <circle cx="118" cy="30" r="12" fill="#f59e0b" fill-opacity=".18" stroke="#f59e0b" stroke-opacity=".7" stroke-width="1.5" />
+  <rect x="116.75" y="23.5" width="2.5" height="8" rx="1.25" fill="#d97706" />
+  <circle cx="118" cy="35" r="1.6" fill="#d97706" />
+
+  <circle cx="20" cy="88" r="2" fill="#64748b" fill-opacity=".35" />
+  <circle cx="142" cy="72" r="2.5" fill="#64748b" fill-opacity=".25" />
+</svg>

@@ -1837,7 +1837,7 @@ export default {
       stateAfter: '本轮后状态：{state}',
       stateAlert: '告警中',
       stateOk: '正常',
-      title: '定时测试', create: '新建定时测试', edit: '编辑定时测试', empty: '暂无定时测试计划', loadFailed: '加载定时测试失败', saveFailed: '保存定时测试失败', deleteConfirm: '确定删除此计划吗？', runNow: '立即执行', history: '历史记录', yes: '是', no: '否', alerting: '告警', ok: '正常', noRuns: '暂无运行记录', crossPlatform: '批量测试只支持同一平台的账号，请重新选择', noCommonModels: '所选账号没有共同的可用模型，请改用默认模型', modelsLoadFailed: '共同模型加载失败，可继续使用各账号默认模型', validation: '请填写有效的名称、账号、题目、五段 cron，并确认阈值和冷却范围',
+      title: '定时测试', create: '新建定时测试', edit: '编辑定时测试', empty: '暂无定时测试计划', loadFailed: '加载定时测试失败', saveFailed: '保存定时测试失败', deleteConfirm: '确定删除此计划吗？', runNow: '立即执行', history: '历史记录', yes: '是', no: '否', alerting: '告警', ok: '正常', noRuns: '暂无运行记录', crossPlatform: '批量测试只支持同一平台的账号，请重新选择', noCommonModels: '所选账号没有共同的可用模型，请改用默认模型', modelsLoadFailed: '共同模型加载失败，可继续使用各账号默认模型', defaultModePlatformHint: '账号未修改，仍使用各账号默认模型，可直接保存', unchangedAccountsModelKept: '账号未修改，已保留原模型，可直接保存', validation: '请填写有效的名称、账号、题目、五段 cron，并确认阈值和冷却范围',
       recentRun: '通过 {passed}/{total} · 告警 {alerted}', recentRunSkipped: '通过 {passed}/{total} · 告警 {alerted} · 跳过 {skipped}', runSummary: '通过 {passed} · 未通过 {alerted} · 跳过 {skipped} · 共 {total}', noDetails: '无明细', running: '执行中…', runFailed: '执行计划失败', deleteFailed: '删除计划失败', historyFailed: '加载运行历史失败', columns: { name: '名称', accounts: '账号数', questions: '题目数', cron: 'Cron', threshold: '阈值', enabled: '启用', lastRun: '最近一轮', nextRun: '下次执行', actions: '操作' },
       results: { passed: '通过', failed: '未通过', unjudged: '需人工', error: '出错', incomplete: '未完成', skipped: '已跳过' },
       skipReasons: { quota_exceeded: '配额已用尽', window_cost_exceeded: '5h 窗口费用达到阈值', rate_limited: '上游限流中' },

@@ -252,6 +252,9 @@ func ProvideHandlers(
 		ModelPlaza:       modelPlazaHandler,
 		AsyncImage:       asyncImageHandler,
 		BatchImage:       batchImageHandler,
+		// Built from handlers that are already injected, so the Wire constructor
+		// signature (and wire_gen.go) stays untouched.
+		CreationStudio: NewCreationStudioHandler(openaiGatewayHandler.apiKeyService, openaiGatewayHandler.gatewayService, asyncImageHandler.tasks),
 	}
 }
 

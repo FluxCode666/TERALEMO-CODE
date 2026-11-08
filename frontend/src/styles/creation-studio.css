@@ -1,0 +1,1424 @@
+/*
+ * 创作页（Creation Studio）样式层
+ *
+ * 规范：src/styles/creation-studio.spec.md
+ * 引入：在 src/style.css 第一行 `@import './styles/shadcn.css';` 之后追加
+ *         @import './styles/creation-studio.css';
+ *       Vite 会先把它内联，再交给 Tailwind 处理，所以下面的 @layer 和 @apply 才能生效。
+ *       不要在 .vue 里单独 import：单独引入的文件没有 @tailwind 指令，@layer 会报错。
+ *
+ * 约定：
+ * - 只声明 `cs-` 前缀的组件类和 `--cs-*` 变量；颜色、圆角、阴影都复用 tailwind.config.js 里的
+ *   primary / dark / gray 色阶，与 .card / .btn / .input / .badge 保持同一视觉。
+ * - 组件类放在 Tailwind 的 components 层，页面没用到时会被 purge；模板里的工具类可以覆盖它们。
+ * - 状态尽量用 data-* / aria-* 属性表达（data-state、data-status、aria-selected 等），
+ *   同时兼容 reka-ui 原语自带的 data-state，减少 :class 拼接。
+ * - 过渡与动画直接写 transition / animation 声明，不 @apply duration-* / ease-*：
+ *   tailwind.config.js 把这些工具类额外挂到了 shadcn-scope 上，@apply 会带出多余规则。
+ * - 不在样式里写任何用户可见文案。
+ */
+
+@layer base {
+  :root {
+    /* 布局 */
+    --cs-form-col: 100%; /* 表单列宽，由 .cs-layout 按断点重设 */
+    --cs-sticky-top: 5rem; /* AppHeader h-16 + main 顶部内边距，由 .cs-layout 按断点重设 */
+    --cs-tile-min: 9rem; /* 结果网格最小单元宽度 */
+    --cs-tile-radius: 0.75rem;
+
+    /* 媒体区域（HSL 通道，与 shadcn.css 写法一致） */
+    --cs-media-bg: 220 14.3% 95.9%; /* gray-100 #f3f4f6 */
+    --cs-checker-a: 0 0% 100%; /* 透明底棋盘格 */
+    --cs-checker-b: 220 13% 91%; /* gray-200 #e5e7eb */
+    --cs-overlay: 0 0% 0% / 0.55; /* 悬浮操作条底部渐变 */
+    --cs-shimmer: 0 0% 100% / 0.65; /* 骨架扫光 */
+  }
+
+  html.dark {
+    --cs-media-bg: 222.2 47.4% 11.2%; /* dark-900 #0f172a */
+    --cs-checker-a: 217.2 32.6% 17.5%; /* dark-800 #1e293b */
+    --cs-checker-b: 215.3 25% 26.7%; /* dark-700 #334155 */
+    --cs-overlay: 0 0% 0% / 0.65;
+    --cs-shimmer: 0 0% 100% / 0.07;
+  }
+}
+
+@layer components {
+  /* ================= 页面骨架 ================= */
+  .cs-page {
+    @apply min-w-0 space-y-5;
+  }
+
+  .cs-header {
+    @apply flex flex-wrap items-start justify-between gap-4;
+  }
+
+  .cs-title {
+    @apply text-xl font-semibold text-gray-900 dark:text-gray-100;
+  }
+
+  .cs-description {
+    @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
+  }
+
+  /* 两栏布局：< md 单列；>= md 左表单（固定宽）+ 右结果（自适应） */
+  .cs-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @screen md {
+    .cs-layout {
+      --cs-form-col: 20rem;
+      --cs-sticky-top: 5.5rem;
+      grid-template-columns: var(--cs-form-col) minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+
+  @screen lg {
+    .cs-layout {
+      --cs-form-col: 21.25rem;
+      --cs-sticky-top: 6rem;
+    }
+  }
+
+  @screen xl {
+    .cs-layout {
+      --cs-form-col: 23.75rem;
+    }
+  }
+
+  @screen 2xl {
+    .cs-layout {
+      --cs-form-col: 26.25rem;
+    }
+  }
+
+  /* 移动端「参数 / 结果」切换条（md 以上隐藏） */
+  .cs-view-switch-bar {
+    /* 不用 @apply sticky：会连带 style.css 里的 `.table-wrapper thead.sticky` 规则 */
+    position: sticky;
+    @apply top-16 z-20 -mx-4 bg-gray-50/85 px-4 py-2 backdrop-blur-md dark:bg-dark-950/85 md:hidden;
+  }
+
+  /* ================= 分段切换（模式切换 / 移动端视图切换 / 历史筛选） ================= */
+  .cs-segmented {
+    @apply inline-flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800;
+  }
+
+  .cs-segmented-item {
+    @apply inline-flex min-h-[2.25rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-1.5 text-sm font-medium;
+    @apply text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .cs-segmented-item[aria-selected='true'],
+  .cs-segmented-item[aria-checked='true'],
+  .cs-segmented-item[data-state='active'],
+  .cs-segmented-item[data-state='on'] {
+    @apply bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white;
+  }
+
+  .cs-segmented-item svg {
+    @apply h-4 w-4 shrink-0;
+  }
+
+  /* 不可用但仍可选的选项（例如对象存储未开启时的「生图」），右上角小圆点提示 */
+  .cs-segmented-item[data-unavailable='true'] {
+    @apply relative;
+  }
+
+  .cs-segmented-item[data-unavailable='true']::after {
+    content: '';
+    @apply absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-amber-500;
+  }
+
+  .cs-segmented-badge {
+    @apply min-w-[1.25rem] rounded-full bg-primary-100 px-1.5 text-center text-[11px] font-semibold leading-4 tabular-nums text-primary-700 dark:bg-primary-900/40 dark:text-primary-300;
+  }
+
+  /* 顶部模式切换：比普通分段更醒目，移动端占满一行 */
+  .cs-mode-switch {
+    @apply w-full sm:w-auto;
+  }
+
+  .cs-mode-switch .cs-segmented-item {
+    @apply min-h-[2.5rem] sm:px-5;
+  }
+
+  /* ================= 表单面板 ================= */
+  .cs-form-panel {
+    @apply flex min-w-0 flex-col;
+  }
+
+  @screen md {
+    .cs-form-panel {
+      position: sticky;
+      top: var(--cs-sticky-top);
+      max-height: calc(100vh - var(--cs-sticky-top) - 1.5rem);
+      max-height: calc(100dvh - var(--cs-sticky-top) - 1.5rem);
+      overflow: hidden; /* 只在桌面裁切：移动端底部提交栏需要相对视口 sticky */
+    }
+  }
+
+  .cs-form-body {
+    @apply min-h-0 flex-1 space-y-5 p-4 sm:p-5;
+  }
+
+  @screen md {
+    .cs-form-body {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+
+  .cs-form-footer {
+    @apply space-y-3 rounded-b-2xl border-t border-gray-100 bg-gray-50/60 p-4 dark:border-dark-700 dark:bg-dark-900/40 sm:px-5;
+  }
+
+  @media (max-width: 767.98px) {
+    .cs-form-footer {
+      position: sticky;
+      @apply bottom-0 z-10 bg-white/95 backdrop-blur-md dark:bg-dark-900/95;
+      padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  .cs-group {
+    @apply space-y-4;
+  }
+
+  .cs-group + .cs-group {
+    @apply border-t border-gray-100 pt-5 dark:border-dark-700/70;
+  }
+
+  .cs-group-title {
+    @apply text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500;
+  }
+
+  /* 「高级参数」折叠触发器，兼容 aria-expanded 与 reka-ui Collapsible 的 data-state */
+  .cs-disclosure {
+    @apply flex w-full items-center justify-between gap-2 rounded-lg py-1 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50;
+  }
+
+  .cs-disclosure svg {
+    @apply h-4 w-4 shrink-0 text-gray-400 dark:text-dark-500;
+    transition: transform 0.2s ease;
+  }
+
+  .cs-disclosure[aria-expanded='true'] svg,
+  .cs-disclosure[data-state='open'] svg {
+    transform: rotate(180deg);
+  }
+
+  /* ================= 表单字段 ================= */
+  .cs-field {
+    @apply min-w-0 space-y-1.5;
+  }
+
+  .cs-field-head {
+    @apply flex items-center justify-between gap-2;
+  }
+
+  .cs-field-label {
+    @apply text-sm font-medium text-gray-700 dark:text-gray-300;
+  }
+
+  .cs-field-optional {
+    @apply ml-1 text-xs font-normal text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-field-hint {
+    @apply text-xs text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-field-error {
+    @apply flex items-start gap-1 text-xs text-red-600 dark:text-red-400;
+  }
+
+  .cs-field-error svg {
+    @apply mt-px h-3.5 w-3.5 shrink-0;
+  }
+
+  .cs-field-counter {
+    @apply text-xs tabular-nums text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-field-counter[data-over='true'] {
+    @apply font-medium text-red-600 dark:text-red-400;
+  }
+
+  /* 提示词：与 .input 组合使用 → class="input cs-prompt" */
+  .cs-prompt {
+    @apply resize-y leading-relaxed;
+    min-height: 7.5rem;
+    max-height: 22rem;
+  }
+
+  .cs-prompt-footer {
+    @apply flex items-center justify-between gap-2 text-xs text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-kbd {
+    @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-gray-200 bg-gray-50 px-1 font-mono text-[11px] leading-none text-gray-500 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-400;
+  }
+
+  /* Select 下拉项内容（Select 的下拉层 teleport 到 body，这些类是全局的） */
+  .cs-option {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
+  .cs-option-main {
+    @apply min-w-0 flex-1;
+  }
+
+  .cs-option-name {
+    @apply block truncate text-sm;
+  }
+
+  .cs-option-sub {
+    @apply block truncate font-mono text-[11px] text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-option-aside {
+    @apply shrink-0 text-xs tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-option-reason {
+    @apply block text-[11px] text-amber-600 dark:text-amber-400;
+  }
+
+  /* ================= 选项胶囊（单选 radio） =================
+   * 推荐结构：
+   *   <div class="cs-chip-group" role="radiogroup" aria-labelledby="...">
+   *     <label><input type="radio" class="cs-chip-input" ...><span class="cs-chip">…</span></label>
+   *   </div>
+   * 也兼容 reka-ui RadioGroupItem（data-state='checked'）或 aria-checked。
+   */
+  .cs-chip-group {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .cs-chip-group--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    @apply gap-2;
+  }
+
+  .cs-chip-input {
+    @apply sr-only;
+  }
+
+  .cs-chip {
+    @apply inline-flex min-h-[2.25rem] w-full cursor-pointer select-none items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm;
+    @apply border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50;
+    @apply dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:border-dark-500 dark:hover:bg-dark-700;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cs-chip-group:not(.cs-chip-group--grid) .cs-chip {
+    @apply w-auto;
+  }
+
+  .cs-chip-input:focus-visible + .cs-chip,
+  .cs-chip:focus-visible {
+    @apply outline-none ring-2 ring-primary-500/50 ring-offset-1 dark:ring-offset-dark-900;
+  }
+
+  .cs-chip-input:checked + .cs-chip,
+  .cs-chip[aria-checked='true'],
+  .cs-chip[data-state='checked'] {
+    @apply border-primary-500 bg-primary-50 font-medium text-primary-700;
+    @apply dark:border-primary-500/70 dark:bg-primary-900/30 dark:text-primary-300;
+  }
+
+  .cs-chip-input:disabled + .cs-chip,
+  .cs-chip[aria-disabled='true'],
+  .cs-chip[data-disabled] {
+    @apply cursor-not-allowed opacity-50 hover:border-gray-200 hover:bg-white dark:hover:border-dark-600 dark:hover:bg-dark-800;
+  }
+
+  .cs-chip-stack {
+    @apply flex-col gap-0.5 py-2 leading-tight;
+  }
+
+  .cs-chip-sub {
+    @apply text-[11px] font-normal tabular-nums text-gray-400 dark:text-dark-400;
+  }
+
+  .cs-chip-input:checked + .cs-chip .cs-chip-sub,
+  .cs-chip[aria-checked='true'] .cs-chip-sub,
+  .cs-chip[data-state='checked'] .cs-chip-sub {
+    @apply text-primary-600/80 dark:text-primary-300/70;
+  }
+
+  /* 比例示意框：style="--cs-ratio-w: 2; --cs-ratio-h: 3"，长边固定 1.125rem */
+  .cs-ratio-glyph {
+    --_w: var(--cs-ratio-w, 1);
+    --_h: var(--cs-ratio-h, 1);
+    width: calc(1.125rem * var(--_w) / max(var(--_w), var(--_h)));
+    height: calc(1.125rem * var(--_h) / max(var(--_w), var(--_h)));
+    @apply inline-block shrink-0 rounded-[3px] border-[1.5px] border-current opacity-70;
+  }
+
+  /* ================= 数字步进器（数量 / 时长等整数范围） ================= */
+  .cs-stepper {
+    @apply inline-flex items-stretch overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .cs-stepper:focus-within {
+    @apply border-primary-500 ring-2 ring-primary-500/30;
+  }
+
+  .cs-stepper[data-invalid='true'] {
+    @apply border-red-500 ring-red-500/30;
+  }
+
+  .cs-stepper[aria-disabled='true'] {
+    @apply cursor-not-allowed bg-gray-100 opacity-60 dark:bg-dark-900;
+  }
+
+  .cs-stepper-btn {
+    @apply flex w-9 items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900;
+    @apply disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent;
+    @apply dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-white;
+    @apply focus-visible:bg-gray-50 focus-visible:outline-none dark:focus-visible:bg-dark-700;
+  }
+
+  .cs-stepper-btn svg {
+    @apply h-4 w-4;
+  }
+
+  .cs-stepper-input {
+    @apply w-14 border-x border-gray-200 bg-transparent py-2 text-center text-sm tabular-nums text-gray-900 focus:outline-none dark:border-dark-600 dark:text-gray-100;
+  }
+
+  .cs-stepper-unit {
+    @apply flex items-center pr-3 text-xs text-gray-400 dark:text-dark-500;
+  }
+
+  /* ================= 参考图 / 首帧上传 ================= */
+  .cs-dropzone {
+    @apply relative flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 text-center text-sm;
+    @apply border-gray-300 bg-gray-50/60 text-gray-500 hover:border-primary-400 hover:bg-primary-50/40 hover:text-gray-700;
+    @apply dark:border-dark-600 dark:bg-dark-900/30 dark:text-dark-400 dark:hover:border-primary-500/60 dark:hover:bg-primary-900/10 dark:hover:text-dark-200;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cs-dropzone:focus-visible,
+  .cs-dropzone:focus-within {
+    @apply outline-none ring-2 ring-primary-500/50 ring-offset-2 dark:ring-offset-dark-900;
+  }
+
+  .cs-dropzone[data-dragover='true'] {
+    @apply border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-900/20 dark:text-primary-300;
+  }
+
+  .cs-dropzone[data-invalid='true'] {
+    @apply border-red-400 bg-red-50/60 dark:border-red-500/60 dark:bg-red-950/20;
+  }
+
+  .cs-dropzone[aria-disabled='true'] {
+    @apply cursor-not-allowed opacity-50 hover:border-gray-300 hover:bg-gray-50/60 hover:text-gray-500;
+    @apply dark:hover:border-dark-600 dark:hover:bg-dark-900/30 dark:hover:text-dark-400;
+  }
+
+  /*
+   * 能力不可用（对象存储未开启 → 无法上传参考图 / 首帧 / 编辑原图）：
+   *   <div class="cs-dropzone" data-state="unavailable" aria-disabled="true"> 不渲染 file input
+   * 与普通禁用的区别：不降透明度（要能读清原因），实线边框 + 中性底，图标用 CloudOff。
+   */
+  .cs-dropzone[data-state='unavailable'] {
+    @apply cursor-not-allowed border-solid border-gray-200 bg-gray-50 text-gray-500 opacity-100;
+    @apply hover:border-gray-200 hover:bg-gray-50 hover:text-gray-500;
+    @apply dark:border-dark-700 dark:bg-dark-800/60 dark:text-dark-400;
+    @apply dark:hover:border-dark-700 dark:hover:bg-dark-800/60 dark:hover:text-dark-400;
+  }
+
+  .cs-dropzone[data-state='unavailable'] .cs-dropzone-icon {
+    @apply text-amber-500;
+  }
+
+  /* 已有缩略图时，上传入口缩成网格里的一个方块 */
+  .cs-dropzone--tile {
+    @apply aspect-square gap-1 p-2 text-xs;
+  }
+
+  .cs-dropzone-icon {
+    @apply h-6 w-6 text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-dropzone[data-dragover='true'] .cs-dropzone-icon {
+    @apply text-primary-500;
+  }
+
+  .cs-dropzone-title {
+    @apply font-medium text-gray-700 dark:text-gray-200;
+  }
+
+  .cs-dropzone-hint {
+    @apply text-xs text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-thumb-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    @apply gap-2;
+  }
+
+  .cs-thumb {
+    @apply relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-dark-600 dark:bg-dark-900;
+  }
+
+  .cs-thumb > img {
+    @apply h-full w-full object-cover;
+  }
+
+  .cs-thumb[data-state='error'] {
+    @apply border-red-400 dark:border-red-500/60;
+  }
+
+  .cs-thumb-label {
+    @apply pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 text-[10px] font-medium leading-4 text-white;
+  }
+
+  .cs-thumb-remove {
+    @apply absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 hover:bg-black/80;
+    @apply focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white;
+    transition: opacity 0.15s ease;
+  }
+
+  .cs-thumb-remove svg {
+    @apply h-3.5 w-3.5;
+  }
+
+  .cs-thumb:hover .cs-thumb-remove,
+  .cs-thumb:focus-within .cs-thumb-remove {
+    opacity: 1;
+  }
+
+  /* 上传中：底部细进度条，宽度用 style="--cs-progress: 40%" */
+  .cs-thumb-progress {
+    @apply absolute inset-x-1.5 bottom-1.5 h-1 overflow-hidden rounded-full bg-white/40;
+  }
+
+  .cs-thumb-progress::after {
+    content: '';
+    @apply absolute inset-y-0 left-0 rounded-full bg-white;
+    width: var(--cs-progress, 0%);
+    transition: width 0.2s ease;
+  }
+
+  /*
+   * 上传失败（可重试的失败：CREATION_UPLOAD_STORAGE_FAILED / 网络中断）：
+   *   <div class="cs-thumb" data-state="error"><img …本地预览>
+   *     <button type="button" class="cs-thumb-error">[RotateCcw] <span class="cs-thumb-error-text">…</span></button>
+   *   </div>
+   * 整块是「原位重试」按钮；不可重试的校验类失败（413/415/422）不保留缩略图，只在字段下方报错。
+   */
+  .cs-thumb-error {
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center text-white;
+    background-color: rgb(220 38 38 / 0.72);
+    transition: background-color 0.15s ease;
+  }
+
+  button.cs-thumb-error:hover {
+    background-color: rgb(220 38 38 / 0.85);
+  }
+
+  button.cs-thumb-error:focus-visible {
+    @apply outline-none ring-2 ring-inset ring-white;
+  }
+
+  .cs-thumb-error svg {
+    @apply h-5 w-5 shrink-0;
+  }
+
+  .cs-thumb-error-text {
+    @apply text-[10px] font-medium leading-tight;
+  }
+
+  /*
+   * 参考图已过期（复用参数回填的链接已失效，或提交时被后端判定过期）：
+   *   <div class="cs-thumb" data-state="expired">
+   *     <button type="button" class="cs-thumb-expired">[Link2Off] <span class="cs-thumb-expired-text">…</span></button>
+   *     <span class="cs-thumb-label">…</span>  首帧等标签照常显示
+   *     <button class="cs-thumb-remove">…</button>
+   *   </div>
+   * 整块是「原位替换」按钮：点击打开文件选择，新图上传后占回同一位置（首帧顺序不变）。
+   * 不显示旧图（链接已失效，img 会裂图），用琥珀色占位。
+   */
+  .cs-thumb[data-state='expired'] {
+    @apply border-dashed border-amber-400 bg-amber-50 dark:border-amber-500/60 dark:bg-amber-950/30;
+  }
+
+  .cs-thumb-expired {
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center text-amber-700 hover:bg-amber-100/70;
+    @apply dark:text-amber-300 dark:hover:bg-amber-900/30;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500;
+    transition: background-color 0.15s ease;
+  }
+
+  .cs-thumb-expired svg {
+    @apply h-4 w-4 shrink-0;
+  }
+
+  .cs-thumb-expired-text {
+    @apply text-[10px] font-medium leading-tight;
+  }
+
+  /* 字段级警示（琥珀，非阻断的「需要你处理」），与 .cs-field-error 并列使用 */
+  .cs-field-warning {
+    @apply flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400;
+  }
+
+  .cs-field-warning svg {
+    @apply mt-px h-3.5 w-3.5 shrink-0;
+  }
+
+  /* 提示行里的行内操作（例如「重新上传」「全部移除」） */
+  .cs-field-action {
+    @apply ml-1 font-medium underline underline-offset-2 hover:opacity-80;
+    @apply focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current;
+  }
+
+  /* ================= 预计费用 / 提交 ================= */
+  .cs-cost {
+    @apply flex items-baseline justify-between gap-3 text-sm;
+  }
+
+  .cs-cost-label {
+    @apply text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-cost-value {
+    @apply text-lg font-semibold tabular-nums text-gray-900 dark:text-white;
+  }
+
+  .cs-cost-detail {
+    @apply text-xs tabular-nums text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-cost[data-state='insufficient'] .cs-cost-value {
+    @apply text-red-600 dark:text-red-400;
+  }
+
+  .cs-cost[data-state='unavailable'] .cs-cost-value {
+    @apply text-base font-medium text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-balance {
+    @apply flex items-center justify-between gap-2 text-xs tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  /* 提交按钮：与 .btn .btn-primary 组合 → class="btn btn-primary cs-submit" */
+  .cs-submit {
+    @apply h-11 w-full text-[15px];
+  }
+
+  .cs-submit[aria-busy='true'] {
+    cursor: progress;
+  }
+
+  .cs-submit-reason {
+    @apply text-center text-xs text-gray-500 dark:text-dark-400;
+  }
+
+  /* ================= 提示条 Callout（错误码、不可用、过期等） ================= */
+  .cs-callout {
+    @apply flex gap-3 rounded-xl border p-3.5 text-sm;
+  }
+
+  .cs-callout-icon {
+    @apply mt-0.5 h-4 w-4 shrink-0;
+  }
+
+  .cs-callout-content {
+    @apply min-w-0 flex-1;
+  }
+
+  .cs-callout-title {
+    @apply font-medium;
+  }
+
+  .cs-callout-body {
+    @apply mt-0.5 break-words text-[13px] leading-relaxed opacity-90;
+  }
+
+  .cs-callout-actions {
+    @apply mt-2 flex flex-wrap items-center gap-x-3 gap-y-2;
+  }
+
+  .cs-callout-link {
+    @apply font-medium underline underline-offset-2 hover:opacity-80;
+    @apply focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current;
+  }
+
+  .cs-callout--info {
+    @apply border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-200;
+  }
+
+  .cs-callout--warning {
+    @apply border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300;
+  }
+
+  .cs-callout--danger {
+    @apply border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300;
+  }
+
+  .cs-callout--neutral {
+    @apply border-gray-200 bg-gray-50 text-gray-700 dark:border-dark-700 dark:bg-dark-800/60 dark:text-gray-300;
+  }
+
+  /* ================= 空态 / 不可用 ================= */
+  .cs-empty {
+    @apply flex flex-col items-center px-6 py-12 text-center;
+  }
+
+  .cs-empty--compact {
+    @apply py-8;
+  }
+
+  /* 插画：<img class="cs-illu" src="@/assets/creation-studio/*.svg" alt="" aria-hidden="true"> */
+  .cs-illu {
+    @apply pointer-events-none mb-4 h-28 w-auto select-none;
+  }
+
+  .cs-illu--sm {
+    @apply mb-3 h-20;
+  }
+
+  .cs-empty-title {
+    @apply text-base font-semibold text-gray-900 dark:text-gray-100;
+  }
+
+  .cs-empty-desc {
+    @apply mt-1.5 max-w-sm text-sm text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-empty-actions {
+    @apply mt-5 flex flex-wrap justify-center gap-2;
+  }
+
+  .cs-suggestion {
+    @apply inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs;
+    @apply border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700;
+    @apply dark:border-dark-600 dark:bg-dark-800 dark:text-dark-300 dark:hover:border-primary-500/50 dark:hover:bg-primary-900/20 dark:hover:text-primary-300;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cs-suggestion svg {
+    @apply h-3.5 w-3.5 shrink-0;
+  }
+
+  .cs-suggestion > span {
+    @apply truncate;
+  }
+
+  /* ================= 结果列 / 区块标题 / 同步状态 ================= */
+  .cs-results {
+    @apply min-w-0 space-y-5;
+  }
+
+  .cs-section {
+    @apply space-y-3;
+  }
+
+  .cs-section-head {
+    @apply flex flex-wrap items-center justify-between gap-2;
+  }
+
+  .cs-section-title {
+    @apply flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100;
+  }
+
+  .cs-section-count {
+    @apply rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium tabular-nums text-gray-600 dark:bg-dark-700 dark:text-dark-300;
+  }
+
+  /* 自动更新指示：data-state = live | paused | error */
+  .cs-sync {
+    @apply inline-flex items-center gap-1.5 text-xs tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-sync-dot {
+    @apply relative inline-flex h-2 w-2 shrink-0 rounded-full bg-emerald-500;
+  }
+
+  .cs-sync-dot::after {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-emerald-500;
+    animation: cs-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .cs-sync[data-state='paused'] .cs-sync-dot,
+  .cs-sync[data-state='paused'] .cs-sync-dot::after {
+    @apply bg-gray-400 dark:bg-dark-500;
+    animation: none;
+  }
+
+  .cs-sync[data-state='error'] {
+    @apply text-amber-700 dark:text-amber-400;
+  }
+
+  .cs-sync[data-state='error'] .cs-sync-dot,
+  .cs-sync[data-state='error'] .cs-sync-dot::after {
+    @apply bg-amber-500;
+    animation: none;
+  }
+
+  /* ================= 任务卡片 ================= */
+  /* 与 .card 组合 → class="card cs-task" data-status="processing" */
+  .cs-task {
+    @apply relative min-w-0 overflow-hidden;
+    --cs-task-accent: transparent;
+  }
+
+  /* 左侧 3px 状态色条：只有需要关注的状态才上色 */
+  .cs-task::before {
+    content: '';
+    @apply pointer-events-none absolute inset-y-0 left-0 w-[3px];
+    background-color: var(--cs-task-accent);
+  }
+
+  .cs-task[data-status='queued'] {
+    --cs-task-accent: theme('colors.blue.300');
+  }
+
+  .cs-task[data-status='processing'] {
+    --cs-task-accent: theme('colors.blue.500');
+  }
+
+  .cs-task[data-status='failed'] {
+    --cs-task-accent: theme('colors.red.500');
+  }
+
+  .cs-task[data-status='expired'] {
+    --cs-task-accent: theme('colors.amber.400');
+  }
+
+  .cs-task-header {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 pt-4 sm:px-5;
+  }
+
+  .cs-task-kind {
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-dark-300;
+  }
+
+  .cs-task-kind svg {
+    @apply h-4 w-4;
+  }
+
+  .cs-task-title {
+    @apply min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100;
+  }
+
+  .cs-task-meta {
+    @apply flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-dot-sep {
+    @apply inline-block h-0.5 w-0.5 rounded-full bg-current opacity-60;
+  }
+
+  .cs-task-prompt {
+    @apply mt-2 line-clamp-2 whitespace-pre-line break-words px-4 text-sm leading-relaxed text-gray-700 dark:text-gray-300 sm:px-5;
+  }
+
+  .cs-task-prompt[data-expanded='true'] {
+    @apply line-clamp-none;
+  }
+
+  .cs-task-params {
+    @apply mt-2 flex flex-wrap gap-1.5 px-4 sm:px-5;
+  }
+
+  .cs-param-pill {
+    @apply inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs tabular-nums text-gray-600 dark:bg-dark-700/70 dark:text-dark-300;
+  }
+
+  .cs-param-pill svg {
+    @apply h-3 w-3;
+  }
+
+  .cs-task-body {
+    @apply mt-3 px-4 sm:px-5;
+  }
+
+  .cs-task-body:last-child {
+    @apply pb-4;
+  }
+
+  .cs-task-error {
+    @apply max-h-40 overflow-y-auto whitespace-pre-line break-words rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:bg-red-950/40 dark:text-red-300;
+  }
+
+  .cs-task-footer {
+    @apply mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-3 py-2 dark:border-dark-700 sm:px-4;
+  }
+
+  .cs-task-actions {
+    @apply flex flex-wrap items-center gap-1;
+  }
+
+  /* ================= 任务状态徽标（与 AsyncTasksView statusClass 同色） ================= */
+  .cs-status {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium;
+  }
+
+  .cs-status svg {
+    @apply h-3.5 w-3.5 shrink-0;
+  }
+
+  .cs-status--submitting {
+    @apply bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300;
+  }
+
+  /* 排队：同处理中蓝色系，用描边区分「尚未开始」 */
+  .cs-status--queued {
+    @apply bg-white text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-transparent dark:text-blue-300 dark:ring-blue-800;
+  }
+
+  .cs-status--processing {
+    @apply bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300;
+  }
+
+  .cs-status--completed {
+    @apply bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300;
+  }
+
+  .cs-status--failed {
+    @apply bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300;
+  }
+
+  .cs-status--cancelled {
+    @apply bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-400;
+  }
+
+  /* 派生状态：已完成但结果链接过期 */
+  .cs-status--expired {
+    @apply bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300;
+  }
+
+  /* ================= 进度条 ================= */
+  /* 有确定进度：style="--cs-progress: 42%"；无确定进度：data-indeterminate="true" */
+  .cs-progress {
+    @apply relative h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700;
+  }
+
+  .cs-progress-bar {
+    @apply h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-400;
+    width: var(--cs-progress, 0%);
+    transition: width 0.5s ease-out;
+  }
+
+  .cs-progress[data-indeterminate='true'] .cs-progress-bar {
+    @apply absolute inset-y-0;
+    width: 40%;
+    animation: cs-indeterminate 1.4s ease-in-out infinite;
+  }
+
+  .cs-progress-meta {
+    @apply mt-1.5 flex items-center justify-between gap-2 text-xs tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  /* ================= 结果网格 =================
+   * 生图一次 1–4 张、全部展示，网格按 data-count 固定排布（骨架期用请求数量，结果期用实际数量）：
+   *   1 → 单列，宽 ≤ 28rem，且高度 ≤ --cs-tile-max-h（竖图自动收窄，不会撑出一屏）
+   *   2 → 2 列，≤ 40rem
+   *   3 → 3 列，≤ 48rem
+   *   4 → 2×2，≤ 40rem
+   *   缺省 / >4 → auto-fill 兜底（--cs-tile-min，移动端 7rem）
+   * 比例写在网格上，单元继承：style="--cs-aspect-w: 2; --cs-aspect-h: 3"（数字）。
+   * 也可在单元上直接写 --cs-aspect: 2 / 3 覆盖（但单图限高需要 w/h 数字）。
+   */
+  .cs-media-grid {
+    --cs-tile-max-h: 32rem;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(var(--cs-tile-min), 1fr));
+  }
+
+  @media (max-width: 767.98px) {
+    .cs-media-grid {
+      --cs-tile-min: 7rem;
+      --cs-tile-max-h: 26rem;
+    }
+  }
+
+  .cs-media-grid[data-count='1'] {
+    grid-template-columns: minmax(
+      0,
+      min(28rem, calc(var(--cs-tile-max-h) * var(--cs-aspect-w, 1) / var(--cs-aspect-h, 1)))
+    );
+  }
+
+  .cs-media-grid[data-count='2'],
+  .cs-media-grid[data-count='4'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 40rem;
+  }
+
+  .cs-media-grid[data-count='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 48rem;
+  }
+
+  /* 单元比例：优先 --cs-aspect，其次继承网格的 --cs-aspect-w / --cs-aspect-h，默认 1:1 */
+  .cs-media-tile {
+    @apply relative overflow-hidden border border-gray-200/70 dark:border-dark-700;
+    aspect-ratio: var(--cs-aspect, var(--cs-aspect-w, 1) / var(--cs-aspect-h, 1));
+    border-radius: var(--cs-tile-radius);
+    background-color: hsl(var(--cs-media-bg));
+  }
+
+  .cs-media-tile > img,
+  .cs-media-img {
+    @apply h-full w-full object-cover;
+  }
+
+  .cs-media-tile[data-fit='contain'] > img {
+    @apply object-contain;
+  }
+
+  /* 透明底图片的棋盘格背景 */
+  .cs-checker {
+    background-image: conic-gradient(
+      hsl(var(--cs-checker-b)) 25%,
+      hsl(var(--cs-checker-a)) 0 50%,
+      hsl(var(--cs-checker-b)) 0 75%,
+      hsl(var(--cs-checker-a)) 0
+    );
+    background-size: 16px 16px;
+  }
+
+  /* 覆盖整块的「预览」按钮（打开灯箱），放在 img 之上、操作条之下 */
+  .cs-media-open {
+    @apply absolute inset-0 cursor-zoom-in focus-visible:outline-none;
+    border-radius: inherit;
+  }
+
+  .cs-media-open:focus-visible {
+    box-shadow: inset 0 0 0 2px theme('colors.primary.500');
+  }
+
+  .cs-media-index {
+    @apply pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/50 px-1.5 text-[11px] leading-5 tabular-nums text-white;
+  }
+
+  /* 文字角标（例如编辑对照里的「原图」），与 cs-media-index 同位置，二者不同时出现 */
+  .cs-media-tag {
+    @apply pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 text-[11px] font-medium leading-5 text-white;
+  }
+
+  /* ================= 编辑对照：原图 → 结果 =================
+   * <div class="cs-compare">                         容器（container query 以它的宽度为准）
+   *   <div class="cs-compare-body">
+   *     <figure class="cs-compare-source">
+   *       <div class="cs-media-tile" style="--cs-aspect-w: <原图宽>; --cs-aspect-h: <原图高>">…<span class="cs-media-tag">原图</span></div>
+   *       <figcaption class="cs-compare-label">原图 · 1024×1536</figcaption>
+   *     </figure>
+   *     <span class="cs-compare-arrow" aria-hidden="true"><ArrowRight /></span>
+   *     <div class="cs-compare-results">
+   *       <p class="cs-compare-label">结果 · 4 张</p>
+   *       <div class="cs-media-grid" data-count="4">…</div>
+   *     </div>
+   *   </div>
+   * </div>
+   * 窄（< 30rem，移动端 / md / lg 展开侧栏）：上下排布——原图缩成 4.5rem 缩略图 + 说明一行，箭头朝下，结果网格在下。
+   * 宽（≥ 30rem，xl 以上 / lg 收起侧栏）：左右排布——原图一列（占 26%，6–11rem），箭头朝右，结果网格在右。
+   * 不支持 container query 的浏览器停留在上下排布（可用的默认形态）。
+   */
+  .cs-compare {
+    container-type: inline-size;
+    container-name: cs-compare;
+    @apply min-w-0;
+  }
+
+  .cs-compare-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .cs-compare-source {
+    @apply m-0 flex min-w-0 items-center gap-3;
+  }
+
+  .cs-compare-source > .cs-media-tile {
+    @apply shrink-0;
+    width: 4.5rem;
+  }
+
+  .cs-compare-label {
+    @apply min-w-0 truncate text-xs font-medium tabular-nums text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-compare-arrow {
+    @apply flex text-gray-400 dark:text-dark-500;
+    padding-left: 2rem; /* 与上方 4.5rem 缩略图居中对齐 */
+  }
+
+  .cs-compare-arrow svg {
+    @apply h-4 w-4;
+    transform: rotate(90deg);
+  }
+
+  .cs-compare-results {
+    @apply min-w-0 space-y-1.5;
+  }
+
+  @container cs-compare (min-width: 30rem) {
+    .cs-compare-body {
+      grid-template-columns: clamp(6rem, 26%, 11rem) auto minmax(0, 1fr);
+      align-items: start;
+      gap: 0.75rem;
+    }
+
+    .cs-compare-source {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 0.375rem;
+    }
+
+    .cs-compare-source > .cs-media-tile {
+      width: 100%;
+    }
+
+    .cs-compare-arrow {
+      align-self: center;
+      padding-left: 0;
+    }
+
+    .cs-compare-arrow svg {
+      transform: none;
+    }
+  }
+
+  /* 悬浮操作条：桌面悬停 / 键盘聚焦时出现，触屏常显 */
+  .cs-media-overlay {
+    @apply pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-end gap-1 p-1.5 pt-6;
+    background: linear-gradient(to top, hsl(var(--cs-overlay)), transparent);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .cs-media-overlay > * {
+    pointer-events: auto;
+  }
+
+  .cs-media-tile:hover .cs-media-overlay,
+  .cs-media-tile:focus-within .cs-media-overlay {
+    opacity: 1;
+  }
+
+  .cs-media-action {
+    @apply flex h-8 w-8 items-center justify-center rounded-lg bg-black/40 text-white backdrop-blur-sm hover:bg-black/60;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white;
+    @apply disabled:cursor-not-allowed disabled:opacity-40;
+    transition: background-color 0.15s ease;
+  }
+
+  .cs-media-action svg {
+    @apply h-4 w-4;
+  }
+
+  .cs-media-action[data-state='done'] {
+    @apply bg-emerald-600/80;
+  }
+
+  /* 生成中骨架：数量与比例与请求一致 */
+  .cs-media-skeleton {
+    @apply relative flex items-center justify-center overflow-hidden text-gray-300 dark:text-dark-600;
+  }
+
+  .cs-media-skeleton > svg {
+    @apply h-7 w-7;
+  }
+
+  .cs-media-skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, hsl(var(--cs-shimmer)), transparent);
+    transform: translateX(-100%);
+    animation: cs-shimmer 1.6s linear infinite;
+  }
+
+  /* 单元内占位：加载失败 / 链接过期 / 已删除 */
+  .cs-media-placeholder {
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center text-xs text-gray-500 dark:text-dark-400;
+  }
+
+  .cs-media-placeholder > svg {
+    @apply h-6 w-6 text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-media-placeholder[data-tone='warning'] > svg {
+    @apply text-amber-500;
+  }
+
+  /* ================= 视频 ================= */
+  /* style="--cs-aspect: 16 / 9"；竖屏加 data-orientation="portrait" 以高度为基准 */
+  .cs-video {
+    @apply relative max-w-full overflow-hidden rounded-xl border border-gray-200/70 bg-black dark:border-dark-700;
+    aspect-ratio: var(--cs-aspect, 16 / 9);
+    width: 100%;
+    max-height: 70vh;
+  }
+
+  .cs-video[data-orientation='portrait'] {
+    width: auto;
+    height: min(70vh, 36rem);
+  }
+
+  .cs-video > video {
+    @apply block h-full w-full bg-black object-contain;
+  }
+
+  .cs-video-actions {
+    @apply mt-2 flex flex-wrap items-center gap-1;
+  }
+
+  /* ================= 通用小图标按钮 ================= */
+  .cs-icon-btn {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900;
+    @apply dark:text-dark-400 dark:hover:bg-dark-700 dark:hover:text-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50;
+    @apply disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .cs-icon-btn svg {
+    @apply h-4 w-4;
+  }
+
+  .cs-icon-btn[data-state='done'] {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+
+  /* ================= 灯箱预览（建议基于 reka-ui Dialog 原语） ================= */
+  .cs-lightbox-overlay {
+    @apply fixed inset-0 z-50 bg-black/85 backdrop-blur-sm;
+  }
+
+  .cs-lightbox {
+    @apply fixed inset-0 z-50 flex flex-col text-white focus:outline-none;
+  }
+
+  .cs-lightbox-toolbar {
+    @apply flex items-center justify-between gap-2 px-3 pb-2 text-sm text-white/80 sm:px-5;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .cs-lightbox-counter {
+    @apply tabular-nums text-white/70;
+  }
+
+  /* 灯箱当前项是「原图」时，在计数位置显示的标签 */
+  .cs-lightbox-tag {
+    @apply rounded-md bg-white/15 px-2 py-0.5 text-xs font-medium text-white;
+  }
+
+  .cs-lightbox-btn {
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm text-white/90 hover:bg-white/10;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white;
+    @apply disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .cs-lightbox-btn svg {
+    @apply h-4 w-4;
+  }
+
+  .cs-lightbox-btn--icon {
+    @apply w-9 px-0;
+  }
+
+  .cs-lightbox-stage {
+    @apply relative flex min-h-0 flex-1 items-center justify-center px-3 pb-3 sm:px-16 sm:pb-6;
+  }
+
+  .cs-lightbox-stage > img,
+  .cs-lightbox-stage > video {
+    @apply max-h-full max-w-full rounded-lg object-contain shadow-2xl;
+  }
+
+  .cs-lightbox-nav {
+    @apply absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white;
+    @apply disabled:pointer-events-none disabled:opacity-30;
+  }
+
+  .cs-lightbox-nav svg {
+    @apply h-5 w-5;
+  }
+
+  .cs-lightbox-nav--prev {
+    @apply left-2 sm:left-4;
+  }
+
+  .cs-lightbox-nav--next {
+    @apply right-2 sm:right-4;
+  }
+
+  .cs-lightbox-caption {
+    @apply mx-auto line-clamp-2 max-w-3xl px-4 text-center text-xs text-white/60;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* ================= 历史 / 任务流 ================= */
+  .cs-feed {
+    @apply space-y-3;
+  }
+
+  .cs-feed-divider {
+    @apply flex items-center gap-3 pt-1 text-xs font-medium text-gray-400 dark:text-dark-500;
+  }
+
+  .cs-feed-divider::before,
+  .cs-feed-divider::after {
+    content: '';
+    @apply h-px flex-1 bg-gray-200 dark:bg-dark-700;
+  }
+
+  .cs-load-more {
+    @apply flex justify-center pt-1;
+  }
+
+  .cs-feed-end {
+    @apply py-2 text-center text-xs text-gray-400 dark:text-dark-500;
+  }
+
+  /* ================= 动效 ================= */
+  /* 新任务卡片入场 */
+  .cs-enter {
+    animation: cs-enter 0.28s ease-out both;
+  }
+
+  /* 「复用参数」后被回填的字段闪一下；前端在 1.2s 后移除该类（再次复用时可重新触发） */
+  .cs-flash {
+    @apply rounded-xl;
+    animation: cs-flash 1.2s ease-out 1;
+  }
+
+  /* ================= 触屏与减少动态效果 ================= */
+  @media (hover: none) {
+    .cs-media-overlay,
+    .cs-thumb-remove {
+      opacity: 1;
+    }
+
+    .cs-media-action {
+      @apply h-9 w-9;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .cs-icon-btn {
+      @apply h-10 w-10;
+    }
+
+    .cs-stepper-btn {
+      @apply w-11;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cs-media-skeleton::after,
+    .cs-sync-dot::after,
+    .cs-enter,
+    .cs-flash {
+      animation: none;
+    }
+
+    /* 减少动态时改为静态描边，类移除后即消失 */
+    .cs-flash {
+      box-shadow: 0 0 0 2px rgb(20 184 166 / 0.45);
+    }
+
+    .cs-progress[data-indeterminate='true'] .cs-progress-bar {
+      animation: none;
+      left: 0;
+      width: 100%;
+      opacity: 0.45;
+    }
+
+    .cs-progress-bar,
+    .cs-media-overlay,
+    .cs-thumb-remove,
+    .cs-thumb-progress::after,
+    .cs-disclosure svg {
+      transition: none;
+    }
+  }
+}
+
+/* 关键帧放在层外，保证始终输出（体积可忽略） */
+@keyframes cs-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes cs-indeterminate {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes cs-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes cs-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cs-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgb(20 184 166 / 0.55);
+  }
+  30% {
+    box-shadow: 0 0 0 4px rgb(20 184 166 / 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgb(20 184 166 / 0);
+  }
+}

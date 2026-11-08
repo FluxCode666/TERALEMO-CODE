@@ -222,7 +222,17 @@ func (s *ScheduledQuestionTestService) validatePlanFields(plan *ScheduledQuestio
 	return nil
 }
 
+// validatePlanDependencies checks both dependency sets. Create always uses it;
+// Update uses the split helpers so a saved plan with stale references can still
+// be edited when those references did not change.
 func (s *ScheduledQuestionTestService) validatePlanDependencies(ctx context.Context, plan *ScheduledQuestionTestPlan) error {
+	if err := s.validatePlanAccountDependencies(ctx, plan); err != nil {
+		return err
+	}
+	return s.validatePlanQuestionDependencies(ctx, plan)
+}
+
+func (s *ScheduledQuestionTestService) validatePlanAccountDependencies(ctx context.Context, plan *ScheduledQuestionTestPlan) error {
 	platform := ""
 	for _, id := range plan.AccountIDs {
 		account, err := s.accounts.GetByID(ctx, id)
@@ -234,6 +244,10 @@ func (s *ScheduledQuestionTestService) validatePlanDependencies(ctx context.Cont
 		}
 		platform = account.Platform
 	}
+	return nil
+}
+
+func (s *ScheduledQuestionTestService) validatePlanQuestionDependencies(ctx context.Context, plan *ScheduledQuestionTestPlan) error {
 	for _, id := range plan.QuestionIDs {
 		question, err := s.questions.GetByID(ctx, id)
 		if err != nil {
@@ -244,6 +258,30 @@ func (s *ScheduledQuestionTestService) validatePlanDependencies(ctx context.Cont
 		}
 	}
 	return nil
+}
+
+// scheduledQuestionIDSetsEqual compares two id lists as sets: duplicates and
+// order are irrelevant. The API clients resend the full arrays on every save, so
+// this is what distinguishes "the user edited the accounts/questions" from "the
+// client repeated the current value".
+func scheduledQuestionIDSetsEqual(left, right []int64) bool {
+	toSet := func(ids []int64) map[int64]struct{} {
+		set := make(map[int64]struct{}, len(ids))
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		return set
+	}
+	leftSet, rightSet := toSet(left), toSet(right)
+	if len(leftSet) != len(rightSet) {
+		return false
+	}
+	for id := range leftSet {
+		if _, ok := rightSet[id]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *ScheduledQuestionTestService) Create(ctx context.Context, input ScheduledQuestionTestPlanInput) (*ScheduledQuestionTestPlan, error) {
@@ -277,8 +315,20 @@ func (s *ScheduledQuestionTestService) Update(ctx context.Context, id int64, inp
 	if err := s.validatePlanFields(&plan); err != nil {
 		return nil, err
 	}
-	if mask.AccountIDs || mask.QuestionIDs || (!existing.Enabled && plan.Enabled) {
-		if err := s.validatePlanDependencies(ctx, &plan); err != nil {
+	// A resubmitted but unchanged array is not an edit: clients always send the
+	// full account_ids/question_ids, so validating on mere presence used to block
+	// any save (even a cron-only change) once a referenced account was deleted or
+	// a question was disabled. Re-enabling still rechecks everything.
+	accountsChanged := !scheduledQuestionIDSetsEqual(existing.AccountIDs, plan.AccountIDs)
+	questionsChanged := !scheduledQuestionIDSetsEqual(existing.QuestionIDs, plan.QuestionIDs)
+	reenabled := !existing.Enabled && plan.Enabled
+	if accountsChanged || reenabled {
+		if err := s.validatePlanAccountDependencies(ctx, &plan); err != nil {
+			return nil, err
+		}
+	}
+	if questionsChanged || reenabled {
+		if err := s.validatePlanQuestionDependencies(ctx, &plan); err != nil {
 			return nil, err
 		}
 	}

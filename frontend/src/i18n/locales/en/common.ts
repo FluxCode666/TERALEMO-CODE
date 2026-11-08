@@ -172,6 +172,7 @@ export default {
 
   // Navigation
   nav: {
+    creationStudio: 'Create',
     asyncTasks: 'Async tasks',
     apiDocs: 'API Docs',
     globalAsyncTasks: 'Global async tasks',

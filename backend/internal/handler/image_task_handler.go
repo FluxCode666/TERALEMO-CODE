@@ -99,6 +99,13 @@ func (h *AsyncImageHandler) Submit(c *gin.Context) {
 	if !h.checkSecurityAuditBeforeSubmit(c, apiKey, platform, body) {
 		return
 	}
+	// Creation studio only: the in-process replay marker is unforgeable, so direct
+	// API users of the async image endpoints keep their previous behaviour.
+	if service.IsCreationStudioReplay(c.Request.Context()) {
+		if !h.creationStudioImagePrecheck(c, apiKey, platform, body) {
+			return
+		}
+	}
 
 	taskCtx, recorder, cancel := newAsyncImageContext(c, body, h.tasks.ExecutionTimeout())
 	model := service.ParseGrokMediaRequest(c.GetHeader("Content-Type"), body).Model

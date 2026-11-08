@@ -68,7 +68,10 @@ func (a *Account) VideoTestModelIDs() []string {
 	return models
 }
 
-func videoTestModelMatchesProtocol(model, protocol string) bool {
+// VideoTestModelMatchesProtocol reports whether a mapped upstream model belongs
+// to the given video protocol. Exported so the creation studio catalog applies
+// the same protocol filter as the account test model picker.
+func VideoTestModelMatchesProtocol(model, protocol string) bool {
 	model = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(model), "models/"))
 	switch {
 	case strings.HasPrefix(model, "veo-"):
@@ -80,6 +83,10 @@ func videoTestModelMatchesProtocol(model, protocol string) bool {
 	default:
 		return true // custom upstream model / endpoint ID
 	}
+}
+
+func videoTestModelMatchesProtocol(model, protocol string) bool {
+	return VideoTestModelMatchesProtocol(model, protocol)
 }
 
 // Use the gateway's native video adapters so model mapping, auth, task IDs and

@@ -13,19 +13,23 @@ import (
 // AsyncTask exposes only user-owned task metadata. Internal routing fields are
 // stored separately by the repository and never serialized into panel responses.
 type AsyncTask struct {
-	ID          string `json:"id"`
-	TaskID      string `json:"task_id"`
-	Kind        string `json:"kind"`
-	Protocol    string `json:"protocol"`
-	Model       string `json:"model,omitempty"`
-	Status      string `json:"status"`
-	APIKeyID    int64  `json:"api_key_id"`
-	GroupID     *int64 `json:"group_id,omitempty"`
-	ResultURL   string `json:"result_url,omitempty"`
-	Error       string `json:"error,omitempty"`
-	CreatedAt   int64  `json:"created_at"`
-	CompletedAt *int64 `json:"completed_at,omitempty"`
-	ExpiresAt   int64  `json:"expires_at"`
+	ID       string `json:"id"`
+	TaskID   string `json:"task_id"`
+	Kind     string `json:"kind"`
+	Protocol string `json:"protocol"`
+	Model    string `json:"model,omitempty"`
+	Status   string `json:"status"`
+	APIKeyID int64  `json:"api_key_id"`
+	GroupID  *int64 `json:"group_id,omitempty"`
+	// ResultURL keeps the first result link for backwards compatibility.
+	ResultURL string `json:"result_url,omitempty"`
+	// ResultURLs carries every result link of an image task (max 10). Video
+	// tasks never populate it, so the upstream link stays hidden.
+	ResultURLs  []string `json:"result_urls,omitempty"`
+	Error       string   `json:"error,omitempty"`
+	CreatedAt   int64    `json:"created_at"`
+	CompletedAt *int64   `json:"completed_at,omitempty"`
+	ExpiresAt   int64    `json:"expires_at"`
 }
 
 type AsyncTaskRecord struct {
@@ -113,6 +117,13 @@ func (s *ImageTaskService) GetUserTask(ctx context.Context, userID int64, id str
 	return record, nil
 }
 
+// AsyncVideoTaskCatalogID is the catalog identifier of a video task. The panel
+// submit response and ObserveVideoTask must derive it from the same inputs, so
+// both call this function instead of duplicating the hash.
+func AsyncVideoTaskCatalogID(userID, apiKeyID int64, requestID string) string {
+	return fmt.Sprintf("vidtask_%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%s", userID, apiKeyID, requestID))))
+}
+
 func (s *ImageTaskService) ObserveVideoTask(ctx context.Context, key *APIKey, requestID, model, protocol string, result *OpenAIForwardResult, deleting bool) error {
 	if s == nil || result == nil || key == nil {
 		return nil
@@ -121,7 +132,7 @@ func (s *ImageTaskService) ObserveVideoTask(ctx context.Context, key *APIKey, re
 	if err != nil {
 		return err
 	}
-	id := fmt.Sprintf("vidtask_%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%s", key.UserID, key.ID, requestID))))
+	id := AsyncVideoTaskCatalogID(key.UserID, key.ID, requestID)
 	record, err := store.GetAsyncTask(ctx, key.UserID, id)
 	if err != nil && !errors.Is(err, ErrImageTaskNotFound) {
 		return err
