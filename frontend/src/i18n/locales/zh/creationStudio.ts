@@ -188,8 +188,7 @@ export default {
       },
       imageStorage: {
         title: '生图暂不可用',
-        description: '站点未开启对象存储，暂时无法生成图片；生视频仍可使用。',
-        contactAdmin: '请联系管理员开启对象存储',
+        description: '站点未开启对象存储，暂时无法生成图片；生视频仍可使用。'
       },
       uploads: {
         title: '暂不能上传参考图',
