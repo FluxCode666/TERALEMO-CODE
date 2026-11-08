@@ -273,6 +273,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, int64(*result.FirstTokenMs))
 		}
 		if err != nil {
+			var imageUpstreamErr *service.OpenAIImagesUpstreamError
+			if errors.As(err, &imageUpstreamErr) && imageUpstreamErr.AsyncTaskAccepted {
+				reqLog.Warn("openai.images.async_upstream.failed",
+					zap.Int64("account_id", account.ID),
+					zap.Int("status_code", imageUpstreamErr.StatusCode),
+				)
+				return
+			}
 			if result != nil && result.ImageCount > 0 {
 				reqLog.Warn("openai.images.forward_partial_error_with_image_result",
 					zap.Int64("account_id", account.ID),
@@ -280,8 +288,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					zap.Error(err),
 				)
 			} else {
-				var imageUpstreamErr *service.OpenAIImagesUpstreamError
-				if errors.As(err, &imageUpstreamErr) {
+				if imageUpstreamErr != nil {
 					retryableServerError := service.IsOpenAIImagesRetryableUpstreamError(imageUpstreamErr)
 					if retryableServerError {
 						h.gatewayService.ReportOpenAIAccountScheduleResult(account, openAIAccountScheduleModel(c, account, requestModel, false, result), false, nil, err)

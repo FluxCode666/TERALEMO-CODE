@@ -38,6 +38,7 @@ type OpenAIImagesUpstreamError struct {
 	Message           string
 	Param             string
 	UpstreamRequestID string
+	AsyncTaskAccepted bool
 
 	// SynthesizedFromModelText marks an error the gateway inferred from the
 	// model's plain-text output instead of reading it off a structured upstream
@@ -104,7 +105,7 @@ func (e *OpenAIImagesUpstreamError) clientMessage() string {
 // IsOpenAIImagesRetryableUpstreamError reports whether an Images error is an
 // upstream server failure that may be retried on another account.
 func IsOpenAIImagesRetryableUpstreamError(err *OpenAIImagesUpstreamError) bool {
-	return err != nil && err.StatusCode >= http.StatusInternalServerError
+	return err != nil && !err.AsyncTaskAccepted && err.StatusCode >= http.StatusInternalServerError
 }
 
 func openAIImagesSSEErrorStatus(errType, code string) int {
