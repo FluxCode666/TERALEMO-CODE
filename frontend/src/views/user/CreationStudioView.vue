@@ -96,10 +96,7 @@
                 :body="unavailableCopy.body"
               >
                 <template #actions>
-                  <a v-if="isAdmin" class="cs-callout-link" href="/admin/settings">
-                    {{ t('creationStudio.unavailable.imageStorage.contactAdmin') }}
-                  </a>
-                  <a v-else class="cs-callout-link" href="/keys">
+                  <a class="cs-callout-link" href="/keys">
                     {{ t('creationStudio.action.switchKey') }}
                   </a>
                 </template>
@@ -381,7 +378,6 @@ const {
 } = submitApi
 
 // ==================== 派生状态 ====================
-const isAdmin = computed(() => authStore.user?.role === 'admin')
 const uploadsAvailable = computed(() => options.value?.uploads.available ?? false)
 const modeAvailability = computed(() => (mode.value === 'image' ? options.value?.image : options.value?.video))
 const modeUnavailable = computed(() => Boolean(modeAvailability.value && !modeAvailability.value.available))

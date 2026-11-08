@@ -188,8 +188,7 @@ export default {
       },
       imageStorage: {
         title: 'Image generation unavailable',
-        description: 'Object storage is not enabled, so images cannot be generated. Video generation still works.',
-        contactAdmin: 'Ask an administrator to enable object storage',
+        description: 'Object storage is not enabled, so images cannot be generated. Video generation still works.'
       },
       uploads: {
         title: 'Uploads unavailable',

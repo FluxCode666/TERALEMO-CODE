@@ -137,7 +137,7 @@
 | 悬停 | 文字变深（`gray-900 / white`） |
 | 聚焦 | `ring-2 ring-primary-500/50`（键盘可见） |
 | 禁用 | 整项 `opacity-50 cursor-not-allowed`，`title` / `aria-describedby` 指到不可用原因 |
-| 不可用但可点（推荐） | 不真正禁用：加 `data-unavailable="true"`（右上角琥珀小圆点），点进去后在 C 区展示完整说明与处理入口（如「前往后台开启对象存储」）。禁用按钮无法告知原因，体验更差 |
+| 不可用但可点（推荐） | 不真正禁用：加 `data-unavailable="true"`（右上角琥珀小圆点），点进去后在 C 区展示原因说明，所有用户（含管理员）只给「切换 Key」一个操作，不提供开启对象存储的入口或「联系管理员」的引导。禁用按钮无法告知原因，体验更差 |
 | 切换中 | 表单内容 150ms 淡入（`fade-in`），不整块 loading；Key/模型选择按模式各自记忆 |
 
 图标：生图 `ImageIcon`，生视频 `Film`。文案 key：`creationStudio.mode.image`、`creationStudio.mode.video`。
@@ -459,7 +459,7 @@ footer: 时间（创建 / 耗时） + 操作区（下载、复制链接、复用
 | 首次进入、表单从未提交 | 表单默认值齐全，不需要空态；若缺 Key/模型走不可用态 | — | — |
 | 无可用 Key | 表单整块 `cs-empty`（`setup-required.svg`）+ 「去创建 Key」 | `.cs-empty` `.cs-empty--compact` | `creationStudio.unavailable.noKey*` |
 | 无可用模型（该 Key 分组） | 模型字段处 `cs-empty--compact` 或 `cs-callout--warning` + 「切换 Key」 | | `creationStudio.unavailable.noModel*` |
-| 对象存储未开启 → 生图不可用 | 模式切换「生图」保留并带 `data-unavailable` 角标（§12 Q4 已决定）；切到生图后表单位置显示 `cs-callout--warning`（面向非管理员只写「请联系管理员」）+ 插画 `setup-required.svg`；**生视频仍可用** | `.cs-segmented-item[data-unavailable]` `.cs-callout--warning` | `creationStudio.unavailable.imageStorage*` |
+| 对象存储未开启 → 生图不可用 | 模式切换「生图」保留并带 `data-unavailable` 角标（§12 Q4 已决定）；切到生图后表单位置显示 `cs-callout--warning`（说明当前无法生图；所有用户统一只显示「切换 Key」链接，不区分管理员）+ 插画 `setup-required.svg`；**生视频仍可用** | `.cs-segmented-item[data-unavailable]` `.cs-callout--warning` | `creationStudio.unavailable.imageStorage*` |
 | 对象存储未开启 → 视频首帧 / 参考图不可上传 | 该上传字段进入「不可用」（§4.5）；可选字段只禁用自身，必填字段同时禁用提交 | `.cs-dropzone[data-state=unavailable]` | `creationStudio.unavailable.uploads.*` |
 | 复用参数时参考图已过期 | 对应缩略图进入「已过期」，字段下方琥珀汇总 + 「重新上传」，提交禁用直到处理完 | `.cs-thumb[data-state=expired]` `.cs-thumb-expired` `.cs-field-warning` `.cs-field-action` | `creationStudio.upload.expired*` / `creationStudio.reuse.refImagesExpired` |
 | 余额不足（402 / 403） | 提交按钮上方 `cs-callout--danger`（图标 `Wallet`）+ 费用 `data-state=insufficient` + 「去充值」（仅个人钱包） | | `creationStudio.errors.balanceInsufficient`（402）/ `.balanceLow`（403）/ `.enterpriseBalance` |
@@ -749,7 +749,7 @@ import emptyStudio from '@/assets/creation-studio/empty-studio.svg'
 | 任务 | `creationStudio.task.submitting` `.queued` `.processing` `.completed` `.failed` `.cancelled` `.expired` `.elapsed` `.queuePosition` `.expiredHint` `.cancelledHint` `.retentionWarning` |
 | 操作 | `creationStudio.action.reuse` `creationStudio.action.download` `creationStudio.action.copyLink` `creationStudio.action.copied` `creationStudio.action.openInNewTab` `creationStudio.action.preview` `creationStudio.action.previewCount` `creationStudio.action.retry` `creationStudio.action.openTaskList` `creationStudio.action.goRecharge` `creationStudio.action.createKey` `creationStudio.action.switchKey` |
 | 结果列 | `creationStudio.feed.title` `creationStudio.feed.inProgress` `creationStudio.feed.recent` `creationStudio.feed.filterAll` `creationStudio.feed.loadMore` `creationStudio.feed.noMore` `creationStudio.feed.loadFailed` `creationStudio.feed.syncLive` `creationStudio.feed.syncPaused` `creationStudio.feed.syncError` |
-| 空态 / 不可用 | `creationStudio.empty.title` `creationStudio.empty.description` `creationStudio.empty.suggestions` `creationStudio.unavailable.noKey.title` `.description` `creationStudio.unavailable.noModel.title` `.description` `creationStudio.unavailable.imageStorage.title` `.description` `.contactAdmin` `creationStudio.unavailable.uploads.title`（「暂不能上传参考图」）`.description`（「站点未开启对象存储，暂不能上传参考图；不带图仍可生成」）`.required`（「该模型需要参考图，站点开启对象存储后才能使用」）（`unavailable.imageStorage` / `unavailable.uploads` 两个名字由契约 §6.1 指定） |
+| 空态 / 不可用 | `creationStudio.empty.title` `creationStudio.empty.description` `creationStudio.empty.suggestions` `creationStudio.unavailable.noKey.title` `.description` `creationStudio.unavailable.noModel.title` `.description` `creationStudio.unavailable.imageStorage.title` `.description` `creationStudio.unavailable.uploads.title`（「暂不能上传参考图」）`.description`（「站点未开启对象存储，暂不能上传参考图；不带图仍可生成」）`.required`（「该模型需要参考图，站点开启对象存储后才能使用」）（`unavailable.imageStorage` / `unavailable.uploads` 两个名字由契约 §6.1 指定） |
 | 错误（`errors.*`，**以契约 §6.1 为准，不另起名字**） | `creationStudio.errors.invalidRequest` `.modelUnavailable` `.pricingMissing` `.balanceInsufficient` `.balanceLow` `.enterpriseBalance` `.imageForbidden` `.groupUnavailable` `.enterpriseBlocked` `.keyUnavailable` `.subscriptionMissing` `.ipRestricted` `.keyNotFound` `.uploadExpired` `.uploadTooLarge` `.bodyTooLarge` `.uploadUnsupportedType` `.uploadInvalidImage` `.rateLimited` `.quotaExceeded` `.keyQuota` `.enterpriseQuota` `.uploadLimit` `.upstream` `.uploadFailed` `.noCapacity` `.billingUnavailable` `.internal`（共 28 个；每个 reason 的展示位置见 §7.1 / §7.2） |
 | 非 reason 的前端失败 | `creationStudio.feed.loadFailed`（列表加载失败）`creationStudio.action.copyFailed` `creationStudio.action.downloadFailed`（不放进 `errors.*`，`errors.*` 只对应契约 reason 码） |
 | 复用 | `creationStudio.reuse.applied` `creationStudio.reuse.partial` `creationStudio.reuse.modelUnavailable` `creationStudio.reuse.keyMissing` `creationStudio.reuse.refImagesExpired`（`{count}`） |
@@ -779,5 +779,5 @@ import emptyStudio from '@/assets/creation-studio/empty-studio.svg'
 
 - 简体中文界面短句、动宾结构；技术错误原文放进 callout 正文，不替换成「出错了」。
 - 不在文案里承诺时间精确值（「约 1 分钟」可以，「60 秒内」不行）。
-- 面向非管理员用户，提到对象存储 / 分组 / 配额时只写「当前 Key 无法生图，请联系管理员或更换 Key」，不暴露后台配置细节。
+- 提到对象存储 / 分组 / 配额时只写「当前 Key 无法生图，请更换 Key」，所有用户（含管理员）一致，不出现「联系管理员」或开启对象存储的引导，不暴露后台配置细节。
 - 英文本地化按现有 `en` 目录风格，句子首字母大写、不加句号结尾（短句）。
