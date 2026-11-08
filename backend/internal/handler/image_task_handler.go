@@ -239,6 +239,10 @@ func (h *AsyncImageHandler) run(taskID, platform string, taskCtx *gin.Context, r
 
 	h.execute(platform, taskCtx)
 	body := bytes.TrimSpace(recorder.Body.Bytes())
+	if upstreamErr := service.OpenAIImagesAsyncUpstreamErrorFromContext(taskCtx); upstreamErr != nil && upstreamErr.AsyncTaskAccepted {
+		h.failTask(taskID, upstreamErr.StatusCode, extractImageTaskError(body))
+		return
+	}
 	if err := taskCtx.Request.Context().Err(); err != nil && len(body) == 0 {
 		h.failTask(taskID, http.StatusGatewayTimeout, imageTaskErrorPayload("timeout_error", "image generation task timed out"))
 		return
