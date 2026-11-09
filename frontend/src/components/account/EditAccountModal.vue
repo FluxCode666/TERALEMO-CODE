@@ -26,6 +26,7 @@
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
       </div>
 
+      <ImageProtocolField v-if="account.platform === 'image'" id="edit-image-protocol" v-model="editImageProtocol" />
       <VideoProtocolField v-if="account.platform === 'video'" id="edit-video-protocol" v-model="editVideoProtocol" />
       <VideoPrivacyField v-if="account.platform === 'video'" id="edit-video-hide-upstream-url" v-model="editHideVideoUpstreamURL" />
       <VideoCapabilityField
@@ -44,7 +45,9 @@
             type="text"
             class="input"
             :placeholder="
-              account.platform === 'video'
+              account.platform === 'image'
+                ? imageBaseURL(editImageProtocol)
+                : account.platform === 'video'
                 ? videoBaseURL(editVideoProtocol)
                 : account.platform === 'openai'
                 ? 'https://api.openai.com'
@@ -247,7 +250,9 @@
             data-lpignore="true"
             data-bwignore="true"
             :placeholder="
-              account.platform === 'video'
+              account.platform === 'image'
+                ? imageApiKeyPlaceholder(editImageProtocol)
+                : account.platform === 'video'
                 ? videoApiKeyPlaceholder
                 : account.platform === 'openai'
                 ? 'sk-proj-...'
@@ -3240,10 +3245,12 @@
 </template>
 
 <script setup lang="ts">
+import ImageProtocolField from './ImageProtocolField.vue'
 import VideoProtocolField from './VideoProtocolField.vue'
 import VideoPrivacyField from './VideoPrivacyField.vue'
 import VideoCapabilityField from './VideoCapabilityField.vue'
 import { videoBaseURL, switchVideoBaseURL, resolveVideoProtocol } from '@/utils/videoProtocol'
+import { imageBaseURL, switchImageBaseURL, resolveImageProtocol, imageApiKeyPlaceholder } from '@/utils/imageProtocol'
 import { applyVideoCapabilities, normalizeVideoResolutions, readVideoDuration, validateVideoDurations } from '@/utils/videoCapabilities'
 import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -3482,7 +3489,7 @@ const baseUrlHint = computed(() => {
   if (!props.account) return t('admin.accounts.baseUrlHint')
   if (props.account.platform === 'openai') return t('admin.accounts.openai.baseUrlHint')
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
-  if (props.account.platform === 'grok' || props.account.platform === 'video') return ''
+  if (props.account.platform === 'grok' || props.account.platform === 'video' || props.account.platform === 'image') return ''
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3509,6 +3516,8 @@ const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editVideoProtocol = ref('seedance')
+const editImageProtocol = ref('openai')
+watch(editImageProtocol, value => { if (props.account?.platform === 'image') editBaseUrl.value = switchImageBaseURL(editBaseUrl.value, value) })
 const editHideVideoUpstreamURL = ref(false)
 const editVideoResolutions = ref<string[]>([])
 const editVideoMinDuration = ref('')
@@ -4200,6 +4209,7 @@ const tempUnschedPresets = computed(() => [
 
 // Computed: default base URL based on platform
 const defaultBaseUrl = computed(() => {
+  if (props.account?.platform === 'image') return imageBaseURL(editImageProtocol.value)
   if (props.account?.platform === 'video') return videoBaseURL(editVideoProtocol.value)
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
@@ -4585,6 +4595,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   if (newAccount.type === 'apikey' && newAccount.credentials) {
     const credentials = newAccount.credentials as Record<string, unknown>
     editVideoProtocol.value = resolveVideoProtocol(credentials.video_protocol)
+    editImageProtocol.value = resolveImageProtocol(credentials.image_protocol)
     editHideVideoUpstreamURL.value = credentials.hide_video_upstream_url === true
     editHideVideoUpstreamURLHadKey = Object.prototype.hasOwnProperty.call(credentials, 'hide_video_upstream_url')
     editHideVideoUpstreamURLInitial = editHideVideoUpstreamURL.value
@@ -4656,7 +4667,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
     }
     const platformDefaultUrl =
-      newAccount.platform === 'video'
+      newAccount.platform === 'image'
+        ? imageBaseURL(editImageProtocol.value)
+        : newAccount.platform === 'video'
         ? videoBaseURL(editVideoProtocol.value)
         : newAccount.platform === 'openai'
         ? 'https://api.openai.com'
@@ -5428,6 +5441,9 @@ const handleSubmit = async () => {
         base_url: newBaseUrl
       }
 
+      if (props.account.platform === 'image') {
+        newCredentials.image_protocol = editImageProtocol.value
+      }
       if (props.account.platform === 'video') {
         newCredentials.video_protocol = editVideoProtocol.value
         // 隐私开关：原凭据没有该键且用户未改动时保持缺省，不隐式写入

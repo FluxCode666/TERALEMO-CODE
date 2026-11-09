@@ -375,7 +375,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("X-Accel-Buffering", "no")
-		if account.Platform == PlatformVideo || account.IsTypeSafe() {
+		if account.Platform == PlatformVideo || account.Platform == PlatformImage || account.IsTypeSafe() {
 			return s.sendErrorAndEnd(c, "Test questions are not supported for this account")
 		}
 		if questionRequiresTextModel(modelID) {
@@ -390,6 +390,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		}
 		testOpts.ImageDataURL = ""
 		testOpts.AudioDataURL = ""
+	}
+	if account.Platform == PlatformImage {
+		return s.sendErrorAndEnd(c, "Image platform account testing is not supported yet; use the Images API")
 	}
 	if account.Platform == PlatformVideo {
 		return s.testVideoAccountConnection(c, account, modelID, prompt, testOpts)

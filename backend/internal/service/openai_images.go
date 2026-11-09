@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -229,14 +230,19 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 
 	applyOpenAIImagesDefaults(req)
+	if isImagePlatformRequest(c) {
+		if err := validateImagePlatformInput(req, false); err != nil {
+			return nil, err
+		}
+	}
 	// Composite middleware preserves multipart bodies, including their public
 	// alias. Validate and forward the resolved model without altering uploads.
-	if platform, _ := ResolvedTargetPlatformFromContext(c.Request.Context()); platform == PlatformOpenAI {
+	if platform, _ := ResolvedTargetPlatformFromContext(c.Request.Context()); platform == PlatformOpenAI || platform == PlatformImage {
 		if model, ok := ResolvedUpstreamModelFromContext(c.Request.Context()); ok {
 			req.Model = model
 		}
 	}
-	if err := validateCompatibleImagesModel(req.Model); err != nil {
+	if err := validateCompatibleImagesModel(req.Model); err != nil && !isImagePlatformRequest(c) {
 		return nil, err
 	}
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
@@ -610,9 +616,23 @@ func (s *OpenAIGatewayService) ForwardImages(
 	body []byte,
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (result *OpenAIForwardResult, forwardErr error) {
+	defer func() {
+		if account.Platform == PlatformImage && result != nil {
+			result.RequestID = redactImageAccountText(account, result.RequestID)
+		}
+	}()
 	if parsed == nil {
 		return nil, fmt.Errorf("parsed images request is required")
+	}
+	if account.Platform == PlatformImage {
+		c.Set("image_platform_account", account)
+		if err := validateImagePlatformInput(parsed, account.ImageProtocol() != ImageProtocolOpenAI); err != nil {
+			return nil, s.writeImagePlatformError(c, err)
+		}
+	}
+	if account.Platform == PlatformImage && account.ImageProtocol() != ImageProtocolOpenAI {
+		return s.forwardImagePlatformCompatible(ctx, c, account, parsed, channelMappedModel)
 	}
 	switch account.Type {
 	case AccountTypeAPIKey:
@@ -637,11 +657,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
 	}
-	if err := validateCompatibleImagesModel(requestModel); err != nil {
+	if err := validateCompatibleImagesModel(requestModel); err != nil && account.Platform != PlatformImage {
 		return nil, err
 	}
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateCompatibleImagesModel(upstreamModel); err != nil {
+	if err := validateCompatibleImagesModel(upstreamModel); err != nil && account.Platform != PlatformImage {
 		return nil, err
 	}
 	SetOpsUpstreamModel(c, upstreamModel)
@@ -667,10 +687,16 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 
 	token, _, err := s.GetAccessToken(upstreamCtx, account)
 	if err != nil {
+		if account.Platform == PlatformImage {
+			return nil, s.writeImagePlatformError(c, err)
+		}
 		return nil, err
 	}
 	upstreamReq, err := s.buildOpenAIImagesRequest(upstreamCtx, c, account, forwardBody, forwardContentType, token, parsed.Endpoint)
 	if err != nil {
+		if account.Platform == PlatformImage {
+			return nil, s.writeImagePlatformError(c, err)
+		}
 		return nil, err
 	}
 
@@ -682,6 +708,9 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
+		if account.Platform == PlatformImage {
+			return nil, s.writeImagePlatformError(c, err)
+		}
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
 		setOpsUpstreamError(c, 0, safeErr, "")
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -697,10 +726,13 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		})
 		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
 	}
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= 400 || (account.Platform == PlatformImage && resp.StatusCode >= 300) {
 		respBody := s.readUpstreamErrorBody(resp)
 		_ = resp.Body.Close()
 		respBody = s.redactAgentIdentitySensitiveBody(upstreamCtx, account, respBody)
+		if account.Platform == PlatformImage {
+			return nil, s.handleImagePlatformUpstreamError(upstreamCtx, c, account, resp, respBody, upstreamModel)
+		}
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
@@ -749,10 +781,33 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 
 	var usage OpenAIUsage
 	imageCount := parsed.N
+	if account.Platform == PlatformImage {
+		imageCount = 0
+	}
 	var firstTokenMs *int
 	if parsed.Stream && isEventStreamResponse(resp.Header) {
-		streamUsage, streamCount, streamSizes, ttft, err := s.handleOpenAIImagesStreamingResponse(resp, c, startTime, nil)
+		var direct *OpenAIImagesRequest
+		if account.Platform == PlatformImage {
+			direct = parsed
+		}
+		beforeStream := OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c)
+		streamUsage, streamCount, streamSizes, ttft, err := s.handleOpenAIImagesStreamingResponse(resp, c, startTime, direct)
 		if err != nil {
+			if account.Platform == PlatformImage && streamCount == 0 && OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) == beforeStream {
+				var upstreamErr *OpenAIImagesUpstreamError
+				if errors.As(err, &upstreamErr) {
+					if typed := upstreamErr.ImagePlatformError; typed != nil {
+						s.imagePlatformFailureSideEffects(upstreamCtx, &http.Response{StatusCode: typed.UpstreamStatus, Header: resp.Header}, account, typed)
+						if typed.Retryable {
+							return nil, imagePlatformFailoverError(typed, resp.Header)
+						}
+						return nil, s.writeImagePlatformError(c, typed)
+					}
+					errorResponse := &http.Response{StatusCode: upstreamErr.StatusCode, Header: resp.Header}
+					return nil, s.handleImagePlatformUpstreamError(upstreamCtx, c, account, errorResponse, buildOpenAIImagesStreamErrorBodyFromUpstream(upstreamErr), upstreamModel)
+				}
+				return nil, s.writeImagePlatformError(c, err)
+			}
 			if streamCount > 0 {
 				return &OpenAIForwardResult{
 					RequestID:        resp.Header.Get("x-request-id"),
@@ -832,6 +887,9 @@ func (s *OpenAIGatewayService) buildOpenAIImagesRequest(
 		targetURL = openAIImagesEditsURL
 	}
 	baseURL := account.GetOpenAIBaseURL()
+	if account.Platform == PlatformImage {
+		baseURL = account.ImageBaseURL()
+	}
 	if baseURL != "" {
 		validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 		if err != nil {
@@ -976,6 +1034,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 		return OpenAIUsage{}, 0, nil, err
 	}
 	body = s.backfillOpenAIImagesB64JSON(ctx, account, parsed, body)
+	if account.Platform == PlatformImage && extractOpenAIImageCountFromJSONBytes(body) == 0 {
+		return OpenAIUsage{}, 0, nil, s.writeImagePlatformError(c, fmt.Errorf("image upstream returned no images"))
+	}
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	contentType := "application/json"
 	if s.cfg != nil && !s.cfg.Security.ResponseHeaders.Enabled {
@@ -1038,6 +1099,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 			return
 		}
 		seenSSEData = true
+		if isImagePlatformRequest(c) && gjson.GetBytes(dataBytes, "error").IsObject() && gjson.GetBytes(dataBytes, "type").String() == "" {
+			dataBytes, _ = sjson.SetBytes(dataBytes, "type", "error")
+		}
 		fallbackBody.Reset()
 		fallbackBytes = 0
 		if direct != nil && strings.HasSuffix(gjson.GetBytes(dataBytes, "type").String(), ".completed") {
@@ -1057,6 +1121,13 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 			observer.Observe(gjson.GetBytes(dataBytes, "model").String(), strings.HasSuffix(gjson.GetBytes(dataBytes, "type").String(), ".completed"))
 		}
 		if upstreamErr := openAIImagesUpstreamErrorFromSSEPayload(dataBytes); upstreamErr != nil {
+			if isImagePlatformRequest(c) {
+				var account *Account
+				if value, ok := c.Get("image_platform_account"); ok {
+					account, _ = value.(*Account)
+				}
+				upstreamErr, dataBytes = sanitizeImagePlatformStreamError(account, upstreamErr)
+			}
 			streamErr = upstreamErr
 			if IsOpenAIImagesRetryableUpstreamError(upstreamErr) && imageCounter.Count() == 0 {
 				return

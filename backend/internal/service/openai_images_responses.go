@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagecompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
@@ -32,12 +33,13 @@ type openAIResponsesImageResult struct {
 }
 
 type OpenAIImagesUpstreamError struct {
-	StatusCode        int
-	ErrorType         string
-	Code              string
-	Message           string
-	Param             string
-	UpstreamRequestID string
+	ImagePlatformError *imagecompat.Error
+	StatusCode         int
+	ErrorType          string
+	Code               string
+	Message            string
+	Param              string
+	UpstreamRequestID  string
 
 	// SynthesizedFromModelText marks an error the gateway inferred from the
 	// model's plain-text output instead of reading it off a structured upstream
@@ -104,6 +106,9 @@ func (e *OpenAIImagesUpstreamError) clientMessage() string {
 // IsOpenAIImagesRetryableUpstreamError reports whether an Images error is an
 // upstream server failure that may be retried on another account.
 func IsOpenAIImagesRetryableUpstreamError(err *OpenAIImagesUpstreamError) bool {
+	if err != nil && err.ImagePlatformError != nil {
+		return err.ImagePlatformError.Retryable
+	}
 	return err != nil && err.StatusCode >= http.StatusInternalServerError
 }
 

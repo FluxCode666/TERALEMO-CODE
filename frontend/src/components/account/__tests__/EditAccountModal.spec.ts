@@ -355,6 +355,28 @@ describe('EditAccountModal', () => {
     wrapper.unmount()
   })
 
+  it('echoes the stored image protocol and saves a changed one while keeping a custom relay', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key', base_url: 'https://image-relay.example', image_protocol: 'gemini' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-image-protocol').element as HTMLSelectElement).value).toBe('gemini')
+    await wrapper.get('#edit-image-protocol').setValue('grok')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+      api_key: 'image-key', base_url: 'https://image-relay.example', image_protocol: 'grok'
+    })
+    wrapper.unmount()
+  })
+
+  it('defaults a legacy image account without image_protocol to openai', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key' } }
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-image-protocol').element as HTMLSelectElement).value).toBe('openai')
+    wrapper.unmount()
+  })
+
   it.each(['gemini', 'minimax'])('switches a video account to %s while preserving its custom relay and API key', async protocol => {
     const account = { ...buildAccount(), platform: 'video', credentials: { api_key: 'video-key', base_url: 'https://video-relay.example', video_protocol: 'seedance' } }
     updateAccountMock.mockReset().mockResolvedValue(account)

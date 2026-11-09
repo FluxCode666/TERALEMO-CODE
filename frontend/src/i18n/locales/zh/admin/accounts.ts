@@ -295,6 +295,7 @@ export default {
         thresholdPlaceholder: '输入百分比',
       },
       testConnection: '测试连接',
+      imageTestUnsupported: '图片账号暂不支持在线测试，请通过 Images API（/v1/images/generations）验证。',
       reAuthorize: '重新授权',
       refreshToken: '刷新令牌',
       noAccountsYet: '暂无账号',
@@ -1770,6 +1771,7 @@ export default {
         unknownError: '未知错误',
         copied: '结果已复制',
         crossPlatform: '批量测试只支持同一平台的账号，请重新选择',
+        skippedImageAccounts: '已跳过 {count} 个图片账号（暂不支持在线测试）',
         loadingModels: '加载共同模型中...',
         modelsLoadFailed: '共同模型加载失败，可继续使用各账号默认模型',
         noCommonModels: '所选账号没有共同的可用模型，请改用默认模型'

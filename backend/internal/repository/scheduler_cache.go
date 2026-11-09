@@ -959,8 +959,9 @@ func filterSchedulerCredentials(credentials map[string]any) map[string]any {
 	keys := []string{"model_mapping", "compact_model_mapping", "api_key", "project_id", "oauth_type", "plan_type", "account_scheduling_threshold",
 		// Endpoint admission runs on this projection before loading full credentials.
 		// Keep protocol/capability declarations so video accounts do not default to
-		// Seedance and legacy OpenAI accounts retain their explicit Seedance opt-in.
-		"video_protocol", "openai_capabilities",
+		// Seedance, image accounts retain their model/pricing capabilities, and
+		// legacy OpenAI accounts retain their explicit Seedance opt-in.
+		"video_protocol", "image_protocol", "openai_capabilities",
 		// Gemini 显式缓存的候选过滤（GeminiExplicitCacheExclusions）读本投影判定账号是否支持显式缓存：
 		// 官方地址、Vertex 认证方式与上游网关的显式缓存声明。缺这几个键时只能按类型粗筛，
 		// 不支持的账号要逐个选中后才被剔除。

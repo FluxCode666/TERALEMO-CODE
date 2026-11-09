@@ -294,6 +294,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 			ids = append(ids, model.ID)
 		}
 		return ids
+	case PlatformImage:
+		return append(append(DefaultImageModelIDs(ImageProtocolOpenAI), DefaultImageModelIDs(ImageProtocolGemini)...), DefaultImageModelIDs(ImageProtocolGrok)...)
 	case PlatformVideo:
 		return []string{"doubao-seedance-1-0-pro", "veo-3.0-generate-001", "veo-3.0-fast-generate-001"}
 	case PlatformGrok:
@@ -319,7 +321,7 @@ func defaultModelsListCandidateIDs(platform string) []string {
 // gates OpenAI image generation there.
 func DefaultAllowImageGenerationForPlatform(platform string) bool {
 	switch platform {
-	case PlatformGrok, PlatformGemini, PlatformAntigravity:
+	case PlatformImage, PlatformGrok, PlatformGemini, PlatformAntigravity:
 		return true
 	default:
 		return false

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagecompat"
 )
 
 // Creation availability reason codes (contract §3.1).
@@ -216,7 +217,7 @@ func (s *OpenAIGatewayService) creationStudioAccounts(ctx context.Context, group
 }
 
 func creationStudioImageAvailability(group *Group, storageEnabled bool, candidates []creationCandidate) (bool, string) {
-	if group.Platform != PlatformOpenAI && group.Platform != PlatformGrok {
+	if group.Platform != PlatformOpenAI && group.Platform != PlatformGrok && group.Platform != PlatformImage {
 		return false, CreationUnavailablePlatformUnsupported
 	}
 	if !storageEnabled {
@@ -268,11 +269,12 @@ type creationModelRow struct {
 
 // creationCandidate is one (mode, protocol, model) offered by one account.
 type creationCandidate struct {
-	mode     string
-	protocol string
-	model    string
-	mapped   string
-	limits   videoModelLimits
+	mode          string
+	protocol      string
+	model         string
+	mapped        string
+	limits        videoModelLimits
+	imageProtocol string
 }
 
 func (c creationCandidate) id() string {
@@ -300,6 +302,10 @@ func (s *OpenAIGatewayService) creationStudioCandidates(accounts []Account) []cr
 			continue
 		}
 		switch account.Platform {
+		case PlatformImage:
+			for _, model := range account.ImageModelIDs() {
+				add(creationCandidate{mode: CreationModeImage, protocol: CreationProtocolOpenAI, model: model, mapped: account.GetMappedModel(model), imageProtocol: account.ImageProtocol()})
+			}
 		case PlatformOpenAI, PlatformGrok:
 			for _, model := range creationStudioImageModels(account) {
 				protocol := CreationProtocolOpenAI
@@ -454,6 +460,24 @@ var CreationImageParamKeys = []string{"source", "first_frame", "last_frame", "re
 // descriptors renders the parameter list of one candidate.
 func (c creationCandidate) descriptors(storageEnabled bool) []CreationParamDescriptor {
 	switch {
+	case c.mode == CreationModeImage && c.imageProtocol != "" && c.imageProtocol != ImageProtocolOpenAI:
+		sizes := make([]string, 0)
+		for _, size := range []string{"1024x1024", "960x640", "640x960", "1024x768", "768x1024", "1536x1024", "1024x1536", "2048x2048", "4096x4096"} {
+			_, err := imagecompat.BuildPlan(imagecompat.Protocol(c.imageProtocol), imagecompat.Request{
+				Operation: imagecompat.OperationGenerations, Model: c.mapped, Prompt: "image", Size: size, N: 1,
+			})
+			if err == nil {
+				sizes = append(sizes, size)
+			}
+		}
+		params := []CreationParamDescriptor{
+			creationSelectDescriptor("size", sizes, "1024x1024"),
+			creationIntegerDescriptor("n", 1, 4, 1, 1),
+		}
+		if !strings.HasPrefix(strings.ToLower(c.mapped), "imagen-") {
+			params = append(params, creationImageDescriptor(CreationImageRoleSource, 1, false, storageEnabled))
+		}
+		return params
 	case c.mode == CreationModeImage && c.protocol == CreationProtocolOpenAI:
 		return []CreationParamDescriptor{
 			creationSelectDescriptor("size", []string{"1024x1024", "1536x1024", "1024x1536", "auto"}, "1024x1024"),
@@ -783,8 +807,14 @@ func clampInt(value, minValue, maxValue int) int {
 // creationStudioPricingHint renders the read-only price summary of one row.
 func (s *OpenAIGatewayService) creationStudioPricingHint(ctx context.Context, key *APIKey, candidate creationCandidate) CreationPricingHint {
 	if candidate.mode == CreationModeImage {
+		tier := ImageBillingSize2K
+		if candidate.imageProtocol != "" {
+			if actual, err := imageProtocolSizeTier(candidate.imageProtocol, candidate.mapped, "1024x1024"); err == nil {
+				tier = actual
+			}
+		}
 		cost := s.calculateOpenAIImageCost(ctx, candidate.mapped, key, &OpenAIForwardResult{
-			ImageSize: ImageBillingSize2K, ImageInputSize: ImageBillingSize2K, ImageCount: 1,
+			ImageSize: tier, ImageCount: 1,
 		}, 1)
 		if cost == nil {
 			return CreationPricingHint{Priced: false}

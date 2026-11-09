@@ -22,6 +22,7 @@
       </div>
 
       <!-- Platform-specific content -->
+      <ImageAPIUsage v-else-if="platform === 'image'" :base-url="baseUrl" :api-key="apiKey" />
       <VideoAPIUsage v-else-if="platform === 'video'" :base-url="baseUrl" :api-key="apiKey" />
       <template v-else>
         <!-- Description -->
@@ -268,6 +269,7 @@
 </template>
 
 <script setup lang="ts">
+import ImageAPIUsage from './ImageAPIUsage.vue'
 import VideoAPIUsage from './VideoAPIUsage.vue'
 import { ref, computed, h, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -1326,6 +1328,7 @@ function generateRoutedCodexFiles(
   const preferredModel = preferredModels[platform] || ''
   const model = selectCodexCatalogModel(preferredModel)
   const labels: Record<GroupPlatform, string> = {
+    image: 'Image',
     video: 'Video',
     anthropic: 'Anthropic',
     openai: 'OpenAI',

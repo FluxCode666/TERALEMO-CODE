@@ -21,6 +21,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagecompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -691,6 +692,7 @@ type GatewayFailureReason string
 // trigger account failover. Additive metadata keeps existing composite literals
 // source-compatible and preserves their legacy retry-next-account behavior.
 type UpstreamFailoverError struct {
+	ImagePlatformError       *imagecompat.Error
 	StatusCode               int
 	ResponseBody             []byte        // 上游响应体，用于错误透传规则匹配
 	ResponseHeaders          http.Header   // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
@@ -1448,6 +1450,13 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 			continue
 		}
 
+		if acc.Platform == PlatformImage {
+			for _, model := range acc.ImageModelIDs() {
+				modelSet[model] = struct{}{}
+				hasAnyMapping = true
+			}
+			continue
+		}
 		mapping := acc.GetModelMapping()
 		for model := range mapping {
 			// Accounts pulled in through mixed scheduling only contribute the

@@ -6,6 +6,13 @@
     @close="handleClose"
   >
     <div class="space-y-4">
+      <p
+        v-if="isUnsupportedImageAccount"
+        data-testid="image-test-unsupported"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+      >
+        {{ t('admin.accounts.imageTestUnsupported') }}
+      </p>
       <!-- Account Info Card -->
       <div
         v-if="account"
@@ -205,7 +212,7 @@
         </button>
         <button
           @click="startTest"
-          :disabled="status === 'connecting' || !selectedModelId"
+          :disabled="status === 'connecting' || !selectedModelId || isUnsupportedImageAccount"
           :class="[
             'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
             status === 'connecting' || !selectedModelId
@@ -288,6 +295,8 @@ let abortController: AbortController | null = null
 const generatedImages = ref<PreviewImage[]>([])
 const testMode = ref<'default' | 'compact'>('default')
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
+// image 平台账号由后端测试接口明确拒绝，这里禁用测试动作。
+const isUnsupportedImageAccount = computed(() => props.account?.platform === 'image')
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
   { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
@@ -405,6 +414,7 @@ const scrollToBottom = async () => {
 }
 
 const startTest = async () => {
+  if (isUnsupportedImageAccount.value) return
   if (!props.account || !selectedModelId.value) return
 
   resetState()

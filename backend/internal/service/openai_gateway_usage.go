@@ -247,6 +247,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		})
 		multiplier = input.VideoPricingContract.EffectiveMultiplier
 		videoMultiplier = multiplier
+	} else if account.Platform == PlatformImage {
+		if result.ImageCount <= 0 {
+			cost = &CostBreakdown{BillingMode: string(BillingModeImage)}
+		} else {
+			cost = s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier)
+		}
 	} else {
 		cost, err = s.calculateOpenAIRecordUsageCost(
 			ctx,
@@ -625,6 +631,12 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	pricingAt time.Time,
 ) (*CostBreakdown, error) {
 	billingModel := firstUsageBillingModel(billingModels)
+	if isImagePlatformBilling(ctx, apiKey) && result != nil {
+		if result.ImageCount <= 0 {
+			return &CostBreakdown{BillingMode: string(BillingModeImage)}, nil
+		}
+		return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier), nil
+	}
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取
 		// 分组覆盖价（nil 时默认 0.01 = 官方 $10/1000 次），不参与渠道级模型定价。

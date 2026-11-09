@@ -40,6 +40,22 @@ describe('UseKeyModal', () => {
     saveAsMock.mockClear()
   })
 
+  it('shows image usage for image platform groups', () => {
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-image-test', baseUrl: 'https://example.com/v1', platform: 'image' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, RouterLink: true } }
+    })
+    const text = wrapper.text()
+    expect(wrapper.find('[data-testid="image-api-usage"]').exists()).toBe(true)
+    expect(text).toContain('https://example.com/v1/images/generations')
+    expect(text).toContain('https://example.com/v1/images/edits')
+    expect(text).toContain('/v1/images/generations/async')
+    expect(text).toContain('/v1/images/tasks/{task_id}')
+    expect(text).toContain('-F image=@input.png')
+    expect(text).toContain('Bearer sk-image-test')
+    expect(wrapper.text()).not.toContain('keys.useKeyModal.noGroupTitle')
+  })
+
   it('shows only Claude Code for Claude Code-only groups', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {

@@ -119,6 +119,24 @@ describe('AccountTestModal', () => {
     vi.restoreAllMocks()
   })
 
+  it('disables the test action for image platform accounts and explains why', async () => {
+    const wrapper = mountModal({ id: 7, name: 'Image Account', platform: 'image', type: 'apikey', status: 'active', credentials: { image_protocol: 'gemini' } })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="image-test-unsupported"]').text()).toBe('admin.accounts.imageTestUnsupported')
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeDefined()
+    await startBtn.trigger('click')
+    expect(global.fetch).not.toHaveBeenCalled()
+    // 测试题也不支持 image：不显示「测试类型」选择，只剩模型选择（普通账号还会多一个类型选择）
+    const normal = mountModal()
+    await normal.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.findAll('.select-stub').length).toBeLessThan(normal.findAll('.select-stub').length)
+    normal.unmount()
+    wrapper.unmount()
+  })
+
   it.each([
     ['seedance', 'doubao-seedance-1-0-pro', 'Seedance (Ark)'],
     ['gemini', 'veo-3.0-generate-001', 'Google Gemini (Veo)'],

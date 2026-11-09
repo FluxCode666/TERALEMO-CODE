@@ -933,6 +933,14 @@ func (a *Account) isModelMappingSupported(requestedModel string) bool {
 		if a.Platform == PlatformDeepseek {
 			return isDeepseekServableModel(requestedModel)
 		}
+		if a.Platform == PlatformImage {
+			for _, model := range DefaultImageModelIDs(a.ImageProtocol()) {
+				if model == requestedModel {
+					return true
+				}
+			}
+			return false
+		}
 		return true // 无映射 = 允许所有
 	}
 	if mappingSupportsRequestedModel(mapping, requestedModel) {
@@ -1868,7 +1876,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	if capability == OpenAIEndpointCapabilityMiniMaxVideo {
 		return a.Platform == PlatformVideo && a.Type == AccountTypeAPIKey && a.VideoProtocol() == VideoProtocolMiniMax
 	}
-	if a.Platform == PlatformVideo && capability != "" {
+	if (a.Platform == PlatformVideo || a.Platform == PlatformImage) && capability != "" {
 		return false
 	}
 	if capability == "" {
@@ -2051,6 +2059,9 @@ func (a *Account) openAIEndpointCapabilitySet() (map[string]bool, bool) {
 }
 
 func (a *Account) SupportsOpenAIImageCapability(capability OpenAIImagesCapability) bool {
+	if a.Platform == PlatformImage {
+		return a.Type == AccountTypeAPIKey
+	}
 	if capability == "" {
 		return true
 	}

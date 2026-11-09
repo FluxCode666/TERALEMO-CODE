@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { fetchAllAccountIds } from '../accountSelection'
+import { fetchAllAccountIds, fetchAllAccountRows } from '../accountSelection'
 
 describe('fetchAllAccountIds', () => {
   it('loads every page with the same filter snapshot and returns unique account IDs', async () => {
@@ -64,5 +64,23 @@ describe('fetchAllAccountIds', () => {
       .mockRejectedValueOnce(new Error('page 2 failed'))
 
     await expect(fetchAllAccountIds(fetchPage, { group: '7' })).rejects.toThrow('page 2 failed')
+  })
+})
+
+describe('fetchAllAccountRows', () => {
+  it('keeps the platform of every account across pages', async () => {
+    const fetchPage = vi.fn(async (page: number, _pageSize: number, _filters: Record<string, unknown>) => ({
+      items: page === 1
+        ? [{ id: 1, platform: 'gemini' }, { id: 2, platform: 'image' }]
+        : [{ id: 3, platform: 'image' }],
+      total: 3,
+      pages: 2
+    }))
+    const rows = await fetchAllAccountRows(fetchPage, {})
+    expect(rows).toEqual([
+      { id: 1, platform: 'gemini' },
+      { id: 2, platform: 'image' },
+      { id: 3, platform: 'image' }
+    ])
   })
 })

@@ -6,6 +6,13 @@
     @close="handleClose"
   >
     <div class="space-y-4">
+      <p
+        v-if="isUnsupportedImageAccount"
+        data-testid="image-test-unsupported"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+      >
+        {{ t('admin.accounts.imageTestUnsupported') }}
+      </p>
       <!-- Account Info Card -->
       <div
         v-if="account"
@@ -500,9 +507,11 @@ const audioFileInput = ref<HTMLInputElement | null>(null)
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
 const isVideoAccount = computed(() => props.account?.platform === 'video')
+// image 平台账号走图片生成，后端测试接口明确返回“暂不支持”，这里直接禁用入口。
+const isUnsupportedImageAccount = computed(() => props.account?.platform === 'image')
 const supportsTestQuestions = computed(() => {
   const platform = props.account?.platform
-  return Boolean(platform && platform !== 'video' && platform !== 'typesafe')
+  return Boolean(platform && platform !== 'video' && platform !== 'image' && platform !== 'typesafe')
 })
 const showTestTypeSelect = computed(
   () => supportsTestQuestions.value && !isOpenAIAccount.value && !isGrokAccount.value
@@ -800,7 +809,7 @@ const testModeSummary = computed(() => {
 })
 
 const canStartTest = computed(() => {
-  if (status.value === 'connecting') return false
+  if (status.value === 'connecting' || isUnsupportedImageAccount.value) return false
   if (isQuestionMode.value) {
     return Boolean(selectedModelId.value && selectedQuestionId.value)
   }

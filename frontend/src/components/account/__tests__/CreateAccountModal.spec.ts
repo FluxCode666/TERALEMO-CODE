@@ -239,6 +239,27 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    ['openai', 'https://api.openai.com', 'sk-...'],
+    ['gemini', 'https://generativelanguage.googleapis.com', 'AIza...'],
+    ['grok', 'https://api.x.ai', 'xai-...']
+  ])('creates image accounts using the %s protocol and its default upstream', async (protocol, baseURL, placeholder) => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-image"]').trigger('click')
+    expect((wrapper.get('#create-image-protocol').element as HTMLSelectElement).value).toBe('openai')
+    await wrapper.get('#create-image-protocol').setValue(protocol)
+    expect(wrapper.get('form#create-account-form input[type="password"]').attributes('placeholder')).toBe(placeholder)
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Image account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('image-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'image', type: 'apikey',
+      credentials: { image_protocol: protocol, api_key: 'image-key', base_url: baseURL }
+    })
+    wrapper.unmount()
+  })
+
   it('allows disabling upstream video URL privacy per new account', async () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="platform-button-video"]').trigger('click')

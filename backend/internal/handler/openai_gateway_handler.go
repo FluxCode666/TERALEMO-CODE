@@ -3673,6 +3673,17 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		return
 	}
 	copyFailoverRetryAfter(c, failoverErr.ResponseHeaders)
+	if typed := failoverErr.ImagePlatformError; typed != nil {
+		service.SetOpsUpstreamError(c, failoverErr.StatusCode, typed.Message, "")
+		if !streamStarted {
+			c.Header("Content-Type", "application/json")
+			c.Data(typed.HTTPStatus, "application/json", typed.OpenAIErrorBody())
+			service.MarkResponseCommitted(c)
+		} else {
+			h.handleStreamingAwareErrorWithCode(c, typed.HTTPStatus, typed.Type, typed.Code, typed.Message, true, false)
+		}
+		return
+	}
 	if failoverErr.IsOpenAIRequestBodyTooLarge() {
 		service.SetOpsUpstreamError(c, http.StatusRequestEntityTooLarge, service.OpenAIRequestBodyTooLargeClientMessage, "")
 		h.handleStreamingAwareError(

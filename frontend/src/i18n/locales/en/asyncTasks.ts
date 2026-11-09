@@ -127,6 +127,25 @@ export default {
     "released": "Reservation released.",
     "settled": "Reservation settled."
   },
+  "imageAccounts": {
+    "platform": "Image",
+    "protocol": "Upstream image protocol",
+    "openaiHint": "Default. Passes through the OpenAI image API (/v1/images/generations, /v1/images/edits). Users always call with the OpenAI image protocol; the gateway converts it to the selected upstream protocol.",
+    "geminiHint": "Uses the Google Gemini protocol: models starting with imagen- use Imagen :predict, others (e.g. gemini-2.5-flash-image) use :generateContent. Users call with the OpenAI image protocol and the gateway converts it; the upstream only returns base64, so response_format supports b64_json only.",
+    "grokHint": "Uses xAI Grok /v1/images/generations and /v1/images/edits. Users call with the OpenAI image protocol and the gateway converts it to the selected upstream protocol.",
+    "usage": {
+      "intro": "Use the OpenAI image protocol and replace YOUR_IMAGE_MODEL with the image model name provided by the administrator. Billing is per image actually produced; failed upstream calls and zero-image results are not billed.",
+      "generations": "Text to image (JSON)",
+      "editsMultipart": "Image edit (multipart reference upload)",
+      "editsJson": "Image edit (JSON reference image URL)",
+      "async": "Async generation (submit, then poll the task)",
+      "notesTitle": "Parameter notes",
+      "noteN": "n: number of images per request. The cap depends on the upstream protocol and a larger value returns 400; billing follows the images actually produced.",
+      "noteSize": "size: when the model has no tier for the requested size, the request falls back to the highest tier that model can produce and is billed at that tier (e.g. gemini-2.5-flash-image receives 1536x1024 and returns a 3:2 1K image). Unsupported aspect ratios return 400.",
+      "noteResponseFormat": "response_format: Gemini and Grok conversion protocols default to b64_json when omitted. Gemini only supports b64_json, so explicitly passing url returns 400. The OpenAI passthrough protocol keeps the upstream default, so pass response_format explicitly.",
+      "noteUnsupported": "Parameters the upstream does not support return 400 (invalid_request_error) and are never silently dropped."
+    }
+  },
   "videoAccounts": {
     "platform": "Video",
     "protocol": "Upstream video protocol",

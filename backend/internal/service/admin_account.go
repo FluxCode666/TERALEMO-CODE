@@ -437,6 +437,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Status:      StatusActive,
 		Schedulable: true,
 	}
+	if err := ValidateImageAccount(account); err != nil {
+		return nil, err
+	}
 	if err := ValidateVideoAccount(account); err != nil {
 		return nil, err
 	}
@@ -664,6 +667,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 		// Strip SSO/password residue that must never sit next to OAuth tokens.
 		account.Credentials = SanitizeStoredCredentials(account.Platform, account.Credentials)
+	}
+	if err := ValidateImageAccount(account); err != nil {
+		return nil, err
 	}
 	if err := ValidateVideoAccount(account); err != nil {
 		return nil, err
@@ -1129,7 +1135,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
 	}
 	for _, target := range cachedTargets {
-		if target != nil && target.Platform == PlatformVideo && len(input.Credentials) > 0 {
+		if target != nil && (target.Platform == PlatformVideo || target.Platform == PlatformImage) && len(input.Credentials) > 0 {
 			candidate := *target
 			// Bulk writes merge JSONB keys. Validate that same final object so a
 			// one-sided duration update cannot bypass the other stored bound.
@@ -1139,6 +1145,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 			}
 			for name, value := range input.Credentials {
 				candidate.Credentials[name] = value
+			}
+			if err := ValidateImageAccount(&candidate); err != nil {
+				return nil, err
 			}
 			if err := ValidateVideoAccount(&candidate); err != nil {
 				return nil, err

@@ -72,6 +72,13 @@ func (s *AccountModelCatalogService) GetAvailableModels(ctx context.Context, acc
 	if account == nil {
 		return nil, ErrAccountNotFound
 	}
+	if account.Platform == PlatformImage {
+		models := make([]openai.Model, 0)
+		for _, id := range account.ImageModelIDs() {
+			models = append(models, openai.Model{ID: id, Object: "model", Type: "model", DisplayName: id})
+		}
+		return models, nil
+	}
 	if account.Platform == PlatformVideo {
 		models := make([]openai.Model, 0)
 		for _, id := range account.VideoTestModelIDs() {
