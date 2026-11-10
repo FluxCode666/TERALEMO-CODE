@@ -502,7 +502,7 @@ export default {
         thresholdPlaceholder: 'Enter percentage',
       },
       testConnection: 'Test Connection',
-      imageTestUnsupported: 'Online testing is not supported for image accounts. Verify them through the Images API (/v1/images/generations).',
+      imageTestImagenNoReference: 'Imagen models do not support reference-image editing. Pick a Gemini image model or remove the reference image.',
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',
       noAccountsYet: 'No accounts yet',
@@ -1690,7 +1690,8 @@ export default {
         unknownError: 'Unknown error',
         copied: 'Results copied',
         crossPlatform: 'Batch tests only support accounts from the same platform. Please reselect accounts.',
-        skippedImageAccounts: 'Skipped {count} image account(s) (online testing is not supported)',
+        skippedImageAccounts: 'Image accounts do not support test questions; skipped {count} image account(s)',
+        imageNoQuestions: 'Image accounts do not support test questions. Choose other accounts; image accounts can be tested one by one via "Test connection" in the account menu.',
         loadingModels: 'Loading common models...',
         modelsLoadFailed: 'Failed to load common models; you can continue with each account default model.',
         noCommonModels: 'The selected accounts have no common models. Use each account default model instead.'

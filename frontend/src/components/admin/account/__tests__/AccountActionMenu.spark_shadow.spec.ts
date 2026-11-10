@@ -176,18 +176,17 @@ describe('AccountActionMenu — spark shadow 按钮可见性', () => {
 })
 
 describe('AccountActionMenu — image 账号测试入口', () => {
-  it('image 账号的「测试连接」置灰且不触发 test', async () => {
+  it('image 账号的「测试连接」可用并触发 test（真实出图测试）', async () => {
     const account = makeAccount({ platform: 'image', type: 'apikey', parent_account_id: null })
     const wrapper = mount(AccountActionMenu, {
       props: { show: true, account, anchorRect },
       attachTo: document.body,
     })
-    const btn = document.body.querySelector('[data-testid="test-connection-unsupported"]') as HTMLButtonElement
-    expect(btn).toBeTruthy()
-    expect(btn.disabled).toBe(true)
-    expect(btn.getAttribute('title')).toBe('admin.accounts.imageTestUnsupported')
+    expect(document.body.querySelector('[data-testid="test-connection-unsupported"]')).toBeNull()
+    const btn = getBodyButtons().find(b => b.textContent?.includes('admin.accounts.testConnection'))!
+    expect(btn.disabled).toBe(false)
     btn.click()
-    expect(wrapper.emitted('test')).toBeUndefined()
+    expect(wrapper.emitted('test')).toHaveLength(1)
     wrapper.unmount()
   })
 

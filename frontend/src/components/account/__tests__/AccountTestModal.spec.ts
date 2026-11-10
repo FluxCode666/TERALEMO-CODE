@@ -189,4 +189,32 @@ describe('AccountTestModal', () => {
 
     expect(wrapper.text()).toContain('已通过 /v1/chat/completions 验证')
   })
+
+  it('lets an image account start with an empty model list and sends no model_id', async () => {
+    getAvailableModelsMock.mockResolvedValue([])
+    const wrapper = mount(AccountTestModal, {
+      props: { show: true, account: { ...buildAccount(), platform: 'image', type: 'apikey', credentials: { image_protocol: 'openai' } } },
+      global: { stubs: { BaseDialog: BaseDialogStub, Select: SelectStub, TextArea: TextAreaStub, Icon: true } }
+    })
+    await flushPromises()
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeUndefined()
+    await startBtn.trigger('click')
+    await flushPromises()
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+    expect(body).not.toHaveProperty('model_id')
+    wrapper.unmount()
+  })
+
+  it('still disables start for non-image accounts without a model', async () => {
+    getAvailableModelsMock.mockResolvedValue([])
+    const wrapper = mount(AccountTestModal, {
+      props: { show: true, account: buildAccount() },
+      global: { stubs: { BaseDialog: BaseDialogStub, Select: SelectStub, TextArea: TextAreaStub, Icon: true } }
+    })
+    await flushPromises()
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
 })

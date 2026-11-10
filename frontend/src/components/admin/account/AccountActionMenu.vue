@@ -11,24 +11,8 @@
       >
         <div class="py-1">
           <template v-if="account">
-            <!-- image 平台账号由后端测试接口明确拒绝（S1），菜单项置灰并给出说明。 -->
-            <button
-              v-if="account.platform !== 'image'"
-              @click="$emit('test', account); $emit('close')"
-              class="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-700"
-            >
+            <button @click="$emit('test', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-700">
               <Icon name="play" size="sm" class="text-green-500" :stroke-width="2" />
-              {{ t('admin.accounts.testConnection') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              disabled
-              data-testid="test-connection-unsupported"
-              :title="t('admin.accounts.imageTestUnsupported')"
-              class="flex w-full cursor-not-allowed items-center gap-2 px-4 py-2 text-left text-sm text-gray-400 dark:text-gray-500"
-            >
-              <Icon name="play" size="sm" class="text-gray-400 dark:text-gray-500" :stroke-width="2" />
               {{ t('admin.accounts.testConnection') }}
             </button>
             <button @click="$emit('stats', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-700">

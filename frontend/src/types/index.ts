@@ -970,6 +970,8 @@ export interface ClaudeModel {
   type: string
   display_name: string
   created_at: string
+  /** 仅 image 平台账号：该模型（按映射后的实际上游模型和协议）是否支持参考图。后端是唯一判断来源。 */
+  supports_reference_image?: boolean
 }
 
 export interface Proxy {

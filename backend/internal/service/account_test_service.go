@@ -392,7 +392,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		testOpts.AudioDataURL = ""
 	}
 	if account.Platform == PlatformImage {
-		return s.sendErrorAndEnd(c, "Image platform account testing is not supported yet; use the Images API")
+		return s.testImageAccountConnection(c, account, modelID, prompt, testOpts)
 	}
 	if account.Platform == PlatformVideo {
 		return s.testVideoAccountConnection(c, account, modelID, prompt, testOpts)

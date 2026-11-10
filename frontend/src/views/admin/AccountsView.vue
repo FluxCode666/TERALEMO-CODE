@@ -499,7 +499,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <AccountTestQuestionsModal :show="showAccountTestQuestions" @close="showAccountTestQuestions = false" />
-    <ScheduledQuestionTestsModal :show="showScheduledQuestionTests" :selected-account-ids="selIds" @close="showScheduledQuestionTests = false" />
+    <ScheduledQuestionTestsModal :show="showScheduledQuestionTests" :selected-account-ids="scheduledQuestionAccountIds" @close="showScheduledQuestionTests = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
   </AppLayout>
@@ -1609,6 +1609,11 @@ const openAccountTestQuestions = () => {
 
 const openScheduledQuestionTests = () => {
   closeAccountToolsDropdown()
+  const { kept, skipped } = excludeImageAccounts(selIds.value)
+  if (skipped > 0) {
+    appStore.showWarning(t('admin.accounts.batchTest.skippedImageAccounts', { count: skipped }))
+  }
+  scheduledQuestionAccountIds.value = kept
   showScheduledQuestionTests.value = true
 }
 
@@ -2397,26 +2402,27 @@ const knownAccountPlatforms = new Map<number, string>()
 watch(accounts, (rows) => {
   for (const row of rows) knownAccountPlatforms.set(row.id, row.platform)
 }, { immediate: true })
-// image 账号不支持在线测试：批量测试前从所选账号中排除，并提示跳过数量；
+// 批量测试 / 定时题目测试本质是文本测试题，不适用于 image 账号：从所选账号中排除并提示跳过数量；
 // 排除后一个都不剩则拦截。平台取自 knownAccountPlatforms（含跨页全选结果）；从未见过的账号原样保留，后端仍会拒绝 image。
+// （单个账号的「测试连接」对 image 账号是真实出图，不受此限制。）
+const excludeImageAccounts = (ids: number[]) => {
+  const kept = ids.filter((id) => knownAccountPlatforms.get(id) !== 'image')
+  return { kept, skipped: ids.length - kept.length }
+}
+const scheduledQuestionAccountIds = ref<number[]>([])
 const openBatchTest = () => {
-  const ids = selIds.value.filter((id) => knownAccountPlatforms.get(id) !== 'image')
-  const skipped = selIds.value.length - ids.length
-  if (ids.length === 0) {
-    appStore.showWarning(t('admin.accounts.imageTestUnsupported'))
+  const { kept, skipped } = excludeImageAccounts(selIds.value)
+  if (kept.length === 0) {
+    appStore.showWarning(t('admin.accounts.batchTest.imageNoQuestions'))
     return
   }
   if (skipped > 0) {
     appStore.showWarning(t('admin.accounts.batchTest.skippedImageAccounts', { count: skipped }))
   }
-  batchTestIds.value = ids
+  batchTestIds.value = kept
   showBatchTest.value = true
 }
 const handleTest = async (a: AccountListItem) => {
-  if (a.platform === 'image') {
-    appStore.showWarning(t('admin.accounts.imageTestUnsupported'))
-    return
-  }
   const account = await loadAccountDetails(a)
   if (!account) return
   testingAcc.value = account

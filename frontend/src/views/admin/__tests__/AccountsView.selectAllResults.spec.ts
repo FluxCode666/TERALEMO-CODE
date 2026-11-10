@@ -301,7 +301,7 @@ describe('admin AccountsView select all filtered results', () => {
       await wrapper.get('[data-test="batch-test"]').trigger('click')
       await flushPromises()
       expect(wrapper.get('[data-test="batch-modal"]').attributes('data-show')).toBe('false')
-      expect(showWarning).toHaveBeenCalledWith('admin.accounts.imageTestUnsupported')
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.imageNoQuestions')
       wrapper.unmount()
     })
 
@@ -338,7 +338,7 @@ describe('admin AccountsView select all filtered results', () => {
       await wrapper.get('[data-test="batch-test"]').trigger('click')
       await flushPromises()
       expect(wrapper.get('[data-test="batch-modal"]').attributes('data-show')).toBe('false')
-      expect(showWarning).toHaveBeenCalledWith('admin.accounts.imageTestUnsupported')
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.imageNoQuestions')
       wrapper.unmount()
     })
 
