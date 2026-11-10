@@ -660,6 +660,8 @@ export interface SyncUpstreamPreviewParams {
   type: string
   base_url?: string
   api_key: string
+  /** 仅 platform=image 使用：openai / gemini / grok，空按 openai。 */
+  image_protocol?: string
   model_mapping?: Record<string, string>
 }
 

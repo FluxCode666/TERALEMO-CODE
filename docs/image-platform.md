@@ -20,6 +20,16 @@ Image 是独立的生图平台，账号仅支持 API Key。客户端统一使用
 
 OpenAI 协议复用 API Key Images 转发；Gemini 中 `imagen-` 开头的映射模型走 `:predict`，其他走 `:generateContent`；Grok 走 xAI Images API。创作页对 Image 平台使用 `protocol=openai` 请求格式，模型来自账号映射或协议默认目录。组合分组可显式将 Images 路由指向 `image`；异步提交和创作页当前要求具体的 Image 分组。
 
+## 同步上游模型
+
+管理端创建或编辑 Image 账号时，可以使用“从上游同步模型”获取真实模型列表。已保存账号调用 `POST /api/v1/admin/accounts/:id/models/sync-upstream`；创建预览调用 `POST /api/v1/admin/accounts/models/sync-upstream-preview`，请求体沿用 `platform`、`type`、`base_url`、`api_key`、`model_mapping`，新增可选 `image_protocol`，为空按 openai 处理。响应仍为 `models`、可选 `metadata` 和 `warnings`；同步只查询模型目录，不调用生图接口，也不会自动修改模型映射。
+
+- openai：Bearer 鉴权请求 `/v1/models`，保留名称含 `image` 或以 `dall-e-` 开头的模型（包括 `gpt-image-*`、`chatgpt-image*`）。
+- gemini：`x-goog-api-key` 鉴权请求 `/v1beta/models`，最多读取 20 页；去掉 `models/` 前缀，保留 `imagen-*` 和名称含 `image` 的模型。
+- grok：Bearer 鉴权优先请求 `/v1/image-generation-models`，保留其中全部模型；仅在该接口返回 404/405 时回退 `/v1/models`，再保留名称含 `image` 或 `imagine` 的模型。
+
+地址取自账号协议对应的默认地址或 `base_url`，沿用现有同步功能的上游地址校验、代理和响应大小限制。过滤后没有识别出图片模型但原列表非空时，返回完整列表并附 `image_models_not_identified` 警告，管理员需手动挑选；上游本身返回空列表则报错。Image 同步跳过 Codex 能力元数据补全，避免自定义图片模型因缺少文本上下文信息而同步失败；上游错误不向前端返回凭证或原始响应体。
+
 ## 参数与限制
 
 Gemini/Imagen 默认返回 `b64_json`，显式 `response_format=url` 返回 400。转换协议 Grok 默认也请求 `b64_json`，上游仅返回 URL 时会安全下载并回填，下载失败则返回错误且不计费；请求 `url` 但上游只给 base64 时，转换为 `url: "data:<mime>;base64,<data>"`，按实际图片数计费，无法识别 MIME 时使用 `image/png`。OpenAI 透传协议不改变上游默认格式，建议显式传 `response_format`。Gemini generateContent 的 `n` 为 1–4，最多 4 路并发调用，结果顺序和调用顺序一致；部分失败不会取消其他调用。Imagen 为 1–4，Grok 为 1–10。Imagen 不支持 edits；Gemini 支持内联参考图，Grok 支持 URL 或 data URL。Image URL 下载在连接时解析、验证并固定公网 IP，逐跳校验重定向，每图最大 20 MiB；账号配置代理时拒绝需要本地下载的参考图或回填，避免代理出口绕过校验。

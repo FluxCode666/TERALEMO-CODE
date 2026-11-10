@@ -1703,6 +1703,7 @@
                 :model-mappings="modelMappings"
                 :platform="form.platform"
                 :sync-credentials="syncPreviewCredentials"
+                :sync-context-key="syncContextKey"
                 @upstream-synced="upstreamModelsPreviewed = true"
               />
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -2233,6 +2234,7 @@
               :model-mappings="modelMappings"
               platform="anthropic"
               :sync-credentials="syncPreviewCredentials"
+                :sync-context-key="syncContextKey"
               @upstream-synced="upstreamModelsPreviewed = true"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -2575,6 +2577,7 @@
               :model-mappings="modelMappings"
               :platform="form.platform"
               :sync-credentials="syncPreviewCredentials"
+                :sync-context-key="syncContextKey"
               @upstream-synced="upstreamModelsPreviewed = true"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -4454,7 +4457,17 @@ const videoResolutions = ref<string[]>([])
 const videoMinDuration = ref('')
 const videoMaxDuration = ref('')
 watch(videoProtocol, value => { if (form.platform === 'video') apiKeyBaseUrl.value = switchVideoBaseURL(apiKeyBaseUrl.value, value) })
-watch(imageProtocol, value => { if (form.platform === 'image') apiKeyBaseUrl.value = switchImageBaseURL(apiKeyBaseUrl.value, value) })
+watch(imageProtocol, value => {
+  if (form.platform !== 'image') return
+  apiKeyBaseUrl.value = switchImageBaseURL(apiKeyBaseUrl.value, value)
+  // 已从上游同步过模型列表时，换协议后旧列表不再适用：清掉并提示重新同步。
+  if (upstreamModelsPreviewed.value) {
+    upstreamModelsPreviewed.value = false
+    allowedModels.value = []
+    modelMappings.value = []
+    appStore.showWarning(t('admin.accounts.imageProtocolChangedResync'))
+  }
+})
 const upstreamBillingAutoProbeEnabled = ref(true)
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）账号类型、API 协议与端点 ──
@@ -4659,6 +4672,11 @@ function onCnPresetSelect(preset: { mode: CnAccountMode; protocol: CnApiProtocol
   apiKeyBaseUrl.value = preset.url
 }
 
+// 切平台 / 切图片协议 / 改地址都会让进行中的上游同步失效（选择器据此丢弃旧结果）。
+const syncContextKey = computed(() =>
+  form.platform === 'image' ? `image:${imageProtocol.value}:${apiKeyBaseUrl.value.trim()}` : form.platform
+)
+
 const syncPreviewCredentials = computed(() => {
   if (!apiKeyValue.value) return undefined
   const baseUrl = isMultiProtocolPlatform.value && apiProtocol.value === 'adaptive'
@@ -4674,6 +4692,7 @@ const syncPreviewCredentials = computed(() => {
     type: form.type,
     base_url: baseUrl || undefined,
     api_key: apiKeyValue.value,
+    ...(form.platform === 'image' ? { image_protocol: imageProtocol.value } : {}),
     ...(modelMapping ? { model_mapping: modelMapping } : {})
   }
 })

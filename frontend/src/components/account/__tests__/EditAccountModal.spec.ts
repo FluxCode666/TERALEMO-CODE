@@ -76,6 +76,8 @@ const ModelWhitelistSelectorStub = defineComponent({
   name: 'ModelWhitelistSelector',
   props: {
     modelMappings: { type: Array, default: () => [] },
+    syncDisabledReason: String,
+    accountId: Number,
     modelValue: {
       type: Array,
       default: () => []
@@ -367,6 +369,18 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
       api_key: 'image-key', base_url: 'https://image-relay.example', image_protocol: 'grok'
     })
+    wrapper.unmount()
+  })
+
+  it('disables upstream model sync while the image protocol edit is unsaved', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key', image_protocol: 'gemini' } }
+    const wrapper = mountModal(account)
+    const selector = () => wrapper.getComponent(ModelWhitelistSelectorStub)
+    expect(selector().props('syncDisabledReason')).toBeUndefined()
+    await wrapper.get('#edit-image-protocol').setValue('grok')
+    expect(selector().props('syncDisabledReason')).toBe('admin.accounts.imageSyncSaveProtocolFirst')
+    await wrapper.get('#edit-image-protocol').setValue('gemini')
+    expect(selector().props('syncDisabledReason')).toBeUndefined()
     wrapper.unmount()
   })
 

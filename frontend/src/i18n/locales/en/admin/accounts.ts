@@ -848,6 +848,13 @@ export default {
       syncUpstreamModelsEmpty: 'Upstream returned no models to sync',
       syncUpstreamModelsFailed: 'Failed to sync upstream models',
       syncUpstreamModelsError: 'Failed to sync upstream models: {message}',
+      syncUpstreamModelsImageNotIdentified: 'No image models were identified; all upstream models were returned. Please pick them manually.',
+      imageProtocolChangedResync: 'The image upstream protocol changed, so the previously synced model list was cleared. Please sync models from the upstream again.',
+      imageProtocolChangedSaveThenResync: 'The upstream protocol changed; the current model list may belong to the original protocol. Save, then sync models again.',
+      imageProtocolSaveConfirmTitle: 'Confirm image protocol change',
+      imageProtocolSaveConfirmMessage: 'The image upstream protocol changed and the models/mappings below may belong to the original protocol. Save anyway? Consider re-syncing models from the upstream after saving.',
+      imageProtocolSaveConfirmMore: '... and {count} more',
+      imageSyncSaveProtocolFirst: 'The image upstream protocol was changed but not saved. Save the account before syncing models.',
       syncUpstreamModelsMetadataIncomplete:
         'Model IDs were synced, but no capability metadata could be updated.',
       syncUpstreamModelsMetadataPartial:

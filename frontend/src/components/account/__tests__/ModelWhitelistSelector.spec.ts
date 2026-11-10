@@ -348,4 +348,76 @@ describe('ModelWhitelistSelector', () => {
     expect(syncButton).toBeDefined()
     expect(syncButton?.exists()).toBe(true)
   })
+
+  describe('image platform upstream sync', () => {
+    beforeEach(() => {
+      syncUpstreamModels.mockReset()
+      syncUpstreamModelsPreview.mockReset()
+      showWarning.mockReset()
+    })
+
+    it('shows the sync button for image accounts (saved and create flow)', () => {
+      expect(mountSelector({ platform: 'image', accountId: 5 }).find('[data-testid="sync-upstream-models"]').exists()).toBe(true)
+      expect(mountSelector({
+        platform: 'image',
+        syncCredentials: { platform: 'image', type: 'apikey', api_key: 'k', image_protocol: 'gemini' }
+      }).find('[data-testid="sync-upstream-models"]').exists()).toBe(true)
+    })
+
+    it('posts image_protocol in the preview request', async () => {
+      syncUpstreamModelsPreview.mockResolvedValue({ models: ['gemini-2.5-flash-image'], metadata: {}, warnings: [] })
+      const credentials = { platform: 'image', type: 'apikey', api_key: 'k', base_url: 'https://x.example', image_protocol: 'gemini' }
+      const wrapper = mountSelector({ platform: 'image', syncCredentials: credentials })
+      await wrapper.get('[data-testid="sync-upstream-models"]').trigger('click')
+      await flushPromises()
+      expect(syncUpstreamModelsPreview).toHaveBeenCalledWith(expect.objectContaining({ image_protocol: 'gemini', platform: 'image' }))
+      expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([['gemini-2.5-flash-image']])
+    })
+
+    it('shows a warning when no image models were identified', async () => {
+      syncUpstreamModels.mockResolvedValue({
+        models: ['custom-a', 'custom-b'],
+        metadata: {},
+        warnings: [{ code: 'image_models_not_identified', message: 'x' }]
+      })
+      const wrapper = mountSelector({ platform: 'image', accountId: 5 })
+      await wrapper.get('[data-testid="sync-upstream-models"]').trigger('click')
+      await flushPromises()
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsImageNotIdentified')
+      expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([['custom-a', 'custom-b']])
+    })
+
+    it('stays silent when an invalidated sync request fails', async () => {
+      let reject!: (e: unknown) => void
+      syncUpstreamModelsPreview.mockImplementation(() => new Promise((_r, rj) => { reject = rj }))
+      const creds = { platform: 'image', type: 'apikey', api_key: 'k', image_protocol: 'gemini' }
+      const wrapper = mountSelector({ platform: 'image', syncCredentials: creds })
+      await wrapper.get('[data-testid="sync-upstream-models"]').trigger('click')
+      await wrapper.setProps({ syncCredentials: { ...creds, image_protocol: 'grok' } })
+      reject(new Error('upstream raw body leak'))
+      await flushPromises()
+      expect(showError).not.toHaveBeenCalled()
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    })
+
+    it('still reports a failure when the context is unchanged', async () => {
+      syncUpstreamModelsPreview.mockRejectedValue(new Error('boom'))
+      const wrapper = mountSelector({
+        platform: 'image',
+        syncCredentials: { platform: 'image', type: 'apikey', api_key: 'k', image_protocol: 'gemini' }
+      })
+      await wrapper.get('[data-testid="sync-upstream-models"]').trigger('click')
+      await flushPromises()
+      expect(showError).toHaveBeenCalled()
+    })
+
+    it('disables sync with a reason when the protocol edit is not saved yet', async () => {
+      const wrapper = mountSelector({ platform: 'image', accountId: 5, syncDisabledReason: 'save first' })
+      const btn = wrapper.get('[data-testid="sync-upstream-models"]')
+      expect(btn.attributes('disabled')).toBeDefined()
+      expect(btn.attributes('title')).toBe('save first')
+      await btn.trigger('click')
+      expect(syncUpstreamModels).not.toHaveBeenCalled()
+    })
+  })
 })

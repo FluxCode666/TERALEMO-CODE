@@ -105,7 +105,9 @@
         v-if="canSyncUpstream"
         type="button"
         @click="syncUpstreamModels"
-        :disabled="isSyncingUpstream"
+        :disabled="isSyncingUpstream || !!syncDisabledReason"
+        :title="syncDisabledReason || undefined"
+        data-testid="sync-upstream-models"
         class="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
       >
         {{ isSyncingUpstream ? t('admin.accounts.syncUpstreamModelsLoading') : t('admin.accounts.syncUpstreamModels') }}
@@ -170,7 +172,12 @@ const props = defineProps<{
     type: string
     base_url?: string
     api_key: string
+    image_protocol?: string
   }
+  /** 当前表单状态下同步会用到旧配置（例如编辑中改了图片协议但还没保存）时禁用同步并给出原因。 */
+  syncDisabledReason?: string
+  /** 父组件传入的同步上下文（如 image:gemini:<base_url>）；请求返回时与发起时不一致则丢弃结果。 */
+  syncContextKey?: string
 }>()
 
 const emit = defineEmits<{
@@ -290,9 +297,21 @@ const fillRelated = () => {
   emit('update:modelValue', newModels)
 }
 
-const syncUpstreamModels = async () => {
-  if (isSyncingUpstream.value || !canSyncUpstream.value) return
+// 同步上下文：账号、预览凭证和父组件上下文键任一变化，都视为同步已失效。
+const syncContextSignature = () => JSON.stringify([
+  props.syncContextKey ?? '',
+  props.accountId ?? null,
+  props.syncCredentials?.platform ?? '',
+  props.syncCredentials?.type ?? '',
+  props.syncCredentials?.base_url ?? '',
+  props.syncCredentials?.api_key ?? '',
+  props.syncCredentials?.image_protocol ?? ''
+])
 
+const syncUpstreamModels = async () => {
+  if (isSyncingUpstream.value || !canSyncUpstream.value || props.syncDisabledReason) return
+
+  const requestContext = syncContextSignature()
   isSyncingUpstream.value = true
   try {
     let result
@@ -303,6 +322,9 @@ const syncUpstreamModels = async () => {
     } else {
       return
     }
+
+    // 请求期间上下文变化（切协议、换账号、同步被禁用）：丢弃旧结果，不更新表单、不弹提示。
+    if (requestContext !== syncContextSignature() || props.syncDisabledReason) return
 
     const upstreamModels = result.models.map(model => model.trim()).filter(Boolean)
     if (upstreamModels.length === 0) {
@@ -331,6 +353,10 @@ const syncUpstreamModels = async () => {
     const hasIncompleteMetadata = warnings.some(
       warning => warning.code === 'upstream_model_metadata_incomplete'
     )
+    // image 平台：没识别出图片模型时上游返回了完整列表，提示管理员手动挑选。
+    if (warnings.some(warning => warning.code === 'image_models_not_identified')) {
+      appStore.showWarning(t('admin.accounts.syncUpstreamModelsImageNotIdentified'))
+    }
     if (hasIncompleteMetadata) {
       appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
       return
@@ -344,6 +370,8 @@ const syncUpstreamModels = async () => {
       appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
     }
   } catch (error) {
+    // 请求期间上下文已变（切协议、换账号、同步被禁用）：这次失败与当前表单无关，不提示。
+    if (requestContext !== syncContextSignature() || props.syncDisabledReason) return
     const message = extractApiErrorMessage(error, t('admin.accounts.syncUpstreamModelsFailed'))
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
   } finally {

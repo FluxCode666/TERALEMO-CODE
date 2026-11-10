@@ -338,7 +338,7 @@
 
             <!-- Whitelist Mode -->
             <div v-if="modelRestrictionMode === 'whitelist'">
-              <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+              <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" :sync-disabled-reason="imageSyncDisabledReason" :sync-context-key="syncContextKey" />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
                 <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -860,7 +860,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" :sync-disabled-reason="imageSyncDisabledReason" :sync-context-key="syncContextKey" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -1094,7 +1094,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" :sync-disabled-reason="imageSyncDisabledReason" :sync-context-key="syncContextKey" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -3231,6 +3231,17 @@
     </template>
   </BaseDialog>
 
+  <ConfirmDialog
+    :show="showImageProtocolConfirm"
+    :title="t('admin.accounts.imageProtocolSaveConfirmTitle')"
+    :message="imageProtocolConfirmMessage"
+    :confirm-text="t('common.confirm')"
+    :cancel-text="t('common.cancel')"
+    :danger="true"
+    @confirm="handleImageProtocolConfirm"
+    @cancel="showImageProtocolConfirm = false; imageProtocolConfirmed = false"
+  />
+
   <!-- Mixed Channel Warning Dialog -->
   <ConfirmDialog
     :show="showMixedChannelWarning"
@@ -3517,7 +3528,48 @@ const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editVideoProtocol = ref('seedance')
 const editImageProtocol = ref('openai')
-watch(editImageProtocol, value => { if (props.account?.platform === 'image') editBaseUrl.value = switchImageBaseURL(editBaseUrl.value, value) })
+// 按账号 id 同步使用已保存的协议；表单里改了协议但还没保存时，禁用同步避免拿旧协议的列表。
+// 同步上下文：账号 + 当前表单协议，切协议后进行中的同步会被选择器丢弃。
+const syncContextKey = computed(() =>
+  props.account?.platform === 'image' ? `account:${props.account.id}:${editImageProtocol.value}` : `account:${props.account?.id ?? ''}`
+)
+const savedImageProtocol = computed(() =>
+  resolveImageProtocol((props.account?.credentials as Record<string, unknown> | undefined)?.image_protocol)
+)
+const showImageProtocolConfirm = ref(false)
+let imageProtocolConfirmed = false
+// 协议与已保存的不同且白名单/映射非空：切协议时提示、保存前确认（不自动删除任何配置）。
+const imageProtocolDiffersWithModels = computed(() =>
+  props.account?.platform === 'image' &&
+  props.account.type === 'apikey' &&
+  editImageProtocol.value !== savedImageProtocol.value &&
+  (allowedModels.value.length > 0 || modelMappings.value.length > 0)
+)
+const IMAGE_CONFIRM_MAX_ITEMS = 8
+const imageProtocolConfirmMessage = computed(() => {
+  const items = [
+    ...allowedModels.value.map((m) => m.trim()).filter(Boolean),
+    ...modelMappings.value.filter((r) => r.from.trim() && r.to.trim()).map((r) => `${r.from.trim()} → ${r.to.trim()}`)
+  ]
+  const shown = items.slice(0, IMAGE_CONFIRM_MAX_ITEMS)
+  const rest = items.length - shown.length
+  const list = shown.join('\n') + (rest > 0 ? '\n' + t('admin.accounts.imageProtocolSaveConfirmMore', { count: rest }) : '')
+  return `${t('admin.accounts.imageProtocolSaveConfirmMessage')}\n\n${list}`
+})
+const imageSyncDisabledReason = computed(() => {
+  const acc = props.account
+  if (acc?.platform !== 'image') return undefined
+  const saved = resolveImageProtocol((acc.credentials as Record<string, unknown> | undefined)?.image_protocol)
+  return editImageProtocol.value !== saved ? t('admin.accounts.imageSyncSaveProtocolFirst') : undefined
+})
+watch(editImageProtocol, value => {
+  if (props.account?.platform !== 'image') return
+  editBaseUrl.value = switchImageBaseURL(editBaseUrl.value, value)
+  // 不自动删除任何模型/映射：只提示列表可能属于原协议，保存前还会再确认。
+  if (imageProtocolDiffersWithModels.value) {
+    appStore.showWarning(t('admin.accounts.imageProtocolChangedSaveThenResync'))
+  }
+})
 const editHideVideoUpstreamURL = ref(false)
 const editVideoResolutions = ref<string[]>([])
 const editVideoMinDuration = ref('')
@@ -4596,6 +4648,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     const credentials = newAccount.credentials as Record<string, unknown>
     editVideoProtocol.value = resolveVideoProtocol(credentials.video_protocol)
     editImageProtocol.value = resolveImageProtocol(credentials.image_protocol)
+    imageProtocolConfirmed = false
     editHideVideoUpstreamURL.value = credentials.hide_video_upstream_url === true
     editHideVideoUpstreamURLHadKey = Object.prototype.hasOwnProperty.call(credentials, 'hide_video_upstream_url')
     editHideVideoUpstreamURLInitial = editHideVideoUpstreamURL.value
@@ -5382,6 +5435,12 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
   }
 }
 
+const handleImageProtocolConfirm = () => {
+  showImageProtocolConfirm.value = false
+  imageProtocolConfirmed = true
+  void handleSubmit()
+}
+
 const handleSubmit = async () => {
   if (!props.account) return
   const accountID = props.account.id
@@ -5397,6 +5456,13 @@ const handleSubmit = async () => {
 			return
 		}
 	}
+
+  // 协议与保存时不同、模型列表又非空：这些模型可能属于旧协议，保存前必须明确确认。
+  if (imageProtocolDiffersWithModels.value && !imageProtocolConfirmed) {
+    showImageProtocolConfirm.value = true
+    return
+  }
+  imageProtocolConfirmed = false
 
   if (props.account.platform === 'video' && props.account.type === 'apikey') {
     const durationError = validateVideoDurations(editVideoMinDuration.value, editVideoMaxDuration.value)
