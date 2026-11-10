@@ -616,7 +616,7 @@ function onSubmitted(response: CreationSubmitResponse, request: CreationSubmitRe
     snapshot,
     fresh: true,
   })
-  appStore.showToast('success', t('creationStudio.submit.success'))
+  appStore.showSuccess(t('creationStudio.submit.success'))
   if (mobileView.value === 'form' && window.matchMedia('(max-width: 767.98px)').matches) {
     mobileView.value = 'results'
   }
@@ -666,7 +666,7 @@ function onReuse(task: CreationTaskView) {
     // 没有本地记录：只回填模型与默认参数（契约 §8.2 第 5 条）。
     setMode(task.kind)
     selectModel(`${task.kind}:${task.protocol}:${task.model}`)
-    appStore.showToast('info', t('creationStudio.reuse.noSnapshot'))
+    appStore.showInfo(t('creationStudio.reuse.noSnapshot'))
     return
   }
 
@@ -686,10 +686,10 @@ function onReuse(task: CreationTaskView) {
     expiredCount = snapshot.images.filter(image => image.expires_at - now < 900).length
   }
 
-  if (!keyExists) appStore.showToast('warning', t('creationStudio.reuse.keyMissing'))
-  else if (expiredCount > 0) appStore.showToast('warning', t('creationStudio.reuse.refImagesExpired', { count: expiredCount }))
-  else if (!uploadsAvailable.value && snapshot.images.length) appStore.showToast('warning', t('creationStudio.reuse.partial'))
-  else appStore.showToast('success', t('creationStudio.reuse.applied'))
+  if (!keyExists) appStore.showWarning(t('creationStudio.reuse.keyMissing'))
+  else if (expiredCount > 0) appStore.showWarning(t('creationStudio.reuse.refImagesExpired', { count: expiredCount }))
+  else if (!uploadsAvailable.value && snapshot.images.length) appStore.showWarning(t('creationStudio.reuse.partial'))
+  else appStore.showSuccess(t('creationStudio.reuse.applied'))
 }
 
 function imageBinding(role: CreationImageRole): ImageFieldBinding {

@@ -15,7 +15,7 @@ import type { CreationSnapshotImage } from '@/features/creation-studio/types'
 
 const mocks = vi.hoisted(() => ({
   auth: { user: { id: 42, role: 'user', enterprise: null as null | { id: number; role: string } } },
-  app: { showToast: vi.fn() },
+  app: { showToast: vi.fn(), showSuccess: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn() },
 }))
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => mocks.auth }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => mocks.app }))
@@ -76,6 +76,9 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(NOW * 1000); localStorage.clear()
   mocks.auth.user.enterprise = null
   mocks.app.showToast.mockClear()
+  mocks.app.showSuccess.mockClear()
+  mocks.app.showInfo.mockClear()
+  mocks.app.showWarning.mockClear()
   vi.spyOn(keysAPI, 'list').mockResolvedValue({ items: [{ id: 7, name: 'QA key', group_id: 3, group: { id: 3, name: 'QA group' }, status: 'active' }], total: 1 } as Awaited<ReturnType<typeof keysAPI.list>>)
   vi.spyOn(creationStudioApi, 'getOptions').mockResolvedValue(clone(optionsOpenAI))
   vi.spyOn(creationStudioApi, 'estimate').mockResolvedValue(clone(estimateSufficient))
@@ -179,6 +182,14 @@ describe('CreationStudioView states and validation (Q3)', () => {
     expect(wrapper.get('.cs-task [role="progressbar"]').attributes('data-indeterminate')).toBe('true')
     const stored = JSON.parse(localStorage.getItem('creationStudio:snapshots:v1:42')!)
     expect(stored.items[0]).toMatchObject({ catalog_id: submitImageFixture.catalog_id, prompt: 'QA lighthouse', params: { n: 1 } })
+  })
+
+  it('confirms submission with an auto-dismissing toast instead of a sticky one', async () => {
+    const { wrapper } = await render()
+    await fillAndSubmit(wrapper)
+    expect(mocks.app.showSuccess).toHaveBeenCalledWith(en.creationStudio.submit.success)
+    // showToast without a duration never auto-dismisses; the view must not use it.
+    expect(mocks.app.showToast).not.toHaveBeenCalled()
   })
 
   it('successful upload transitions the rendered thumbnail to ready and permits submit', async () => {
