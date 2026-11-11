@@ -682,7 +682,7 @@ func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAut
 	{
 		// S3 存储配置
 		backup.GET("/s3-config", h.Admin.Backup.GetS3Config)
-		// 修改 S3 目标可将数据库备份外泄——要求 step-up 2FA
+		// 修改 S3 目标可将生成内容导向外部账号——要求 step-up 2FA
 		backup.PUT("/s3-config", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.UpdateS3Config)
 		backup.POST("/s3-config/test", h.Admin.Backup.TestS3Connection)
 
@@ -692,20 +692,6 @@ func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAut
 		backup.PUT("/image-storage", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.UpdateImageStorageConfig)
 		backup.POST("/image-storage/test", h.Admin.Backup.TestImageStorageConnection)
 
-		// 定时备份配置
-		backup.GET("/schedule", h.Admin.Backup.GetSchedule)
-		backup.PUT("/schedule", h.Admin.Backup.UpdateSchedule)
-
-		// 备份操作
-		backup.POST("", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.CreateBackup)
-		backup.GET("", h.Admin.Backup.ListBackups)
-		backup.GET("/:id", h.Admin.Backup.GetBackup)
-		backup.DELETE("/:id", h.Admin.Backup.DeleteBackup)
-		// 备份下载链接可直接取走整库数据——要求 step-up 2FA
-		backup.GET("/:id/download-url", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.GetDownloadURL)
-
-		// 恢复操作：整库覆盖可回滚安全设置（含 step-up 开关本身）——要求 step-up 2FA
-		backup.POST("/:id/restore", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.RestoreBackup)
 	}
 }
 

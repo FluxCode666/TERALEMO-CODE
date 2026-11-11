@@ -763,20 +763,14 @@ func ProvideImageTaskService(store ImageTaskStore, settings *ImageStorageSetting
 	return NewImageTaskServiceWithResolver(store, settings.Resolver(), defaultImageTaskTTL, defaultImageTaskExecutionTimeout)
 }
 
-// ProvideBackupService creates and starts BackupService
+// ProvideBackupService creates the shared S3 configuration service
 func ProvideBackupService(
 	settingRepo SettingRepository,
 	cfg *config.Config,
 	encryptor SecretEncryptor,
 	storeFactory BackupObjectStoreFactory,
-	dumper DBDumper,
-	lockCache LeaderLockCache,
-	db *sql.DB,
 ) *BackupService {
-	svc := NewBackupService(settingRepo, cfg, encryptor, storeFactory, dumper)
-	svc.SetLeaderLock(lockCache, db)
-	svc.Start()
-	return svc
+	return NewBackupService(settingRepo, cfg, encryptor, storeFactory)
 }
 
 // ProvideOpsService constructs OpsService and wires the SettingService-backed quota
