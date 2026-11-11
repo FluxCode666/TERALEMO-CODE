@@ -306,6 +306,13 @@ func (s *TotpService) CompleteSetup(ctx context.Context, userID int64, totpCode,
 // Disable disables TOTP for a user
 // If email verification is enabled, emailCode is required; otherwise password is required
 func (s *TotpService) Disable(ctx context.Context, userID int64, emailCode, password string) error {
+	forced, err := s.settingService.ForceTotpEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if forced {
+		return infraerrors.Forbidden("TOTP_REQUIRED", "TOTP cannot be disabled while two-factor authentication is required")
+	}
 	// Get user
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {

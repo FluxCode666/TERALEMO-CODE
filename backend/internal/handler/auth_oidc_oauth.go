@@ -1282,6 +1282,7 @@ func (h *AuthHandler) tryOIDCVerifiedEmailFastPath(
 	fragment.Set("access_token", tokenPair.AccessToken)
 	fragment.Set("refresh_token", tokenPair.RefreshToken)
 	fragment.Set("expires_in", fmt.Sprintf("%d", tokenPair.ExpiresIn))
+	fragment.Set("requires_totp_setup", strconv.FormatBool(tokenPair.RequiresTotpSetup))
 	fragment.Set("token_type", "Bearer")
 	fragment.Set("redirect", redirectTo)
 	clearOAuthPendingSessionCookie(c, isRequestHTTPS(c))

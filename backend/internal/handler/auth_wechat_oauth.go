@@ -616,6 +616,7 @@ func (h *AuthHandler) createWeChatPendingSession(
 		completionResponse["access_token"] = tokenPair.AccessToken
 		completionResponse["refresh_token"] = tokenPair.RefreshToken
 		completionResponse["expires_in"] = tokenPair.ExpiresIn
+		completionResponse["requires_totp_setup"] = tokenPair.RequiresTotpSetup
 		completionResponse["token_type"] = "Bearer"
 	}
 

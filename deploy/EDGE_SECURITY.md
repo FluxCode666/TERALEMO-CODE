@@ -108,6 +108,41 @@ server:
     - ::1/128
 ```
 
+## Required console TOTP enrollment
+
+The independent security-settings switch is disabled by default and covers all
+console users, including administrators and users signing in with OAuth or a
+passkey. Only TOTP enrollment satisfies this policy. API-key model requests
+remain independent of the console policy.
+
+Before enabling it, configure the same fixed `TOTP_ENCRYPTION_KEY` (or
+`totp.encryption_key`) on every application instance and enroll the operating
+administrator. The security-settings actions always require an administrator's
+recent TOTP step-up grant; an admin API key cannot change these policies. The
+enable dialog displays the number of accounts without TOTP.
+
+Enabling first persists a new policy epoch and then revokes all refresh sessions
+for users without TOTP in bounded pages. Access and refresh tokens carry the
+policy epoch and a shared Redis session version. Each console JWT request checks
+the persisted policy and the shared session version, so old sessions are rejected
+across instances immediately, even while the revocation batch is running. A batch
+failure leaves the policy enabled and returns an error; do not disable it merely
+to retry cleanup. Disabling preserves the revocation epoch so older credentials
+do not become valid again. Retain Redis persistence for session-version keys.
+
+After signing in again, users without TOTP receive `requires_totp_setup: true`
+and are restricted to `/auth/me`, logout/session revocation and the exact TOTP
+status, identity-verification and setup/enable routes. Other authenticated
+console requests return `403 TOTP_SETUP_REQUIRED`. The dedicated setup screen
+does not load dashboard APIs. Completing setup restores access with the same new
+session; disabling TOTP is forbidden while the policy is active.
+
+Upgrade all replicas before enabling either security switch. An older binary
+does not enforce these settings. Already-running HTTP/SSE responses are not
+interrupted; WebSocket model sessions recheck the allowlist before each new turn.
+Keep encrypted TOTP secrets and their fixed encryption key backed up together;
+never rotate or discard the key without a migration/recovery procedure.
+
 ## Nginx baseline
 
 Define shared zones in the `http` block. Tune rates to measured legitimate

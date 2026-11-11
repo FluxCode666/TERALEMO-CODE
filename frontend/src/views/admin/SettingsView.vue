@@ -1620,6 +1620,7 @@
               </div>
 
               <ModelAllowlistPanel />
+              <ForceTotpPanel />
 
               <!-- TOTP 2FA -->
               <div
@@ -8978,6 +8979,7 @@
 
 <script setup lang="ts">
 import ModelAllowlistPanel from "@/components/admin/ModelAllowlistPanel.vue";
+import ForceTotpPanel from "@/components/admin/ForceTotpPanel.vue";
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { listPlatformIds } from "@/constants/platformCatalog";
 import { useI18n } from "vue-i18n";

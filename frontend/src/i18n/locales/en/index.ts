@@ -10,9 +10,11 @@ import asyncTasks from './asyncTasks'
 import apiDocs from './apiDocs'
 import creationStudio from './creationStudio'
 import modelAllowlist from './modelAllowlist'
+import forceTotp from './forceTotp'
 
 export default {
   ...modelAllowlist,
+  ...forceTotp,
   ...landing,
   ...common,
   ...enterprise,

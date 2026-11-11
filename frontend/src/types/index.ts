@@ -67,6 +67,8 @@ export interface UserProfileSourceContext {
 }
 
 export interface User {
+  requires_totp_setup?: boolean
+  totp_enabled?: boolean
   id: number
   username: string
   email: string
@@ -295,6 +297,7 @@ export interface PublicSettings {
 }
 
 export interface AuthResponse {
+  requires_totp_setup?: boolean
   access_token: string
   refresh_token?: string  // New: Refresh Token for token renewal
   expires_in?: number     // New: Access Token expiry time in seconds

@@ -13,6 +13,10 @@ import (
 // Must be placed AFTER JWT auth middleware so that the user role is available in context.
 func BackendModeUserGuard(settingService *service.SettingService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isTotpEnrollmentRoute(c.Request.Method, c.Request.URL.Path) {
+			c.Next()
+			return
+		}
 		if settingService == nil || !settingService.IsBackendModeEnabled(c.Request.Context()) {
 			c.Next()
 			return
@@ -28,6 +32,9 @@ func BackendModeUserGuard(settingService *service.SettingService) gin.HandlerFun
 }
 
 func backendModeAllowsAuthPath(path string) bool {
+	if path == "/api/v1/auth/me" {
+		return true
+	}
 	path = strings.ToLower(strings.TrimSpace(path))
 	for _, suffix := range []string{
 		"/auth/login",

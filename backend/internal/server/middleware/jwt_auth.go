@@ -93,6 +93,9 @@ func jwtAuth(
 		}
 
 		// 会话绑定校验：IP/UA 任一变化即撤销会话（功能可在系统设置中关闭）
+		if !enforceTotpEnrollment(c, authService, user, claims) {
+			return
+		}
 		if !enforceSessionBinding(c, authService, settingService, auditService, claims) {
 			return
 		}
