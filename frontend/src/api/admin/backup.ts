@@ -10,69 +10,6 @@ export interface BackupS3Config {
   force_path_style: boolean
 }
 
-export interface BackupScheduleConfig {
-  enabled: boolean
-  cron_expr: string
-  retain_days: number
-  retain_count: number
-  monthly_archive?: BackupMonthlyArchiveConfig
-}
-
-export interface BackupMonthlyArchiveConfig {
-  enabled: boolean
-  days: number[]
-  include_month_end: boolean
-  retain_count: number // 0 = permanent
-}
-
-export interface BackupMonthlyArchive {
-  dates: string[]
-  retain_count: number
-}
-
-export interface BackupRecord {
-  id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  backup_type: string
-  file_name: string
-  s3_key: string
-  parts?: BackupPart[]
-  size_bytes: number
-  triggered_by: string
-  error_message?: string
-  started_at: string
-  finished_at?: string
-  expires_at?: string
-  progress?: string
-  restore_status?: string
-  restore_started_at?: string
-  restore_error?: string
-  restored_at?: string
-  monthly_archive?: BackupMonthlyArchive
-}
-
-export interface BackupPart {
-  index: number
-  s3_key: string
-  size_bytes: number
-  sha256?: string
-}
-
-export interface BackupDownloadPart {
-  index: number
-  size_bytes: number
-  url: string
-}
-
-export interface BackupDownloadResponse {
-  url?: string
-  parts?: BackupDownloadPart[]
-}
-
-export interface CreateBackupRequest {
-  expire_days?: number
-}
-
 export interface TestS3Response {
   ok: boolean
   message: string
@@ -140,63 +77,13 @@ export async function testImageStorageConnection(
   return data
 }
 
-// Schedule
-export async function getSchedule(): Promise<BackupScheduleConfig> {
-  const { data } = await apiClient.get<BackupScheduleConfig>('/admin/backups/schedule')
-  return data
-}
-
-export async function updateSchedule(config: BackupScheduleConfig): Promise<BackupScheduleConfig> {
-  const { data } = await apiClient.put<BackupScheduleConfig>('/admin/backups/schedule', config)
-  return data
-}
-
-// Backup operations
-export async function createBackup(req?: CreateBackupRequest): Promise<BackupRecord> {
-  const { data } = await apiClient.post<BackupRecord>('/admin/backups', req || {})
-  return data
-}
-
-export async function listBackups(): Promise<{ items: BackupRecord[] }> {
-  const { data } = await apiClient.get<{ items: BackupRecord[] }>('/admin/backups')
-  return data
-}
-
-export async function getBackup(id: string): Promise<BackupRecord> {
-  const { data } = await apiClient.get<BackupRecord>(`/admin/backups/${id}`)
-  return data
-}
-
-export async function deleteBackup(id: string, deleteArchived = false): Promise<void> {
-  await apiClient.delete(`/admin/backups/${id}`, deleteArchived ? { params: { delete_archived: true } } : undefined)
-}
-
-export async function getDownloadURL(id: string): Promise<BackupDownloadResponse> {
-  const { data } = await apiClient.get<BackupDownloadResponse>(`/admin/backups/${id}/download-url`)
-  return data
-}
-
-// Restore
-export async function restoreBackup(id: string, password: string): Promise<BackupRecord> {
-  const { data } = await apiClient.post<BackupRecord>(`/admin/backups/${id}/restore`, { password })
-  return data
-}
-
 export const backupAPI = {
-  getS3Config,
-  updateS3Config,
-  testS3Connection,
-  getImageStorageConfig,
-  updateImageStorageConfig,
-  testImageStorageConnection,
-  getSchedule,
-  updateSchedule,
-  createBackup,
-  listBackups,
-  getBackup,
-  deleteBackup,
-  getDownloadURL,
-  restoreBackup,
+ getS3Config,
+ updateS3Config,
+ testS3Connection,
+ getImageStorageConfig,
+ updateImageStorageConfig,
+ testImageStorageConnection,
 }
 
 export default backupAPI
