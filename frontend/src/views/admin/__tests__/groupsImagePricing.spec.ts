@@ -19,6 +19,14 @@ describe("groups image pricing platform support", () => {
     expect(imagePricingPlatforms.has("grok")).toBe(true);
   });
 
+  it("includes Image platform groups in image pricing controls and defaults", () => {
+    expect(supportsImagePricingPlatform("image")).toBe(true);
+    expect(imagePricingPlatforms.has("image")).toBe(true);
+    // 与后端 DefaultAllowImageGenerationForPlatform 一致：新建 image 分组默认允许生图。
+    expect(defaultAllowImageGenerationForPlatform("image")).toBe(true);
+    expect(getImagePricePlaceholder("image", "image_price_1k")).toBe("0.134");
+  });
+
   it("enables video pricing controls for Grok only", () => {
     expect(supportsVideoPricingPlatform("grok")).toBe(true);
     expect(supportsVideoPricingPlatform("openai")).toBe(false);

@@ -76,6 +76,8 @@ const ModelWhitelistSelectorStub = defineComponent({
   name: 'ModelWhitelistSelector',
   props: {
     modelMappings: { type: Array, default: () => [] },
+    syncDisabledReason: String,
+    accountId: Number,
     modelValue: {
       type: Array,
       default: () => []
@@ -352,6 +354,40 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
     await flushPromises()
     expect(updateAccountMock.mock.calls.at(-1)?.[1]?.credentials.hide_video_upstream_url).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('echoes the stored image protocol and saves a changed one while keeping a custom relay', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key', base_url: 'https://image-relay.example', image_protocol: 'gemini' } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-image-protocol').element as HTMLSelectElement).value).toBe('gemini')
+    await wrapper.get('#edit-image-protocol').setValue('grok')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+      api_key: 'image-key', base_url: 'https://image-relay.example', image_protocol: 'grok'
+    })
+    wrapper.unmount()
+  })
+
+  it('disables upstream model sync while the image protocol edit is unsaved', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key', image_protocol: 'gemini' } }
+    const wrapper = mountModal(account)
+    const selector = () => wrapper.getComponent(ModelWhitelistSelectorStub)
+    expect(selector().props('syncDisabledReason')).toBeUndefined()
+    await wrapper.get('#edit-image-protocol').setValue('grok')
+    expect(selector().props('syncDisabledReason')).toBe('admin.accounts.imageSyncSaveProtocolFirst')
+    await wrapper.get('#edit-image-protocol').setValue('gemini')
+    expect(selector().props('syncDisabledReason')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('defaults a legacy image account without image_protocol to openai', async () => {
+    const account = { ...buildAccount(), platform: 'image', credentials: { api_key: 'image-key' } }
+    const wrapper = mountModal(account)
+    expect((wrapper.get('#edit-image-protocol').element as HTMLSelectElement).value).toBe('openai')
     wrapper.unmount()
   })
 

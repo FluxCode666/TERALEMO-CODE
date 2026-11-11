@@ -79,13 +79,17 @@ func (r *compatibleImagesUsage) Create(_ context.Context, log *service.UsageLog)
 
 func TestCompositeCompatibleImagesEndToEnd(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, scenario := range []string{"generation", "json_edit", "multipart_alias", "disabled", "native_only", "restricted"} {
+	for _, scenario := range []string{"generation", "json_edit", "multipart_alias", "disabled", "native_only", "restricted", "image_platform"} {
 		t.Run(scenario, func(t *testing.T) {
 			const model = "gemini-3.1-flash-image"
 			groupID := int64(101)
 			price := 0.17
 			group := &service.Group{ID: groupID, Platform: service.PlatformComposite, AllowImageGeneration: scenario != "disabled", RateMultiplier: 1, ImagePrice1K: &price, ImagePrice2K: &price, ImagePrice4K: &price}
 			accounts := []service.Account{}
+			target := service.PlatformOpenAI
+			if scenario == "image_platform" {
+				target = service.PlatformImage
+			}
 			// Native accounts deliberately advertise the same model and have higher
 			// priority, proving the image capability fence controls selection.
 			for i, typ := range []string{service.AccountTypeOAuth, service.AccountTypeSetupToken, service.AccountTypeAPIKey} {
@@ -96,7 +100,7 @@ func TestCompositeCompatibleImagesEndToEnd(t *testing.T) {
 				if scenario == "restricted" && typ == service.AccountTypeAPIKey {
 					mapping = map[string]any{"gpt-image-2": "gpt-image-2"}
 				}
-				accounts = append(accounts, service.Account{ID: int64(i + 1), Platform: service.PlatformOpenAI, Type: typ, Status: service.StatusActive, Schedulable: true, Priority: i, Credentials: map[string]any{"api_key": "fixture-key", "access_token": "unused-native-token", "base_url": "https://compatible.example/v1", "model_mapping": mapping}})
+				accounts = append(accounts, service.Account{ID: int64(i + 1), Platform: target, Type: typ, Status: service.StatusActive, Schedulable: true, Priority: i, Credentials: map[string]any{"api_key": "fixture-key", "access_token": "unused-native-token", "base_url": "https://compatible.example/v1", "model_mapping": mapping}})
 			}
 			cfg := &config.Config{RunMode: config.RunModeSimple}
 			repo := compatibleImagesAccounts{accounts: accounts}
@@ -109,7 +113,7 @@ func TestCompositeCompatibleImagesEndToEnd(t *testing.T) {
 			if scenario == "multipart_alias" {
 				publicModel = "public-image"
 			}
-			resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{routes: []service.CompositeModelRoute{{ID: 1, GroupID: groupID, PublicModel: publicModel, MatchType: service.CompositeRouteMatchExact, TargetPlatform: service.PlatformOpenAI, UpstreamModel: model, Endpoint: service.CompositeRouteEndpointImages, Enabled: true}}})
+			resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{routes: []service.CompositeModelRoute{{ID: 1, GroupID: groupID, PublicModel: publicModel, MatchType: service.CompositeRouteMatchExact, TargetPlatform: target, UpstreamModel: model, Endpoint: service.CompositeRouteEndpointImages, Enabled: true}}})
 			router := gin.New()
 			router.Use(func(c *gin.Context) {
 				c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{ID: 202, GroupID: &groupID, Group: group, User: &service.User{ID: 303}})

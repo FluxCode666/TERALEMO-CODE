@@ -377,7 +377,9 @@ type InflightEstimateRequest struct {
 	MaxTokens int
 	Kind      InflightEstimateKind
 	// Units 按次/按张数量（<=0 视为 1）。
-	Units int
+	Units         int
+	ImageSize     string
+	imageSizeTier string
 	// SearchCalls 叠加的搜索次数（按分组 search_price_per_1k 计）。
 	SearchCalls int
 	// 视频：分辨率与时长（秒）。
@@ -401,6 +403,7 @@ type inflightEstimateDeps struct {
 	// 仅在首选/渠道候选均无法定价（或 composite 分组）时才调用；实现只读调度器快照，
 	// 不在请求路径上直接查库，也不按模型名缓存（内存不随请求模型名增长）。
 	accountMappedModels func(ctx context.Context, apiKey *APIKey, model string) []string
+	imageAccounts       func(ctx context.Context, apiKey *APIKey) []Account
 }
 
 // inflightSnapshotLister 调度器快照读取（与账号选择同源：Redis 快照，未命中时由快照服务自身回源并回填）。
@@ -581,6 +584,14 @@ func (d inflightEstimateDeps) estimateOne(ctx context.Context, apiKey *APIKey, m
 	perRequestMode := resolved != nil && (resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage || resolved.Mode == BillingModeVideo)
 	switch req.Kind {
 	case InflightEstimateImage:
+		if isImagePlatformBilling(ctx, apiKey) && d.billing != nil {
+			gateway := &OpenAIGatewayService{cfg: d.cfg, billingService: d.billing, resolver: d.resolver}
+			priced := gateway.calculateOpenAIImageCost(ctx, model, apiKey, &OpenAIForwardResult{ImageCount: units, ImageSize: req.imageSizeTier}, imageRate)
+			if priced != nil {
+				cost = priced.ActualCost
+			}
+			return cost
+		}
 		if perRequestMode {
 			cost = maxPerRequestPrice(resolved) * float64(units) * imageRate
 		}
@@ -666,6 +677,12 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		return 0, true
 	}
 	primary, fallbacks, upstreamInput := inflightBillingModelCandidates(ctx, d, apiKey, req.Model)
+	if req.Kind == InflightEstimateImage && isImagePlatformBilling(ctx, apiKey) {
+		req.imageSizeTier = NormalizeImageBillingTierOrDefault(req.ImageSize)
+		if d.imageAccounts != nil {
+			req.imageSizeTier = imagePlatformPricingTier(d.imageAccounts(ctx, apiKey), upstreamInput, req.ImageSize)
+		}
+	}
 	bestOf := func(models []string) float64 {
 		best := 0.0
 		for _, m := range models {
@@ -737,6 +754,9 @@ func inflightReservationCfg(cfg *config.Config) config.InflightReservationConfig
 
 func (s *GatewayService) inflightEstimateDeps() inflightEstimateDeps {
 	d := inflightEstimateDeps{cfg: s.cfg, billing: s.billingService, resolver: s.resolver}
+	d.imageAccounts = func(ctx context.Context, key *APIKey) []Account {
+		return imagePricingAccounts(ctx, key, s.schedulerSnapshot, s.accountRepo)
+	}
 	if s.channelService != nil {
 		d.resolveMapping = s.channelService.ResolveChannelMapping
 	}
@@ -768,6 +788,9 @@ func (s *GatewayService) EstimateInflightReservation(ctx context.Context, apiKey
 
 func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 	d := inflightEstimateDeps{cfg: s.cfg, billing: s.billingService, resolver: s.resolver}
+	d.imageAccounts = func(ctx context.Context, key *APIKey) []Account {
+		return imagePricingAccounts(ctx, key, s.schedulerSnapshot, s.accountRepo)
+	}
 	if s.channelService != nil {
 		d.resolveMapping = s.channelService.ResolveChannelMapping
 	}

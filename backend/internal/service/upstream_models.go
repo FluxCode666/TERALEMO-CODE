@@ -213,6 +213,9 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 // snapshot. When no model is complete, the existing account snapshot is left
 // untouched.
 func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, account *Account) (*UpstreamModelCatalog, error) {
+	if account != nil && account.Platform == PlatformImage {
+		return s.fetchImageUpstreamModelCatalog(ctx, account)
+	}
 	models, body, err := s.fetchUpstreamModelList(ctx, account)
 	liveListAvailable := err == nil
 	if err != nil {
@@ -748,6 +751,13 @@ func (s *AccountTestService) fetchUpstreamModelList(ctx context.Context, account
 	if s.httpUpstream == nil {
 		return nil, nil, newUpstreamModelSyncConfigError("Upstream HTTP client is not configured", nil)
 	}
+	if account.Platform == PlatformImage {
+		catalog, err := s.fetchImageUpstreamModelCatalog(ctx, account)
+		if err != nil {
+			return nil, nil, err
+		}
+		return catalog.Models, nil, nil
+	}
 
 	if account.IsGemini() && account.IsVertexServiceAccount() {
 		models, err := s.fetchVertexGeminiUpstreamModels(ctx, account)
@@ -903,6 +913,8 @@ func listVertexGeminiPublisherModels(location string, fetchPage func(page int, l
 
 func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
 	switch {
+	case account.Platform == PlatformImage:
+		return s.buildImageUpstreamModelsRequest(ctx, account)
 	case account.Platform == PlatformAntigravity:
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():

@@ -21,6 +21,10 @@ import (
 // POST /v1/images/generations
 // POST /v1/images/edits
 func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
+	platform := service.PlatformOpenAI
+	if target, _ := service.ResolvedTargetPlatformFromContext(c.Request.Context()); target == service.PlatformImage {
+		platform = target
+	}
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 
@@ -70,6 +74,9 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 
 	parsed, err := h.gatewayService.ParseOpenAIImagesRequest(c, body)
 	if err != nil {
+		if platform == service.PlatformImage && writeImageCompatErrorResponse(c, err) {
+			return
+		}
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
@@ -80,7 +87,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	if resolvedModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok {
 		routingModel = resolvedModel
 	}
-	if !compositeTargetPlatformAllowed(c, apiKey, requestModel, service.PlatformOpenAI) {
+	if !compositeTargetPlatformAllowed(c, apiKey, requestModel, platform) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
 	}
@@ -144,7 +151,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	}
 
 	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
-	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: routingModel, BodyBytes: len(body), Kind: service.InflightEstimateImage, Units: parsed.N})
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: routingModel, BodyBytes: len(body), Kind: service.InflightEstimateImage, Units: parsed.N, ImageSize: parsed.Size})
 	if inflightErr != nil {
 		status, code, message, retryAfter := billingErrorDetailsForContext(c, inflightErr)
 		if retryAfter > 0 {
@@ -178,6 +185,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			routingModel,
 			failedAccountIDs,
 			parsed.RequiredCapabilityForModel(channelMapping.MappedModel),
+			platform,
 		)
 		if err != nil {
 			if failoverClientGone(c) {
@@ -189,7 +197,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
 			)
 			if len(failedAccountIDs) == 0 {
-				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, clientRequestModel, routingModel, service.PlatformOpenAI)
+				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, clientRequestModel, routingModel, platform)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
@@ -208,7 +216,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			return
 		}
 		if selection == nil || selection.Account == nil {
-			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, clientRequestModel, routingModel, service.PlatformOpenAI)
+			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, clientRequestModel, routingModel, platform)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
 			}

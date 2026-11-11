@@ -157,6 +157,14 @@
         {{ promptInputHint }}
       </p>
 
+      <p
+        v-if="isImagenSelection"
+        data-testid="image-test-imagen-no-reference"
+        class="text-xs text-gray-500 dark:text-gray-400"
+      >
+        {{ t('admin.accounts.imageTestImagenNoReference') }}
+      </p>
+
       <!-- Optional media uploads for real generation / transcription -->
       <div v-if="supportsImageUpload" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -435,6 +443,7 @@ import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import { adminAPI } from '@/api/admin'
 import { resolveVideoProtocol } from '@/utils/videoProtocol'
+import { resolveImageProtocol } from '@/utils/imageProtocol'
 import type { Account, ClaudeModel } from '@/types'
 import type { AccountTestQuestion } from '@/api/admin/accountTestQuestions'
 
@@ -500,9 +509,24 @@ const audioFileInput = ref<HTMLInputElement | null>(null)
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
 const isGrokAccount = computed(() => props.account?.platform === 'grok')
 const isVideoAccount = computed(() => props.account?.platform === 'video')
+// image 平台账号：测试 = 用该账号真实生成 1 张图（按图片测试展示）。
+const isImageAccount = computed(() => props.account?.platform === 'image')
+const imageAccountProtocol = computed(() => resolveImageProtocol(props.account?.credentials?.image_protocol))
+// 能否带参考图以后端为准：模型对象上的 supports_reference_image（按映射后的实际上游模型计算，别名也准确）。
+// 字段缺失（旧后端）时才退回「gemini 协议 + imagen- 前缀」判断。不支持时隐藏上传并说明（带参考图会被后端拒绝）。
+const isImagenSelection = computed(() => {
+  if (!isImageAccount.value) return false
+  const model = availableModels.value.find((m) => m.id === selectedModelId.value)
+  if (typeof model?.supports_reference_image === 'boolean') return !model.supports_reference_image
+  return imageAccountProtocol.value === 'gemini' && selectedModelId.value.toLowerCase().startsWith('imagen-')
+})
+// 列表为空（例如只有通配符映射的旧后端）时，image 账号仍允许开始测试：请求不带 model_id，由后端选默认模型。
+const imageTestWithoutModel = computed(
+  () => isImageAccount.value && !loadingModels.value && availableModels.value.length === 0
+)
 const supportsTestQuestions = computed(() => {
   const platform = props.account?.platform
-  return Boolean(platform && platform !== 'video' && platform !== 'typesafe')
+  return Boolean(platform && platform !== 'video' && platform !== 'image' && platform !== 'typesafe')
 })
 const showTestTypeSelect = computed(
   () => supportsTestQuestions.value && !isOpenAIAccount.value && !isGrokAccount.value
@@ -586,7 +610,7 @@ const supportsGrokVideoTest = computed(
 )
 
 const supportsImageTest = computed(
-  () => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value
+  () => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value || isImageAccount.value
 )
 
 // Model select only when the mode needs a model.
@@ -627,7 +651,11 @@ const supportsPromptInput = computed(() => {
 })
 
 const supportsImageUpload = computed(
-  () => !isQuestionMode.value && (isVideoAccount.value || (isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video')))
+  () =>
+    !isQuestionMode.value &&
+    (isVideoAccount.value ||
+      (isGrokAccount.value && (grokTestMode.value === 'image' || grokTestMode.value === 'video')) ||
+      (isImageAccount.value && !isImagenSelection.value))
 )
 const supportsAudioUpload = computed(() => !isQuestionMode.value && isGrokAccount.value && grokTestMode.value === 'stt')
 const imageUploadLabel = computed(() =>
@@ -815,7 +843,7 @@ const canStartTest = computed(() => {
     }
     return Boolean(selectedModelId.value)
   }
-  return Boolean(selectedModelId.value)
+  return Boolean(selectedModelId.value) || imageTestWithoutModel.value
 })
 
 const sortTestModels = (models: ClaudeModel[]) => {
@@ -894,6 +922,11 @@ watch(grokTestMode, () => {
   clearMediaUploads()
   pickDefaultModelForMode()
   applyDefaultPromptForMode()
+})
+
+// 选中 Imagen 模型时参考图不可用：清掉已选的参考图，避免被带进请求。
+watch(isImagenSelection, (imagen) => {
+  if (imagen) clearMediaUploads()
 })
 
 watch(isQuestionMode, async (questionMode) => {
@@ -1037,6 +1070,12 @@ const startTest = async () => {
     }
     if (isOpenAIAccount.value) {
       requestBody.mode = isQuestionMode.value ? 'default' : testMode.value
+    }
+    if (isImageAccount.value && !selectedModelId.value) {
+      delete (requestBody as { model_id?: string }).model_id
+    }
+    if (isImageAccount.value && uploadImageDataURL.value && !isImagenSelection.value) {
+      requestBody.image_data_url = uploadImageDataURL.value
     }
     if (isVideoAccount.value) {
       requestBody.mode = 'video'

@@ -239,6 +239,27 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    ['openai', 'https://api.openai.com', 'sk-...'],
+    ['gemini', 'https://generativelanguage.googleapis.com', 'AIza...'],
+    ['grok', 'https://api.x.ai', 'xai-...']
+  ])('creates image accounts using the %s protocol and its default upstream', async (protocol, baseURL, placeholder) => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-image"]').trigger('click')
+    expect((wrapper.get('#create-image-protocol').element as HTMLSelectElement).value).toBe('openai')
+    await wrapper.get('#create-image-protocol').setValue(protocol)
+    expect(wrapper.get('form#create-account-form input[type="password"]').attributes('placeholder')).toBe(placeholder)
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Image account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('image-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'image', type: 'apikey',
+      credentials: { image_protocol: protocol, api_key: 'image-key', base_url: baseURL }
+    })
+    wrapper.unmount()
+  })
+
   it('allows disabling upstream video URL privacy per new account', async () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="platform-button-video"]').trigger('click')
@@ -394,6 +415,47 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
     expect(createAccountMock).toHaveBeenCalledOnce()
     expect(syncUpstreamModelsMock).toHaveBeenCalledWith(42)
+  })
+
+  it.each(['openai', 'gemini', 'grok'])('sends image_protocol=%s in image preview sync credentials', async (protocol) => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-image"]').trigger('click')
+    await wrapper.get('#create-image-protocol').setValue(protocol)
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('image-key')
+    await flushPromises()
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('syncCredentials')).toMatchObject({
+      platform: 'image', type: 'apikey', api_key: 'image-key', image_protocol: protocol
+    })
+    expect((wrapper.getComponent(ModelWhitelistSelectorStub).props('syncCredentials') as any).base_url).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('does not send image_protocol for non-image platforms', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('k')
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('syncCredentials')).not.toHaveProperty('image_protocol')
+    wrapper.unmount()
+  })
+
+  it('clears synced models and warns when the image protocol changes after a sync', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-image"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('image-key')
+    await wrapper.get('[data-testid="model-whitelist-selector"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelValue')).toEqual(['public-glm'])
+    showWarningMock.mockClear()
+    await wrapper.get('#create-image-protocol').setValue('grok')
+    await flushPromises()
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelValue')).toEqual([])
+    expect(showWarningMock).toHaveBeenCalledWith('admin.accounts.imageProtocolChangedResync')
+    // 没同步过时换协议不提示
+    showWarningMock.mockClear()
+    await wrapper.get('#create-image-protocol').setValue('gemini')
+    expect(showWarningMock).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('includes the current concrete model mapping in preview credentials', async () => {

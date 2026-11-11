@@ -487,7 +487,7 @@
 
         <fieldset v-if="!showEditModal" data-tour="key-form-provider">
           <legend class="input-label">{{ t('keys.providerLabel') }}</legend>
-          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <label
               v-for="provider in createProviderOptions"
               :key="provider.value"

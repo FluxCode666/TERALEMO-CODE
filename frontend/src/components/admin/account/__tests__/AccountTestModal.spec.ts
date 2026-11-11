@@ -77,7 +77,11 @@ function mountModal(account: Record<string, unknown> = {
     global: {
       stubs: {
         BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
-        Select: { template: '<div class="select-stub"></div>' },
+        Select: {
+          props: ['modelValue', 'options', 'valueKey'],
+          emits: ['update:modelValue'],
+          template: '<select class="select-stub" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in (options || [])" :key="o.id ?? o.value" :value="o.id ?? o.value">{{ o.display_name ?? o.label }}</option></select>'
+        },
         TextArea: {
           props: ['modelValue'],
           emits: ['update:modelValue'],
@@ -117,6 +121,157 @@ describe('AccountTestModal', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  const imageAccount = (protocol: string) => ({
+    id: 7, name: 'Image Account', platform: 'image', type: 'apikey', status: 'active', credentials: { image_protocol: protocol }
+  })
+
+  it('runs image platform accounts as an image test (enabled button, prompt input, generated image preview)', async () => {
+    getAvailableModels.mockResolvedValue([{ id: 'gpt-image-1', display_name: 'gpt-image-1' }])
+    global.fetch = vi.fn().mockResolvedValue(createStreamResponse([
+      'data: {"type":"test_start","model":"gpt-image-1"}\n',
+      'data: {"type":"image","image_url":"data:image/png;base64,QUJD","mime_type":"image/png"}\n',
+      'data: {"type":"test_complete","success":true}\n'
+    ])) as any
+    const wrapper = mountModal(imageAccount('openai'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="image-test-unsupported"]').exists()).toBe(false)
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeUndefined()
+    const prompt = wrapper.get('textarea.textarea-stub')
+    expect((prompt.element as HTMLTextAreaElement).value).toBe('Generate a cute orange cat astronaut sticker on a clean pastel background.')
+    await startBtn.trigger('click')
+    await flushPromises()
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+    expect(body.model_id).toBe('gpt-image-1')
+    expect(body.prompt).toContain('orange cat')
+    expect(wrapper.find('img[alt="test-image-1"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it.each(['openai', 'grok'])('shows the reference image upload for %s image accounts', async (protocol) => {
+    getAvailableModels.mockResolvedValue([{ id: 'some-image-model', display_name: 'some-image-model' }])
+    const wrapper = mountModal(imageAccount(protocol))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.find('input[type="file"][accept^="image/"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="image-test-imagen-no-reference"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows the reference upload for gemini image models but hides it for Imagen with an explanation', async () => {
+    getAvailableModels.mockResolvedValue([{ id: 'imagen-4.0-generate-001', display_name: 'imagen-4.0-generate-001' }])
+    const imagen = mountModal(imageAccount('gemini'))
+    await imagen.setProps({ show: true })
+    await flushPromises()
+    expect(imagen.find('input[type="file"][accept^="image/"]').exists()).toBe(false)
+    expect(imagen.get('[data-testid="image-test-imagen-no-reference"]').text()).toBe('admin.accounts.imageTestImagenNoReference')
+    imagen.unmount()
+
+    getAvailableModels.mockResolvedValue([{ id: 'gemini-2.5-flash-image', display_name: 'gemini-2.5-flash-image' }])
+    const flash = mountModal(imageAccount('gemini'))
+    await flash.setProps({ show: true })
+    await flushPromises()
+    expect(flash.find('input[type="file"][accept^="image/"]').exists()).toBe(true)
+    expect(flash.find('[data-testid="image-test-imagen-no-reference"]').exists()).toBe(false)
+    flash.unmount()
+  })
+
+  const FILE_SELECTOR = 'input[type="file"][accept^="image/"]'
+  const model = (id: string, supports?: boolean) => ({ id, display_name: id, ...(supports === undefined ? {} : { supports_reference_image: supports }) })
+
+  it('hides the upload when an alias maps to an Imagen model (backend flag false)', async () => {
+    getAvailableModels.mockResolvedValue([model('public-render-image', false)])
+    const wrapper = mountModal(imageAccount('gemini'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.find(FILE_SELECTOR).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="image-test-imagen-no-reference"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('shows the upload for an imagen-* alias that maps to a gemini model (backend flag true)', async () => {
+    getAvailableModels.mockResolvedValue([model('imagen-public', true)])
+    const wrapper = mountModal(imageAccount('gemini'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.find(FILE_SELECTOR).exists()).toBe(true)
+    expect(wrapper.find('[data-testid="image-test-imagen-no-reference"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('falls back to the imagen- prefix when the backend flag is missing', async () => {
+    getAvailableModels.mockResolvedValue([model('imagen-4.0-generate-001')])
+    const wrapper = mountModal(imageAccount('gemini'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.find(FILE_SELECTOR).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('clears an uploaded reference image when switching to a model without reference support', async () => {
+    getAvailableModels.mockResolvedValue([model('gemini-2.5-flash-image', true), model('imagen-4.0-generate-001', false)])
+    const wrapper = mountModal(imageAccount('gemini'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const input = wrapper.get(FILE_SELECTOR)
+    const file = new File(['abc'], 'ref.png', { type: 'image/png' })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await new Promise((r) => setTimeout(r, 20))
+    await flushPromises()
+    expect(wrapper.find('img[src^="data:"]').exists()).toBe(true)
+    const modelSelect = wrapper.findAll('select.select-stub')[0]
+    await modelSelect.setValue('imagen-4.0-generate-001')
+    await flushPromises()
+    expect(wrapper.find(FILE_SELECTOR).exists()).toBe(false)
+    await modelSelect.setValue('gemini-2.5-flash-image')
+    await flushPromises()
+    expect(wrapper.find('img[src^="data:"]').exists()).toBe(false)
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    await startBtn.trigger('click')
+    await flushPromises()
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+    expect(body.image_data_url).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('lets an image account start a test with an empty model list and sends no model_id', async () => {
+    getAvailableModels.mockResolvedValue([])
+    const wrapper = mountModal(imageAccount('gemini'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeUndefined()
+    await startBtn.trigger('click')
+    await flushPromises()
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body)
+    expect(body).not.toHaveProperty('model_id')
+    wrapper.unmount()
+  })
+
+  it('still requires a model for non-image accounts', async () => {
+    getAvailableModels.mockResolvedValue([])
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const startBtn = wrapper.findAll('button').find((b) => b.text().includes('admin.accounts.startTest'))!
+    expect(startBtn.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('keeps test questions out of image accounts (no test-type select)', async () => {
+    const wrapper = mountModal(imageAccount('openai'))
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const normal = mountModal()
+    await normal.setProps({ show: true })
+    await flushPromises()
+    expect(wrapper.findAll('.select-stub').length).toBeLessThan(normal.findAll('.select-stub').length)
+    wrapper.unmount()
+    normal.unmount()
   })
 
   it.each([

@@ -73,6 +73,11 @@ func (s *OpenAIGatewayService) EstimateCreationImageCost(
 	// 1. Tier: the same resolver ApplyOpenAIImageBillingResolution uses. It maps
 	// "" and "auto" to 2K and understands 1k/2k/4k plus pixel dimensions.
 	tier := ResolveImageBillingSize(size, nil).BillingSize
+	if isImagePlatformBilling(ctx, apiKey) {
+		deps := s.inflightEstimateDeps()
+		_, _, upstreamModel := inflightBillingModelCandidates(ctx, deps, apiKey, billingModel)
+		tier = imagePlatformPricingTier(deps.imageAccounts(ctx, apiKey), upstreamModel, size)
+	}
 
 	// 2. Multiplier: identical to RecordUsage (user/group/enterprise overrides,
 	// then the peak-aware split which keeps image pricing off the peak factor).
@@ -87,7 +92,7 @@ func (s *OpenAIGatewayService) EstimateCreationImageCost(
 
 	// 3. Token-priced channels cannot be known before generation: fall back to
 	// the gateway's own in-flight estimate, exactly as the executor does.
-	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
+	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken && !isImagePlatformBilling(ctx, apiKey) {
 		estimate.Basis = CreationCostBasisImageTokenEstimate
 		estimate.Amount, estimate.Priced = s.EstimateInflightReservation(ctx, apiKey, InflightEstimateRequest{
 			Model: billingModel, BodyBytes: bodyBytes, Kind: InflightEstimateImage, Units: n,

@@ -502,6 +502,7 @@ export default {
         thresholdPlaceholder: 'Enter percentage',
       },
       testConnection: 'Test Connection',
+      imageTestImagenNoReference: 'Imagen models do not support reference-image editing. Pick a Gemini image model or remove the reference image.',
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',
       noAccountsYet: 'No accounts yet',
@@ -847,6 +848,13 @@ export default {
       syncUpstreamModelsEmpty: 'Upstream returned no models to sync',
       syncUpstreamModelsFailed: 'Failed to sync upstream models',
       syncUpstreamModelsError: 'Failed to sync upstream models: {message}',
+      syncUpstreamModelsImageNotIdentified: 'No image models were identified; all upstream models were returned. Please pick them manually.',
+      imageProtocolChangedResync: 'The image upstream protocol changed, so the previously synced model list was cleared. Please sync models from the upstream again.',
+      imageProtocolChangedSaveThenResync: 'The upstream protocol changed; the current model list may belong to the original protocol. Save, then sync models again.',
+      imageProtocolSaveConfirmTitle: 'Confirm image protocol change',
+      imageProtocolSaveConfirmMessage: 'The image upstream protocol changed and the models/mappings below may belong to the original protocol. Save anyway? Consider re-syncing models from the upstream after saving.',
+      imageProtocolSaveConfirmMore: '... and {count} more',
+      imageSyncSaveProtocolFirst: 'The image upstream protocol was changed but not saved. Save the account before syncing models.',
       syncUpstreamModelsMetadataIncomplete:
         'Model IDs were synced, but no capability metadata could be updated.',
       syncUpstreamModelsMetadataPartial:
@@ -1682,6 +1690,8 @@ export default {
         unknownError: 'Unknown error',
         copied: 'Results copied',
         crossPlatform: 'Batch tests only support accounts from the same platform. Please reselect accounts.',
+        skippedImageAccounts: 'Image accounts do not support test questions; skipped {count} image account(s)',
+        imageNoQuestions: 'Image accounts do not support test questions. Choose other accounts; image accounts can be tested one by one via "Test connection" in the account menu.',
         loadingModels: 'Loading common models...',
         modelsLoadFailed: 'Failed to load common models; you can continue with each account default model.',
         noCommonModels: 'The selected accounts have no common models. Use each account default model instead.'

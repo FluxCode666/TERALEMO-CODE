@@ -1226,7 +1226,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		writeGrokModelsList(c, xai.DefaultModelIDs())
 		return
 	}
-	if platform == service.PlatformVideo {
+	if platform == service.PlatformVideo || platform == service.PlatformImage {
 		writeModelsList(c, platform, defaultModelIDsForPlatform(platform))
 		return
 	}
@@ -1500,6 +1500,8 @@ func defaultCodexModelIDsForPlatform(platform string) []string {
 
 func defaultModelIDsForPlatform(platform string) []string {
 	switch platform {
+	case service.PlatformImage:
+		return append(append(service.DefaultImageModelIDs(service.ImageProtocolOpenAI), service.DefaultImageModelIDs(service.ImageProtocolGemini)...), service.DefaultImageModelIDs(service.ImageProtocolGrok)...)
 	case service.PlatformVideo:
 		return []string{"doubao-seedance-1-0-pro", "veo-3.0-generate-001", "veo-3.0-fast-generate-001", "MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02"}
 	case service.PlatformOpenAI:

@@ -254,6 +254,9 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		account.AutoPauseOnExpired = true
 	}
 
+	if err := ValidateImageAccount(account); err != nil {
+		return nil, err
+	}
 	if err := ValidateVideoAccount(account); err != nil {
 		return nil, err
 	}
@@ -382,6 +385,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 		}
 	}
 
+	if err := ValidateImageAccount(account); err != nil {
+		return nil, err
+	}
 	if err := ValidateVideoAccount(account); err != nil {
 		return nil, err
 	}

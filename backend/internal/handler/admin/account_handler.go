@@ -2892,11 +2892,12 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 // POST /api/v1/admin/accounts/models/sync-upstream-preview
 func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 	var req struct {
-		Platform     string            `json:"platform" binding:"required"`
-		Type         string            `json:"type" binding:"required"`
-		BaseURL      string            `json:"base_url"`
-		APIKey       string            `json:"api_key" binding:"required"`
-		ModelMapping map[string]string `json:"model_mapping"`
+		Platform      string            `json:"platform" binding:"required"`
+		Type          string            `json:"type" binding:"required"`
+		BaseURL       string            `json:"base_url"`
+		APIKey        string            `json:"api_key" binding:"required"`
+		ImageProtocol json.RawMessage   `json:"image_protocol"`
+		ModelMapping  map[string]string `json:"model_mapping"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -2915,6 +2916,20 @@ func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 			"base_url":      req.BaseURL,
 			"model_mapping": modelMapping,
 		},
+	}
+	if req.Platform == service.PlatformImage {
+		var imageProtocol string
+		if len(req.ImageProtocol) > 0 {
+			if err := json.Unmarshal(req.ImageProtocol, &imageProtocol); err != nil {
+				response.BadRequest(c, "Invalid image account credentials or protocol")
+				return
+			}
+		}
+		tempAccount.Credentials["image_protocol"] = imageProtocol
+		if err := service.ValidateImageAccount(tempAccount); err != nil {
+			response.BadRequest(c, "Invalid image account credentials or protocol")
+			return
+		}
 	}
 
 	if h.accountTestService == nil {

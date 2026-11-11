@@ -62,7 +62,7 @@ func (h *AsyncImageHandler) Submit(c *gin.Context) {
 	if apiKey.Group != nil {
 		platform = apiKey.Group.Platform
 	}
-	if platform != service.PlatformOpenAI && platform != service.PlatformGrok {
+	if platform != service.PlatformOpenAI && platform != service.PlatformGrok && platform != service.PlatformImage {
 		imageTaskJSONError(c, http.StatusNotFound, "not_found_error", "Images API is not supported for this platform")
 		return
 	}
@@ -93,6 +93,9 @@ func (h *AsyncImageHandler) Submit(c *gin.Context) {
 		return
 	}
 	if err := h.validateRequest(c, platform, body); err != nil {
+		if platform == service.PlatformImage && writeImageCompatErrorResponse(c, err) {
+			return
+		}
 		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
@@ -150,6 +153,9 @@ func (h *AsyncImageHandler) checkSecurityAuditBeforeSubmit(c *gin.Context, apiKe
 	} else if h.openAI.gatewayService != nil {
 		parsed, err := h.openAI.gatewayService.ParseOpenAIImagesRequest(c, body)
 		if err != nil {
+			if platform == service.PlatformImage && writeImageCompatErrorResponse(c, err) {
+				return false
+			}
 			imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return false
 		}
@@ -206,6 +212,9 @@ func (h *AsyncImageHandler) validateRequest(c *gin.Context, platform string, bod
 		}
 		return nil
 	}
+	if platform == service.PlatformImage {
+		c.Request = c.Request.WithContext(service.WithResolvedTargetPlatform(c.Request.Context(), platform))
+	}
 	parsed, err := h.openAI.gatewayService.ParseOpenAIImagesRequest(c, body)
 	if err != nil {
 		return err
@@ -223,6 +232,10 @@ func (h *AsyncImageHandler) executeWithGateway(platform string, c *gin.Context) 
 	}
 	if platform == service.PlatformGrok {
 		h.openAI.GrokImages(c)
+		return
+	}
+	if platform == service.PlatformImage {
+		h.openAI.ImagePlatformImages(c)
 		return
 	}
 	h.openAI.Images(c)

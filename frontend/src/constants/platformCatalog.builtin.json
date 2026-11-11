@@ -36,6 +36,12 @@
       "litellm_provider": "xai"
     },
     {
+      "id": "image",
+      "display_name": "Image",
+      "gateway": "openai",
+      "cn_provider": false
+    },
+    {
       "id": "video",
       "display_name": "Video",
       "gateway": "openai",
@@ -292,6 +298,7 @@
     "openai",
     "antigravity",
     "grok",
+    "image",
     "video",
     "kimi",
     "zhipu",

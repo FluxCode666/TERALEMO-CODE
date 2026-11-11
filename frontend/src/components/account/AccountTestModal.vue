@@ -205,10 +205,10 @@
         </button>
         <button
           @click="startTest"
-          :disabled="status === 'connecting' || !selectedModelId"
+          :disabled="!canStartTest"
           :class="[
             'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
-            status === 'connecting' || !selectedModelId
+            !canStartTest
               ? 'cursor-not-allowed bg-primary-400 text-white'
               : status === 'success'
                 ? 'bg-green-500 text-white hover:bg-green-600'
@@ -307,7 +307,17 @@ const supportsOpenAIImageTest = computed(() => {
   return props.account?.platform === 'openai'
 })
 
-const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value)
+// image 账号模型列表为空时也允许测试：请求不带 model_id，由后端选默认模型。
+const canStartTest = computed(
+  () =>
+    status.value !== 'connecting' &&
+    (Boolean(selectedModelId.value) ||
+      (props.account?.platform === 'image' && !loadingModels.value && availableModels.value.length === 0))
+)
+
+const supportsImageTest = computed(
+  () => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || props.account?.platform === 'image'
+)
 
 const sortTestModels = (models: ClaudeModel[]) => {
   const priorityMap = new Map(prioritizedGeminiModels.map((id, index) => [id, index]))
@@ -405,7 +415,7 @@ const scrollToBottom = async () => {
 }
 
 const startTest = async () => {
-  if (!props.account || !selectedModelId.value) return
+  if (!props.account || !canStartTest.value) return
 
   resetState()
   status.value = 'connecting'
@@ -429,7 +439,8 @@ const startTest = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model_id: selectedModelId.value,
+        // image 账号列表为空时不带 model_id，由后端选默认模型
+        ...(selectedModelId.value ? { model_id: selectedModelId.value } : {}),
         prompt: supportsImageTest.value ? testPrompt.value.trim() : '',
         mode: isOpenAIAccount.value ? testMode.value : 'default'
       }),

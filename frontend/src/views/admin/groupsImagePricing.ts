@@ -3,6 +3,7 @@ export const imagePricingPlatforms = new Set([
   "composite",
   "gemini",
   "grok",
+  "image",
   "openai",
 ]);
 
@@ -10,7 +11,12 @@ export const supportsImagePricingPlatform = (platform: string): boolean =>
   imagePricingPlatforms.has(platform);
 
 // 与后端 DefaultAllowImageGenerationForPlatform 一致：这些平台新建分组默认允许生图。
-const imageGenerationDefaultPlatforms = new Set(["antigravity", "gemini", "grok"]);
+const imageGenerationDefaultPlatforms = new Set([
+  "antigravity",
+  "gemini",
+  "grok",
+  "image",
+]);
 
 export const defaultAllowImageGenerationForPlatform = (platform: string): boolean =>
   imageGenerationDefaultPlatforms.has(platform);

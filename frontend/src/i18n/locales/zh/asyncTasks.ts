@@ -127,6 +127,25 @@ export default {
     "released": "预占已释放。",
     "settled": "预占已结算。"
   },
+  "imageAccounts": {
+    "platform": "图片",
+    "protocol": "图片上游协议",
+    "openaiHint": "默认协议。直接透传 OpenAI 生图接口（/v1/images/generations、/v1/images/edits）。用户统一用 OpenAI 生图协议请求，网关自动转换成所选上游协议。",
+    "geminiHint": "使用 Google Gemini 协议：imagen- 开头的模型走 Imagen :predict，其他模型（如 gemini-2.5-flash-image）走 :generateContent。用户统一用 OpenAI 生图协议请求，网关自动转换；上游只返回 base64，response_format 仅支持 b64_json。",
+    "grokHint": "使用 xAI Grok 的 /v1/images/generations 与 /v1/images/edits。用户统一用 OpenAI 生图协议请求，网关自动转换成所选上游协议。",
+    "usage": {
+      "intro": "使用 OpenAI 生图协议请求，并将 YOUR_IMAGE_MODEL 替换为管理员提供的图片模型名。按实际出图张数计费，上游失败或未出图不计费。",
+      "generations": "文生图（JSON）",
+      "editsMultipart": "图生图 / 编辑（multipart 上传参考图）",
+      "editsJson": "图生图 / 编辑（JSON 参考图 URL）",
+      "async": "异步生图（提交后轮询任务）",
+      "notesTitle": "参数说明",
+      "noteN": "n：一次生成的张数，上限取决于上游协议，超出会返回 400；按实际出图张数计费。",
+      "noteSize": "size：模型没有所请求尺寸的档位时，会降到该模型能出的最高档，并按实际档位计费（例如 gemini-2.5-flash-image 收到 1536x1024，会按 3:2 出 1K 图）；比例不支持时返回 400。",
+      "noteResponseFormat": "response_format：Gemini / Grok 转换协议在未传时默认返回 b64_json；Gemini 只支持 b64_json，显式传 url 会返回 400；OpenAI 透传协议沿用上游默认值，建议显式传 response_format。",
+      "noteUnsupported": "上游不支持的参数会明确返回 400（invalid_request_error），不会被静默忽略。"
+    }
+  },
   "videoAccounts": {
     "platform": "视频",
     "protocol": "上游视频协议",

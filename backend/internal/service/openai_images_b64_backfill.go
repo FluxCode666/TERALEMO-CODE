@@ -114,6 +114,12 @@ func (s *OpenAIGatewayService) fetchOpenAIImageURLBase64(ctx context.Context, ac
 	}
 	ctx, cancel := context.WithTimeout(WithHTTPUpstreamPublicHostsOnly(ctx), openAIImageURLDownloadTimeout)
 	defer cancel()
+	if account.Platform == PlatformImage {
+		if account.ProxyID != nil {
+			return "", errors.New("image downloads through account proxies are not supported")
+		}
+		ctx = WithHTTPUpstreamImageDownload(ctx)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("build image download request: %w", err)

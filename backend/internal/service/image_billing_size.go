@@ -125,6 +125,11 @@ func ApplyOpenAIImageBillingResolution(result *OpenAIForwardResult) {
 		outputSizes = []string{result.ImageOutputSize}
 	}
 	resolved := ResolveImageBillingSize(inputSize, outputSizes)
+	if tier, ok := ClassifyImageBillingTier(result.ImagePlanSizeTier); ok {
+		resolved.BillingSize = tier
+		resolved.Source = ImageSizeSourceOutput
+		resolved.Breakdown = map[string]int{tier: result.ImageCount}
+	}
 	applyImageBillingResolution(
 		&result.ImageSize,
 		&result.ImageInputSize,

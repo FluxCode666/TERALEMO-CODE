@@ -192,7 +192,7 @@
           :total-results="pagination.total"
           :selecting-all="selectingAllResults"
           :all-results-selected="allResultsSelected"
-          @batch-test="showBatchTest = true"
+          @batch-test="openBatchTest"
           @delete="handleBulkDelete"
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
@@ -471,7 +471,7 @@
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
-    <AccountBatchTestModal :show="showBatchTest" :account-ids="selIds" @close="showBatchTest = false" />
+    <AccountBatchTestModal :show="showBatchTest" :account-ids="batchTestIds" @close="showBatchTest = false" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
@@ -499,7 +499,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <AccountTestQuestionsModal :show="showAccountTestQuestions" @close="showAccountTestQuestions = false" />
-    <ScheduledQuestionTestsModal :show="showScheduledQuestionTests" :selected-account-ids="selIds" @close="showScheduledQuestionTests = false" />
+    <ScheduledQuestionTestsModal :show="showScheduledQuestionTests" :selected-account-ids="scheduledQuestionAccountIds" @close="showScheduledQuestionTests = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
   </AppLayout>
@@ -549,7 +549,7 @@ import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRules
 import AccountTestQuestionsModal from '@/components/admin/AccountTestQuestionsModal.vue'
 import ScheduledQuestionTestsModal from '@/components/admin/ScheduledQuestionTestsModal.vue'
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
-import { fetchAllAccountIds } from '@/utils/accountSelection'
+import { fetchAllAccountRows } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
@@ -1609,6 +1609,11 @@ const openAccountTestQuestions = () => {
 
 const openScheduledQuestionTests = () => {
   closeAccountToolsDropdown()
+  const { kept, skipped } = excludeImageAccounts(selIds.value)
+  if (skipped > 0) {
+    appStore.showWarning(t('admin.accounts.batchTest.skippedImageAccounts', { count: skipped }))
+  }
+  scheduledQuestionAccountIds.value = kept
   showScheduledQuestionTests.value = true
 }
 
@@ -2143,11 +2148,15 @@ const handleSelectAllResults = async () => {
   const filters = buildBulkEditFilterSnapshot()
   selectingAllResults.value = true
   try {
-    const ids = await fetchAllAccountIds(
+    const rows = await fetchAllAccountRows(
       (page, pageSize, requestFilters) => adminAPI.accounts.list(page, pageSize, requestFilters),
       filters
     )
     if (requestVersion !== selectionRequestVersion.value) return
+    const ids = rows.map(row => row.id)
+    for (const row of rows) {
+      if (row.platform) knownAccountPlatforms.set(row.id, row.platform)
+    }
 
     setSelectedIds(ids)
     selectedAllResultIDs.value = new Set(ids)
@@ -2387,6 +2396,32 @@ const accountExportStepUp = useStepUp()
 const closeTestModal = () => { showTest.value = false; testingAcc.value = null }
 const closeStatsModal = () => { showStats.value = false; statsAcc.value = null }
 const closeReAuthModal = () => { showReAuth.value = false; reAuthAcc.value = null }
+const batchTestIds = ref<number[]>([])
+// 记住见过的账号平台（当前页加载、跨页全选都会写入），翻页或跨页全选后仍能识别页外的 image 账号。
+const knownAccountPlatforms = new Map<number, string>()
+watch(accounts, (rows) => {
+  for (const row of rows) knownAccountPlatforms.set(row.id, row.platform)
+}, { immediate: true })
+// 批量测试 / 定时题目测试本质是文本测试题，不适用于 image 账号：从所选账号中排除并提示跳过数量；
+// 排除后一个都不剩则拦截。平台取自 knownAccountPlatforms（含跨页全选结果）；从未见过的账号原样保留，后端仍会拒绝 image。
+// （单个账号的「测试连接」对 image 账号是真实出图，不受此限制。）
+const excludeImageAccounts = (ids: number[]) => {
+  const kept = ids.filter((id) => knownAccountPlatforms.get(id) !== 'image')
+  return { kept, skipped: ids.length - kept.length }
+}
+const scheduledQuestionAccountIds = ref<number[]>([])
+const openBatchTest = () => {
+  const { kept, skipped } = excludeImageAccounts(selIds.value)
+  if (kept.length === 0) {
+    appStore.showWarning(t('admin.accounts.batchTest.imageNoQuestions'))
+    return
+  }
+  if (skipped > 0) {
+    appStore.showWarning(t('admin.accounts.batchTest.skippedImageAccounts', { count: skipped }))
+  }
+  batchTestIds.value = kept
+  showBatchTest.value = true
+}
 const handleTest = async (a: AccountListItem) => {
   const account = await loadAccountDetails(a)
   if (!account) return

@@ -20,6 +20,7 @@ const concretePlatforms = [
   'gemini',
   'antigravity',
   'grok',
+  'image',
   'video',
   'kimi',
   'zhipu',
@@ -60,11 +61,11 @@ describe('platform catalog with a newly registered platform', () => {
   it('keeps the built-in catalog equal to the legacy literals', () => {
     expect(listPlatformIds()).toEqual(concretePlatforms)
     expect(compositePrecedencePlatformIds()).toEqual([
-      'anthropic', 'gemini', 'openai', 'antigravity', 'grok', 'video',
+      'anthropic', 'gemini', 'openai', 'antigravity', 'grok', 'image', 'video',
       'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'typesafe', 'command_code', 'cline'
     ])
     expect(CONCRETE_PLATFORM_OPTIONS.map((option) => option.label)).toEqual([
-      'Anthropic', 'OpenAI', 'Gemini', 'Antigravity', 'Grok', 'Video',
+      'Anthropic', 'OpenAI', 'Gemini', 'Antigravity', 'Grok', 'Image', 'Video',
       'Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax', 'OpenCode', 'TypeSafe / Jev', 'Command Code', 'Cline'
     ])
     expect(platformLabel('zhipu')).toBe('Zhipu GLM')

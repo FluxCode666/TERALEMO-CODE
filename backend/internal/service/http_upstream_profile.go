@@ -16,6 +16,15 @@ const (
 type httpUpstreamProfileContextKey struct{}
 type httpUpstreamDisableRedirectsContextKey struct{}
 type httpUpstreamPublicHostsOnlyContextKey struct{}
+type httpUpstreamImageDownloadContextKey struct{}
+
+func WithHTTPUpstreamImageDownload(ctx context.Context) context.Context {
+	return context.WithValue(WithHTTPUpstreamPublicHostsOnly(ctx), httpUpstreamImageDownloadContextKey{}, true)
+}
+
+func HTTPUpstreamImageDownload(ctx context.Context) bool {
+	return ctx != nil && ctx.Value(httpUpstreamImageDownloadContextKey{}) == true
+}
 
 // WithHTTPUpstreamProfile injects an upstream transport profile into ctx.
 func WithHTTPUpstreamProfile(ctx context.Context, profile HTTPUpstreamProfile) context.Context {

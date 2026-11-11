@@ -11,7 +11,8 @@ const {
   getUpstreamBillingProbeSettings,
   getAllProxies,
   getAllGroups,
-  showError
+  showError,
+  showWarning
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
@@ -20,7 +21,8 @@ const {
   getUpstreamBillingProbeSettings: vi.fn(),
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
-  showError: vi.fn()
+  showError: vi.fn(),
+  showWarning: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -48,7 +50,8 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     showError,
     showSuccess: vi.fn(),
-    showInfo: vi.fn()
+    showInfo: vi.fn(),
+    showWarning
   })
 }))
 
@@ -81,7 +84,7 @@ const makeAccounts = (count: number) => Array.from({ length: count }, (_, index)
 
 const AccountBulkActionsBarStub = {
   props: ['selectedIds', 'totalResults', 'selectingAll', 'allResultsSelected'],
-  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token'],
+  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token', 'batch-test'],
   template: `
     <div>
       <span data-test="selected-count">{{ selectedIds.length }}</span>
@@ -91,6 +94,7 @@ const AccountBulkActionsBarStub = {
       <button data-test="select-all-results" @click="$emit('select-all-results')">select all</button>
       <button data-test="clear" @click="$emit('clear')">clear</button>
       <button data-test="refresh-token" @click="$emit('refresh-token')">refresh token</button>
+      <button data-test="batch-test" @click="$emit('batch-test')">batch test</button>
     </div>
   `
 }
@@ -120,6 +124,7 @@ const mountView = () => mount(AccountsView, {
       ImportDataModal: true,
       ReAuthAccountModal: true,
       AccountTestModal: true,
+      AccountBatchTestModal: { props: ['show', 'accountIds'], template: '<div data-test="batch-modal" :data-show="String(show)" :data-ids="accountIds.join(\',\')"></div>' },
       AccountStatsModal: true,
       ScheduledTestsPanel: true,
       SyncFromCrsModal: true,
@@ -151,6 +156,7 @@ describe('admin AccountsView select all filtered results', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     showError.mockReset()
+    showWarning.mockReset()
 
     listWithEtag.mockResolvedValue({
       notModified: true,
@@ -263,5 +269,89 @@ describe('admin AccountsView select all filtered results', () => {
     expect(wrapper.get('[data-test="selected-count"]').text()).toBe('20')
     expect(wrapper.get('[data-test="all-results-selected"]').text()).toBe('false')
     expect(showError).toHaveBeenCalledWith('admin.accounts.bulkActions.selectAllFailed')
+  })
+
+  describe('batch test with image accounts', () => {
+    const mixed = () => [
+      { ...makeAccounts(1)[0], id: 1, platform: 'gemini' },
+      { ...makeAccounts(1)[0], id: 2, platform: 'image' },
+      { ...makeAccounts(1)[0], id: 3, platform: 'gemini' },
+      { ...makeAccounts(1)[0], id: 4, platform: 'image' }
+    ]
+
+    it('excludes image accounts from a mixed selection and reports how many were skipped', async () => {
+      listAccounts.mockResolvedValue({ items: mixed(), total: 4, page: 1, page_size: 20, pages: 1 })
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-test="select-page"]').trigger('click')
+      await wrapper.get('[data-test="batch-test"]').trigger('click')
+      await flushPromises()
+      const modal = wrapper.get('[data-test="batch-modal"]')
+      expect(modal.attributes('data-show')).toBe('true')
+      expect(modal.attributes('data-ids')).toBe('1,3')
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.skippedImageAccounts')
+      wrapper.unmount()
+    })
+
+    it('blocks the batch test when every selected account is an image account', async () => {
+      listAccounts.mockResolvedValue({ items: mixed().filter((a) => a.platform === 'image'), total: 2, page: 1, page_size: 20, pages: 1 })
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-test="select-page"]').trigger('click')
+      await wrapper.get('[data-test="batch-test"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-test="batch-modal"]').attributes('data-show')).toBe('false')
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.imageNoQuestions')
+      wrapper.unmount()
+    })
+
+    it('excludes image accounts that are only on other pages after selecting all results', async () => {
+      const all = Array.from({ length: 45 }, (_, i) => ({
+        ...makeAccounts(1)[0], id: i + 1, platform: i + 1 > 30 && i + 1 <= 33 ? 'image' : 'gemini'
+      }))
+      listAccounts.mockImplementation(async (_page: number, pageSize: number) => pageSize === 1000
+        ? { items: all, total: 45, page: 1, page_size: 1000, pages: 1 }
+        : { items: all.slice(0, 20), total: 45, page: 1, page_size: 20, pages: 3 })
+      const wrapper = mountView()
+      await flushPromises()
+      // 当前页（1-20）没有 image，31-33 在页外
+      await wrapper.get('[data-test="select-all-results"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-test="batch-test"]').trigger('click')
+      await flushPromises()
+      const ids = wrapper.get('[data-test="batch-modal"]').attributes('data-ids')!.split(',').map(Number)
+      expect(ids).toHaveLength(42)
+      expect([31, 32, 33].some((id) => ids.includes(id))).toBe(false)
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.skippedImageAccounts')
+      wrapper.unmount()
+    })
+
+    it('blocks the batch test when all results selected across pages are image accounts', async () => {
+      const all = Array.from({ length: 25 }, (_, i) => ({ ...makeAccounts(1)[0], id: i + 1, platform: 'image' }))
+      listAccounts.mockImplementation(async (_page: number, pageSize: number) => pageSize === 1000
+        ? { items: all, total: 25, page: 1, page_size: 1000, pages: 1 }
+        : { items: all.slice(0, 20), total: 25, page: 1, page_size: 20, pages: 2 })
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-test="select-all-results"]').trigger('click')
+      await flushPromises()
+      await wrapper.get('[data-test="batch-test"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-test="batch-modal"]').attributes('data-show')).toBe('false')
+      expect(showWarning).toHaveBeenCalledWith('admin.accounts.batchTest.imageNoQuestions')
+      wrapper.unmount()
+    })
+
+    it('does not warn when no image account is selected', async () => {
+      listAccounts.mockResolvedValue({ items: makeAccounts(2), total: 2, page: 1, page_size: 20, pages: 1 })
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-test="select-page"]').trigger('click')
+      await wrapper.get('[data-test="batch-test"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-test="batch-modal"]').attributes('data-ids')).toBe('1,2')
+      expect(showWarning).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
   })
 })
