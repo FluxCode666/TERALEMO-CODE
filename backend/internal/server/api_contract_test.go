@@ -51,6 +51,8 @@ func TestAPIContracts(t *testing.T) {
 					"id": 1,
 					"email": "alice@example.com",
 					"email_bound": true,
+					"requires_totp_setup": false,
+					"totp_enabled": false,
 					"username": "alice",
 						"role": "user",
 						"balance": 12.5,

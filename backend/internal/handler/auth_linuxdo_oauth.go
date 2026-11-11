@@ -820,6 +820,7 @@ func redirectOAuthTokenPair(c *gin.Context, frontendCallback string, tokenPair *
 		fragment.Set("access_token", truncateFragmentValue(tokenPair.AccessToken))
 		fragment.Set("refresh_token", truncateFragmentValue(tokenPair.RefreshToken))
 		fragment.Set("expires_in", strconv.Itoa(tokenPair.ExpiresIn))
+		fragment.Set("requires_totp_setup", strconv.FormatBool(tokenPair.RequiresTotpSetup))
 		fragment.Set("token_type", "Bearer")
 	}
 	if redirect := strings.TrimSpace(redirectTo); redirect != "" {
@@ -1210,6 +1211,11 @@ func (h *AuthHandler) resolveOAuthBindTargetUserID(c *gin.Context) (*int64, erro
 	}
 	if user == nil || !user.IsActive() || claims.TokenVersion != user.TokenVersion {
 		return nil, service.ErrInvalidToken
+	}
+	if required, err := h.authService.ValidateConsoleSession(c.Request.Context(), user, claims); err != nil {
+		return nil, err
+	} else if required {
+		return nil, service.ErrTotpSetupRequired
 	}
 	return &user.ID, nil
 }

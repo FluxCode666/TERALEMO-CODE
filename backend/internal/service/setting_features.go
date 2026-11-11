@@ -177,6 +177,9 @@ func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {
 
 // IsTotpEnabled 检查是否启用 TOTP 双因素认证功能
 func (s *SettingService) IsTotpEnabled(ctx context.Context) bool {
+	if forced, err := s.ForceTotpEnabled(ctx); err == nil && forced {
+		return true
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyTotpEnabled)
 	if err != nil {
 		return false // 默认关闭
@@ -234,7 +237,7 @@ func (s *SettingService) passkeySettingEnabled(settings map[string]string) bool 
 // IsTotpEncryptionKeyConfigured 检查 TOTP 加密密钥是否已手动配置
 // 只有手动配置了密钥才允许在管理后台启用 TOTP 功能
 func (s *SettingService) IsTotpEncryptionKeyConfigured() bool {
-	return s.cfg.Totp.EncryptionKeyConfigured
+	return s != nil && s.cfg != nil && s.cfg.Totp.EncryptionKeyConfigured
 }
 
 // IsSessionBindingEnabled 检查会话 IP/UA 绑定是否启用（默认关闭）。

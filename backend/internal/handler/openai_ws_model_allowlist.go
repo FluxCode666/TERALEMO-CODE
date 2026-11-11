@@ -1,0 +1,22 @@
+package handler
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/service"
+)
+
+func (h *OpenAIGatewayHandler) checkOpenAIWSModelRequestIP(ctx context.Context, clientIP string, key *service.APIKey) error {
+	if h.apiKeyService == nil {
+		return nil
+	}
+	allowed, err := h.apiKeyService.CheckModelRequestIP(ctx, clientIP, key)
+	if err == nil && allowed {
+		return nil
+	}
+	slog.Warn("websocket model request IP rejected", "audit", true, "client_ip", clientIP, "error", err)
+	return infraerrors.Forbidden("ip_not_allowed", fmt.Sprintf("Client IP %s is not allowed; contact the administrator", clientIP))
+}

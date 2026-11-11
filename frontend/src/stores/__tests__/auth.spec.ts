@@ -66,6 +66,14 @@ describe('useAuthStore', () => {
   // --- login ---
 
   describe('login', () => {
+    it('保存后端要求配置 TOTP 的登录标记', async () => {
+      mockLogin.mockResolvedValue({ ...fakeAuthResponse, requires_totp_setup: true })
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+      expect(store.user?.requires_totp_setup).toBe(true)
+      expect(JSON.parse(localStorage.getItem('auth_user')!).requires_totp_setup).toBe(true)
+    })
+
     it('成功登录后设置 token 和 user', async () => {
       mockLogin.mockResolvedValue(fakeAuthResponse)
       const store = useAuthStore()

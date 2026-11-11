@@ -58,8 +58,15 @@ func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
+	if _, configured := c.Get(proxyPolicyKey); configured {
+		return resolveTrustedClientIP(c)
+	}
 	if !requestUsesLegacyForwardedIPTrust(c) {
 		return GetTrustedClientIP(c)
+	}
+	peer := peerAddress(c)
+	if peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
+		return peer.String()
 	}
 
 	settings, _ := requestForwardedIPSettings(c)
@@ -154,7 +161,7 @@ func GetTrustedClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	return normalizeIP(c.ClientIP())
+	return resolveTrustedClientIP(c)
 }
 
 // GetSecurityClientIP returns the address used by security-sensitive paths.
@@ -162,6 +169,11 @@ func GetTrustedClientIP(c *gin.Context) string {
 // client-IP resolution. When disabled, Gin's server.trusted_proxies chain is
 // authoritative.
 func GetSecurityClientIP(c *gin.Context, trustForwarded bool) string {
+	if c != nil {
+		if _, configured := c.Get(proxyPolicyKey); configured {
+			return resolveTrustedClientIP(c)
+		}
+	}
 	if requestSettings, ok := requestForwardedIPSettings(c); ok {
 		trustForwarded = requestSettings.trustForwarded
 	}

@@ -1619,6 +1619,9 @@
                 </p>
               </div>
 
+              <ModelAllowlistPanel />
+              <ForceTotpPanel />
+
               <!-- TOTP 2FA -->
               <div
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
@@ -8975,6 +8978,8 @@
 </template>
 
 <script setup lang="ts">
+import ModelAllowlistPanel from "@/components/admin/ModelAllowlistPanel.vue";
+import ForceTotpPanel from "@/components/admin/ForceTotpPanel.vue";
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { listPlatformIds } from "@/constants/platformCatalog";
 import { useI18n } from "vue-i18n";

@@ -85,6 +85,8 @@ type UpdateProfileRequest struct {
 }
 
 type userProfileResponse struct {
+	RequiresTotpSetup bool `json:"requires_totp_setup"`
+	TotpEnabled       bool `json:"totp_enabled"`
 	dto.User
 	Enterprise        *dto.EnterpriseIdentity                `json:"enterprise"`
 	AvatarURL         string                                 `json:"avatar_url,omitempty"`
@@ -553,6 +555,7 @@ func userProfileResponseFromService(user *service.User, identities service.UserI
 	bindings := userProfileBindingMap(identities)
 	profileSources, avatarSource, usernameSource := inferUserProfileSources(user, identities)
 	return userProfileResponse{
+		TotpEnabled:       user.TotpEnabled,
 		User:              *base,
 		AvatarURL:         user.AvatarURL,
 		AvatarSource:      avatarSource,

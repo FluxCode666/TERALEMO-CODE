@@ -172,6 +172,10 @@ func (s *APIKeyService) invalidateLocalAuthCache(cacheKey string) {
 	if s == nil {
 		return
 	}
+	if cacheKey == modelAllowlistInvalidationKey && s.modelAllowlistSettings != nil {
+		s.modelAllowlistSettings.InvalidateModelAllowlist()
+		return
+	}
 	if s.authCacheL1 != nil {
 		s.authCacheL1.Del(cacheKey)
 	}

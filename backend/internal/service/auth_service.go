@@ -58,10 +58,12 @@ const refreshTokenPrefix = "rt_"
 
 // JWTClaims JWT载荷数据
 type JWTClaims struct {
-	UserID       int64  `json:"user_id"`
-	Email        string `json:"email"`
-	Role         string `json:"role"`
-	TokenVersion int64  `json:"token_version"` // Used to invalidate tokens on password change
+	TotpPolicyEpoch string `json:"tpe,omitempty"`
+	SessionVersion  string `json:"sv,omitempty"`
+	UserID          int64  `json:"user_id"`
+	Email           string `json:"email"`
+	Role            string `json:"role"`
+	TokenVersion    int64  `json:"token_version"` // Used to invalidate tokens on password change
 	// SessionID 会话 ID（与 refresh token family 对应），用于单会话撤销与 step-up 授权绑定。
 	SessionID string `json:"sid,omitempty"`
 	// BindingHash 会话指纹哈希（IP+UA），会话绑定开启时校验；空值表示旧 token（平滑升级）。
@@ -1413,11 +1415,15 @@ func (s *AuthService) GenerateToken(ctx context.Context, user *User) (string, er
 	if err != nil {
 		return "", fmt.Errorf("generate session id: %w", err)
 	}
-	return s.generateAccessToken(user, sessionID, sessionBindingHashFromContext(ctx))
+	return s.generateAccessToken(ctx, user, sessionID, sessionBindingHashFromContext(ctx))
 }
 
 // generateAccessToken 生成带会话 ID 与绑定指纹的 access token。
-func (s *AuthService) generateAccessToken(user *User, sessionID, bindingHash string) (string, error) {
+func (s *AuthService) generateAccessToken(ctx context.Context, user *User, sessionID, bindingHash string) (string, error) {
+	security, err := s.tokenSecurity(ctx, user.ID)
+	if err != nil {
+		return "", fmt.Errorf("read session version: %w", err)
+	}
 	now := time.Now()
 	var expiresAt time.Time
 	if s.cfg.JWT.AccessTokenExpireMinutes > 0 {
@@ -1428,12 +1434,14 @@ func (s *AuthService) generateAccessToken(user *User, sessionID, bindingHash str
 	}
 
 	claims := &JWTClaims{
-		UserID:       user.ID,
-		Email:        user.Email,
-		Role:         user.Role,
-		TokenVersion: resolvedTokenVersion(user),
-		SessionID:    sessionID,
-		BindingHash:  bindingHash,
+		SessionVersion:  security.version,
+		TotpPolicyEpoch: security.policy.Epoch,
+		UserID:          user.ID,
+		Email:           user.Email,
+		Role:            user.Role,
+		TokenVersion:    resolvedTokenVersion(user),
+		SessionID:       sessionID,
+		BindingHash:     bindingHash,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -1481,6 +1489,14 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 	if err != nil && !errors.Is(err, ErrTokenExpired) {
 		return "", err
 	}
+	security, err := s.tokenSecurity(ctx, claims.UserID)
+	if err != nil {
+		return "", err
+	}
+	ctx = context.WithValue(ctx, tokenSecuritySnapshotKey{}, security)
+	if err := s.ValidateUserSession(ctx, claims.UserID, claims.SessionVersion); err != nil {
+		return "", err
+	}
 
 	// 获取最新的用户信息
 	user, err := s.userRepo.GetByID(ctx, claims.UserID)
@@ -1498,6 +1514,9 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 	}
 
 	// Security: Check TokenVersion to prevent refreshing revoked tokens
+	if err := s.ValidateTotpPolicySession(ctx, user, claims.TotpPolicyEpoch); err != nil {
+		return "", err
+	}
 	// This ensures tokens issued before a password change cannot be refreshed
 	if claims.TokenVersion != resolvedTokenVersion(user) {
 		return "", ErrTokenRevoked
@@ -1673,9 +1692,10 @@ func (s *AuthService) ResetPassword(ctx context.Context, email, token, newPasswo
 
 // TokenPair 包含Access Token和Refresh Token
 type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"` // Access Token有效期（秒）
+	RequiresTotpSetup bool   `json:"requires_totp_setup"`
+	AccessToken       string `json:"access_token"`
+	RefreshToken      string `json:"refresh_token"`
+	ExpiresIn         int    `json:"expires_in"` // Access Token有效期（秒）
 }
 
 // TokenPairWithUser extends TokenPair with user role for backend mode checks
@@ -1687,6 +1707,11 @@ type TokenPairWithUser struct {
 // GenerateTokenPair 生成Access Token和Refresh Token对
 // familyID: 可选的Token家族ID，用于Token轮转时保持家族关系
 func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyID string) (*TokenPair, error) {
+	security, err := s.tokenSecurity(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, tokenSecuritySnapshotKey{}, security)
 	// 检查 refreshTokenCache 是否可用
 	if s.refreshTokenCache == nil {
 		return nil, errors.New("refresh token cache not configured")
@@ -1703,7 +1728,7 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 	}
 
 	// 生成Access Token（携带会话ID与绑定指纹）
-	accessToken, err := s.generateAccessToken(user, familyID, sessionBindingHashFromContext(ctx))
+	accessToken, err := s.generateAccessToken(ctx, user, familyID, sessionBindingHashFromContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("generate access token: %w", err)
 	}
@@ -1714,15 +1739,24 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 		return nil, fmt.Errorf("generate refresh token: %w", err)
 	}
 
+	requiresSetup, err := s.RequiresTotpSetup(ctx, user)
+	if err != nil {
+		return nil, err
+	}
 	return &TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    s.GetAccessTokenExpiresIn(),
+		RequiresTotpSetup: requiresSetup,
+		AccessToken:       accessToken,
+		RefreshToken:      refreshToken,
+		ExpiresIn:         s.GetAccessTokenExpiresIn(),
 	}, nil
 }
 
 // generateRefreshToken 生成并存储Refresh Token
 func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, familyID string) (string, error) {
+	security, err := s.tokenSecurity(ctx, user.ID)
+	if err != nil {
+		return "", err
+	}
 	// 生成随机Token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -1746,12 +1780,14 @@ func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, fami
 	ttl := time.Duration(s.cfg.JWT.RefreshTokenExpireDays) * 24 * time.Hour
 
 	data := &RefreshTokenData{
-		UserID:       user.ID,
-		TokenVersion: resolvedTokenVersion(user),
-		FamilyID:     familyID,
-		BindingHash:  sessionBindingHashFromContext(ctx),
-		CreatedAt:    now,
-		ExpiresAt:    now.Add(ttl),
+		SessionVersion:  security.version,
+		TotpPolicyEpoch: security.policy.Epoch,
+		UserID:          user.ID,
+		TokenVersion:    resolvedTokenVersion(user),
+		FamilyID:        familyID,
+		BindingHash:     sessionBindingHashFromContext(ctx),
+		CreatedAt:       now,
+		ExpiresAt:       now.Add(ttl),
 	}
 
 	// 存储Token数据
@@ -1801,7 +1837,15 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 		return nil, ErrServiceUnavailable
 	}
 
+	security, err := s.tokenSecurity(ctx, data.UserID)
+	if err != nil {
+		return nil, ErrServiceUnavailable
+	}
+	ctx = context.WithValue(ctx, tokenSecuritySnapshotKey{}, security)
 	// 检查Token是否过期
+	if err := s.ValidateUserSession(ctx, data.UserID, data.SessionVersion); err != nil {
+		return nil, err
+	}
 	if time.Now().After(data.ExpiresAt) {
 		// 删除过期Token
 		_ = s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
@@ -1828,6 +1872,9 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 	}
 
 	// 检查TokenVersion（密码更改后所有Token失效）
+	if err := s.ValidateTotpPolicySession(ctx, user, data.TotpPolicyEpoch); err != nil {
+		return nil, err
+	}
 	if data.TokenVersion != resolvedTokenVersion(user) {
 		// TokenVersion不匹配，撤销整个Token家族
 		_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
@@ -1892,20 +1939,24 @@ func (s *AuthService) RevokeAllUserSessions(ctx context.Context, userID int64) e
 	return s.refreshTokenCache.DeleteUserRefreshTokens(ctx, userID)
 }
 
-// RevokeAllUserTokens invalidates both stateless access tokens and refresh sessions.
-//
-// 注意：users 表没有 token_version 列（resolvedTokenVersion 由 email+password_hash
-// 指纹推导），因此对 user.TokenVersion 自增只影响内存副本。之前紧跟其后的整行
-// Update 不写任何有效数据，却会用旧快照覆盖并发写入的列，故已移除。
-// 会话撤销由下面的 refresh session 清理承担；改密路径通过 password_hash 变化
-// 改变指纹，从而使旧 token 失效。
+// RevokeAllUserTokens rotates the shared session version and deletes refresh sessions.
 func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID int64) error {
 	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return fmt.Errorf("get user: %w", err)
 	}
+	if store, ok := s.refreshTokenCache.(UserSessionVersionStore); ok {
+		version, err := randomHexString(16)
+		if err != nil {
+			return err
+		}
+		if err := store.SetUserSessionVersion(ctx, userID, version); err != nil {
+			return err
+		}
+	}
 
 	if err := s.RevokeAllUserSessions(ctx, userID); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to revoke refresh sessions after token invalidation for user %d: %v", userID, err)
+		return err
 	}
 	return nil
 }

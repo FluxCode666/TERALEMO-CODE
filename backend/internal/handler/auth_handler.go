@@ -92,11 +92,12 @@ func captchaProof(turnstileToken, tencentTicket, tencentRandstr string) service.
 
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
-	AccessToken  string            `json:"access_token"`
-	RefreshToken string            `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int               `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
-	TokenType    string            `json:"token_type"`
-	User         *authUserResponse `json:"user"`
+	RequiresTotpSetup bool              `json:"requires_totp_setup"`
+	AccessToken       string            `json:"access_token"`
+	RefreshToken      string            `json:"refresh_token,omitempty"` // 新增：Refresh Token
+	ExpiresIn         int               `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
+	TokenType         string            `json:"token_type"`
+	User              *authUserResponse `json:"user"`
 }
 
 func ensureLoginUserActive(user *service.User) error {
@@ -121,6 +122,12 @@ func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user
 		response.ErrorFrom(c, err)
 		return
 	}
+	requiresSetup, err := authService.RequiresTotpSetup(c.Request.Context(), user)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	userResponse.RequiresTotpSetup = requiresSetup
 
 	tokenPair, err := authService.GenerateTokenPair(c.Request.Context(), user, "")
 	if err != nil {
@@ -132,18 +139,20 @@ func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user
 			return
 		}
 		response.Success(c, AuthResponse{
-			AccessToken: token,
-			TokenType:   "Bearer",
-			User:        userResponse,
+			RequiresTotpSetup: requiresSetup,
+			AccessToken:       token,
+			TokenType:         "Bearer",
+			User:              userResponse,
 		})
 		return
 	}
 	response.Success(c, AuthResponse{
-		AccessToken:  tokenPair.AccessToken,
-		RefreshToken: tokenPair.RefreshToken,
-		ExpiresIn:    tokenPair.ExpiresIn,
-		TokenType:    "Bearer",
-		User:         userResponse,
+		RequiresTotpSetup: requiresSetup,
+		AccessToken:       tokenPair.AccessToken,
+		RefreshToken:      tokenPair.RefreshToken,
+		ExpiresIn:         tokenPair.ExpiresIn,
+		TokenType:         "Bearer",
+		User:              userResponse,
 	})
 }
 
@@ -452,6 +461,11 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	profile := userProfileResponseFromService(user, identities)
+	profile.RequiresTotpSetup, err = h.authService.RequiresTotpSetup(c.Request.Context(), user)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	profile.Enterprise, err = readAuthEnterpriseIdentity(c.Request.Context(), h.enterpriseIdentity, subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -681,10 +695,11 @@ type RefreshTokenRequest struct {
 
 // RefreshTokenResponse 刷新Token响应
 type RefreshTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"` // Access Token有效期（秒）
-	TokenType    string `json:"token_type"`
+	RequiresTotpSetup bool   `json:"requires_totp_setup"`
+	AccessToken       string `json:"access_token"`
+	RefreshToken      string `json:"refresh_token"`
+	ExpiresIn         int    `json:"expires_in"` // Access Token有效期（秒）
+	TokenType         string `json:"token_type"`
 }
 
 // RefreshToken 刷新Token
@@ -709,10 +724,11 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	response.Success(c, RefreshTokenResponse{
-		AccessToken:  result.AccessToken,
-		RefreshToken: result.RefreshToken,
-		ExpiresIn:    result.ExpiresIn,
-		TokenType:    "Bearer",
+		RequiresTotpSetup: result.RequiresTotpSetup,
+		AccessToken:       result.AccessToken,
+		RefreshToken:      result.RefreshToken,
+		ExpiresIn:         result.ExpiresIn,
+		TokenType:         "Bearer",
 	})
 }
 

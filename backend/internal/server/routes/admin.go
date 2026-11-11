@@ -613,6 +613,12 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
+		adminSettings.GET("/model-allowlist", h.Admin.Setting.GetModelAllowlist)
+		adminSettings.PUT("/model-allowlist", h.Admin.Setting.UpdateModelAllowlist)
+		adminSettings.PUT("/model-allowlist/enabled", h.Admin.Setting.ToggleModelAllowlist)
+		adminSettings.GET("/force-totp", h.Admin.Setting.GetForceTotp)
+		adminSettings.PUT("/force-totp", h.Admin.Setting.UpdateForceTotp)
+		adminSettings.POST("/model-allowlist/test", h.Admin.Setting.TestModelAllowlist)
 		adminSettings.POST("/test-smtp", h.Admin.Setting.TestSMTPConnection)
 		adminSettings.POST("/send-test-email", h.Admin.Setting.SendTestEmail)
 		adminSettings.GET("/email-templates", h.Admin.Setting.ListEmailTemplates)

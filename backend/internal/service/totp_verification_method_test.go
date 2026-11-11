@@ -39,7 +39,7 @@ type totpVMSettingRepoStub struct {
 func (s *totpVMSettingRepoStub) GetValue(ctx context.Context, key string) (string, error) {
 	v, ok := s.values[key]
 	if !ok {
-		return "", errors.New("setting not found")
+		return "", ErrSettingNotFound
 	}
 	return v, nil
 }

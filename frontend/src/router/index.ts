@@ -15,11 +15,18 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { totpEnrollmentRedirect } from './totpEnrollment'
 
 /**
  * Route definitions with lazy loading
  */
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/auth/totp-required',
+    name: 'TotpRequired',
+    component: () => import('@/views/auth/TotpRequiredView.vue'),
+    meta: { requiresAuth: true, titleKey: 'forceTotp.setupTitle' }
+  },
   // ==================== Setup Routes ====================
   {
     path: '/setup',
@@ -868,6 +875,12 @@ router.beforeEach(async (to, _from, next) => {
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdmin = to.meta.requiresAdmin === true
+
+  if (authStore.isAuthenticated) {
+    const enrollmentPath = totpEnrollmentRedirect(authStore.user, to.path)
+    if (enrollmentPath) { next(enrollmentPath); return }
+    if (to.path === '/auth/totp-required') { next(); return }
+  }
 
   if (to.path === '/setup') {
     try {

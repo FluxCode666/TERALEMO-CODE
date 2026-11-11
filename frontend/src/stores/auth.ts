@@ -316,6 +316,7 @@ export const useAuthStore = defineStore('auth', () => {
       runMode.value = response.user.run_mode
     }
     const { run_mode: _run_mode, ...userData } = response.user
+    if (response.requires_totp_setup !== undefined) userData.requires_totp_setup = response.requires_totp_setup
     user.value = userData
     userLoadedAt.value = Date.now()
 
