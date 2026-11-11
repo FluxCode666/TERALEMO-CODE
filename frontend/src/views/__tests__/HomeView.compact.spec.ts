@@ -108,7 +108,7 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="enterprise-home"]').exists()).toBe(true)
   })
 
   it('links unauthenticated visitors to login', () => {
@@ -180,5 +180,67 @@ describe('HomeView compact mode', () => {
     })
 
     expect(modelPlazaDestination(wrapper)).toBeUndefined()
+  })
+})
+
+describe('HomeView enterprise home', () => {
+  beforeEach(() => {
+    authStore.isAuthenticated = false
+    authStore.isAdmin = false
+    authStore.user = null
+    localStorage.clear()
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
+  })
+
+  function enterpriseDestinations(wrapper: ReturnType<typeof mountHome>) {
+    return wrapper
+      .get('[data-testid="enterprise-home"]')
+      .findAllComponents(RouterLinkStub)
+      .map((link) => link.props('to'))
+  }
+
+  it('sends anonymous visitors to login and never to the dashboard', () => {
+    const destinations = enterpriseDestinations(mountHome())
+
+    expect(destinations).toContain('/login')
+    expect(destinations).not.toContain('/dashboard')
+    expect(destinations).not.toContain('/admin/dashboard')
+  })
+
+  it('sends administrators to the admin dashboard', () => {
+    authStore.isAuthenticated = true
+    authStore.isAdmin = true
+
+    const destinations = enterpriseDestinations(mountHome())
+    expect(destinations).toContain('/admin/dashboard')
+    expect(destinations).not.toContain('/login')
+  })
+
+  it('shows the configured API base URL without a trailing slash', () => {
+    const wrapper = mountHome({ api_base_url: ' https://api.example.com/ ' })
+
+    expect(wrapper.get('[data-testid="home-api-base-url"]').text()).toBe('https://api.example.com')
+  })
+
+  it('falls back to the current origin when no API base URL is configured', () => {
+    const wrapper = mountHome()
+
+    expect(wrapper.get('[data-testid="home-api-base-url"]').text()).toBe(window.location.origin)
+  })
+
+  it('shows business contact info only when configured and links e-mail addresses', () => {
+    expect(mountHome().find('[data-testid="home-contact"]').exists()).toBe(false)
+
+    const wrapper = mountHome({ contact_info: 'sales@example.com' })
+    const contact = wrapper.get('[data-testid="home-contact"]')
+    expect(contact.text()).toContain('sales@example.com')
+    expect(contact.get('a').attributes('href')).toBe('mailto:sales@example.com')
+  })
+
+  it('renders plain-text contact info without a link', () => {
+    const contact = mountHome({ contact_info: 'WeChat: teralemo' }).get('[data-testid="home-contact"]')
+
+    expect(contact.text()).toContain('WeChat: teralemo')
+    expect(contact.find('a').exists()).toBe(false)
   })
 })

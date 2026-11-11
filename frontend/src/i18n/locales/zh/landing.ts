@@ -5,7 +5,6 @@ export default {
   },
   // Home Page
   home: {
-    viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',
     switchToLight: '切换到浅色模式',
@@ -14,102 +13,162 @@ export default {
     login: '登录',
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
-    // 新增：面向用户的价值主张
-    heroSubtitle: '一个密钥，畅用多个 AI 模型',
-    heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
-    tags: {
-      subscriptionToApi: '订阅转 API',
-      stickySession: '会话保持',
-      realtimeBilling: '按量计费'
+    skipToContent: '跳到正文',
+    nav: {
+      label: '首页导航',
+      access: '统一接入',
+      governance: '组织治理',
+      security: '安全审计',
+      onboarding: '接入流程'
     },
-    // 用户痛点区块
-    painPoints: {
-      title: '你是否也遇到这些问题？',
-      items: {
-        expensive: {
-          title: '订阅费用高',
-          desc: '每个 AI 服务都要单独订阅，每月支出越来越多'
+    hero: {
+      eyebrow: '企业级 AI 接入层',
+      titleLead: '把大模型',
+      titleAccent: '接入组织的每一层',
+      description:
+        '{name} 为企业提供统一的模型接入、组织级额度治理与全链路审计。一个入口对接主流对话、图像与视频模型，按部门与成员分配、计量、追溯。',
+      primaryGuest: '企业登录',
+      primaryAuthed: '进入控制台',
+      secondaryDocs: '查看接入文档',
+      secondaryPlaza: '浏览模型广场',
+      secondaryOnboarding: '了解接入流程',
+      note: '成员账号可由企业管理员批量导入，无需逐个注册'
+    },
+    map: {
+      label: '示意图：企业组织以等高线表示，每一圈代表一级部门',
+      enterprise: '企业',
+      rd: '研发中心',
+      rdMeta: '月限额已用 62%',
+      backend: '后端组',
+      backendMeta: '接近上限 · 85%',
+      requestMeta: '200 · 1.24s',
+      legend: '每一圈等高线代表一级部门，最多 8 级',
+      rollup: '用量逐级汇总至上级'
+    },
+    facts: {
+      label: '平台关键能力',
+      levels: { unit: '级', label: '部门层级', desc: '组织架构按真实汇报关系建模' },
+      periods: { unit: '档', label: '限额周期', desc: '日 / 周 / 月 / 累计，分别设上限' },
+      protocols: { unit: '种', label: '原生协议兼容', desc: 'OpenAI / Anthropic / Gemini' },
+      key: { unit: '个', label: 'Key 调用授权模型', desc: '按分组授权，按调用计量' }
+    },
+    access: {
+      kicker: '统一接入',
+      title: '一个入口，接入主流模型',
+      description:
+        '兼容 OpenAI、Anthropic 与 Gemini 原生协议，现有 SDK 与开发工具只需替换 Base URL 和 Key。对话、图像、视频统一鉴权、统一计量。',
+      points: {
+        protocol: {
+          title: '原生协议，零改造',
+          desc: '业务代码与 Claude Code、Codex 等开发工具无需改写，替换地址即可接入。'
         },
-        complex: {
-          title: '多账号难管理',
-          desc: '不同平台的账号、密钥分散各处，管理起来很麻烦'
+        routing: {
+          title: '多上游调度',
+          desc: '上游账号池自动负载均衡与故障切换，会话保持避免长任务上下文中断。'
         },
-        unstable: {
-          title: '服务不稳定',
-          desc: '单一账号容易触发限制，影响正常使用'
-        },
-        noControl: {
-          title: '用量无法控制',
-          desc: '不知道钱花在哪了，也无法限制团队成员的使用'
+        media: {
+          title: '对话之外，图像与视频',
+          desc: '生图、视频生成与对话共用一套 Key 与账单，网页端创作台开箱即用。'
         }
-      }
-    },
-    // 解决方案区块
-    solutions: {
-      title: '我们帮你解决',
-      subtitle: '简单三步，开始省心使用 AI'
-    },
-    features: {
-      unifiedGateway: '一键接入',
-      unifiedGatewayDesc: '获取一个 API 密钥，即可调用所有已接入的 AI 模型，无需分别申请。',
-      multiAccount: '稳定可靠',
-      multiAccountDesc: '智能调度多个上游账号，自动切换和负载均衡，告别频繁报错。',
-      balanceQuota: '用多少付多少',
-      balanceQuotaDesc: '按实际使用量计费，支持设置配额上限，团队用量一目了然。'
-    },
-    // 优势对比
-    comparison: {
-      title: '为什么选择我们？',
-      headers: {
-        feature: '对比项',
-        official: '官方订阅',
-        us: '本平台'
       },
+      panel: {
+        title: '接入参数',
+        baseUrl: 'Base URL',
+        copy: '复制',
+        copied: '已复制',
+        protocol: '协议',
+        endpoint: '端点',
+        keyNote: 'API Key 在控制台创建，绑定分组后即可调用该分组授权的全部模型。'
+      }
+    },
+    governance: {
+      kicker: '组织治理',
+      title: '额度与权限，跟着组织架构走',
+      description:
+        '按部门与成员建立层级，额度与可调用模型逐级收窄。谁在用、用了多少、还剩多少，一张表看清。',
       items: {
-        pricing: {
-          feature: '付费方式',
-          official: '固定月费，用不完也付',
-          us: '按量付费，用多少付多少'
+        org: {
+          title: '组织架构',
+          desc: '最多 8 级部门；支持 XLSX / CSV 批量导入成员，不存在的部门路径自动创建。'
         },
-        models: {
-          feature: '模型选择',
-          official: '单一服务商',
-          us: '多模型随意切换'
+        quota: {
+          title: '四档限额',
+          desc: '企业、部门、成员均可设置日 / 周 / 月 / 累计上限，设为 0 即禁止调用。'
         },
-        management: {
-          feature: '账号管理',
-          official: '每个服务单独管理',
-          us: '统一密钥，一站管理'
+        groups: {
+          title: '分组授权',
+          desc: '下级部门只能在上级允许的范围内，进一步收窄可调用的模型分组。'
         },
-        stability: {
-          feature: '服务稳定性',
-          official: '单账号易触发限制',
-          us: '多账号池，自动切换'
+        roles: {
+          title: '角色分工',
+          desc: '企业负责人、部门负责人、员工三级角色，权限与可见范围随之变化。'
+        }
+      },
+      table: {
+        title: '限额管理 · 本月',
+        department: '部门',
+        usage: '已用 / 月限额',
+        unlimited: '不限',
+        rows: {
+          rd: '研发中心',
+          backend: '后端组',
+          algorithm: '算法组',
+          marketing: '市场部',
+          design: '设计部'
         },
-        control: {
-          feature: '用量控制',
-          official: '无法限制',
-          us: '可设配额、查明细'
+        status: {
+          normal: '正常',
+          warning: '接近上限',
+          unlimited: '不限',
+          disabled: '已禁用'
+        },
+        footnote: '上级部门的用量包含全部下级部门'
+      }
+    },
+    security: {
+      kicker: '安全审计',
+      title: '每一次调用，都有据可查',
+      description: '调用日志、操作审计与内容审计贯穿全链路，满足企业内控与合规留档需要。',
+      items: {
+        usage: { title: '用量分析', desc: '按部门、成员、模型拆分用量，支持导出 CSV。' },
+        audit: { title: '操作审计', desc: '成员变更、限额调整、权限修改全部留痕。' },
+        prompt: { title: '内容审计', desc: '对提示词进行审计与留档，敏感请求可追溯。' },
+        risk: { title: '风险控制', desc: '识别异常调用行为，及时拦截与处置。' },
+        sso: { title: '统一登录', desc: '支持钉钉、OIDC 等企业身份源登录。' },
+        notify: { title: '余额提醒', desc: '余额或额度不足时及时通知相关负责人。' }
+      },
+      ledger: {
+        title: '审计日志',
+        live: '实时',
+        rows: {
+          call: '后端组 · 张**',
+          quota: '管理员 · 调整「市场部」月限额',
+          image: '算法组 · 李**',
+          blocked: '系统 · 拦截「设计部」成员调用',
+          blockedMeta: '已禁用'
         }
       }
     },
-    providers: {
-      title: '已支持的 AI 模型',
-      description: '一个 API，多种选择',
-      supported: '已支持',
-      soon: '即将推出',
-      claude: 'Claude',
-      gemini: 'Gemini',
-      antigravity: 'Antigravity',
-      more: '更多'
+    onboarding: {
+      kicker: '接入流程',
+      title: '四步完成企业接入',
+      steps: {
+        open: { title: '开通企业空间', desc: '与我们确认需求，开通企业账户并指定企业负责人。' },
+        org: { title: '搭建组织', desc: '导入成员与部门，指派各部门负责人。' },
+        quota: { title: '配置额度与模型', desc: '为企业、部门与成员设置限额和可调用分组。' },
+        key: { title: '创建 Key，开始调用', desc: '成员在控制台创建 Key，接入现有工具与业务系统。' }
+      }
     },
-    // CTA 区块
     cta: {
-      title: '准备好开始了吗？',
-      description: '注册即可获得免费试用额度，体验一站式 AI 服务',
-      button: '免费注册'
+      title: '让 AI 成为组织的基础设施',
+      description: '已开通企业账户，直接登录控制台；需要开通或评估接入，欢迎联系商务对接。',
+      contact: '商务对接'
     },
     footer: {
+      tagline: '企业级 AI 接入与治理平台',
+      product: '产品',
+      account: '账户',
+      keyUsage: 'Key 用量查询',
       allRightsReserved: '保留所有权利。'
     }
   },

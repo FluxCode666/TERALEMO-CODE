@@ -5,7 +5,6 @@ export default {
   },
   // Home Page
   home: {
-    viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',
     switchToLight: 'Switch to Light Mode',
@@ -14,102 +13,163 @@ export default {
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
-    // User-focused value proposition
-    heroSubtitle: 'One Key, All AI Models',
-    heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
-    tags: {
-      subscriptionToApi: 'Subscription to API',
-      stickySession: 'Session Persistence',
-      realtimeBilling: 'Pay As You Go'
+    skipToContent: 'Skip to content',
+    nav: {
+      label: 'Home navigation',
+      access: 'Access',
+      governance: 'Governance',
+      security: 'Audit',
+      onboarding: 'Onboarding'
     },
-    // Pain points section
-    painPoints: {
-      title: 'Sound Familiar?',
-      items: {
-        expensive: {
-          title: 'High Subscription Costs',
-          desc: 'Paying for multiple AI subscriptions that add up every month'
+    hero: {
+      eyebrow: 'Enterprise AI access layer',
+      titleLead: 'Bring AI models',
+      titleAccent: 'into every layer of your org',
+      description:
+        '{name} gives enterprises one gateway to leading chat, image and video models — with organization-wide quota governance and end-to-end audit. Allocate, meter and trace usage by department and member.',
+      primaryGuest: 'Enterprise sign in',
+      primaryAuthed: 'Open console',
+      secondaryDocs: 'Read the docs',
+      secondaryPlaza: 'Browse models',
+      secondaryOnboarding: 'How onboarding works',
+      note: 'Admins can bulk-import member accounts — no one-by-one sign-ups'
+    },
+    map: {
+      label: 'Illustration: the organization drawn as contour lines, one ring per department level',
+      enterprise: 'Enterprise',
+      rd: 'R&D Center',
+      rdMeta: '62% of monthly quota',
+      backend: 'Backend Team',
+      backendMeta: 'Near limit · 85%',
+      requestMeta: '200 · 1.24s',
+      legend: 'Each contour is one department level — up to 8',
+      rollup: 'Usage rolls up to parent levels'
+    },
+    facts: {
+      label: 'Platform at a glance',
+      levels: { unit: 'levels', label: 'Department depth', desc: 'Model your real reporting lines' },
+      periods: { unit: 'periods', label: 'Quota windows', desc: 'Daily / weekly / monthly / lifetime caps' },
+      protocols: { unit: 'protocols', label: 'Native compatibility', desc: 'OpenAI / Anthropic / Gemini' },
+      key: { unit: 'key', label: 'For every granted model', desc: 'Granted by group, metered per call' }
+    },
+    access: {
+      kicker: 'Unified access',
+      title: 'One gateway to the models that matter',
+      description:
+        'Natively compatible with OpenAI, Anthropic and Gemini protocols — existing SDKs and tools only need a new base URL and key. Chat, image and video share one auth and one meter.',
+      points: {
+        protocol: {
+          title: 'Native protocols, zero rewrites',
+          desc: 'Business code and tools like Claude Code or Codex work as-is — just point them here.'
         },
-        complex: {
-          title: 'Account Chaos',
-          desc: 'Managing scattered accounts and API keys across different platforms'
+        routing: {
+          title: 'Multi-upstream scheduling',
+          desc: 'Upstream account pools with load balancing, failover and sticky sessions for long tasks.'
         },
-        unstable: {
-          title: 'Service Interruptions',
-          desc: 'Single accounts hitting rate limits and disrupting your workflow'
-        },
-        noControl: {
-          title: 'No Usage Control',
-          desc: "Can't track where your money goes or limit team member usage"
+        media: {
+          title: 'Beyond chat: image and video',
+          desc: 'Image and video generation share the same keys and bill, with a ready-to-use web studio.'
         }
-      }
-    },
-    // Solutions section
-    solutions: {
-      title: 'We Solve These Problems',
-      subtitle: 'Three simple steps to stress-free AI access'
-    },
-    features: {
-      unifiedGateway: 'One-Click Access',
-      unifiedGatewayDesc: 'Get a single API key to call all connected AI models. No separate applications needed.',
-      multiAccount: 'Always Reliable',
-      multiAccountDesc: 'Smart routing across multiple upstream accounts with automatic failover. Say goodbye to errors.',
-      balanceQuota: 'Pay What You Use',
-      balanceQuotaDesc: 'Usage-based billing with quota limits. Full visibility into team consumption.'
-    },
-    // Comparison section
-    comparison: {
-      title: 'Why Choose Us?',
-      headers: {
-        feature: 'Comparison',
-        official: 'Official Subscriptions',
-        us: 'Our Platform'
       },
+      panel: {
+        title: 'Connection details',
+        baseUrl: 'Base URL',
+        copy: 'Copy',
+        copied: 'Copied',
+        protocol: 'Protocol',
+        endpoint: 'Endpoint',
+        keyNote: 'Create an API key in the console and bind it to a group to call every model that group allows.'
+      }
+    },
+    governance: {
+      kicker: 'Governance',
+      title: 'Quotas and permissions that follow your org chart',
+      description:
+        'Build a hierarchy of departments and members; quotas and callable models narrow level by level. Who is using what, how much, and what is left — in one table.',
       items: {
-        pricing: {
-          feature: 'Pricing',
-          official: 'Fixed monthly fee, pay even if unused',
-          us: 'Pay only for what you use'
+        org: {
+          title: 'Org structure',
+          desc: 'Up to 8 department levels; bulk-import members via XLSX / CSV, missing paths are created for you.'
         },
-        models: {
-          feature: 'Model Selection',
-          official: 'Single provider only',
-          us: 'Switch between models freely'
+        quota: {
+          title: 'Four quota windows',
+          desc: 'Set daily / weekly / monthly / lifetime caps for the enterprise, departments and members — 0 blocks calls.'
         },
-        management: {
-          feature: 'Account Management',
-          official: 'Manage each service separately',
-          us: 'Unified key, one dashboard'
+        groups: {
+          title: 'Group grants',
+          desc: 'Child departments can only narrow the model groups their parent allows.'
         },
-        stability: {
-          feature: 'Stability',
-          official: 'Single account rate limits',
-          us: 'Multi-account pool, auto-failover'
+        roles: {
+          title: 'Clear roles',
+          desc: 'Owner, department manager and member roles, each with its own permissions and visibility.'
+        }
+      },
+      table: {
+        title: 'Quotas · this month',
+        department: 'Department',
+        usage: 'Used / monthly cap',
+        unlimited: 'Unlimited',
+        rows: {
+          rd: 'R&D Center',
+          backend: 'Backend Team',
+          algorithm: 'Algorithms',
+          marketing: 'Marketing',
+          design: 'Design'
         },
-        control: {
-          feature: 'Usage Control',
-          official: 'Not available',
-          us: 'Quotas & detailed analytics'
+        status: {
+          normal: 'Normal',
+          warning: 'Near limit',
+          unlimited: 'Unlimited',
+          disabled: 'Disabled'
+        },
+        footnote: 'Parent usage includes all child departments'
+      }
+    },
+    security: {
+      kicker: 'Audit & security',
+      title: 'Every call leaves a trail',
+      description:
+        'Request logs, admin audit and content audit cover the full path — built for internal controls and compliance retention.',
+      items: {
+        usage: { title: 'Usage analytics', desc: 'Break usage down by department, member and model; export to CSV.' },
+        audit: { title: 'Admin audit', desc: 'Member changes, quota edits and permission updates are all recorded.' },
+        prompt: { title: 'Content audit', desc: 'Audit and retain prompts so sensitive requests stay traceable.' },
+        risk: { title: 'Risk control', desc: 'Detect abnormal call patterns and stop them early.' },
+        sso: { title: 'Single sign-on', desc: 'Sign in with DingTalk, OIDC and other enterprise identity providers.' },
+        notify: { title: 'Balance alerts', desc: 'Notify the right owners when balance or quota runs low.' }
+      },
+      ledger: {
+        title: 'Audit log',
+        live: 'Live',
+        rows: {
+          call: 'Backend · Z***',
+          quota: 'Admin · changed Marketing monthly cap',
+          image: 'Algorithms · L***',
+          blocked: 'System · blocked a Design member call',
+          blockedMeta: 'Disabled'
         }
       }
     },
-    providers: {
-      title: 'Supported AI Models',
-      description: 'One API, Multiple Choices',
-      supported: 'Supported',
-      soon: 'Soon',
-      claude: 'Claude',
-      gemini: 'Gemini',
-      antigravity: 'Antigravity',
-      more: 'More'
+    onboarding: {
+      kicker: 'Onboarding',
+      title: 'Four steps to go live',
+      steps: {
+        open: { title: 'Open an enterprise space', desc: 'Confirm your needs with us, then we open the account and assign an owner.' },
+        org: { title: 'Build the organization', desc: 'Import members and departments, and appoint department managers.' },
+        quota: { title: 'Set quotas and models', desc: 'Configure caps and callable groups for the enterprise, departments and members.' },
+        key: { title: 'Create keys, start calling', desc: 'Members create keys in the console and plug them into existing tools.' }
+      }
     },
-    // CTA section
     cta: {
-      title: 'Ready to Get Started?',
-      description: 'Sign up now and get free trial credits to experience seamless AI access',
-      button: 'Sign Up Free'
+      title: 'Make AI part of your infrastructure',
+      description: 'Already have an enterprise account? Sign in to the console. To open an account or evaluate access, talk to our team.',
+      contact: 'Business contact'
     },
     footer: {
+      tagline: 'Enterprise AI access & governance',
+      product: 'Product',
+      account: 'Account',
+      keyUsage: 'Key usage lookup',
       allRightsReserved: 'All rights reserved.'
     }
   },
