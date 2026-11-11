@@ -3158,6 +3158,10 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				return mapping.MappedModel, nil
 			},
 			BeforeTurn: func(turn int) error {
+				if err := h.checkOpenAIWSModelRequestIP(ctx, clientIP, apiKey); err != nil {
+					writeOpenAIBillingWSError(ctx, wsConn, err)
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, err.Error(), err)
+				}
 				// turn==1 的会话屏蔽已由握手层检查覆盖；连接内 flag 只拦截后续 turn。
 				if cyberBlockedThisConn && !h.cyberPolicyLogOnly(c, apiKey) {
 					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, cyberSessionBlockedClientMsg, nil)

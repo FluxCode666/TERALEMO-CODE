@@ -29,42 +29,75 @@ the application's responsibility.
 
 ## Trusted client IPs
 
-`security.trust_forwarded_ip_for_api_key_acl` is enabled by default for upgrade
-compatibility. While enabled, raw forwarding headers take over client-IP
-resolution for logs and security-sensitive paths. Custom headers from
-`security.forwarded_client_ip_headers` are checked in configured order before
-the built-in `CF-Connecting-IP`, `X-Real-IP`, and `X-Forwarded-For` fallback.
-Header names are case-insensitive, normalized when loaded, de-duplicated, and
-limited to 16 unique valid HTTP field names. Header values must contain IP
-literals; comma-separated values are supported, invalid entries are skipped,
-and public addresses are preferred over private fallback addresses.
+### Model allowlist and proxy chain hardening
+
+The model request allowlist is disabled by default. Save customer IPs, CIDRs or
+egress domains and customer notes first. Observe unmatched sources in admin
+security settings, then enable enforcement with its separate action. Entry saves
+preserve the enforcement switch. Observations aggregate by IP, user and API key in
+Redis for seven days (10,000 groups maximum); the enable dialog counts distinct
+unmatched sources active in the last 24 hours against the saved rules. No API key
+credential is included. Domain A/AAAA answers are cached for five minutes; failed
+lookups grant no access. Both the global and per-key rules must pass.
+
+Raw forwarding headers never override the trusted proxy chain at the
+application ingress. `server.trusted_proxies` specifies exact local nginx,
+load-balancer or Docker bridge peers. The allowlist panel independently configures
+official Cloudflare ranges and other CDN origin IP/CIDRs. Do not trust an entire
+private network, `0.0.0.0/0`, or `::/0`. Requests traverse X-Forwarded-For from right
+to left and stop at the first untrusted address. CF-Connecting-IP and custom
+single-IP headers are only accepted after identifying a trusted CDN peer, not
+from an arbitrary client arriving through local nginx.
+
+Recommended deployment: nginx resolves the client IP and overwrites all headers
+passed to Sub2API. Trust CDN ranges in nginx and only nginx's actual connection
+address in the application (often the exact Docker bridge gateway, not 127.0.0.1
+as observed inside a container). Keep the application port bound to loopback.
+Use full official Cloudflare IPv4/IPv6 lists from https://www.cloudflare.com/ips/
+and exact ranges confirmed by each custom CDN; never guess a /16 from an observed
+address. Each trusted CDN must overwrite X-Forwarded-For with the verified client
+or append its actual incoming peer.
+
+```nginx
+# http/server scope; file contains every official Cloudflare range plus confirmed
+# custom CDN origin addresses, e.g. set_real_ip_from 103.79.184.232/32;
+include /etc/nginx/trusted-cdn-realip.conf;
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+
+# In EVERY location proxying to Sub2API (including WebSocket locations):
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header CF-Connecting-IP "";
+# Clear every custom client-IP header configured in Sub2API as well.
+```
+
+If a custom CDN does not provide trustworthy X-Forwarded-For, normalize its
+provider-specific header at a separate nginx listener with a source-IP allowlist.
+Never select CF-Connecting-IP merely because it is present. Without nginx real_ip,
+use `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` and configure both
+the local nginx peer and confirmed CDN ranges in the application. Cloudflare-only
+single-IP headers work when the chain reaches a confirmed Cloudflare peer.
+After enabling nginx real_ip, overwrite XFF with `$remote_addr` as above to avoid
+reintroducing client-supplied values.
+
+The legacy `security.trust_forwarded_ip_for_api_key_acl` setting remains in the
+settings schema for compatibility, but cannot bypass this trust policy. Custom
+headers from `security.forwarded_client_ip_headers` are eligible only at the
+verified CDN fallback described above. Header names are case-insensitive,
+normalized when loaded, de-duplicated, and limited to 16 unique valid HTTP field
+names. Fallback values must contain one IP literal; malformed or overlong XFF
+chains fall back to the socket peer, never a client-supplied alternate header.
 
 The list can be supplied in YAML or with the comma-separated environment
 variable `SECURITY_FORWARDED_CLIENT_IP_HEADERS`; an explicitly empty environment
 value clears YAML values. It is also editable from the admin security settings
-and updates at runtime without a restart. A request snapshots the switch and
-header list together, so one request cannot mix old and new settings. Custom
-headers are ignored completely when the switch is disabled. In that mode Gin's
-`server.trusted_proxies` chain is authoritative: configure only the exact
-CIDR/IP addresses that connect directly to Sub2API. An explicit empty list
-trusts no forwarded client IPs.
-
-On the first upgrade to this mode, a legacy `false` value is changed to `true`
-only when `server.trusted_proxies` was not explicitly configured; explicit
-proxy policies remain in secure mode. New installations persist the configured
-custom header list during database initialization. Existing installations
-backfill a missing database value from the YAML configuration. A hidden
-migration marker prevents later administrator changes from being overwritten.
-If settings cannot be read or the persisted custom-header list is malformed,
-the process fails closed to trusted-proxy mode with no custom headers. If a
-migration write fails, the computed mode remains active for the current process
-and startup records a warning.
-
-Compatibility takeover accepts forwarded headers without validating the direct
-peer, including any configured custom header. Protect the origin from direct
-access while it is enabled. A CDN deployment must firewall the origin so only
-the CDN or load balancer can reach it, and that proxy must overwrite every
-trusted client-IP header rather than append an untrusted client value.
+and updates at runtime without a restart. A request snapshots the header list
+and trusted proxy policy. Configure only the exact proxy connection addresses;
+an empty local proxy list trusts no nginx forwarding headers. Firewall the
+application port against direct public access. Forwarding trust remains enforced
+even while the global model allowlist is disabled, including per-key ACLs,
+security rate limits, session binding and usage logging.
 
 Example for a proxy on the same host:
 

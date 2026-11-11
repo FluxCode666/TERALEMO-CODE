@@ -304,6 +304,7 @@ type RateLimitCacheInvalidator interface {
 }
 
 type APIKeyService struct {
+	modelAllowlistSettings    *SettingService
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	enterpriseRepo            EnterpriseRepository

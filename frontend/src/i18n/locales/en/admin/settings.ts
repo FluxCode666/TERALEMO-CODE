@@ -280,13 +280,13 @@ export default {
         title: 'API Key IP Access Control',
         description:
           'Choose which client IP is used by API Key allowlists/denylists, admin audit logs, and session IP/UA binding',
-        trustForwardedIp: 'Trust forwarded client IP',
+        trustForwardedIp: 'Legacy client-IP compatibility setting',
         trustForwardedIpHint:
-          'Enabled by default for upgrade compatibility. When enabled, raw CF-Connecting-IP, X-Real-IP, or X-Forwarded-For values take over server.trusted_proxies for client-IP resolution. Disable it to enforce the Gin trusted-proxy chain configured by server.trusted_proxies. Only enable takeover mode when the origin cannot be reached directly. Changing this switch changes existing session IP fingerprints.',
+          'Retained for upgrade compatibility. Every request verifies the direct peer and trusted proxy chain. Configure CDN ranges in the model allowlist panel below and list only the actual nginx or Docker gateway connection addresses in server.trusted_proxies.',
         forwardedClientIpHeaders: 'Custom client-IP headers',
-        forwardedClientIpHeadersHint: 'Add CDN or proxy header names to check before the built-in headers.',
+        forwardedClientIpHeadersHint: 'Single-IP fallback headers are used only after verifying a trusted CDN in the proxy chain and when X-Forwarded-For has no client address.',
         forwardedClientIpHeadersPlaceholder: 'X-Client-IP',
-        forwardedClientIpHeadersRiskHint: 'These raw headers can be spoofed when the origin is reachable directly. Restrict origin access before trusting them.',
+        forwardedClientIpHeadersRiskHint: 'The CDN must overwrite these headers. Prefer nginx real_ip validation, then overwrite upstream X-Forwarded-For and clear alternate client-IP headers.',
         forwardedClientIpHeaderInvalid: 'Enter a valid HTTP header name.',
         forwardedClientIpHeadersLimit: 'At most {max} custom client-IP headers are allowed.',
         removeForwardedClientIpHeader: 'Remove {header}'

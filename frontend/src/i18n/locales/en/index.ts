@@ -9,8 +9,10 @@ import misc from './misc'
 import asyncTasks from './asyncTasks'
 import apiDocs from './apiDocs'
 import creationStudio from './creationStudio'
+import modelAllowlist from './modelAllowlist'
 
 export default {
+  ...modelAllowlist,
   ...landing,
   ...common,
   ...enterprise,
