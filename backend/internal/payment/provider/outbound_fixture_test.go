@@ -1,19 +1,15 @@
-//go:build !integration
-
 package provider
 
 import (
 	"os"
 	"testing"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+	"github.com/Wei-Shaw/sub2api/internal/testutil/outboundtest"
 )
 
 // Local HTTP fixtures require an explicit exception just like private deployments.
 // Destination-policy tests install their own policy and restore this fixture policy.
 func TestMain(m *testing.M) {
-	if err := outbound.Configure([]string{"127.0.0.0/8", "::1/128"}); err != nil {
-		panic(err)
-	}
+	outboundtest.AllowLoopback()
 	os.Exit(m.Run())
 }

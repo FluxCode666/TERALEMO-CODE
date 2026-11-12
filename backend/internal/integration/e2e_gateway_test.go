@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/testutil/outboundtest"
 )
 
 var (
@@ -68,6 +70,7 @@ var geminiModels = []string{
 }
 
 func TestMain(m *testing.M) {
+	outboundtest.AllowLoopback()
 	mode := "混合模式"
 	if endpointPrefix != "" {
 		mode = "Antigravity 模式"
