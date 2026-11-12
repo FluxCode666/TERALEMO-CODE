@@ -187,7 +187,7 @@ func TestExchangeVertexServiceAccountTokenUsesProxy(t *testing.T) {
 	seenProxyRequest := make(chan string, 1)
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenProxyRequest <- r.URL.String()
-		require.Equal(t, "oauth2.googleapis.com", r.URL.Host)
+		require.Equal(t, "8.8.8.8", r.URL.Host)
 		require.Equal(t, "/token", r.URL.Path)
 		require.NoError(t, r.ParseForm())
 		require.Equal(t, "urn:ietf:params:oauth:grant-type:jwt-bearer", r.PostForm.Get("grant_type"))
@@ -204,7 +204,7 @@ func TestExchangeVertexServiceAccountTokenUsesProxy(t *testing.T) {
 	key := &vertexServiceAccountKey{
 		ClientEmail: "svc@example.iam.gserviceaccount.com",
 		PrivateKey:  string(pemBytes),
-		TokenURI:    "http://oauth2.googleapis.com/token",
+		TokenURI:    "http://8.8.8.8/token",
 	}
 
 	token, ttl, err := exchangeVertexServiceAccountToken(contextWithTestTimeout(t), key, proxy.URL)
@@ -214,7 +214,7 @@ func TestExchangeVertexServiceAccountTokenUsesProxy(t *testing.T) {
 
 	select {
 	case got := <-seenProxyRequest:
-		require.Equal(t, "http://oauth2.googleapis.com/token", got)
+		require.Equal(t, "http://8.8.8.8/token", got)
 	default:
 		t.Fatal("token request did not reach proxy")
 	}

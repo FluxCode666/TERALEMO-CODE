@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -93,7 +94,7 @@ func buildClient(opts Options) (*http.Client, error) {
 	if opts.ValidateResolvedIP && !opts.AllowPrivateHosts {
 		rt = newValidatedTransport(transport)
 	}
-	rt = servertiming.WrapRoundTripper(rt)
+	rt = servertiming.WrapRoundTripper(outbound.WrapTransport(rt))
 	return &http.Client{
 		Transport: rt,
 		Timeout:   opts.Timeout,
@@ -112,9 +113,9 @@ func buildTransport(opts Options) (*http.Transport, error) {
 	}
 
 	transport := &http.Transport{
-		DialContext: (&net.Dialer{
+		DialContext: outbound.DialContext(&net.Dialer{
 			Timeout: defaultDialTimeout,
-		}).DialContext,
+		}),
 		TLSHandshakeTimeout:   defaultTLSHandshakeTimeout,
 		MaxIdleConns:          maxIdleConns,
 		MaxIdleConnsPerHost:   maxIdleConnsPerHost,

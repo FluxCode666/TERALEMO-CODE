@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"golang.org/x/net/proxy"
 )
 
@@ -64,7 +65,7 @@ func ConfigureTransportProxy(transport *http.Transport, proxyURL *url.URL) error
 		return nil
 
 	case "socks5", "socks5h":
-		dialer, err := proxy.FromURL(proxyURL, socks5ForwardDialer)
+		dialer, err := proxy.FromURL(proxyURL, guardedProxyDialer{socks5ForwardDialer})
 		if err != nil {
 			return fmt.Errorf("create socks5 dialer: %w", err)
 		}
@@ -83,4 +84,14 @@ func ConfigureTransportProxy(transport *http.Transport, proxyURL *url.URL) error
 	default:
 		return fmt.Errorf("unsupported proxy scheme: %s", scheme)
 	}
+}
+
+type guardedProxyDialer struct{ *net.Dialer }
+
+func (d guardedProxyDialer) Dial(network, address string) (net.Conn, error) {
+	return d.DialContext(context.Background(), network, address)
+}
+
+func (d guardedProxyDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return outbound.Default().DialContext(ctx, d.Dialer, network, address)
 }

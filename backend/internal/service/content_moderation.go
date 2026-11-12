@@ -22,6 +22,7 @@ import (
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 )
@@ -605,7 +606,7 @@ func NewContentModerationService(
 		proxyRepo:            proxyRepo,
 		authCacheInvalidator: authCacheInvalidator,
 		emailService:         emailService,
-		httpClient:           servertiming.InstrumentClient(nil),
+		httpClient:           servertiming.InstrumentClient(outbound.NewClient(0)),
 		workerCount:          maxContentModerationWorkerCount,
 		asyncQueue:           make(chan contentModerationTask, maxContentModerationQueueSize),
 		keyHealth:            make(map[string]*contentModerationKeyHealth),
@@ -1711,6 +1712,9 @@ func (s *ContentModerationService) validateConfig(ctx context.Context, cfg *Cont
 	if _, err := url.ParseRequestURI(cfg.BaseURL); err != nil {
 		return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_BASE_URL", "审计 Base URL 无效")
 	}
+	if err := outbound.ValidateLiteralURL(cfg.BaseURL); err != nil {
+		return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_BASE_URL", err.Error())
+	}
 	if cfg.ProxyID != nil && s.proxyRepo != nil {
 		if _, err := s.proxyRepo.GetByID(ctx, *cfg.ProxyID); err != nil {
 			return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_PROXY", fmt.Sprintf("代理服务器不存在: %d", *cfg.ProxyID))
@@ -1855,7 +1859,7 @@ const contentModerationProxyURLCacheTTL = time.Minute
 func (s *ContentModerationService) moderationHTTPClient(ctx context.Context, cfg *ContentModerationConfig) (*http.Client, error) {
 	if cfg == nil || cfg.ProxyID == nil {
 		if s.httpClient == nil {
-			return http.DefaultClient, nil
+			return outbound.NewClient(0), nil
 		}
 		return s.httpClient, nil
 	}

@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -433,6 +434,9 @@ func (t *grokAccessDeniedFallbackTransport) RoundTrip(req *http.Request) (*http.
 	if err != nil {
 		return resp, nil
 	}
+	if err := outbound.Default().ValidateURL(fallbackReq.Context(), fallbackReq.URL); err != nil {
+		return resp, nil
+	}
 	fallbackResp, fallbackErr := t.base.RoundTrip(fallbackReq)
 	if fallbackErr != nil {
 		slog.Debug("grok_cli_access_denied_api_fallback_failed", "path", req.URL.EscapedPath(), "error", fallbackErr)
@@ -646,10 +650,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		return nil, fmt.Errorf("build TLS fingerprint transport: %w", err)
 	}
 
-	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
-		client.CheckRedirect = s.redirectChecker
-	}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectChecker}
 
 	entry := &upstreamClientEntry{
 		client:   client,
@@ -678,15 +679,18 @@ func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
 	return !s.cfg.Security.URLAllowlist.AllowPrivateHosts
 }
 
-// validateRequestHost 校验请求主机的解析结果不落在回环、私网、链路本地或未指定地址。
-// 是否全局启用由 security.url_allowlist 决定；带 WithHTTPUpstreamPublicHostsOnly 标记的请求无论配置如何都校验。
+// validateRequestHost always enforces outbound policy. Public-only downloads and
+// the optional legacy host policy can impose stricter checks.
 func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
-	publicHostsOnly := req != nil && service.HTTPUpstreamPublicHostsOnly(req.Context())
-	if !s.shouldValidateResolvedIP() && !publicHostsOnly {
-		return nil
-	}
 	if req == nil || req.URL == nil {
 		return errors.New("request url is nil")
+	}
+	if err := outbound.Default().ValidateURL(req.Context(), req.URL); err != nil {
+		return err
+	}
+	publicHostsOnly := service.HTTPUpstreamPublicHostsOnly(req.Context())
+	if !s.shouldValidateResolvedIP() && !publicHostsOnly {
+		return nil
 	}
 	host := strings.TrimSpace(req.URL.Hostname())
 	if host == "" {
@@ -801,10 +805,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		s.mu.Unlock()
 		return nil, fmt.Errorf("build transport: %w", err)
 	}
-	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
-		client.CheckRedirect = s.redirectChecker
-	}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectChecker}
 	entry := &upstreamClientEntry{
 		client:       client,
 		proxyKey:     proxyKey,
@@ -1405,7 +1406,7 @@ func newUpstreamDialer() *net.Dialer {
 //   - ResponseHeaderTimeout: 等待响应头超时（不影响流式传输）
 func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMode string) (*http.Transport, error) {
 	transport := &http.Transport{
-		DialContext:           newUpstreamDialer().DialContext,
+		DialContext:           outbound.DialContext(newUpstreamDialer()),
 		TLSHandshakeTimeout:   defaultUpstreamTLSHandshakeTimeout,
 		MaxIdleConns:          settings.maxIdleConns,
 		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,
@@ -1473,6 +1474,7 @@ func enableHTTP2KeepAlive(transport *http.Transport, protocolMode string) (*http
 //   - socks5: SOCKS5 代理，使用 SOCKS5ProxyDialer（SOCKS5 隧道 + utls 握手）
 func buildUpstreamTransportWithTLSFingerprint(settings poolSettings, proxyURL *url.URL, profile *tlsfingerprint.Profile) (*http.Transport, error) {
 	transport := &http.Transport{
+		DialContext:           outbound.DialContext(newUpstreamDialer()),
 		MaxIdleConns:          settings.maxIdleConns,
 		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,
 		MaxConnsPerHost:       settings.maxConnsPerHost,
@@ -1486,7 +1488,7 @@ func buildUpstreamTransportWithTLSFingerprint(settings poolSettings, proxyURL *u
 	if proxyURL == nil {
 		// 直连：使用 TLSFingerprintDialer
 		slog.Debug("tls_fingerprint_transport_direct")
-		dialer := tlsfingerprint.NewDialer(profile, nil)
+		dialer := tlsfingerprint.NewDialer(profile, outbound.DialContext(newUpstreamDialer()))
 		transport.DialTLSContext = dialer.DialTLSContext
 	} else {
 		scheme := strings.ToLower(proxyURL.Scheme)

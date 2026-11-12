@@ -74,7 +74,7 @@ func TestVideoSubmissionTransportUnknownRoundTripperIsUncertain(t *testing.T) {
 		return nil, errors.New("custom transport failed")
 	})
 	ctx, writes := service.WithVideoSubmissionWrites(context.Background())
-	err = forwardTransportSeedance(t, cfg, upstream, ctx, "https://video.example.test")
+	err = forwardTransportSeedance(t, cfg, upstream, ctx, "https://8.8.8.8")
 	require.ErrorContains(t, err, "custom transport failed")
 	require.False(t, writes.DefinitelyNotSent(), "absence of hooks from an unknown transport is not proof")
 	require.False(t, writes.ReceivedResponse())

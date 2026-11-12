@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -26,7 +28,7 @@ func NewTurnstileVerifier() service.TurnstileVerifier {
 		ValidateResolvedIP: true,
 	})
 	if err != nil {
-		sharedClient = &http.Client{Timeout: 10 * time.Second}
+		sharedClient = outbound.NewClient(10 * time.Second)
 	}
 	return &turnstileVerifier{
 		httpClient: sharedClient,

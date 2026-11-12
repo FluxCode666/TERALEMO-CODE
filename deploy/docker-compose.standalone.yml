@@ -81,6 +81,7 @@ services:
       # JWT Configuration
       # =======================================================================
       - JWT_SECRET=${JWT_SECRET:-}
+      - SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS=${SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS:-}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
 
       # =======================================================================

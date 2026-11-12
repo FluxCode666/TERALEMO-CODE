@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/spf13/viper"
 	"golang.org/x/net/http/httpguts"
 )
@@ -733,6 +735,7 @@ type ForwardedClientIPSettings struct {
 }
 
 type SecurityConfig struct {
+	Outbound        OutboundConfig       `mapstructure:"outbound"`
 	URLAllowlist    URLAllowlistConfig   `mapstructure:"url_allowlist"`
 	ResponseHeaders ResponseHeaderConfig `mapstructure:"response_headers"`
 	CSP             CSPConfig            `mapstructure:"csp"`
@@ -743,6 +746,10 @@ type SecurityConfig struct {
 	TrustForwardedIPForAPIKeyACL  bool                                       `mapstructure:"trust_forwarded_ip_for_api_key_acl"`
 	ForwardedClientIPHeaders      []string                                   `mapstructure:"forwarded_client_ip_headers" json:"forwarded_client_ip_headers" yaml:"forwarded_client_ip_headers"`
 	forwardedClientIPSettingsLive *atomic.Pointer[ForwardedClientIPSettings] `mapstructure:"-" json:"-" yaml:"-"`
+}
+
+type OutboundConfig struct {
+	AllowPrivateTargets []string `mapstructure:"allow_private_targets"`
 }
 
 func NormalizeForwardedClientIPHeaders(headers []string) ([]string, error) {
@@ -1871,6 +1878,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	if forwardedClientIPHeadersEnvConfigured {
 		cfg.Security.ForwardedClientIPHeaders = normalizeStringSlice(strings.Split(forwardedClientIPHeadersEnv, ","))
 	}
+	if targets, configured := os.LookupEnv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS"); configured {
+		cfg.Security.Outbound.AllowPrivateTargets = normalizeStringSlice(strings.Split(targets, ","))
+	}
 	cfg.Server.TrustedProxiesConfigured = trustedProxiesConfigured
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs == 0 {
 		cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs = 15000
@@ -2001,7 +2011,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 
 	if !cfg.Security.URLAllowlist.Enabled {
-		slog.Warn("security.url_allowlist.enabled=false; allowlist/SSRF checks disabled (minimal format validation only).")
+		slog.Warn("security.url_allowlist.enabled=false; host allowlist disabled; outbound destination protection remains enabled.")
 	}
 	if !cfg.Security.ResponseHeaders.Enabled {
 		slog.Warn("security.response_headers.enabled=false; configurable header filtering disabled (default allowlist only).")
@@ -2092,6 +2102,7 @@ func setDefaults() {
 
 	// Security
 	viper.SetDefault("security.url_allowlist.enabled", false)
+	viper.SetDefault("security.outbound.allow_private_targets", []string{})
 	viper.SetDefault("security.url_allowlist.upstream_hosts", []string{
 		"api.openai.com",
 		"api.anthropic.com",
@@ -2711,6 +2722,9 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if _, err := outbound.NewPolicy(c.Security.Outbound.AllowPrivateTargets); err != nil {
+		return fmt.Errorf("security.outbound.allow_private_targets: %w", err)
+	}
 	if c.Gateway.MinOutputTokens < 16 {
 		return fmt.Errorf("gateway.min_output_tokens must be at least 16")
 	}

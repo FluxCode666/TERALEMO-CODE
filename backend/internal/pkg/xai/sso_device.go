@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"golang.org/x/net/html"
 )
 
@@ -71,7 +73,8 @@ func ConvertSSOToBuild(ctx context.Context, ssoToken string, opts *SSODeviceOpti
 	client := opts.HTTPClient
 	if client == nil {
 		client = &http.Client{
-			Timeout: SSOConversionTimeout,
+			Transport: outbound.WrapTransport(outbound.NewTransport()),
+			Timeout:   SSOConversionTimeout,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
 				return http.ErrUseLastResponse
 			},

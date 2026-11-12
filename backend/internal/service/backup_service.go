@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 )
 
 const settingKeyBackupS3Config = "backup_s3_config"
@@ -83,6 +84,11 @@ func (s *BackupService) GetS3Config(ctx context.Context) (*BackupS3Config, error
 }
 
 func (s *BackupService) UpdateS3Config(ctx context.Context, cfg BackupS3Config) (*BackupS3Config, error) {
+	if cfg.Endpoint != "" {
+		if err := outbound.ValidateLiteralURL(cfg.Endpoint); err != nil {
+			return nil, infraerrors.BadRequest("INVALID_S3_ENDPOINT", err.Error())
+		}
+	}
 	// 如果没提供 secret，保留原有值。loadS3Config 会解密，所以这里拿到的是明文，
 	// 和调用方新填的 secret 一样，都必须走下面的加密再落库。
 	if cfg.SecretAccessKey == "" {

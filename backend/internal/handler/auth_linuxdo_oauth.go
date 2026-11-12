@@ -15,6 +15,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -25,7 +27,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/imroc/req/v3"
 	"github.com/tidwall/gjson"
 )
 
@@ -631,7 +632,7 @@ func linuxDoExchangeCode(
 	redirectURI string,
 	codeVerifier string,
 ) (*linuxDoTokenResponse, error) {
-	client := req.C().SetTimeout(30 * time.Second)
+	client := outboundreq.New().SetTimeout(30 * time.Second)
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -689,7 +690,7 @@ func linuxDoFetchUserInfo(
 	cfg config.LinuxDoConnectConfig,
 	token *linuxDoTokenResponse,
 ) (email string, username string, subject string, displayName string, avatarURL string, err error) {
-	client := req.C().SetTimeout(30 * time.Second)
+	client := outboundreq.New().SetTimeout(30 * time.Second)
 	authorization, err := buildBearerAuthorization(token.TokenType, token.AccessToken)
 	if err != nil {
 		return "", "", "", "", "", fmt.Errorf("invalid token for userinfo request: %w", err)

@@ -754,6 +754,25 @@ func TestLoadIdempotencyConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadOutboundPrivateTargetsFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", "172.18.0.1:8787, 10.20.0.0/16,[::1]:8443")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, []string{"172.18.0.1:8787", "10.20.0.0/16", "[::1]:8443"}, cfg.Security.Outbound.AllowPrivateTargets)
+}
+
+func TestLoadOutboundPrivateTargetsDefaultAndValidation(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", "")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Empty(t, cfg.Security.Outbound.AllowPrivateTargets)
+	t.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", "localhost")
+	_, err = Load()
+	require.ErrorContains(t, err, "security.outbound.allow_private_targets")
+}
+
 func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING", "5")
