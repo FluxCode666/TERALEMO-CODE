@@ -386,15 +386,11 @@ func (h *CreationStudioHandler) resolveKey(ctx context.Context, userID, keyID in
 	if h == nil || h.apiKeys == nil || keyID <= 0 {
 		return nil, service.ErrCreationKeyNotFound
 	}
-	key, err := h.apiKeys.GetByID(ctx, keyID)
-	if err != nil || key == nil || key.UserID != userID {
+	key, err := h.apiKeys.GetByIDForAuth(ctx, keyID)
+	if err != nil || key == nil || key.ID != keyID || key.UserID != userID {
 		return nil, service.ErrCreationKeyNotFound
 	}
-	hydrated, err := h.apiKeys.GetByKey(ctx, key.Key)
-	if err != nil || hydrated == nil || hydrated.ID != key.ID || hydrated.UserID != userID {
-		return nil, service.ErrCreationKeyNotFound
-	}
-	return hydrated, nil
+	return key, nil
 }
 
 // resolveCreationImages loads every referenced upload and, for the protocols that
@@ -446,14 +442,13 @@ type creationStudioDispatchResult struct {
 // dispatch replays the native request in-process as the selected key.
 func (h *CreationStudioHandler) dispatch(c *gin.Context, key *service.APIKey, native *service.NativeCreationRequest) creationStudioDispatchResult {
 	outer := c.Request
-	base := service.WithCreationStudioReplay(context.WithoutCancel(outer.Context()))
+	base := service.WithCreationStudioAPIKey(context.WithoutCancel(outer.Context()), key.UserID, key.ID)
 	ctx, cancel := context.WithTimeout(base, creationDispatchTimeout)
 	defer cancel()
 
 	inner := httptest.NewRequest(http.MethodPost, native.Path, bytes.NewReader(native.Body))
 	inner = inner.WithContext(ctx)
 	inner.RemoteAddr = outer.RemoteAddr
-	inner.Header.Set("Authorization", "Bearer "+key.Key)
 	inner.Header.Set("Content-Type", "application/json")
 	for _, header := range []string{"User-Agent", "X-Forwarded-For", "X-Real-IP", "X-Request-ID"} {
 		if value := strings.TrimSpace(outer.Header.Get(header)); value != "" {

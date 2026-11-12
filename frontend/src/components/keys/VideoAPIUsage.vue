@@ -18,40 +18,40 @@ const examples = computed(() => {
   const base = (props.baseUrl || window.location.origin).replace(/\/$/, '').replace(/\/v1$/, '')
   return [
     { protocol: 'Seedance (Ark)', code: `POST ${base}/api/v3/contents/generations/tasks
-Authorization: Bearer ${props.apiKey}
+Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {"model":"YOUR_VIDEO_MODEL","content":[{"type":"text","text":"Ocean waves at sunset"}]}
 
 GET ${base}/api/v3/contents/generations/tasks/{task_id}
-Authorization: Bearer ${props.apiKey}` },
+Authorization: Bearer YOUR_API_KEY` },
     { protocol: 'Google Gemini (Veo)', code: `POST ${base}/v1beta/models/YOUR_VIDEO_MODEL:predictLongRunning
-Authorization: Bearer ${props.apiKey}
+Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {"instances":[{"prompt":"Ocean waves at sunset"}],"parameters":{"durationSeconds":8,"resolution":"720p"}}
 
 GET ${base}/v1beta/{operation_name}
-Authorization: Bearer ${props.apiKey}` },
+Authorization: Bearer YOUR_API_KEY` },
     { protocol: 'MiniMax v2 (H3)', code: `POST ${base}/v2/video_generation
-Authorization: Bearer ${props.apiKey}
+Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {"model":"MiniMax-H3","content":[{"type":"text","text":"Ocean waves at sunset"}],"duration":6,"resolution":"768P","ratio":"16:9"}
 
 GET ${base}/v2/query/video_generation/{task_id}
-Authorization: Bearer ${props.apiKey}` },
+Authorization: Bearer YOUR_API_KEY` },
     { protocol: 'MiniMax v1 (Hailuo)', code: `POST ${base}/v1/video_generation
-Authorization: Bearer ${props.apiKey}
+Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 
 {"model":"YOUR_VIDEO_MODEL","prompt":"Ocean waves at sunset","duration":6,"resolution":"1080P"}
 
 GET ${base}/v1/query/video_generation?task_id={task_id}
-Authorization: Bearer ${props.apiKey}
+Authorization: Bearer YOUR_API_KEY
 
 GET ${base}/v1/files/retrieve?file_id={file_id}
-Authorization: Bearer ${props.apiKey}` }
+Authorization: Bearer YOUR_API_KEY` }
   ]
 })
 </script>

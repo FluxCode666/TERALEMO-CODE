@@ -197,7 +197,7 @@ func (m *mockChannelCachePubSub) SubscribeUpdates(_ context.Context, handler fun
 	m.mu.Unlock()
 }
 
-func (m *mockChannelAuthCacheInvalidator) InvalidateAuthCacheByKey(_ context.Context, key string) {
+func (m *mockChannelAuthCacheInvalidator) InvalidateAuthCacheByHash(_ context.Context, key string) {
 	m.invalidatedKeys = append(m.invalidatedKeys, key)
 }
 

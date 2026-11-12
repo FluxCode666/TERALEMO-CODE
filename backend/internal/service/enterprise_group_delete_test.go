@@ -41,7 +41,7 @@ func (s *enterpriseGroupDeleteRepoStub) DeleteCascadeIfEmpty(ctx context.Context
 
 type enterpriseGroupDeleteKeysStub struct{ APIKeyRepository }
 
-func (enterpriseGroupDeleteKeysStub) ListKeysByGroupID(context.Context, int64) ([]string, error) {
+func (enterpriseGroupDeleteKeysStub) ListKeyHashesByGroupID(context.Context, int64) ([]string, error) {
 	return []string{"group-key"}, nil
 }
 
@@ -67,7 +67,7 @@ func (s *enterpriseGroupDeleteInvalidatorStub) InvalidateAuthCacheByGroupID(_ co
 	s.check()
 	s.groupIDs = append(s.groupIDs, id)
 }
-func (s *enterpriseGroupDeleteInvalidatorStub) InvalidateAuthCacheByKey(_ context.Context, key string) {
+func (s *enterpriseGroupDeleteInvalidatorStub) InvalidateAuthCacheByHash(_ context.Context, key string) {
 	s.check()
 	s.keys = append(s.keys, key)
 }

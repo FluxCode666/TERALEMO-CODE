@@ -327,7 +327,7 @@ type deleteGroupAPIKeyRepoStub struct {
 	listGroupIDs []int64
 }
 
-func (s *deleteGroupAPIKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
+func (s *deleteGroupAPIKeyRepoStub) ListKeyHashesByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	s.listGroupIDs = append(s.listGroupIDs, groupID)
 	if s.listErr != nil {
 		return nil, s.listErr
@@ -604,8 +604,8 @@ func TestAdminService_DeleteUser_DeletesOwnedAPIKeys(t *testing.T) {
 	apiKeyRepo := &apiKeyRepoStub{
 		allowListByUserID: true,
 		listByUserIDKeys: []APIKey{
-			{ID: 11, UserID: 7, Key: "sk-user-1"},
-			{ID: 12, UserID: 7, Key: "sk-user-2"},
+			{ID: 11, UserID: 7, KeyHash: HashAPIKey("sk-user-1")},
+			{ID: 12, UserID: 7, KeyHash: HashAPIKey("sk-user-2")},
 		},
 	}
 	invalidator := &authCacheInvalidatorStub{}
@@ -620,7 +620,7 @@ func TestAdminService_DeleteUser_DeletesOwnedAPIKeys(t *testing.T) {
 	require.Equal(t, []int64{7}, repo.deletedIDs)
 	require.Equal(t, []int64{7}, apiKeyRepo.listByUserIDCalls)
 	require.Equal(t, []int64{11, 12}, apiKeyRepo.deletedIDs)
-	require.ElementsMatch(t, []string{"sk-user-1", "sk-user-2"}, invalidator.keys)
+	require.ElementsMatch(t, []string{HashAPIKey("sk-user-1"), HashAPIKey("sk-user-2")}, invalidator.keys)
 	require.Equal(t, []int64{7}, invalidator.userIDs)
 }
 

@@ -1,5 +1,6 @@
 export default {
   batchImage: {
+    savedKeyRequired: 'Paste and use the saved full key for {name} first.',
     columns: {
       taskName: 'Task name',
       model: 'Model',
@@ -36,6 +37,7 @@ export default {
       notDownloaded: 'Not downloaded',
     },
     actions: {
+      useSavedKey: 'Use saved key',
       usageGuide: 'Usage guide',
       createJob: 'Create batch job',
       downloadSelected: 'Download selected',
@@ -137,7 +139,7 @@ export default {
     guide: {
       title: 'Batch Image Generation Guide',
       uiTitle: 'How to use this page',
-      step1: '1. Select a Gemini API key with batch image generation enabled. The model list shows the models available to that key’s group.',
+      step1: '1. Select a Gemini API key at the top of the page, paste the full key saved at creation, and click "Use saved key". Credentials stay only in this page memory; enter them again after leaving. The model list shows models available to the key group.',
       step2: '2. The task name can be left empty; the current time is used automatically on submit. Prompts are added to the list one by one, and each prompt can carry reference images and a repeat count.',
       step3: '3. After submitting, the job is queued first and the item list shows the submitted prompts. Image previews are not loaded by default; click the preview button on an item to load a single image.',
       step4: '4. Once completed you can download the ZIP. If some items failed, the More menu lets you retry only the failed items. Billing is still based on the number of successfully generated images; reference images are not billed separately.',

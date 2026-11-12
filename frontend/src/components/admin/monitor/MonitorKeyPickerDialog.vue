@@ -45,7 +45,7 @@
               @click="$emit('pick', k)"
             >
               <td class="px-3 py-2 font-medium text-gray-900 dark:text-white">{{ k.name }}</td>
-              <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{ maskApiKey(k.key) }}</td>
+              <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{ maskApiKey(k.key_hint || k.key) }}</td>
               <td class="px-3 py-2">
                 <GroupBadge
                   v-if="k.group"
@@ -111,7 +111,7 @@ const filteredKeys = computed<ApiKey[]>(() => {
     if (!q) return true
     return (
       k.name.toLowerCase().includes(q) ||
-      k.key.toLowerCase().includes(q) ||
+      (k.key_hint || k.key).toLowerCase().includes(q) ||
       (k.group?.name || '').toLowerCase().includes(q)
     )
   })

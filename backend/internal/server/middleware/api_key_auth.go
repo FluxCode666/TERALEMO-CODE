@@ -84,7 +84,8 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		}
 
 		// 如果所有header都没有API key
-		if apiKeyString == "" {
+		_, _, creationReplay := service.CreationStudioAPIKey(c.Request.Context())
+		if apiKeyString == "" && !creationReplay {
 			recordInvalidAuthFailure(c, apiKeyService)
 			if hasAPIKeyCredentialInput(c) {
 				MarkIngressRejected(c, IngressRejectInvalidAPIKey)
@@ -97,7 +98,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 2. 验证 Key 存在 ─────────────────────────────────────────
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		apiKey, err := lookupGatewayAPIKey(c.Request.Context(), apiKeyService, apiKeyString)
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				recordInvalidAuthFailure(c, apiKeyService)

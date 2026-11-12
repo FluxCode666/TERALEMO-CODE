@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -30,7 +32,9 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 type APIKey struct {
 	ID          int64
 	UserID      int64
-	Key         string
+	Key         string `json:"-"`
+	KeyHash     string `json:"-"`
+	KeyHint     string
 	Name        string
 	GroupID     *int64
 	Status      string
@@ -62,6 +66,27 @@ type APIKey struct {
 	Window5hStart *time.Time // Start of current 5h window
 	Window1dStart *time.Time // Start of current 1d window
 	Window7dStart *time.Time // Start of current 7d window
+}
+
+// HashAPIKey is shared by storage and auth-cache indexes.
+func HashAPIKey(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:])
+}
+
+func MaskAPIKey(key string) string {
+	chars := []rune(key)
+	if len(chars) >= 12 {
+		return string(chars[:7]) + "..." + string(chars[len(chars)-4:])
+	}
+	return string(chars[:min(3, len(chars)/2)]) + "..."
+}
+
+func (k *APIKey) DisplayHint() string {
+	if k.KeyHint != "" {
+		return k.KeyHint
+	}
+	return MaskAPIKey(k.Key)
 }
 
 func (k *APIKey) IsActive() bool {

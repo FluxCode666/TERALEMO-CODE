@@ -45,7 +45,7 @@ func TestRefreshOpenAIWSTurnEnterpriseContext(t *testing.T) {
 	latest := wsEnterpriseLatest(conn)
 	latest.User.Enterprise.GroupWhitelistConfigured = true
 	latest.User.Enterprise.GroupWhitelistIDs = []int64{77}
-	got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return latest, nil }), conn)
+	got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return latest, nil }), conn)
 	require.NotNil(t, got)
 	require.NotSame(t, conn, got)
 	require.NotSame(t, conn.User, got.User)
@@ -83,7 +83,7 @@ func TestRefreshOpenAIWSTurnEnterpriseFailureAndIdentityChangesClose(t *testing.
 			if tc.mutate != nil {
 				tc.mutate(conn, latest)
 			}
-			lookup := wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return latest, tc.err })
+			lookup := wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return latest, tc.err })
 			got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), lookup, conn)
 			require.Nil(t, got)
 			require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
@@ -98,7 +98,7 @@ func TestRefreshOpenAIWSTurnEnterpriseRefreshesDespiteGroupChange(t *testing.T) 
 	latest.GroupID = &other
 	latest.Group.ID = other
 	latest.User.Enterprise.MemberStatus = service.EnterpriseMemberStatusDisabled
-	got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return latest, nil }), conn)
+	got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return latest, nil }), conn)
 	require.NotNil(t, got)
 	require.Same(t, conn.Group, got.Group, "connection routing group remains fixed")
 	require.Equal(t, service.EnterpriseMemberStatusDisabled, got.User.Enterprise.MemberStatus, "group change must not suppress enterprise status refresh")
@@ -160,7 +160,7 @@ func TestOpenAIWSTurnUngroupedPersonalKeepsSnapshotAndLookupFailureCloses(t *tes
 		conn.Group = nil
 		latest := *conn
 		latest.User = &service.User{ID: conn.User.ID, Status: service.StatusActive, Balance: 100}
-		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, lookupErr }), conn)
+		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return &latest, lookupErr }), conn)
 		if lookupErr != nil {
 			require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
 			require.Nil(t, got)
@@ -314,7 +314,7 @@ func TestOpenAIWSTurnPersonalStatusRefreshIgnoresGroupCompatibility(t *testing.T
 		if noGroup {
 			conn.Group = nil
 		}
-		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, nil }), conn)
+		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return &latest, nil }), conn)
 		require.NoError(t, err)
 		require.Equal(t, service.StatusDisabled, got.User.Status)
 		require.Equal(t, service.StatusActive, conn.User.Status, "admitted first turn retains its active snapshot")
@@ -438,7 +438,7 @@ func TestOpenAIWSTurnPersonalMissingCurrentUserCloses(t *testing.T) {
 		}
 		latest := *conn
 		latest.User = nil
-		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, string) (*service.APIKey, error) { return &latest, nil }), conn)
+		got, err := refreshOpenAIWSTurnBillingAPIKeyChecked(context.Background(), wsTurnAPIKeyLookupFunc(func(context.Context, int64) (*service.APIKey, error) { return &latest, nil }), conn)
 		require.Nil(t, got)
 		require.ErrorIs(t, err, errOpenAIWSEnterpriseBillingReconnect)
 	}

@@ -313,7 +313,7 @@ type contentModerationTestAuthCacheInvalidator struct {
 	userIDs []int64
 }
 
-func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByKey(ctx context.Context, key string) {
+func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByHash(ctx context.Context, key string) {
 }
 
 func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByUserID(ctx context.Context, userID int64) {

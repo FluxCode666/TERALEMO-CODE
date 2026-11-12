@@ -6,6 +6,7 @@
     @close="emit('close')"
   >
     <div class="space-y-4">
+      <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('keys.showOnce.exampleHint') }}</p>
       <!-- No Group Assigned Warning -->
       <div v-if="!platform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
         <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -22,8 +23,8 @@
       </div>
 
       <!-- Platform-specific content -->
-      <ImageAPIUsage v-else-if="platform === 'image'" :base-url="baseUrl" :api-key="apiKey" />
-      <VideoAPIUsage v-else-if="platform === 'video'" :base-url="baseUrl" :api-key="apiKey" />
+      <ImageAPIUsage v-else-if="platform === 'image'" :base-url="baseUrl" api-key="YOUR_API_KEY" />
+      <VideoAPIUsage v-else-if="platform === 'video'" :base-url="baseUrl" api-key="YOUR_API_KEY" />
       <template v-else>
         <!-- Description -->
         <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -52,6 +53,12 @@
             </button>
           </nav>
         </div>
+
+        <label v-if="showCodexModelCatalog" class="block space-y-2 text-sm">
+          <span>{{ t('keys.showOnce.catalogCredential') }}</span>
+          <input v-model="catalogCredential" data-testid="catalog-credential" type="password" autocomplete="off" class="input" :placeholder="t('keys.showOnce.savedKeyPlaceholder')" />
+          <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('keys.showOnce.memoryOnly') }}</span>
+        </label>
 
         <!-- Codex Authentication Mode -->
         <div
@@ -217,7 +224,7 @@
               type="button"
               data-testid="codex-model-catalog-fetch"
               class="btn btn-primary min-h-9 flex-shrink-0 px-3 text-xs"
-              :disabled="codexModelManifestState === 'loading' || !apiKey"
+              :disabled="codexModelManifestState === 'loading' || !catalogCredential"
               @click="loadCodexModelManifest"
             >
               <Icon
@@ -319,6 +326,8 @@ const { t } = useI18n()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const copiedIndex = ref<number | null>(null)
+const catalogCredential = ref('')
+watch(() => [props.show, props.apiKey, props.platform], () => { catalogCredential.value = '' })
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
 type CodexAuthMode = 'legacy' | 'api-key'
@@ -669,7 +678,7 @@ function resetCodexModelManifest() {
 }
 
 async function loadCodexModelManifest() {
-  if (!showCodexModelCatalog.value || !props.apiKey) return
+  if (!showCodexModelCatalog.value || !catalogCredential.value) return
 
   codexModelManifestController?.abort()
   const controller = new AbortController()
@@ -678,7 +687,7 @@ async function loadCodexModelManifest() {
   codexModelManifestState.value = 'loading'
 
   try {
-    const result = await fetchCodexModelsManifest(props.baseUrl, props.apiKey, controller.signal)
+    const result = await fetchCodexModelsManifest(props.baseUrl, catalogCredential.value, controller.signal)
     if (requestID !== codexModelManifestRequestID) return
     codexModelManifestContent.value = result.content
     codexModelManifestModelCount.value = result.modelCount
@@ -741,7 +750,7 @@ const comment = (value: string) => wrapToken('text-slate-500', value)
 // Generate file configs based on platform and active tab
 const currentFiles = computed((): FileConfig[] => {
   const baseUrl = props.baseUrl || window.location.origin
-  const apiKey = props.apiKey
+  const apiKey = 'YOUR_API_KEY'
   const baseRoot = baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
   const ensureV1 = (value: string) => {
     const trimmed = value.replace(/\/+$/, '')

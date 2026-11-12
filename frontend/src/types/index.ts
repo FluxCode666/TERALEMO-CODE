@@ -757,7 +757,9 @@ export interface CompositeRouteDecision {
 export interface ApiKey {
   id: number
   user_id: number
+  /** Masked identifier, except in the one-time create response. */
   key: string
+  key_hint?: string
   name: string
   group_id: number | null
   status: 'active' | 'inactive' | 'quota_exhausted' | 'expired'

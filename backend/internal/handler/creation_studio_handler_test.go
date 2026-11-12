@@ -22,6 +22,8 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+const creationTestCredential = "sk-canary-creation"
+
 type creationHandlerAccountRepo struct {
 	service.AccountRepository
 	accounts []service.Account
@@ -49,12 +51,11 @@ func (r *creationHandlerKeyRepo) GetByKeyForAuth(ctx context.Context, value stri
 }
 
 func (r *creationHandlerKeyRepo) GetByKey(ctx context.Context, value string) (*service.APIKey, error) {
-	for _, key := range r.keys {
-		if key.Key == value {
-			return key, nil
-		}
-	}
 	return nil, service.ErrAPIKeyNotFound
+}
+
+func (r *creationHandlerKeyRepo) UpdateLastUsed(context.Context, int64, time.Time) error {
+	return nil
 }
 
 // creationFakeDispatcher records the replayed request and returns a canned reply.
@@ -97,9 +98,9 @@ func newCreationHandlerFixture(t *testing.T, groupPlatform string, accounts ...s
 	group := &service.Group{ID: groupID, Name: "group", Platform: groupPlatform, AllowImageGeneration: true,
 		RateMultiplier: 1, Status: service.StatusActive}
 	user := &service.User{ID: 7, Balance: 100}
-	key := &service.APIKey{ID: 9, UserID: 7, Key: "sk-canary-creation", Name: "canary", Status: service.StatusActive,
+	key := &service.APIKey{ID: 9, UserID: 7, Name: "canary", Status: service.StatusActive,
 		GroupID: &groupID, Group: group, User: user}
-	other := &service.APIKey{ID: 10, UserID: 8, Key: "sk-other-user", Name: "other", Status: service.StatusActive,
+	other := &service.APIKey{ID: 10, UserID: 8, Name: "other", Status: service.StatusActive,
 		GroupID: &groupID, Group: group, User: &service.User{ID: 8}}
 	apiKeys := service.NewAPIKeyService(&creationHandlerKeyRepo{keys: map[int64]*service.APIKey{9: key, 10: other}}, nil, nil, nil, nil, nil, cfg)
 
@@ -165,7 +166,11 @@ func TestCreationStudioSubmitReplaysAsTheSelectedKey(t *testing.T) {
 	require.Len(t, fixture.dispatcher.requests, 1)
 	inner := fixture.dispatcher.requests[0]
 	require.Equal(t, service.CreationPathImageGenerations, inner.URL.Path)
-	require.Equal(t, "Bearer "+fixture.key.Key, inner.Header.Get("Authorization"))
+	require.Empty(t, inner.Header.Get("Authorization"), "internal replay must not need a credential")
+	userID, keyID, authorized := service.CreationStudioAPIKey(inner.Context())
+	require.True(t, authorized)
+	require.Equal(t, int64(7), userID)
+	require.Equal(t, fixture.key.ID, keyID)
 	require.Empty(t, inner.Header.Get("Cookie"), "outer cookies must not be replayed")
 	require.Equal(t, "creation-test", inner.Header.Get("User-Agent"))
 	require.Equal(t, "203.0.113.9", inner.Header.Get("X-Forwarded-For"))
@@ -179,7 +184,31 @@ func TestCreationStudioSubmitReplaysAsTheSelectedKey(t *testing.T) {
 	require.Equal(t, "image", gjson.GetBytes(payload, "data.mode").String())
 	require.Equal(t, "openai", gjson.GetBytes(payload, "data.protocol").String())
 	require.Positive(t, gjson.GetBytes(payload, "data.estimated_cost").Float())
-	require.NotContains(t, recorder.Body.String(), fixture.key.Key, "the key plaintext must never leave the backend")
+	require.NotContains(t, recorder.Body.String(), creationTestCredential, "the key plaintext must never leave the backend")
+}
+
+func TestCreationStudioSubmitReplaysThroughGatewayWithoutCredential(t *testing.T) {
+	fixture := newCreationHandlerFixture(t, service.PlatformOpenAI, creationImageAccountFixture())
+	fixture.key.User.Status = service.StatusActive
+	fixture.key.Group.Hydrated = true
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	router := gin.New()
+	router.Use(gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(fixture.handler.apiKeys, nil, cfg)))
+	router.POST(service.CreationPathImageGenerations, func(c *gin.Context) {
+		key, ok := middleware.GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		require.Equal(t, fixture.key.ID, key.ID)
+		require.Empty(t, key.Key)
+		require.Empty(t, c.GetHeader("Authorization"))
+		c.JSON(http.StatusAccepted, gin.H{"id": "imgtask_without_credential", "status": "processing"})
+	})
+	fixture.handler.SetDispatcher(NewStudioDispatcher(router))
+	body := `{"api_key_id":9,"mode":"image","model":"gpt-image-2","protocol":"openai","prompt":"a cat",` +
+		`"params":{"size":"1024x1024","quality":"auto","n":1}}`
+	c, recorder := creationSubmitContext(t, body, false)
+	fixture.handler.Submit(c)
+	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+	require.Equal(t, "imgtask_without_credential", gjson.GetBytes(recorder.Body.Bytes(), "data.task_id").String())
 }
 
 func TestCreationStudioSubmitVideoCatalogID(t *testing.T) {
@@ -306,7 +335,7 @@ func TestCreationStudioOptionsReturnsCatalog(t *testing.T) {
 	body := recorder.Body.Bytes()
 	require.True(t, gjson.GetBytes(body, "data.image.available").Bool())
 	require.Equal(t, "image:openai:gpt-image-2", gjson.GetBytes(body, "data.models.0.id").String())
-	require.NotContains(t, recorder.Body.String(), fixture.key.Key)
+	require.NotContains(t, recorder.Body.String(), creationTestCredential)
 }
 
 // TestCreationStudioQuotaExhaustedOutranksModelAvailability: the model is fine,

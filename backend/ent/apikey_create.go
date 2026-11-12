@@ -79,6 +79,26 @@ func (_c *APIKeyCreate) SetKey(v string) *APIKeyCreate {
 	return _c
 }
 
+// SetNillableKey sets the "key" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKey(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKey(*v)
+	}
+	return _c
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (_c *APIKeyCreate) SetKeyHash(v string) *APIKeyCreate {
+	_c.mutation.SetKeyHash(v)
+	return _c
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (_c *APIKeyCreate) SetKeyHint(v string) *APIKeyCreate {
+	_c.mutation.SetKeyHint(v)
+	return _c
+}
+
 // SetName sets the "name" field.
 func (_c *APIKeyCreate) SetName(v string) *APIKeyCreate {
 	_c.mutation.SetName(v)
@@ -433,12 +453,25 @@ func (_c *APIKeyCreate) check() error {
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "APIKey.user_id"`)}
 	}
-	if _, ok := _c.mutation.Key(); !ok {
-		return &ValidationError{Name: "key", err: errors.New(`ent: missing required field "APIKey.key"`)}
-	}
 	if v, ok := _c.mutation.Key(); ok {
 		if err := apikey.KeyValidator(v); err != nil {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyHash(); !ok {
+		return &ValidationError{Name: "key_hash", err: errors.New(`ent: missing required field "APIKey.key_hash"`)}
+	}
+	if v, ok := _c.mutation.KeyHash(); ok {
+		if err := apikey.KeyHashValidator(v); err != nil {
+			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyHint(); !ok {
+		return &ValidationError{Name: "key_hint", err: errors.New(`ent: missing required field "APIKey.key_hint"`)}
+	}
+	if v, ok := _c.mutation.KeyHint(); ok {
+		if err := apikey.KeyHintValidator(v); err != nil {
+			return &ValidationError{Name: "key_hint", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hint": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
@@ -526,6 +559,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
 		_node.Key = value
+	}
+	if value, ok := _c.mutation.KeyHash(); ok {
+		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
+		_node.KeyHash = value
+	}
+	if value, ok := _c.mutation.KeyHint(); ok {
+		_spec.SetField(apikey.FieldKeyHint, field.TypeString, value)
+		_node.KeyHint = value
 	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
@@ -748,6 +789,36 @@ func (u *APIKeyUpsert) SetKey(v string) *APIKeyUpsert {
 // UpdateKey sets the "key" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateKey() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldKey)
+	return u
+}
+
+// ClearKey clears the value of the "key" field.
+func (u *APIKeyUpsert) ClearKey() *APIKeyUpsert {
+	u.SetNull(apikey.FieldKey)
+	return u
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsert) SetKeyHash(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyHash, v)
+	return u
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyHash() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyHash)
+	return u
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsert) SetKeyHint(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyHint, v)
+	return u
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyHint() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyHint)
 	return u
 }
 
@@ -1168,6 +1239,41 @@ func (u *APIKeyUpsertOne) SetKey(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateKey() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateKey()
+	})
+}
+
+// ClearKey clears the value of the "key" field.
+func (u *APIKeyUpsertOne) ClearKey() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearKey()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertOne) SetKeyHash(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyHash() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsertOne) SetKeyHint(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHint(v)
+	})
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyHint() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHint()
 	})
 }
 
@@ -1806,6 +1912,41 @@ func (u *APIKeyUpsertBulk) SetKey(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateKey() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateKey()
+	})
+}
+
+// ClearKey clears the value of the "key" field.
+func (u *APIKeyUpsertBulk) ClearKey() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearKey()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertBulk) SetKeyHash(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyHash() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyHint sets the "key_hint" field.
+func (u *APIKeyUpsertBulk) SetKeyHint(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHint(v)
+	})
+}
+
+// UpdateKeyHint sets the "key_hint" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyHint() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHint()
 	})
 }
 

@@ -41,7 +41,8 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 		apiKeyString := extractAPIKeyForGoogle(c)
-		if apiKeyString == "" {
+		_, _, creationReplay := service.CreationStudioAPIKey(c.Request.Context())
+		if apiKeyString == "" && !creationReplay {
 			recordInvalidAuthFailure(c, apiKeyService)
 			if hasAPIKeyCredentialInput(c) {
 				MarkIngressRejected(c, IngressRejectInvalidAPIKey)
@@ -58,7 +59,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		apiKey, err := lookupGatewayAPIKey(c.Request.Context(), apiKeyService, apiKeyString)
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				recordInvalidAuthFailure(c, apiKeyService)

@@ -1266,7 +1266,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		if apiKey != nil {
 			entry.APIKeyID = &apiKey.ID
 			// 有效 key 报错时快照前缀，key 之后被删也保留。
-			entry.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
+			entry.APIKeyPrefix = keyPrefix(apiKey.DisplayHint(), 7)
 			if apiKey.User != nil {
 				entry.UserID = &apiKey.User.ID
 			}
@@ -1386,7 +1386,7 @@ func logOpsRecoveredUpstream(c *gin.Context, ops *service.OpsService, finalStatu
 	entry.UpstreamEndpoint = GetUpstreamEndpoint(c, entry.Platform)
 	if apiKey != nil {
 		entry.APIKeyID = &apiKey.ID
-		entry.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
+		entry.APIKeyPrefix = keyPrefix(apiKey.DisplayHint(), 7)
 		if apiKey.User != nil {
 			entry.UserID = &apiKey.User.ID
 		}
@@ -1574,7 +1574,7 @@ func logOpsStreamErrorValue(c *gin.Context, ops *service.OpsService, wireStatus 
 
 	if apiKey != nil {
 		entry.APIKeyID = &apiKey.ID
-		entry.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
+		entry.APIKeyPrefix = keyPrefix(apiKey.DisplayHint(), 7)
 		if apiKey.User != nil {
 			entry.UserID = &apiKey.User.ID
 		}

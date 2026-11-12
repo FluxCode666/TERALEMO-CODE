@@ -231,6 +231,7 @@ func TestAPIContracts(t *testing.T) {
 					"id": 100,
 					"user_id": 1,
 					"key": "sk_custom_1234567890",
+					"key_hint": "sk_cust...7890",
 					"name": "Key One",
 					"group_id": null,
 					"status": "active",
@@ -281,7 +282,8 @@ func TestAPIContracts(t *testing.T) {
 						{
 							"id": 100,
 							"user_id": 1,
-							"key": "sk_custom_1234567890",
+							"key": "sk_cust...7890",
+							"key_hint": "sk_cust...7890",
 							"name": "Key One",
 							"group_id": null,
 							"status": "active",
@@ -2381,7 +2383,7 @@ func (r *stubApiKeyRepo) GetByID(ctx context.Context, id int64) (*service.APIKey
 	return &clone, nil
 }
 
-func (r *stubApiKeyRepo) GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
+func (r *stubApiKeyRepo) GetKeyHashAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
 	key, ok := r.byID[id]
 	if !ok {
 		return "", 0, service.ErrAPIKeyNotFound
@@ -2536,11 +2538,11 @@ func (r *stubApiKeyRepo) CountByGroupID(ctx context.Context, groupID int64) (int
 	return 0, errors.New("not implemented")
 }
 
-func (r *stubApiKeyRepo) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
+func (r *stubApiKeyRepo) ListKeyHashesByUserID(ctx context.Context, userID int64) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (r *stubApiKeyRepo) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
+func (r *stubApiKeyRepo) ListKeyHashesByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 

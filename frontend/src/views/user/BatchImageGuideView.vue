@@ -35,6 +35,18 @@
             </div>
           </div>
 
+          <div class="grid gap-3 rounded-lg border border-gray-200 p-3 dark:border-dark-700 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
+            <select v-model="credentialKeyId" class="input" :aria-label="t('batchImage.columns.apiKey')">
+              <option :value="0">{{ t('batchImage.create.selectKeyPlaceholder') }}</option>
+              <option v-for="key in geminiApiKeys" :key="key.id" :value="key.id">{{ key.name }}</option>
+            </select>
+            <div class="space-y-1">
+              <input v-model="credentialDraft" data-testid="batch-saved-key" type="password" autocomplete="off" class="input" :aria-label="t('keys.showOnce.savedKeyPlaceholder')" :placeholder="t('keys.showOnce.savedKeyPlaceholder')" />
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.showOnce.memoryOnly') }}</p>
+            </div>
+            <button type="button" class="btn btn-secondary self-start" :disabled="!credentialKeyId || !credentialDraft.trim()" @click="useSavedCredential">{{ t('batchImage.actions.useSavedKey') }}</button>
+          </div>
+
           <div
             v-if="selectedJobIds.size"
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-dark-700 dark:bg-dark-800"
@@ -937,6 +949,24 @@ let promptPopoverCloseTimer: ReturnType<typeof setTimeout> | null = null
 let promptPopoverOpenTimer: ReturnType<typeof setTimeout> | null = null
 let activePromptPopoverTarget: HTMLElement | null = null
 
+const savedCredentials = reactive<Record<number, string>>({})
+const credentialKeyId = ref(0)
+const credentialDraft = ref('')
+
+async function useSavedCredential() {
+  if (!credentialKeyId.value || !credentialDraft.value.trim()) return
+  savedCredentials[credentialKeyId.value] = credentialDraft.value.trim()
+  form.apiKeyId = credentialKeyId.value
+  credentialDraft.value = ''
+  await Promise.all([loadAvailableModels(), loadBatchJobs()])
+}
+
+function credentialForKey(key: ApiKey): string {
+  const credential = savedCredentials[key.id]
+  if (!credential) throw new Error(t('batchImage.savedKeyRequired', { name: key.name }))
+  return credential
+}
+
 const geminiApiKeys = computed(() =>
   apiKeys.value.filter((key) =>
     key.status === 'active' &&
@@ -951,8 +981,8 @@ const selectedApiKey = computed(() =>
 
 const filteredApiKeys = computed(() => {
   const selectedFilterID = Number(filters.apiKeyId || 0)
-  if (!selectedFilterID) return geminiApiKeys.value
-  return geminiApiKeys.value.filter(key => key.id === selectedFilterID)
+  if (!selectedFilterID) return geminiApiKeys.value.filter(key => savedCredentials[key.id])
+  return geminiApiKeys.value.filter(key => key.id === selectedFilterID && savedCredentials[key.id])
 })
 
 const apiKeyFilterOptions = computed<SelectOption[]>(() => [
@@ -1082,7 +1112,7 @@ ${endpointBase.value}
 4. 提交前必须先计算 expected_output_count = 所有 item 的 output_count 之和。单个批量任务硬性最多 200 张输出图；超过 200 张必须拆成多组任务，不能提交一个超大任务，也不能把参考图附件上限当成生成张数上限。
 5. 如果用户提供参考图，把参考图按用途绑定到具体 item。参考图只是输入附件，不是输出图数量。模型单条限制必须按模型执行：Gemini 2.5 Flash Image 每条最多 3 张参考图；Gemini 3 Pro Image 每条最多 14 张参考图。不要把后端附件风控理解成 Pro 单条能力：按 output_count 展开后，所有 item 的参考图附件总数还有内部保护阈值 1000 个，inline base64 参考图解码后总量最多 128MB。这个 1000 只是服务器拒绝异常请求的保护阈值，不是推荐规模；参考图很多或总请求体较大时应主动拆分任务。
 6. 参考图会按 output_count 重复消耗输入 token；大量任务、重复复用同一张参考图或参考图总体积较大时，优先使用 gs:// file_uri 或拆分成多组任务。
-7. 选择 API Key 和模型：先获取当前可用的批量生图 Key/模型；如果用户指定模型且该 Key 支持，则使用用户指定模型；否则使用该 Key 可用模型中的默认/第一个。不要展示或询问内部 provider 名称。
+7. 选择 API Key 和模型：使用用户在创建时保存的完整 Key（列表只返回脱敏标识，无法取回凭据），再获取该 Key 可用模型；如果用户指定模型且该 Key 支持，则使用用户指定模型；否则使用该 Key 可用模型中的默认/第一个。不要展示或询问内部 provider 名称。
 8. 调用批量生图 API 提交、轮询、下载，不要求用户去页面里手填。
 
 API 调用规范：
@@ -1246,6 +1276,7 @@ async function loadApiKeys() {
     if (!selectedApiKey.value && geminiApiKeys.value.length > 0) {
       form.apiKeyId = geminiApiKeys.value[0].id
     }
+    if (!credentialKeyId.value && geminiApiKeys.value.length > 0) credentialKeyId.value = geminiApiKeys.value[0].id
     if (filters.apiKeyId && !geminiApiKeys.value.some(key => String(key.id) === filters.apiKeyId)) {
       filters.apiKeyId = ''
     }
@@ -1266,11 +1297,11 @@ async function loadAvailableModels() {
   modelLoadError.value = ''
   availableBatchImageModels.value = []
   form.model = ''
-  if (!key) return
+  if (!key || !savedCredentials[key.id]) return
 
   loadingModels.value = true
   try {
-    const result = await listBatchImageModels(key.key)
+    const result = await listBatchImageModels(credentialForKey(key))
     if (requestID !== modelRequestSeq) return
     const seen = new Set<string>()
     availableBatchImageModels.value = (result.data || [])
@@ -1506,7 +1537,7 @@ async function loadBatchJobs() {
   try {
     const options = listOptions()
     const results = await Promise.all(keys.map(async (key) => {
-      const result = await listBatchImageJobs(key.key, options)
+      const result = await listBatchImageJobs(credentialForKey(key), options)
       return {
         hasMore: Boolean(result.has_more),
         rows: (result.data || []).map(job => toJobRow(job, key)),
@@ -1599,6 +1630,10 @@ function requireApiKey(): ApiKey | null {
     appStore.showError(batchImageText('selectApiKey'))
     return null
   }
+  if (!savedCredentials[selectedApiKey.value.id]) {
+    appStore.showError(t('batchImage.savedKeyRequired', { name: selectedApiKey.value.name }))
+    return null
+  }
   return selectedApiKey.value
 }
 
@@ -1633,7 +1668,7 @@ async function submitJob() {
 	  submitting.value = true
 	  try {
 	    const job = await submitBatchImageJob(
-	      key.key,
+	      credentialForKey(key),
 	      {
 	        model: form.model,
         task_name: form.taskName.trim() || defaultTaskName(),
@@ -1666,7 +1701,7 @@ async function refreshSelected() {
   if (!key) return
   refreshing.value = true
   try {
-    const job = await getBatchImageJob(key.key, selectedBatchId.value)
+    const job = await getBatchImageJob(credentialForKey(key), selectedBatchId.value)
     currentJob.value = job
     upsertJob(job)
     if (TERMINAL_STATUSES.has(job.status)) stopPolling()
@@ -1774,7 +1809,7 @@ async function cancelSelected() {
   if (!window.confirm(batchImageText('cancelConfirm'))) return
   cancelling.value = true
   try {
-    const job = await cancelBatchImageJob(key.key, currentJob.value.id)
+    const job = await cancelBatchImageJob(credentialForKey(key), currentJob.value.id)
     currentJob.value = job
     upsertJob(job)
     appStore.showSuccess(batchImageText('cancelled'))
@@ -1802,7 +1837,7 @@ async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
   if (!key) return
   retryingBatchId.value = job.id
   try {
-    const sourceItems = await ensureItemsForRetry(key.key, job.id)
+    const sourceItems = await ensureItemsForRetry(credentialForKey(key), job.id)
     const failedItems = sourceItems
       .filter(item => item.status === 'failed')
       .map(item => ({ custom_id: retryCustomID(item.custom_id), prompt: String(item.prompt_preview || '').trim() }))
@@ -1812,7 +1847,7 @@ async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
       return
     }
     const retryJob = await submitBatchImageJob(
-      key.key,
+      credentialForKey(key),
       {
         model: job.model,
         task_name: `${job.task_name || defaultTaskName()} ${t('batchImage.messages.retryTaskNameSuffix')}`,
@@ -1868,7 +1903,7 @@ async function downloadJob(job: (BatchImageJobRow | Pick<BatchImageJob, 'id'>)) 
   downloading.value = true
   downloadingBatchId.value = job.id
   try {
-    const blob = await downloadBatchImageZip(key.key, job.id)
+    const blob = await downloadBatchImageZip(credentialForKey(key), job.id)
     saveBlob(blob, `${job.id}.zip`)
     markJobDownloaded(job.id)
   } catch (error: any) {
@@ -1888,7 +1923,7 @@ async function downloadSelectedJobs() {
       if (!key) continue
       downloading.value = true
       downloadingBatchId.value = row.id
-      const blob = await downloadBatchImageZip(key.key, row.id)
+      const blob = await downloadBatchImageZip(credentialForKey(key), row.id)
       saveBlob(blob, `${row.id}.zip`)
       markJobDownloaded(row.id)
     }
@@ -1910,7 +1945,7 @@ async function deleteJob(job: BatchImageJobRow) {
   if (!window.confirm(batchImageText('deleteConfirm'))) return
   deletingBatchId.value = job.id
   try {
-    await deleteBatchImageJobRecord(key.key, job.id)
+    await deleteBatchImageJobRecord(credentialForKey(key), job.id)
     removeJobFromList(job.id)
     appStore.showSuccess(batchImageText('deleted'))
   } catch (error: any) {
@@ -1930,7 +1965,7 @@ async function deleteSelectedJobs() {
       const key = apiKeyForJob(row)
       if (!key) continue
       deletingBatchId.value = row.id
-      await deleteBatchImageJobRecord(key.key, row.id)
+      await deleteBatchImageJobRecord(credentialForKey(key), row.id)
       removeJobFromList(row.id)
     }
     appStore.showSuccess(batchImageText('deleted'))
@@ -2197,7 +2232,7 @@ async function loadItems() {
     clearItemPreviews()
     const jobs = detailJobsForBatch(batchId)
     const results = await Promise.all(jobs.map(async (job) => {
-      const result = await listBatchImageItems(key.key, job.id)
+      const result = await listBatchImageItems(credentialForKey(key), job.id)
       return (result.data || []).map(item => ({
         ...item,
         batch_id: job.id,
@@ -2247,7 +2282,7 @@ async function loadItemPreview(item: BatchImageItem) {
       itemPreviewUrls[previewKey] = URL.createObjectURL(cached)
       return
     }
-    const blob = await getBatchImageItemContent(key.key, batchId, item.custom_id, 0)
+    const blob = await getBatchImageItemContent(credentialForKey(key), batchId, item.custom_id, 0)
     const thumbnail = await createThumbnailBlob(blob).catch(() => blob)
     itemPreviewUrls[previewKey] = URL.createObjectURL(thumbnail)
     if (thumbnail !== blob || thumbnail.size <= 1024 * 1024) {

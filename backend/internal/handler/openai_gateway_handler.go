@@ -2128,9 +2128,9 @@ func (p *openAIWSTurnPricing) currentOr(fallback time.Time) time.Time {
 }
 
 // openAIWSTurnAPIKeyLookup 是后续 turn 重取 API Key 认证快照的入口
-// （APIKeyService.GetByKey：经 L1/L2 认证缓存，未命中才回源）。
+// It reloads the current key by ID without retaining a connection credential.
 type openAIWSTurnAPIKeyLookup interface {
-	GetByKey(ctx context.Context, key string) (*service.APIKey, error)
+	GetByIDForAuth(ctx context.Context, id int64) (*service.APIKey, error)
 }
 
 // openAIWSTurnBillingAPIKeys 按 turn 号保存每个 turn 计费用的 API Key 快照。
@@ -2211,10 +2211,10 @@ func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAP
 	if conn.User != nil {
 		member = conn.User.Enterprise
 	}
-	if lookup == nil || conn.Key == "" {
+	if lookup == nil || conn.ID <= 0 {
 		return nil
 	}
-	latest, err := lookup.GetByKey(ctx, conn.Key)
+	latest, err := lookup.GetByIDForAuth(ctx, conn.ID)
 	if err != nil || latest == nil || latest.ID != conn.ID || latest.User == nil || conn.User == nil {
 		return nil
 	}
@@ -4484,7 +4484,7 @@ func (h *OpenAIGatewayHandler) enqueueCyberSessionBlockedOpsEntry(c *gin.Context
 	}
 	meta.APIKeyID = apiKey.ID
 	meta.GroupID = apiKey.GroupID
-	meta.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
+	meta.APIKeyPrefix = keyPrefix(apiKey.DisplayHint(), 7)
 	if apiKey.User != nil {
 		meta.UserID = apiKey.User.ID
 	}
@@ -4559,7 +4559,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 	nativeCompactionV2 := service.IsOpenAINativeCompactionV2(c)
 	apiKeyPrefix := ""
 	if apiKey != nil {
-		apiKeyPrefix = keyPrefix(apiKey.Key, 8)
+		apiKeyPrefix = keyPrefix(apiKey.DisplayHint(), 7)
 	}
 	opsMeta := cyberPolicyOpsErrorMeta{
 		RequestID:       requestID,

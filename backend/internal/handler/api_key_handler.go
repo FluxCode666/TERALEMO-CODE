@@ -217,12 +217,32 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		svcReq.RateLimit7d = *req.RateLimit7d
 	}
 
-	executeUserIdempotentJSON(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+	c.Header("Cache-Control", "no-store")
+	var createdCredential string
+	executeUserIdempotentJSONWithPresenter(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		key, err := h.apiKeyService.Create(ctx, subject.UserID, svcReq)
 		if err != nil {
 			return nil, err
 		}
+		createdCredential = key.Key
 		return dto.APIKeyFromService(key).Localized(c.GetHeader("Accept-Language")), nil
+	}, func(data any) any {
+		if key, ok := data.(*dto.APIKey); ok && createdCredential != "" {
+			out := *key
+			out.Key = createdCredential
+			return &out
+		}
+		if stored, ok := data.(map[string]any); ok {
+			out := make(map[string]any, len(stored))
+			for field, value := range stored {
+				out[field] = value
+			}
+			if hint, ok := out["key_hint"].(string); ok {
+				out["key"] = hint
+			}
+			return out
+		}
+		return data
 	})
 }
 

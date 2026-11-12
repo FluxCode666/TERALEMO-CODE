@@ -21,12 +21,12 @@ import (
 // 用于隔离测试 APIKeyService.Delete 方法，避免依赖真实数据库。
 //
 // 设计说明：
-//   - apiKey/getByIDErr: 模拟 GetKeyAndOwnerID 返回的记录与错误
+//   - apiKey/getByIDErr: 模拟 GetKeyHashAndOwnerID 返回的记录与错误
 //   - deleteErr: 模拟 Delete 返回的错误
 //   - deletedIDs: 记录被调用删除的 API Key ID，用于断言验证
 type apiKeyRepoStub struct {
-	apiKey                 *APIKey // GetKeyAndOwnerID 的返回值
-	getByIDErr             error   // GetKeyAndOwnerID 的错误返回值
+	apiKey                 *APIKey // GetKeyHashAndOwnerID 的返回值
+	getByIDErr             error   // GetKeyHashAndOwnerID 的错误返回值
 	deleteErr              error   // Delete 的错误返回值
 	updateErr              error   // Update 的错误返回值
 	deletedIDs             []int64 // 记录已删除的 API Key ID 列表
@@ -64,12 +64,12 @@ func (s *apiKeyRepoStub) GetByID(ctx context.Context, id int64) (*APIKey, error)
 	panic("unexpected GetByID call")
 }
 
-func (s *apiKeyRepoStub) GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
+func (s *apiKeyRepoStub) GetKeyHashAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
 	if s.getByIDErr != nil {
 		return "", 0, s.getByIDErr
 	}
 	if s.apiKey != nil {
-		return s.apiKey.Key, s.apiKey.UserID, nil
+		return s.apiKey.KeyHash, s.apiKey.UserID, nil
 	}
 	return "", 0, ErrAPIKeyNotFound
 }
@@ -199,12 +199,12 @@ func (s *apiKeyRepoStub) CountByGroupID(ctx context.Context, groupID int64) (int
 	panic("unexpected CountByGroupID call")
 }
 
-func (s *apiKeyRepoStub) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
-	panic("unexpected ListKeysByUserID call")
+func (s *apiKeyRepoStub) ListKeyHashesByUserID(ctx context.Context, userID int64) ([]string, error) {
+	panic("unexpected ListKeyHashesByUserID call")
 }
 
-func (s *apiKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
-	panic("unexpected ListKeysByGroupID call")
+func (s *apiKeyRepoStub) ListKeyHashesByGroupID(ctx context.Context, groupID int64) ([]string, error) {
+	panic("unexpected ListKeyHashesByGroupID call")
 }
 
 func (s *apiKeyRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
@@ -286,7 +286,7 @@ func (s *apiKeyCacheStub) SubscribeAuthCacheInvalidation(ctx context.Context, ha
 
 // TestApiKeyService_Delete_OwnerMismatch 测试非所有者尝试删除时返回权限错误。
 // 预期行为：
-//   - GetKeyAndOwnerID 返回所有者 ID 为 1
+//   - GetKeyHashAndOwnerID 返回所有者 ID 为 1
 //   - 调用者 userID 为 2（不匹配）
 //   - 返回 ErrInsufficientPerms 错误
 //   - Delete 方法不被调用
@@ -306,14 +306,14 @@ func TestApiKeyService_Delete_OwnerMismatch(t *testing.T) {
 
 // TestApiKeyService_Delete_Success 测试所有者成功删除 API Key 的场景。
 // 预期行为：
-//   - GetKeyAndOwnerID 返回所有者 ID 为 7
+//   - GetKeyHashAndOwnerID 返回所有者 ID 为 7
 //   - 调用者 userID 为 7（匹配）
 //   - Delete 成功执行
 //   - 认证缓存被正确清除
 //   - 返回 nil 错误
 func TestApiKeyService_Delete_Success(t *testing.T) {
 	repo := &apiKeyRepoStub{
-		apiKey: &APIKey{ID: 42, UserID: 7, Key: "k"},
+		apiKey: &APIKey{ID: 42, UserID: 7, KeyHash: HashAPIKey("k")},
 	}
 	cache := &apiKeyCacheStub{}
 	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
@@ -329,7 +329,7 @@ func TestApiKeyService_Delete_Success(t *testing.T) {
 
 // TestApiKeyService_Delete_NotFound 测试删除不存在的 API Key 时返回正确的错误。
 // 预期行为：
-//   - GetKeyAndOwnerID 返回 ErrAPIKeyNotFound 错误
+//   - GetKeyHashAndOwnerID 返回 ErrAPIKeyNotFound 错误
 //   - 返回 ErrAPIKeyNotFound 错误（被 fmt.Errorf 包装）
 //   - Delete 方法不被调用
 //   - 缓存不被清除
@@ -470,7 +470,7 @@ func TestAPIKeyService_GetByID_FillsCurrentConcurrency(t *testing.T) {
 
 // TestApiKeyService_Delete_DeleteFails 测试删除操作失败时的错误处理。
 // 预期行为：
-//   - GetKeyAndOwnerID 返回正确的所有者 ID
+//   - GetKeyHashAndOwnerID 返回正确的所有者 ID
 //   - 所有权验证通过
 //   - DeleteWithAudit 被调用但返回错误
 //   - 删除失败时缓存不被清除（缓存清理在删除成功后执行，消除竞态）

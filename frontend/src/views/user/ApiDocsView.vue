@@ -10,7 +10,7 @@
         <label for="api-docs-key" class="input-label">{{ t('apiDocs.keySelectLabel') }}</label>
         <select id="api-docs-key" v-model="selectedKeyId" class="input max-w-xl">
           <option :value="0">{{ t('apiDocs.keyPlaceholderOption') }}</option>
-          <option v-for="key in apiKeys" :key="key.id" :value="key.id">{{ key.name }} ({{ maskKey(key.key) }})</option>
+          <option v-for="key in apiKeys" :key="key.id" :value="key.id">{{ key.name }} ({{ maskApiKey(key.key_hint || key.key) }})</option>
         </select>
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('apiDocs.keySelectHint') }}</p>
       </div>
@@ -156,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import { maskApiKey } from '@/utils/maskApiKey'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -208,7 +209,7 @@ watch(selectedKeyId, id => {
 })
 
 const baseUrl = window.location.origin.replace(/\/$/, '')
-const exampleKey = computed(() => apiKeys.value.find(key => key.id === selectedKeyId.value)?.key || 'sk-YOUR_KEY')
+const exampleKey = 'YOUR_API_KEY'
 
 type Protocol = VideoDocsContent['protocols'][number]
 type ExampleSummary = { id: string, title: string }
@@ -257,14 +258,9 @@ function toggleProtocol(protocolId: string): void {
   expandedProtocols.value = next
 }
 
-function maskKey(key: string): string {
-  if (!key) return '****'
-  if (key.length <= 10) return `${key.slice(0, 3)}…`
-  return `${key.slice(0, 6)}…${key.slice(-4)}`
-}
 
 function resolveCode(code: string): string {
-  return code.split('{{BASE_URL}}').join(baseUrl).split('{{API_KEY}}').join(exampleKey.value)
+  return code.split('{{BASE_URL}}').join(baseUrl).split('{{API_KEY}}').join(exampleKey)
 }
 
 // The router scrolls to the top on every navigation, including hash-only

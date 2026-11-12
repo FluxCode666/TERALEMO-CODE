@@ -25,6 +25,10 @@ const (
 	FieldUserID = "user_id"
 	// FieldKey holds the string denoting the key field in the database.
 	FieldKey = "key"
+	// FieldKeyHash holds the string denoting the key_hash field in the database.
+	FieldKeyHash = "key_hash"
+	// FieldKeyHint holds the string denoting the key_hint field in the database.
+	FieldKeyHint = "key_hint"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
 	// FieldGroupID holds the string denoting the group_id field in the database.
@@ -100,6 +104,8 @@ var Columns = []string{
 	FieldDeletedAt,
 	FieldUserID,
 	FieldKey,
+	FieldKeyHash,
+	FieldKeyHint,
 	FieldName,
 	FieldGroupID,
 	FieldStatus,
@@ -146,6 +152,10 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// KeyValidator is a validator for the "key" field. It is called by the builders before save.
 	KeyValidator func(string) error
+	// KeyHashValidator is a validator for the "key_hash" field. It is called by the builders before save.
+	KeyHashValidator func(string) error
+	// KeyHintValidator is a validator for the "key_hint" field. It is called by the builders before save.
+	KeyHintValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -201,6 +211,16 @@ func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByKey orders the results by the key field.
 func ByKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldKey, opts...).ToFunc()
+}
+
+// ByKeyHash orders the results by the key_hash field.
+func ByKeyHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKeyHash, opts...).ToFunc()
+}
+
+// ByKeyHint orders the results by the key_hint field.
+func ByKeyHint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKeyHint, opts...).ToFunc()
 }
 
 // ByName orders the results by the name field.
