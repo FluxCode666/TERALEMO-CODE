@@ -109,7 +109,7 @@ func TestEnsureBootstrapSecretsConfiguredSecretTooShort(t *testing.T) {
 	require.Contains(t, err.Error(), "at least 32 bytes")
 }
 
-func TestEnsureBootstrapSecretsConfiguredSecretDuplicateIgnored(t *testing.T) {
+func TestEnsureBootstrapSecretsConfiguredSecretRotatesPersistedValue(t *testing.T) {
 	client := newSecuritySecretTestClient(t)
 	_, err := client.SecuritySecret.Create().
 		SetKey(securitySecretKeyJWT).
@@ -123,8 +123,26 @@ func TestEnsureBootstrapSecretsConfiguredSecretDuplicateIgnored(t *testing.T) {
 
 	stored, err := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyJWT)).Only(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "existing-jwt-secret-32bytes-long!!!!", stored.Value)
-	require.Equal(t, "existing-jwt-secret-32bytes-long!!!!", cfg.JWT.Secret)
+	require.Equal(t, "another-configured-jwt-secret-32!!!!", stored.Value)
+	require.Equal(t, stored.Value, cfg.JWT.Secret)
+
+	// A subsequent startup without configuration uses the rotated value.
+	loaded := &config.Config{}
+	require.NoError(t, ensureBootstrapSecrets(context.Background(), client, loaded))
+	require.Equal(t, cfg.JWT.Secret, loaded.JWT.Secret)
+}
+
+func TestEnsureBootstrapSecretsConfiguredSecretMatchesPersistedValue(t *testing.T) {
+	client := newSecuritySecretTestClient(t)
+	const secret = "configured-jwt-secret-32bytes-long!!"
+	_, err := client.SecuritySecret.Create().SetKey(securitySecretKeyJWT).SetValue(secret).Save(context.Background())
+	require.NoError(t, err)
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: secret}}
+	require.NoError(t, ensureBootstrapSecrets(context.Background(), client, cfg))
+	require.Equal(t, secret, cfg.JWT.Secret)
+	stored, err := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyJWT)).Only(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, secret, stored.Value)
 }
 
 func TestGetOrCreateGeneratedSecuritySecretTrimmedExistingValue(t *testing.T) {

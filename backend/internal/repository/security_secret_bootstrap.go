@@ -39,9 +39,14 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 			return fmt.Errorf("persist jwt secret: %w", err)
 		}
 		if storedSecret != cfg.JWT.Secret {
-			log.Println("Warning: configured JWT secret mismatches persisted value; using persisted secret for cross-instance consistency.")
+			if err := client.SecuritySecret.Update().
+				Where(securitysecret.KeyEQ(securitySecretKeyJWT)).
+				SetValue(cfg.JWT.Secret).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("rotate persisted jwt secret: %w", err)
+			}
+			log.Println("Warning: persisted JWT secret rotated to match explicit configuration.")
 		}
-		cfg.JWT.Secret = storedSecret
 		return nil
 	}
 
