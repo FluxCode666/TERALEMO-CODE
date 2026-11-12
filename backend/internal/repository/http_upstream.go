@@ -206,7 +206,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		return s.doPublicImageDownload(req, proxyURL)
 	}
 	applyGrokCLIProxyHeaders(req)
-	if err := s.validateRequestHost(req); err != nil {
+	if err := s.validateRequestHostForRoute(req, strings.TrimSpace(proxyURL) != ""); err != nil {
 		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	}
 	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo, "profile", profile.Name)
 
-	if err := s.validateRequestHost(req); err != nil {
+	if err := s.validateRequestHostForRoute(req, strings.TrimSpace(proxyURL) != ""); err != nil {
 		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
@@ -650,7 +650,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		return nil, fmt.Errorf("build TLS fingerprint transport: %w", err)
 	}
 
-	client := &http.Client{Transport: transport, CheckRedirect: s.redirectChecker}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectCheckerForRoute(strings.TrimSpace(proxyURL) != "")}
 
 	entry := &upstreamClientEntry{
 		client:   client,
@@ -682,10 +682,14 @@ func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
 // validateRequestHost always enforces outbound policy. Public-only downloads and
 // the optional legacy host policy can impose stricter checks.
 func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
+	return s.validateRequestHostForRoute(req, true)
+}
+
+func (s *httpUpstreamService) validateRequestHostForRoute(req *http.Request, proxied bool) error {
 	if req == nil || req.URL == nil {
 		return errors.New("request url is nil")
 	}
-	if err := outbound.Default().ValidateURL(req.Context(), req.URL); err != nil {
+	if err := outbound.Default().ValidateRequest(req.Context(), req.URL, proxied); err != nil {
 		return err
 	}
 	publicHostsOnly := service.HTTPUpstreamPublicHostsOnly(req.Context())
@@ -707,6 +711,15 @@ func (s *httpUpstreamService) redirectChecker(req *http.Request, via []*http.Req
 		return errors.New("stopped after 10 redirects")
 	}
 	return s.validateRequestHost(req)
+}
+
+func (s *httpUpstreamService) redirectCheckerForRoute(proxied bool) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return s.validateRequestHostForRoute(req, proxied)
+	}
 }
 
 // acquireClient 获取或创建客户端，并标记为进行中请求
@@ -805,7 +818,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		s.mu.Unlock()
 		return nil, fmt.Errorf("build transport: %w", err)
 	}
-	client := &http.Client{Transport: transport, CheckRedirect: s.redirectChecker}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectCheckerForRoute(strings.TrimSpace(proxyURL) != "")}
 	entry := &upstreamClientEntry{
 		client:       client,
 		proxyKey:     proxyKey,

@@ -32,7 +32,7 @@ func TrustedProxyContext(settings *service.SettingService, cfg *config.Config) g
 			policy.LegacyMetadata = true
 		}
 		ip.SetProxyPolicy(c, policy)
-		binding := &service.SessionBinding{IP: ip.GetClientIP(c), UserAgent: c.Request.UserAgent()}
+		binding := &service.SessionBinding{IP: ip.GetTrustedClientIP(c), UserAgent: c.Request.UserAgent()}
 		c.Request = c.Request.WithContext(service.WithSessionBinding(c.Request.Context(), binding))
 		c.Next()
 	}

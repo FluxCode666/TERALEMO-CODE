@@ -144,7 +144,8 @@ security:
   outbound:
     # Destination protection is always enabled, independently of url_allowlist.
     # Private upstreams and proxies require explicit host:port or CIDR entries.
-    # Env: SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS (comma-separated).
+    # Env: SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS (comma-separated). An empty
+    # value inherits this YAML list; use [] to explicitly clear it.
     allow_private_targets: []
   url_allowlist:
     # Enable the additional host allowlist; outbound destination protection always applies.

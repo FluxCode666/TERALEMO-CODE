@@ -1867,6 +1867,15 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	forwardedClientIPHeadersEnv, forwardedClientIPHeadersEnvConfigured := os.LookupEnv("SECURITY_FORWARDED_CLIENT_IP_HEADERS")
 	trustedProxiesConfigured := viper.InConfig("server.trusted_proxies") ||
 		viper.IsSet("server.trusted_proxies") || trustedProxiesEnvConfigured
+	outboundTargetsRaw, outboundTargetsConfigured := os.LookupEnv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS")
+	outboundTargetsEnv := strings.TrimSpace(outboundTargetsRaw)
+	// AutomaticEnv treats an explicitly empty value as a value during unmarshal.
+	// Temporarily hide it so the YAML value remains authoritative; "[]" is the
+	// explicit opt-in marker for clearing the list.
+	if outboundTargetsConfigured {
+		_ = os.Unsetenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS")
+		defer func() { _ = os.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", outboundTargetsRaw) }()
+	}
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
@@ -1878,8 +1887,10 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	if forwardedClientIPHeadersEnvConfigured {
 		cfg.Security.ForwardedClientIPHeaders = normalizeStringSlice(strings.Split(forwardedClientIPHeadersEnv, ","))
 	}
-	if targets, configured := os.LookupEnv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS"); configured {
-		cfg.Security.Outbound.AllowPrivateTargets = normalizeStringSlice(strings.Split(targets, ","))
+	if outboundTargetsConfigured && outboundTargetsEnv == "[]" {
+		cfg.Security.Outbound.AllowPrivateTargets = nil
+	} else if outboundTargetsConfigured && outboundTargetsEnv != "" {
+		cfg.Security.Outbound.AllowPrivateTargets = normalizeStringSlice(strings.Split(outboundTargetsEnv, ","))
 	}
 	cfg.Server.TrustedProxiesConfigured = trustedProxiesConfigured
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs == 0 {

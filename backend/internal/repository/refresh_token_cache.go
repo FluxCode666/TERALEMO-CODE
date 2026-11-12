@@ -14,6 +14,7 @@ const (
 	refreshTokenKeyPrefix   = "refresh_token:"
 	userRefreshTokensPrefix = "user_refresh_tokens:"
 	tokenFamilyPrefix       = "token_family:"
+	refreshTokenDeleteBatch = 256
 )
 
 // refreshTokenKey generates the Redis key for a refresh token.
@@ -68,6 +69,32 @@ func (c *refreshTokenCache) GetRefreshToken(ctx context.Context, tokenHash strin
 func (c *refreshTokenCache) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
 	key := refreshTokenKey(tokenHash)
 	return c.rdb.Del(ctx, key).Err()
+}
+
+// DeleteAllRefreshTokens removes session tokens and their indexes without a
+// blocking KEYS command. SCAN may return more than COUNT, so deletes are bounded.
+func (c *refreshTokenCache) DeleteAllRefreshTokens(ctx context.Context) error {
+	for _, prefix := range []string{refreshTokenKeyPrefix, userRefreshTokensPrefix, tokenFamilyPrefix} {
+		var cursor uint64
+		for {
+			keys, next, err := c.rdb.Scan(ctx, cursor, prefix+"*", refreshTokenDeleteBatch).Result()
+			if err != nil {
+				return fmt.Errorf("scan refresh token keys: %w", err)
+			}
+			for len(keys) > 0 {
+				size := min(len(keys), refreshTokenDeleteBatch)
+				if err := c.rdb.Del(ctx, keys[:size]...).Err(); err != nil {
+					return fmt.Errorf("delete refresh token keys: %w", err)
+				}
+				keys = keys[size:]
+			}
+			cursor = next
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (c *refreshTokenCache) DeleteUserRefreshTokens(ctx context.Context, userID int64) error {

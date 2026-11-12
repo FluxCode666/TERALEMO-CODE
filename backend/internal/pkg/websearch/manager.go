@@ -413,6 +413,7 @@ func newHTTPClient(proxyURL string) (*http.Client, error) {
 		TLSHandshakeTimeout:   proxyTLSTimeout,
 		ResponseHeaderTimeout: searchDataTimeout,
 	}
+	var proxy func(*http.Request) (*url.URL, error)
 	if proxyURL != "" {
 		parsed, err := url.Parse(proxyURL)
 		if err != nil {
@@ -421,8 +422,9 @@ func newHTTPClient(proxyURL string) (*http.Client, error) {
 		if err := proxyutil.ConfigureTransportProxy(transport, parsed); err != nil {
 			return nil, fmt.Errorf("configure proxy: %w", err)
 		}
+		proxy = http.ProxyURL(parsed)
 	}
-	return &http.Client{Transport: outbound.WrapTransport(transport), Timeout: searchRequestTimeout}, nil
+	return &http.Client{Transport: outbound.WrapTransportWithProxy(transport, proxy), Timeout: searchRequestTimeout}, nil
 }
 
 // GetUsage returns the current usage count for the given provider.

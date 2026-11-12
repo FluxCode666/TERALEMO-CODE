@@ -85,7 +85,7 @@ func (h *PasskeyHandler) BeginLogin(c *gin.Context) {
 		TurnstileToken: req.TurnstileToken,
 		TencentTicket:  req.TencentCaptchaTicket,
 		TencentRandstr: req.TencentCaptchaRandstr,
-	}, ip.GetClientIP(c)); err != nil {
+	}, ip.GetTrustedClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}

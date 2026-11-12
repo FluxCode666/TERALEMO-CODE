@@ -46,7 +46,8 @@ func TestTrustedProxyContextMetadataCompatibilityAndSecurity(t *testing.T) {
 			router.Use(SessionBindingContext(cfg), TrustedProxyContext(settings, cfg))
 			router.GET("/", func(c *gin.Context) {
 				require.Equal(t, test.metadata, ip.GetClientIP(c))
-				require.Equal(t, test.metadata, SecurityClientIP(c))
+				require.Equal(t, test.security, SecurityClientIP(c))
+				require.Equal(t, test.security, service.SessionBindingFromContext(c.Request.Context()).IP)
 				require.Equal(t, test.security, ip.GetSecurityClientIP(c, true))
 				c.Status(http.StatusOK)
 			})

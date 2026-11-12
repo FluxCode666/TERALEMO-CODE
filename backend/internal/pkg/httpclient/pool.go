@@ -94,7 +94,15 @@ func buildClient(opts Options) (*http.Client, error) {
 	if opts.ValidateResolvedIP && !opts.AllowPrivateHosts {
 		rt = newValidatedTransport(transport)
 	}
-	rt = servertiming.WrapRoundTripper(outbound.WrapTransport(rt))
+	_, parsedProxy, err := proxyurl.Parse(opts.ProxyURL)
+	if err != nil {
+		return nil, err
+	}
+	proxy := transport.Proxy
+	if parsedProxy != nil {
+		proxy = http.ProxyURL(parsedProxy)
+	}
+	rt = servertiming.WrapRoundTripper(outbound.WrapTransportWithProxy(rt, proxy))
 	return &http.Client{
 		Transport: rt,
 		Timeout:   opts.Timeout,

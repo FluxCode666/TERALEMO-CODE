@@ -226,7 +226,7 @@ func newVertexServiceAccountHTTPClient(proxyURL string) (*http.Client, error) {
 	if err := proxyutil.ConfigureTransportProxy(transport, parsedProxy); err != nil {
 		return nil, err
 	}
-	return servertiming.InstrumentClient(&http.Client{Timeout: 15 * time.Second, Transport: outbound.WrapTransport(transport)}), nil
+	return servertiming.InstrumentClient(&http.Client{Timeout: 15 * time.Second, Transport: outbound.WrapTransportWithProxy(transport, http.ProxyURL(parsedProxy))}), nil
 }
 
 func exchangeVertexServiceAccountToken(ctx context.Context, key *vertexServiceAccountKey, proxyURL string) (string, time.Duration, error) {

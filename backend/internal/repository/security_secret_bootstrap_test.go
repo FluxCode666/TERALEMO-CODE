@@ -1,11 +1,15 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +18,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/stretchr/testify/require"
 
 	"entgo.io/ent/dialect"
@@ -117,7 +122,8 @@ func TestEnsureBootstrapSecretsConfiguredSecretRotatesPersistedValue(t *testing.
 		Save(context.Background())
 	require.NoError(t, err)
 
-	cfg := &config.Config{JWT: config.JWTConfig{Secret: "another-configured-jwt-secret-32!!!!"}}
+	redisConfig, _ := bootstrapTestRedisConfig(t)
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "another-configured-jwt-secret-32!!!!"}, Redis: redisConfig}
 	err = ensureBootstrapSecrets(context.Background(), client, cfg)
 	require.NoError(t, err)
 
@@ -132,6 +138,16 @@ func TestEnsureBootstrapSecretsConfiguredSecretRotatesPersistedValue(t *testing.
 	require.Equal(t, cfg.JWT.Secret, loaded.JWT.Secret)
 }
 
+func bootstrapTestRedisConfig(t *testing.T) (config.RedisConfig, *miniredis.Miniredis) {
+	t.Helper()
+	server := miniredis.RunT(t)
+	host, port, err := net.SplitHostPort(server.Addr())
+	require.NoError(t, err)
+	portNumber, err := strconv.Atoi(port)
+	require.NoError(t, err)
+	return config.RedisConfig{Host: host, Port: portNumber}, server
+}
+
 func TestEnsureBootstrapSecretsConfiguredSecretMatchesPersistedValue(t *testing.T) {
 	client := newSecuritySecretTestClient(t)
 	const secret = "configured-jwt-secret-32bytes-long!!"
@@ -143,6 +159,58 @@ func TestEnsureBootstrapSecretsConfiguredSecretMatchesPersistedValue(t *testing.
 	stored, err := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyJWT)).Only(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, secret, stored.Value)
+}
+
+func TestBootstrapSecretRotationRevokesRefreshTokens(t *testing.T) {
+	for _, test := range []struct {
+		name, stored, configured string
+		rotates                  bool
+	}{
+		{"changed", "existing-jwt-secret-32bytes-long!!!!", "configured-jwt-secret-32bytes-long!!", true},
+		{"matching", "configured-jwt-secret-32bytes-long!!", "configured-jwt-secret-32bytes-long!!", false},
+		{"loaded", "existing-jwt-secret-32bytes-long!!!!", "", false},
+		{"initial configured", "", "configured-jwt-secret-32bytes-long!!", false},
+		{"initial generated", "", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client := newSecuritySecretTestClient(t)
+			if test.stored != "" {
+				_, err := client.SecuritySecret.Create().SetKey(securitySecretKeyJWT).SetValue(test.stored).Save(t.Context())
+				require.NoError(t, err)
+			}
+			redisConfig, server := bootstrapTestRedisConfig(t)
+			for _, key := range []string{refreshTokenKeyPrefix + "hash", userRefreshTokensPrefix + "1", tokenFamilyPrefix + "family"} {
+				require.NoError(t, server.Set(key, "value"))
+			}
+			require.NoError(t, server.Set("other:cache", "value"))
+			cfg := &config.Config{JWT: config.JWTConfig{Secret: test.configured}, Redis: redisConfig}
+			require.NoError(t, ensureBootstrapSecrets(t.Context(), client, cfg))
+			for _, key := range []string{refreshTokenKeyPrefix + "hash", userRefreshTokensPrefix + "1", tokenFamilyPrefix + "family"} {
+				require.Equal(t, !test.rotates, server.Exists(key), key)
+			}
+			require.True(t, server.Exists("other:cache"))
+		})
+	}
+}
+
+func TestBootstrapSecretRotationContinuesAfterRevocationFailure(t *testing.T) {
+	client := newSecuritySecretTestClient(t)
+	_, err := client.SecuritySecret.Create().SetKey(securitySecretKeyJWT).SetValue("existing-jwt-secret-32bytes-long!!!!").Save(t.Context())
+	require.NoError(t, err)
+	redisConfig, server := bootstrapTestRedisConfig(t)
+	server.SetError("ERR revocation unavailable")
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "configured-jwt-secret-32bytes-long!!"}, Redis: redisConfig}
+	require.NoError(t, ensureBootstrapSecrets(t.Context(), client, cfg))
+	stored, err := client.SecuritySecret.Query().Where(securitysecret.KeyEQ(securitySecretKeyJWT)).Only(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, cfg.JWT.Secret, stored.Value)
+	require.Contains(t, logs.String(), "WARN")
+	require.Contains(t, logs.String(), "refresh token revocation failed")
+	require.NotContains(t, logs.String(), cfg.JWT.Secret)
 }
 
 func TestGetOrCreateGeneratedSecuritySecretTrimmedExistingValue(t *testing.T) {

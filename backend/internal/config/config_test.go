@@ -762,6 +762,29 @@ func TestLoadOutboundPrivateTargetsFromEnv(t *testing.T) {
 	require.Equal(t, []string{"172.18.0.1:8787", "10.20.0.0/16", "[::1]:8443"}, cfg.Security.Outbound.AllowPrivateTargets)
 }
 
+func TestLoadOutboundPrivateTargetsYAMLAndEnv(t *testing.T) {
+	for _, test := range []struct {
+		name, env string
+		want      []string
+	}{
+		{"empty inherits YAML", "", []string{"10.20.0.1:8787"}},
+		{"whitespace inherits YAML", "  ", []string{"10.20.0.1:8787"}},
+		{"nonempty overrides YAML", "10.30.0.0/16", []string{"10.30.0.0/16"}},
+		{"explicit empty list", "[]", nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(path, []byte("security:\n  outbound:\n    allow_private_targets: [10.20.0.1:8787]\n"), 0o600))
+			t.Setenv("CONFIG_FILE", path)
+			t.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", test.env)
+			cfg, err := Load()
+			require.NoError(t, err)
+			require.Equal(t, test.want, cfg.Security.Outbound.AllowPrivateTargets)
+		})
+	}
+}
+
 func TestLoadOutboundPrivateTargetsDefaultAndValidation(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS", "")

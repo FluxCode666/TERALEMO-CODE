@@ -4440,7 +4440,7 @@ func findBlockedCyberSessionKey(ctx context.Context, gatewayService *service.Ope
 	}
 	clientIP, userAgent := "", ""
 	if c != nil {
-		clientIP = strings.TrimSpace(ip.GetClientIP(c))
+		clientIP = strings.TrimSpace(ip.GetTrustedClientIP(c))
 		userAgent = c.GetHeader("User-Agent")
 	}
 	return gatewayService.FindCyberSessionBlockedForRequest(ctx, apiKeyID, c, body, clientIP, userAgent)
@@ -4450,7 +4450,7 @@ func cyberSessionScopeKey(apiKeyID int64, c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	return service.CyberSessionScopeKey(apiKeyID, strings.TrimSpace(ip.GetClientIP(c)), c.GetHeader("User-Agent"))
+	return service.CyberSessionScopeKey(apiKeyID, strings.TrimSpace(ip.GetTrustedClientIP(c)), c.GetHeader("User-Agent"))
 }
 
 // enqueueCyberSessionBlockedOpsEntry captures request meta and enqueues the

@@ -12,22 +12,36 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 )
 
 type Policy struct {
-	targets map[string]struct{}
-	ranges  []netip.Prefix
-	lookup  func(context.Context, string) ([]net.IPAddr, error)
+	targets      map[string]struct{}
+	ranges       []netip.Prefix
+	lookup       func(context.Context, string) ([]net.IPAddr, error)
+	now          func() time.Time
+	cacheMu      sync.Mutex
+	allowedHosts map[string]time.Time
 }
 
+const (
+	preflightTTL      = 30 * time.Second
+	maxPreflightHosts = 4096
+)
+
+var errHostResolution = errors.New("resolve outbound host")
+var nat64Prefix = netip.MustParsePrefix("64:ff9b::/96")
 var current atomic.Pointer[Policy]
 var publicOnly, _ = NewPolicy(nil)
 
 func NewPolicy(entries []string) (*Policy, error) {
-	p := &Policy{targets: make(map[string]struct{}), lookup: net.DefaultResolver.LookupIPAddr}
+	p := &Policy{
+		targets: make(map[string]struct{}), lookup: net.DefaultResolver.LookupIPAddr,
+		now: time.Now, allowedHosts: make(map[string]time.Time),
+	}
 	for _, entry := range entries {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
@@ -53,7 +67,7 @@ func NewPolicy(entries []string) (*Policy, error) {
 	return p, nil
 }
 
-// Configure installs an immutable process-wide policy before clients are created.
+// Configure replaces the process-wide policy and its preflight cache.
 func Configure(entries []string) error {
 	p, err := NewPolicy(entries)
 	if err != nil {
@@ -83,7 +97,18 @@ func IsPrivateIP(ip net.IP) bool {
 		return true
 	}
 	if v4 := ip.To4(); v4 != nil {
-		return v4[0] == 0 || (v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127) || v4[0] >= 240
+		return v4[0] == 0 || (v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127) ||
+			(v4[0] == 192 && v4[1] == 0 && v4[2] == 0) ||
+			(v4[0] == 198 && v4[1] >= 18 && v4[1] <= 19) || v4[0] >= 240
+	}
+	v6 := ip.To16()
+	if v6 != nil {
+		if v6[0] == 0x20 && v6[1] == 0x02 {
+			return IsPrivateIP(net.IP(v6[2:6]))
+		}
+		if nat64Prefix.Contains(netip.AddrFrom16([16]byte(v6))) {
+			return IsPrivateIP(net.IP(v6[12:16]))
+		}
 	}
 	return false
 }
@@ -175,10 +200,10 @@ func (p *Policy) resolve(ctx context.Context, host, port string) ([]net.IPAddr, 
 	defer cancel()
 	addrs, err := p.lookup(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf("resolve outbound host: %w", err)
+		return nil, fmt.Errorf("%w: %w", errHostResolution, err)
 	}
 	if len(addrs) == 0 {
-		return nil, errors.New("outbound host has no addresses")
+		return nil, fmt.Errorf("%w: no addresses", errHostResolution)
 	}
 	for _, addr := range addrs {
 		if err := p.checkIP(host, port, addr.IP); err != nil {
@@ -193,24 +218,58 @@ func (p *Policy) ValidateURL(ctx context.Context, u *url.URL) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.resolve(ctx, host, port)
+	if ip := net.ParseIP(host); ip != nil {
+		return p.checkIP(host, port, ip)
+	}
+	key := net.JoinHostPort(host, port)
+	p.cacheMu.Lock()
+	if expires, ok := p.allowedHosts[key]; ok && p.now().Before(expires) {
+		p.cacheMu.Unlock()
+		return nil
+	}
+	delete(p.allowedHosts, key)
+	p.cacheMu.Unlock()
+	if _, err := p.resolve(ctx, host, port); err != nil {
+		return err
+	}
+	p.cacheMu.Lock()
+	if len(p.allowedHosts) >= maxPreflightHosts {
+		for existing := range p.allowedHosts {
+			delete(p.allowedHosts, existing)
+			break
+		}
+	}
+	p.allowedHosts[key] = p.now().Add(preflightTTL)
+	p.cacheMu.Unlock()
+	return nil
+}
+
+// ValidateRequest lets direct transports reuse established connections during a
+// resolver outage. Every new connection still requires an uncached dial check.
+func (p *Policy) ValidateRequest(ctx context.Context, u *url.URL, proxied bool) error {
+	err := p.ValidateURL(ctx, u)
+	if !proxied && ctx.Err() == nil && errors.Is(err, errHostResolution) {
+		return nil
+	}
 	return err
 }
 
-// DialContext resolves once and connects only to those checked addresses. The
-// socket hook also checks the actual destination before establishing a connection.
+// DialContext delegates name resolution and address racing to net.Dialer. The
+// socket hook checks every actual destination without using the preflight cache,
+// preserving DNS rebinding protection while retaining the standard timeout and
+// Happy Eyeballs semantics.
 func (p *Policy) DialContext(ctx context.Context, dialer *net.Dialer, network, address string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	addrs, err := p.resolve(ctx, host, port)
-	if err != nil {
-		return nil, err
+	if dialer == nil {
+		dialer = &net.Dialer{}
 	}
 	guarded := *dialer
+	controlContext := guarded.ControlContext
 	control := guarded.Control
-	guarded.Control = func(network, address string, conn syscall.RawConn) error {
+	guarded.ControlContext = func(ctx context.Context, network, address string, conn syscall.RawConn) error {
 		resolved, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return err
@@ -218,20 +277,15 @@ func (p *Policy) DialContext(ctx context.Context, dialer *net.Dialer, network, a
 		if err := p.checkIP(host, port, net.ParseIP(resolved)); err != nil {
 			return err
 		}
+		if controlContext != nil {
+			return controlContext(ctx, network, address, conn)
+		}
 		if control != nil {
 			return control(network, address, conn)
 		}
 		return nil
 	}
-	var lastErr error
-	for _, addr := range addrs {
-		conn, err := guarded.DialContext(ctx, network, net.JoinHostPort(addr.IP.String(), port))
-		if err == nil {
-			return conn, nil
-		}
-		lastErr = err
-	}
-	return nil, lastErr
+	return guarded.DialContext(ctx, network, address)
 }
 
 func DialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
@@ -240,17 +294,41 @@ func DialContext(dialer *net.Dialer) func(context.Context, string, string) (net.
 	}
 }
 
-type guardedTransport struct{ base http.RoundTripper }
+type guardedTransport struct {
+	base      http.RoundTripper
+	proxy     func(*http.Request) (*url.URL, error)
+	strictDNS bool
+}
 
 func WrapTransport(base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = NewTransport()
 	}
-	return &guardedTransport{base: base}
+	if transport, ok := base.(*http.Transport); ok {
+		return WrapTransportWithProxy(base, transport.Proxy)
+	}
+	return &guardedTransport{base: base, strictDNS: true}
+}
+
+// WrapTransportWithProxy retains route information when another wrapper hides
+// the transport, or when SOCKS uses DialContext instead of Transport.Proxy.
+func WrapTransportWithProxy(base http.RoundTripper, proxy func(*http.Request) (*url.URL, error)) http.RoundTripper {
+	return &guardedTransport{base: base, proxy: proxy}
 }
 
 func (t *guardedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if err := Default().ValidateURL(req.Context(), req.URL); err != nil {
+	proxied := t.strictDNS
+	if t.proxy != nil {
+		proxyURL, err := t.proxy(req)
+		if err != nil {
+			if req.Body != nil {
+				_ = req.Body.Close()
+			}
+			return nil, err
+		}
+		proxied = proxyURL != nil
+	}
+	if err := Default().ValidateRequest(req.Context(), req.URL, proxied); err != nil {
 		if req.Body != nil {
 			_ = req.Body.Close()
 		}

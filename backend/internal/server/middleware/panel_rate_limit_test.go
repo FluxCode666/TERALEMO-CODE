@@ -278,38 +278,16 @@ func TestPanelRateLimiterPublicIP(t *testing.T) {
 	// 其他公网 IP 独立计数
 	require.Equal(t, http.StatusOK, performPanelRequest(router, "198.51.100.7:1000").Code)
 
-	// 回环/内网地址（反代内部转发地址）：跳过计数，绝不误拦
-	for i := 0; i < 5; i++ {
-		require.Equal(t, http.StatusOK, performPanelRequest(router, "127.0.0.1:1000").Code)
-		require.Equal(t, http.StatusOK, performPanelRequest(router, "10.0.0.8:1000").Code)
-		require.Equal(t, http.StatusOK, performPanelRequest(router, "172.17.0.1:1000").Code)
-		require.Equal(t, http.StatusOK, performPanelRequest(router, "192.168.1.30:1000").Code)
+	for _, address := range []string{"127.0.0.1:1000", "10.0.0.8:1000", "172.17.0.1:1000", "192.168.1.30:1000"} {
+		require.Equal(t, http.StatusOK, performPanelRequest(router, address).Code)
+		require.Equal(t, http.StatusTooManyRequests, performPanelRequest(router, address).Code)
 	}
 
 	allower.mu.Lock()
 	defer allower.mu.Unlock()
 	require.Contains(t, allower.counts, "panel:public:ip:203.0.113.9")
 	require.Contains(t, allower.counts, "panel:public:ip:198.51.100.7")
-	for key := range allower.counts {
-		require.NotContains(t, key, "127.0.0.1")
-		require.NotContains(t, key, "10.0.0.8")
-		require.NotContains(t, key, "172.17.0.1")
-		require.NotContains(t, key, "192.168.1.30")
+	for _, address := range []string{"127.0.0.1", "10.0.0.8", "172.17.0.1", "192.168.1.30"} {
+		require.EqualValues(t, 2, allower.counts["panel:public:ip:"+address])
 	}
-}
-
-func TestIsPubliclyRoutableClientIP(t *testing.T) {
-	require.True(t, isPubliclyRoutableClientIP("203.0.113.9"))
-	require.True(t, isPubliclyRoutableClientIP("2001:db8::1"))
-	require.False(t, isPubliclyRoutableClientIP("127.0.0.1"))
-	require.False(t, isPubliclyRoutableClientIP("::1"))
-	require.False(t, isPubliclyRoutableClientIP("10.1.2.3"))
-	require.False(t, isPubliclyRoutableClientIP("172.16.0.1"))
-	require.False(t, isPubliclyRoutableClientIP("192.168.0.1"))
-	require.False(t, isPubliclyRoutableClientIP("169.254.1.1"))
-	require.False(t, isPubliclyRoutableClientIP("fe80::1"))
-	require.False(t, isPubliclyRoutableClientIP("fc00::1"))
-	require.False(t, isPubliclyRoutableClientIP("0.0.0.0"))
-	require.False(t, isPubliclyRoutableClientIP(""))
-	require.False(t, isPubliclyRoutableClientIP("not-an-ip"))
 }

@@ -2,6 +2,8 @@ package outbound
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -21,13 +23,222 @@ func TestPolicyAddressRanges(t *testing.T) {
 		"127.0.0.1", "127.255.255.255", "0.0.0.0", "10.1.2.3", "172.16.0.1", "172.31.255.255",
 		"192.168.1.1", "169.254.169.254", "100.64.0.1", "100.127.255.255", "224.0.0.1", "255.255.255.255",
 		"::", "::1", "fc00::1", "fdff::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.1.2.3",
+		"192.0.0.0", "192.0.0.255", "198.18.0.0", "198.19.255.255", "::ffff:198.18.0.1",
+		"64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::c000:1",
+		"64:ff9b::c612:1", "2002:7f00:1::", "2002:a9fe:a9fe::", "2002:c612:1::",
 	} {
 		t.Run(address, func(t *testing.T) {
 			require.Error(t, p.checkIP(address, "443", net.ParseIP(address)))
 		})
 	}
-	for _, address := range []string{"8.8.8.8", "1.1.1.1", "100.63.255.255", "100.128.0.1", "172.15.255.255", "172.32.0.1", "2606:4700:4700::1111"} {
+	for _, address := range []string{"8.8.8.8", "1.1.1.1", "100.63.255.255", "100.128.0.1", "172.15.255.255", "172.32.0.1", "2606:4700:4700::1111", "192.0.1.0", "198.17.255.255", "198.20.0.0", "64:ff9b::808:808", "2002:808:808::"} {
 		require.NoError(t, p.checkIP(address, "8787", net.ParseIP(address)))
+	}
+}
+
+func TestPolicyPreflightCachesAllowedHostPort(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	for range 1000 {
+		require.NoError(t, p.ValidateURL(t.Context(), target))
+	}
+	require.Equal(t, 1, lookups, "a warm preflight must not repeat DNS lookups")
+	target.Host = "upstream.example:8443"
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.Equal(t, 2, lookups, "allow decisions are scoped to host and port")
+}
+
+func TestPolicyPreflightLookupFailuresAreNotCached(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		if lookups < 3 {
+			return nil, errors.New("DNS unavailable")
+		}
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	require.Error(t, p.ValidateURL(t.Context(), target))
+	require.Error(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.Equal(t, 3, lookups)
+}
+
+func TestPolicyPreflightExpiryAndCapacity(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	now = now.Add(preflightTTL - time.Millisecond)
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.Equal(t, 1, lookups)
+	now = now.Add(time.Millisecond)
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.Equal(t, 2, lookups)
+	for i := range maxPreflightHosts + 10 {
+		target.Host = fmt.Sprintf("upstream-%d.example", i)
+		require.NoError(t, p.ValidateURL(t.Context(), target))
+	}
+	require.Len(t, p.allowedHosts, maxPreflightHosts)
+}
+
+func TestPolicyPreflightNeverAuthorizesNewConnection(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		if lookups == 1 {
+			return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+		}
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.ValidateURL(t.Context(), target))
+	dns := newTestDNS(t, "127.0.0.1")
+	_, err = p.DialContext(t.Context(), &net.Dialer{Timeout: time.Second, Resolver: dns.resolver}, "tcp", "upstream.example:443")
+	require.ErrorContains(t, err, "not allowed")
+	require.Equal(t, 1, lookups, "native dial resolution must not use the preflight lookup hook")
+}
+
+func TestPolicyRequestResolutionFailureByRoute(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		return nil, errors.New("DNS unavailable")
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	require.NoError(t, p.ValidateRequest(t.Context(), target, false))
+	require.Error(t, p.ValidateRequest(t.Context(), target, true))
+	dns := newTestDNS(t)
+	dns.failed.Store(true)
+	_, err = p.DialContext(t.Context(), &net.Dialer{Timeout: time.Second, Resolver: dns.resolver}, "tcp", "upstream.example:443")
+	require.Error(t, err)
+	target.Host = "127.0.0.1"
+	require.ErrorContains(t, p.ValidateRequest(t.Context(), target, false), "not allowed")
+	target.Host = "upstream.example"
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+	require.Error(t, p.ValidateRequest(cancelled, target, false))
+}
+
+func TestTransportReusesDirectConnectionDuringResolverFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+	defer server.Close()
+	target, err := url.Parse(server.URL)
+	require.NoError(t, err)
+	p, err := NewPolicy([]string{target.Host})
+	require.NoError(t, err)
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	lookups := 0
+	failed := false
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		if failed {
+			return nil, errors.New("DNS unavailable")
+		}
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	dns := newTestDNS(t, "127.0.0.1")
+	previous := current.Swap(p)
+	t.Cleanup(func() { current.Store(previous) })
+	transport := NewTransport()
+	transport.Proxy = nil
+	transport.DialContext = DialContext(&net.Dialer{Timeout: 30 * time.Second, Resolver: dns.resolver})
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: WrapTransport(transport), Timeout: time.Second}
+	target.Host = net.JoinHostPort("upstream.example", target.Port())
+	fetch := func() {
+		resp, err := client.Get(target.String())
+		require.NoError(t, err)
+		_, err = io.Copy(io.Discard, resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+	}
+	fetch()
+	require.Equal(t, 1, lookups, "preflight and native dial use separate resolver hooks")
+	for range 100 {
+		fetch()
+	}
+	require.Equal(t, 1, lookups, "pooled requests perform no preflight DNS lookups")
+	now = now.Add(preflightTTL)
+	failed = true
+	dns.failed.Store(true)
+	fetch()
+	require.Equal(t, 2, lookups, "DNS preflight failure must not discard a usable connection")
+	transport.CloseIdleConnections()
+	_, err = client.Get(target.String())
+	require.Error(t, err)
+}
+
+func TestPolicyPreflightDoesNotCacheBlockedAddress(t *testing.T) {
+	p, err := NewPolicy(nil)
+	require.NoError(t, err)
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	require.NoError(t, err)
+	for range 2 {
+		require.ErrorContains(t, p.ValidateURL(t.Context(), target), "not allowed")
+	}
+	require.Equal(t, 2, lookups)
+}
+
+func BenchmarkPolicyPreflightWarm(b *testing.B) {
+	p, err := NewPolicy(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	lookups := 0
+	p.lookup = func(context.Context, string) ([]net.IPAddr, error) {
+		lookups++
+		return []net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}, nil
+	}
+	target, err := url.Parse("https://upstream.example")
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := p.ValidateURL(b.Context(), target); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for range b.N {
+		if err := p.ValidateURL(b.Context(), target); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	b.ReportMetric(float64(lookups-1)/float64(b.N), "lookups/op")
+	if lookups != 1 {
+		b.Fatalf("warm preflight performed %d DNS lookups", lookups)
 	}
 }
 
@@ -56,8 +267,10 @@ func TestPolicyChecksEveryResolvedAddressAndConnection(t *testing.T) {
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
 	require.ErrorContains(t, p.ValidateURL(context.Background(), target), "not allowed")
-	_, err = p.DialContext(context.Background(), &net.Dialer{Timeout: time.Second}, "tcp", "upstream.example:443")
-	require.ErrorContains(t, err, "not allowed")
+	dns := newTestDNS(t)
+	dns.failed.Store(true)
+	_, err = p.DialContext(context.Background(), &net.Dialer{Timeout: time.Second, Resolver: dns.resolver}, "tcp", "upstream.example:443")
+	require.Error(t, err)
 }
 
 func TestHTTPClientRejectsPrivateTargetsAndRedirects(t *testing.T) {
@@ -89,13 +302,19 @@ func TestHTTPClientPrivateExceptionAndPinnedDNS(t *testing.T) {
 		lookups++
 		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
 	}
-	conn, err := p.DialContext(context.Background(), &net.Dialer{Timeout: time.Second}, "tcp", net.JoinHostPort("upstream.example", u.Port()))
+	dns := newTestDNS(t, "127.0.0.1")
+	conn, err := p.DialContext(context.Background(), &net.Dialer{Timeout: time.Second, Resolver: dns.resolver}, "tcp", net.JoinHostPort("upstream.example", u.Port()))
 	require.NoError(t, err)
 	require.NoError(t, conn.Close())
-	require.Equal(t, 1, lookups)
+	require.Equal(t, 0, lookups, "native dial uses the transport resolver, not the preflight hook")
 	previous := current.Swap(p)
 	t.Cleanup(func() { current.Store(previous) })
-	resp, err := NewClient(time.Second).Get(server.URL)
+	transport := NewTransport()
+	transport.Proxy = nil
+	transport.DialContext = DialContext(&net.Dialer{Timeout: time.Second, Resolver: dns.resolver})
+	defer transport.CloseIdleConnections()
+	targetURL := "http://upstream.example:" + u.Port()
+	resp, err := (&http.Client{Transport: WrapTransport(transport), Timeout: time.Second}).Get(targetURL)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)

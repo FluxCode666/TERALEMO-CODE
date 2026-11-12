@@ -129,7 +129,19 @@ func (d *coderOpenAIWSClientDialer) Dial(
 	if err != nil {
 		return nil, 0, nil, errors.New("invalid ws url")
 	}
-	if err := outbound.Default().ValidateURL(ctx, parsedTarget); err != nil {
+	proxied := strings.TrimSpace(proxyURL) != ""
+	if !proxied {
+		probe := &http.Request{URL: parsedTarget}
+		copyURL := *parsedTarget
+		copyURL.Scheme = strings.Replace(copyURL.Scheme, "ws", "http", 1)
+		probe.URL = &copyURL
+		environmentProxy, err := http.ProxyFromEnvironment(probe)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+		proxied = environmentProxy != nil
+	}
+	if err := outbound.Default().ValidateRequest(ctx, parsedTarget, proxied); err != nil {
 		return nil, 0, nil, err
 	}
 

@@ -307,7 +307,7 @@ func NewClient(proxyURL string) (*Client, error) {
 		if err := proxyutil.ConfigureTransportProxy(transport, parsed); err != nil {
 			return nil, fmt.Errorf("configure proxy: %w", err)
 		}
-		client.Transport = outbound.WrapTransport(transport)
+		client.Transport = outbound.WrapTransportWithProxy(transport, http.ProxyURL(parsed))
 	}
 	return &Client{
 		httpClient: client,
