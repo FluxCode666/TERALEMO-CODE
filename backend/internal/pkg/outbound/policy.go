@@ -213,7 +213,18 @@ func (p *Policy) resolve(ctx context.Context, host, port string) ([]net.IPAddr, 
 	return addrs, nil
 }
 
+// ValidateURL validates without caching when the connection route is unknown.
+// Only known direct transports may use the preflight allow cache.
 func (p *Policy) ValidateURL(ctx context.Context, u *url.URL) error {
+	host, port, err := urlAddress(u)
+	if err != nil {
+		return err
+	}
+	_, err = p.resolve(ctx, host, port)
+	return err
+}
+
+func (p *Policy) validateDirectURL(ctx context.Context, u *url.URL) error {
 	host, port, err := urlAddress(u)
 	if err != nil {
 		return err
@@ -244,11 +255,15 @@ func (p *Policy) ValidateURL(ctx context.Context, u *url.URL) error {
 	return nil
 }
 
-// ValidateRequest lets direct transports reuse established connections during a
-// resolver outage. Every new connection still requires an uncached dial check.
+// ValidateRequest only caches direct preflight decisions, since the actual
+// destination is checked again on each new direct socket. A proxy hides that
+// destination, so its target must be resolved on every request without caching.
 func (p *Policy) ValidateRequest(ctx context.Context, u *url.URL, proxied bool) error {
-	err := p.ValidateURL(ctx, u)
-	if !proxied && ctx.Err() == nil && errors.Is(err, errHostResolution) {
+	if proxied {
+		return p.ValidateURL(ctx, u)
+	}
+	err := p.validateDirectURL(ctx, u)
+	if ctx.Err() == nil && errors.Is(err, errHostResolution) {
 		return nil
 	}
 	return err

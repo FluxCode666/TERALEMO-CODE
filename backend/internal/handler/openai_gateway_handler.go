@@ -2551,6 +2551,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	}
 	reqLog.Info("openai.websocket_ingress_started")
 	clientIP := ip.GetClientIP(c)
+	securityClientIP := ip.GetTrustedClientIP(c)
 	userAgent := strings.TrimSpace(c.GetHeader("User-Agent"))
 	clientLifecycleCtx := c.Request.Context()
 	ctx := clientLifecycleCtx
@@ -3158,7 +3159,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				return mapping.MappedModel, nil
 			},
 			BeforeTurn: func(turn int) error {
-				if err := h.checkOpenAIWSModelRequestIP(ctx, clientIP, apiKey); err != nil {
+				if err := h.checkOpenAIWSModelRequestIP(ctx, securityClientIP, apiKey); err != nil {
 					writeOpenAIBillingWSError(ctx, wsConn, err)
 					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, err.Error(), err)
 				}

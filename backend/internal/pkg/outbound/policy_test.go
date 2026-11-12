@@ -47,11 +47,11 @@ func TestPolicyPreflightCachesAllowedHostPort(t *testing.T) {
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
 	for range 1000 {
-		require.NoError(t, p.ValidateURL(t.Context(), target))
+		require.NoError(t, p.validateDirectURL(t.Context(), target))
 	}
 	require.Equal(t, 1, lookups, "a warm preflight must not repeat DNS lookups")
 	target.Host = "upstream.example:8443"
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	require.Equal(t, 2, lookups, "allow decisions are scoped to host and port")
 }
 
@@ -68,10 +68,10 @@ func TestPolicyPreflightLookupFailuresAreNotCached(t *testing.T) {
 	}
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
-	require.Error(t, p.ValidateURL(t.Context(), target))
-	require.Error(t, p.ValidateURL(t.Context(), target))
-	require.NoError(t, p.ValidateURL(t.Context(), target))
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.Error(t, p.validateDirectURL(t.Context(), target))
+	require.Error(t, p.validateDirectURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	require.Equal(t, 3, lookups)
 }
 
@@ -87,16 +87,16 @@ func TestPolicyPreflightExpiryAndCapacity(t *testing.T) {
 	}
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	now = now.Add(preflightTTL - time.Millisecond)
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	require.Equal(t, 1, lookups)
 	now = now.Add(time.Millisecond)
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	require.Equal(t, 2, lookups)
 	for i := range maxPreflightHosts + 10 {
 		target.Host = fmt.Sprintf("upstream-%d.example", i)
-		require.NoError(t, p.ValidateURL(t.Context(), target))
+		require.NoError(t, p.validateDirectURL(t.Context(), target))
 	}
 	require.Len(t, p.allowedHosts, maxPreflightHosts)
 }
@@ -114,8 +114,8 @@ func TestPolicyPreflightNeverAuthorizesNewConnection(t *testing.T) {
 	}
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
-	require.NoError(t, p.ValidateURL(t.Context(), target))
-	require.NoError(t, p.ValidateURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
+	require.NoError(t, p.validateDirectURL(t.Context(), target))
 	dns := newTestDNS(t, "127.0.0.1")
 	_, err = p.DialContext(t.Context(), &net.Dialer{Timeout: time.Second, Resolver: dns.resolver}, "tcp", "upstream.example:443")
 	require.ErrorContains(t, err, "not allowed")
@@ -207,7 +207,7 @@ func TestPolicyPreflightDoesNotCacheBlockedAddress(t *testing.T) {
 	target, err := url.Parse("https://upstream.example")
 	require.NoError(t, err)
 	for range 2 {
-		require.ErrorContains(t, p.ValidateURL(t.Context(), target), "not allowed")
+		require.ErrorContains(t, p.validateDirectURL(t.Context(), target), "not allowed")
 	}
 	require.Equal(t, 2, lookups)
 }
@@ -226,12 +226,12 @@ func BenchmarkPolicyPreflightWarm(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	if err := p.ValidateURL(b.Context(), target); err != nil {
+	if err := p.validateDirectURL(b.Context(), target); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
 	for range b.N {
-		if err := p.ValidateURL(b.Context(), target); err != nil {
+		if err := p.validateDirectURL(b.Context(), target); err != nil {
 			b.Fatal(err)
 		}
 	}

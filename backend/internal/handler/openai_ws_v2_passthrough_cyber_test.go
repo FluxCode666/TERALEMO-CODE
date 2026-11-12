@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/testutil"
@@ -25,9 +26,23 @@ type openAIWSPassthroughHandlerHarness struct {
 	moderationRepo *contentModerationHandlerTestRepo
 	gatewayCache   service.GatewayCache
 	apiKey         *service.APIKey
+	modelSettings  *service.SettingService
+	usageRepo      *openAIWSUsageHandlerUsageLogRepoStub
+}
+
+type openAIWSClientIPFixture struct {
+	trustedProxies []string
+	forwardedIP    string
+	allowlist      []string
+	metadataIP     string
+	securityIP     string
 }
 
 func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, settings ...map[string]string) *openAIWSPassthroughHandlerHarness {
+	return newOpenAIWSPassthroughHandlerHarnessWithClientIP(t, upstreamURL, nil, settings...)
+}
+
+func newOpenAIWSPassthroughHandlerHarnessWithClientIP(t *testing.T, upstreamURL string, clientIP *openAIWSClientIPFixture, settings ...map[string]string) *openAIWSPassthroughHandlerHarness {
 	t.Helper()
 	gatewayCache := testutil.NewRedisGatewayCache(t)
 
@@ -109,8 +124,24 @@ func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, sett
 	authRepo.apiKey = *apiKey
 	authRepo.group.ID = groupID
 	h.apiKeyService = newWSGroupPricingAPIKeyService(authRepo)
+	if clientIP != nil {
+		cfg.SetTrustForwardedIPForAPIKeyACL(true)
+		cfg.Server.TrustedProxies = clientIP.trustedProxies
+		settingSvc = service.NewSettingService(settingRepo, cfg)
+		h.apiKeyService.SetModelAllowlistSettings(settingSvc)
+		require.NoError(t, settingSvc.SaveModelAllowlistEntries(t.Context(), service.ModelAllowlistSettings{Entries: clientIP.allowlist}))
+	}
 	handlerDone := make(chan struct{})
 	router := gin.New()
+	if clientIP != nil {
+		require.NoError(t, router.SetTrustedProxies(clientIP.trustedProxies))
+		router.Use(middleware.SessionBindingContext(cfg), middleware.TrustedProxyContext(settingSvc, cfg))
+		router.Use(func(c *gin.Context) {
+			require.Equal(t, clientIP.metadataIP, ip.GetClientIP(c))
+			require.Equal(t, clientIP.securityIP, ip.GetTrustedClientIP(c))
+			c.Next()
+		})
+	}
 	router.Use(func(c *gin.Context) {
 		c.Set(string(middleware.ContextKeyAPIKey), apiKey)
 		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.User.ID, Concurrency: 1})
@@ -124,7 +155,11 @@ func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, sett
 	t.Cleanup(handlerServer.Close)
 
 	dialCtx, cancelDial := context.WithTimeout(context.Background(), 3*time.Second)
-	clientConn, _, err := coderws.Dial(dialCtx, "ws"+strings.TrimPrefix(handlerServer.URL, "http")+"/openai/v1/responses", nil)
+	var dialOptions *coderws.DialOptions
+	if clientIP != nil {
+		dialOptions = &coderws.DialOptions{HTTPHeader: http.Header{"X-Forwarded-For": []string{clientIP.forwardedIP}}}
+	}
+	clientConn, _, err := coderws.Dial(dialCtx, "ws"+strings.TrimPrefix(handlerServer.URL, "http")+"/openai/v1/responses", dialOptions)
 	cancelDial()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = clientConn.CloseNow() })
@@ -136,6 +171,8 @@ func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, sett
 		moderationRepo: moderationRepo,
 		gatewayCache:   gatewayCache,
 		apiKey:         apiKey,
+		modelSettings:  settingSvc,
+		usageRepo:      usageRepo,
 	}
 }
 
