@@ -106,7 +106,7 @@ func TestContentModerationCallRoutesThroughProxy(t *testing.T) {
 	var proxied atomic.Int64
 	proxySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// HTTP 目标经正向代理时，代理收到的是绝对 URI 请求。
-		if !strings.HasPrefix(r.RequestURI, "http://moderation-proxy-test.invalid") {
+		if !strings.HasPrefix(r.RequestURI, "http://8.8.8.8") {
 			t.Errorf("expected absolute-URI proxy request, got %q", r.RequestURI)
 		}
 		proxied.Add(1)
@@ -131,7 +131,7 @@ func TestContentModerationCallRoutesThroughProxy(t *testing.T) {
 	svc := NewContentModerationService(nil, nil, nil, nil, nil, proxyRepo, nil, nil)
 
 	cfg := defaultContentModerationConfig()
-	cfg.BaseURL = "http://moderation-proxy-test.invalid"
+	cfg.BaseURL = "http://8.8.8.8"
 	cfg.ProxyID = moderationProxyIDPtr(7)
 	cfg.normalize()
 
@@ -245,7 +245,7 @@ func TestContentModerationTestAPIKeysProxySemantics(t *testing.T) {
 	port, _ := strconv.Atoi(portStr)
 
 	savedCfg := defaultContentModerationConfig()
-	savedCfg.BaseURL = "http://moderation-proxy-test.invalid"
+	savedCfg.BaseURL = "http://8.8.8.8"
 	savedCfg.ProxyID = moderationProxyIDPtr(7)
 	savedCfg.APIKeys = []string{"sk-saved"}
 	rawCfg, err := json.Marshal(savedCfg)

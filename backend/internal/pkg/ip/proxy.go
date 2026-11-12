@@ -22,6 +22,8 @@ var CloudflareProxyRanges = []string{
 type ProxyPolicy struct {
 	Local []netip.Prefix
 	CDN   []netip.Prefix
+	// LegacyMetadata only affects request metadata; security callers stay strict.
+	LegacyMetadata bool
 }
 
 func ParseProxyRanges(entries []string) (prefixes []netip.Prefix, err error) {

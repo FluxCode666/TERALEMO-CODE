@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/imroc/req/v3"
 )
 
 // CoerceDingTalkCorpPolicyForWrite 是 coerceDeprecatedDingTalkCorpPolicy 的导出版本，
@@ -994,7 +995,7 @@ func oidcResolveProviderMetadata(ctx context.Context, discoveryURL string) (*oid
 		return nil, fmt.Errorf("discovery url is empty")
 	}
 
-	resp, err := req.C().
+	resp, err := outboundreq.New().
 		SetTimeout(15*time.Second).
 		R().
 		SetContext(ctx).

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -43,7 +45,7 @@ func NewGitHubReleaseClient(proxyURL string, allowDirectOnProxyError bool) servi
 			slog.Warn("proxy client init failed, all requests will fail", "service", "github_release", "error", err)
 			return &githubReleaseClientError{err: fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)}
 		}
-		sharedClient = &http.Client{Timeout: 30 * time.Second}
+		sharedClient = outbound.NewClient(30 * time.Second)
 	}
 	apiClient := cloneHTTPClient(sharedClient)
 	apiClient.CheckRedirect = githubAPICheckRedirect(apiClient.CheckRedirect)
@@ -58,7 +60,7 @@ func NewGitHubReleaseClient(proxyURL string, allowDirectOnProxyError bool) servi
 			slog.Warn("proxy download client init failed, all requests will fail", "service", "github_release", "error", err)
 			return &githubReleaseClientError{err: fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)}
 		}
-		downloadClient = &http.Client{Timeout: 10 * time.Minute}
+		downloadClient = outbound.NewClient(10 * time.Minute)
 	}
 	downloadClient = cloneHTTPClient(downloadClient)
 

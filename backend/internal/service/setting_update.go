@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 )
 
 // OmittedSettingKeys marks setting keys the caller's payload never carried.
@@ -43,6 +44,9 @@ func (s *SettingService) UpdateSettingsOmitting(ctx context.Context, settings *S
 		return err
 	}
 	omitted.dropFrom(updates)
+	if err := validateOutboundSettings(updates); err != nil {
+		return err
+	}
 
 	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 		return err
@@ -73,11 +77,28 @@ func (s *SettingService) UpdateSettingsWithAuthSourceDefaultsOmitting(ctx contex
 		updates[key] = value
 	}
 	omitted.dropFrom(updates)
+	if err := validateOutboundSettings(updates); err != nil {
+		return err
+	}
 
 	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 		return err
 	}
 	s.refreshCachedSettingsAfterWrite(ctx, settings, omitted)
+	return nil
+}
+
+func validateOutboundSettings(updates map[string]string) error {
+	for _, key := range []string{
+		SettingKeyOIDCConnectIssuerURL, SettingKeyOIDCConnectDiscoveryURL,
+		SettingKeyOIDCConnectTokenURL, SettingKeyOIDCConnectUserInfoURL, SettingKeyOIDCConnectJWKSURL,
+	} {
+		if raw := strings.TrimSpace(updates[key]); raw != "" {
+			if err := outbound.ValidateLiteralURL(raw); err != nil {
+				return infraerrors.BadRequest("INVALID_OUTBOUND_URL", key+": "+err.Error())
+			}
+		}
+	}
 	return nil
 }
 

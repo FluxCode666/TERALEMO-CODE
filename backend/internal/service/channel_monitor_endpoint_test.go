@@ -8,10 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/stretchr/testify/require"
 )
 
 func TestValidateMonitorEndpoint_BasePath(t *testing.T) {
+	require.NoError(t, outbound.Configure(nil))
+	t.Cleanup(func() { require.NoError(t, outbound.Configure([]string{"127.0.0.0/8", "::1/128"})) })
 	for _, endpoint := range []string{
 		"https://8.8.8.8",
 		"https://8.8.8.8/anthropic",

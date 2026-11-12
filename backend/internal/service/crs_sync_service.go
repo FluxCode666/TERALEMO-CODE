@@ -390,7 +390,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      status,
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -527,7 +527,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      status,
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -683,7 +683,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      status,
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -835,7 +835,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      status,
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -966,7 +966,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      mapCRSStatus(src.IsActive, src.Status),
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -1097,7 +1097,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 				Status:      mapCRSStatus(src.IsActive, src.Status),
 				Schedulable: src.Schedulable,
 			}
-			if err := s.accountRepo.Create(ctx, account); err != nil {
+			if err := s.createCRSAccount(ctx, account); err != nil {
 				item.Action = "failed"
 				item.Error = "create failed: " + err.Error()
 				result.Failed++
@@ -1150,6 +1150,9 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 }
 
 func (s *CRSSyncService) updateExistingCRSAccount(ctx context.Context, account *Account, schedulableChanged bool) error {
+	if err := validateAccountOutboundURLs(account.Credentials); err != nil {
+		return err
+	}
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return err
 	}
@@ -1157,6 +1160,13 @@ func (s *CRSSyncService) updateExistingCRSAccount(ctx context.Context, account *
 		return clearManualScheduledQuestionAutoPause(ctx, s.accountRepo, account.ID)
 	}
 	return nil
+}
+
+func (s *CRSSyncService) createCRSAccount(ctx context.Context, account *Account) error {
+	if err := validateAccountOutboundURLs(account.Credentials); err != nil {
+		return err
+	}
+	return s.accountRepo.Create(ctx, account)
 }
 
 func effectiveCRSSchedulable(requested bool, status string) bool {

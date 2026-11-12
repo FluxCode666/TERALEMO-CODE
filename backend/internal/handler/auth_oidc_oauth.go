@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -28,7 +30,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/imroc/req/v3"
 	"github.com/tidwall/gjson"
 )
 
@@ -734,7 +735,7 @@ func oidcExchangeCode(
 	redirectURI string,
 	codeVerifier string,
 ) (*oidcTokenResponse, error) {
-	client := req.C().SetTimeout(30 * time.Second)
+	client := outboundreq.New().SetTimeout(30 * time.Second)
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -847,7 +848,7 @@ func oidcFetchUserInfo(
 		return nil, errors.New("missing access_token for userinfo request")
 	}
 
-	client := req.C().SetTimeout(30 * time.Second)
+	client := outboundreq.New().SetTimeout(30 * time.Second)
 	authorization, err := buildBearerAuthorization(token.TokenType, token.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("invalid token for userinfo request: %w", err)
@@ -1035,7 +1036,7 @@ func oidcFetchJWKSet(ctx context.Context, jwksURL string) (*oidcJWKSet, error) {
 	if jwksURL == "" {
 		return nil, errors.New("missing jwks_url")
 	}
-	resp, err := req.C().
+	resp, err := outboundreq.New().
 		SetTimeout(30*time.Second).
 		R().
 		SetContext(ctx).

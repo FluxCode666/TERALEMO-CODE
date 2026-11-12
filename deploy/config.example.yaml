@@ -141,9 +141,15 @@ security:
   # forwarded_client_ip_headers:
   #   - "True-Client-IP"
   #   - "X-CDN-Client-IP"
+  outbound:
+    # Destination protection is always enabled, independently of url_allowlist.
+    # Private upstreams and proxies require explicit host:port or CIDR entries.
+    # Env: SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS (comma-separated). An empty
+    # value inherits this YAML list; use [] to explicitly clear it.
+    allow_private_targets: []
   url_allowlist:
-    # Enable URL allowlist validation (disable to skip all URL checks)
-    # 启用 URL 白名单验证（禁用则跳过所有 URL 检查）
+    # Enable the additional host allowlist; outbound destination protection always applies.
+    # 启用额外的域名白名单；出站目标地址防护始终生效。
     enabled: false
     # Allowed upstream hosts for API proxying
     # 允许代理的上游 API 主机列表
@@ -166,8 +172,8 @@ security:
     # Allowed hosts for CRS sync (required when using CRS sync)
     # 允许 CRS 同步的主机列表（使用 CRS 同步功能时必须配置）
     crs_hosts: []
-    # Allow localhost/private IPs for upstream/pricing/CRS (use only in trusted networks)
-    # 允许本地/私有 IP 地址用于上游/定价/CRS（仅在可信网络中使用）
+    # Legacy allowlist option; private destinations still require outbound exceptions.
+    # 旧白名单选项；私网目标仍需在 outbound.allow_private_targets 中显式放行。
     allow_private_hosts: true
     # Allow http:// URLs when allowlist is disabled (default: true; set to false to require https)
     # 白名单禁用时是否允许 http:// URL（默认: true，设为 false 则仅允许 https）

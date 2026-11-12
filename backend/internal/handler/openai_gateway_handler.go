@@ -2551,6 +2551,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	}
 	reqLog.Info("openai.websocket_ingress_started")
 	clientIP := ip.GetClientIP(c)
+	securityClientIP := ip.GetTrustedClientIP(c)
 	userAgent := strings.TrimSpace(c.GetHeader("User-Agent"))
 	clientLifecycleCtx := c.Request.Context()
 	ctx := clientLifecycleCtx
@@ -3158,7 +3159,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				return mapping.MappedModel, nil
 			},
 			BeforeTurn: func(turn int) error {
-				if err := h.checkOpenAIWSModelRequestIP(ctx, clientIP, apiKey); err != nil {
+				if err := h.checkOpenAIWSModelRequestIP(ctx, securityClientIP, apiKey); err != nil {
 					writeOpenAIBillingWSError(ctx, wsConn, err)
 					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, err.Error(), err)
 				}
@@ -4440,7 +4441,7 @@ func findBlockedCyberSessionKey(ctx context.Context, gatewayService *service.Ope
 	}
 	clientIP, userAgent := "", ""
 	if c != nil {
-		clientIP = strings.TrimSpace(ip.GetClientIP(c))
+		clientIP = strings.TrimSpace(ip.GetTrustedClientIP(c))
 		userAgent = c.GetHeader("User-Agent")
 	}
 	return gatewayService.FindCyberSessionBlockedForRequest(ctx, apiKeyID, c, body, clientIP, userAgent)
@@ -4450,7 +4451,7 @@ func cyberSessionScopeKey(apiKeyID int64, c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	return service.CyberSessionScopeKey(apiKeyID, strings.TrimSpace(ip.GetClientIP(c)), c.GetHeader("User-Agent"))
+	return service.CyberSessionScopeKey(apiKeyID, strings.TrimSpace(ip.GetTrustedClientIP(c)), c.GetHeader("User-Agent"))
 }
 
 // enqueueCyberSessionBlockedOpsEntry captures request meta and enqueues the

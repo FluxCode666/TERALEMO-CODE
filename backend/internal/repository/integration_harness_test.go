@@ -18,6 +18,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/Wei-Shaw/sub2api/internal/testutil/outboundtest"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -43,21 +44,26 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	outboundtest.AllowLoopback()
+	os.Exit(runIntegrationTests(m))
+}
+
+func runIntegrationTests(m *testing.M) int {
 	ctx := context.Background()
 
 	if err := timezone.Init("UTC"); err != nil {
 		log.Printf("failed to init timezone: %v", err)
-		os.Exit(1)
+		return 1
 	}
 
 	if !dockerIsAvailable(ctx) {
 		// In CI we expect Docker to be available so integration tests should fail loudly.
 		if os.Getenv("CI") != "" {
 			log.Printf("docker is not available (CI=true); failing integration tests")
-			os.Exit(1)
+			return 1
 		}
 		log.Printf("docker is not available; skipping integration tests (start Docker to enable)")
-		os.Exit(0)
+		return 0
 	}
 
 	postgresImage := selectDockerImage(ctx, postgresImageTag)
@@ -71,7 +77,7 @@ func TestMain(m *testing.M) {
 	)
 	if err != nil {
 		log.Printf("failed to start postgres container: %v", err)
-		os.Exit(1)
+		return 1
 	}
 	defer func() { _ = pgContainer.Terminate(ctx) }()
 
@@ -81,24 +87,24 @@ func TestMain(m *testing.M) {
 	)
 	if err != nil {
 		log.Printf("failed to start redis container: %v", err)
-		os.Exit(1)
+		return 1
 	}
 	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	dsn, err := pgContainer.ConnectionString(ctx, "sslmode=disable", "TimeZone=UTC")
 	if err != nil {
 		log.Printf("failed to get postgres dsn: %v", err)
-		os.Exit(1)
+		return 1
 	}
 
 	integrationDB, err = openSQLWithRetry(ctx, dsn, 30*time.Second)
 	if err != nil {
 		log.Printf("failed to open sql db: %v", err)
-		os.Exit(1)
+		return 1
 	}
 	if err := ApplyMigrations(ctx, integrationDB); err != nil {
 		log.Printf("failed to apply db migrations: %v", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// 创建 ent client 用于集成测试
@@ -108,12 +114,12 @@ func TestMain(m *testing.M) {
 	redisHost, err := redisContainer.Host(ctx)
 	if err != nil {
 		log.Printf("failed to get redis host: %v", err)
-		os.Exit(1)
+		return 1
 	}
 	redisPort, err := redisContainer.MappedPort(ctx, "6379/tcp")
 	if err != nil {
 		log.Printf("failed to get redis port: %v", err)
-		os.Exit(1)
+		return 1
 	}
 
 	integrationRedis = redisclient.NewClient(&redisclient.Options{
@@ -122,7 +128,7 @@ func TestMain(m *testing.M) {
 	})
 	if err := integrationRedis.Ping(ctx).Err(); err != nil {
 		log.Printf("failed to ping redis: %v", err)
-		os.Exit(1)
+		return 1
 	}
 
 	code := m.Run()
@@ -131,7 +137,7 @@ func TestMain(m *testing.M) {
 	_ = integrationRedis.Close()
 	_ = integrationDB.Close()
 
-	os.Exit(code)
+	return code
 }
 
 func dockerIsAvailable(ctx context.Context) bool {

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	sharedhttp "github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -241,7 +243,8 @@ func grokOAuthHasExplicitEntitlementDenial(body string) bool {
 }
 
 func createGrokHTTPClient(proxyURL string, noRedirect bool) (*http.Client, error) {
-	transport := &http.Transport{}
+	transport := outbound.NewTransport()
+	transport.Proxy = nil
 	if strings.TrimSpace(proxyURL) != "" {
 		parsed, err := url.Parse(proxyURL)
 		if err != nil {
@@ -249,7 +252,7 @@ func createGrokHTTPClient(proxyURL string, noRedirect bool) (*http.Client, error
 		}
 		transport.Proxy = http.ProxyURL(parsed)
 	}
-	client := &http.Client{Timeout: 120 * time.Second, Transport: transport}
+	client := &http.Client{Timeout: 120 * time.Second, Transport: outbound.WrapTransport(transport)}
 	if noRedirect {
 		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse

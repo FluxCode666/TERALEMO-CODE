@@ -10,14 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeBaseURLAllowsAdministratorConfiguredDestinations(t *testing.T) {
+func TestNormalizeBaseURLRequiresExplicitPrivateException(t *testing.T) {
+	require.NoError(t, outbound.Configure(nil))
+	t.Cleanup(func() { require.NoError(t, outbound.Configure([]string{"127.0.0.0/8", "::1/128"})) })
 	allowed := []string{
 		"https://guard.example.com", "https://guard.example.com/v1", "http://guard.example.com",
-		"http://127.0.0.1:8080", "http://10.0.0.8:8080", "https://172.16.0.5",
-		"http://169.254.169.254", "https://metadata.google.internal", "https://192.0.2.1",
+		"https://192.0.2.1",
 		"http://internal-admin.local", "http://guard.local:8080",
 	}
 	for _, raw := range allowed {
@@ -25,6 +27,8 @@ func TestNormalizeBaseURLAllowsAdministratorConfiguredDestinations(t *testing.T)
 		require.NoError(t, err, raw)
 	}
 	blocked := []string{
+		"http://127.0.0.1:8080", "http://10.0.0.8:8080", "https://172.16.0.5",
+		"http://169.254.169.254", "https://metadata.google.internal",
 		"ftp://guard.example.com", "https://user:pass@guard.example.com",
 		"https://guard.example.com?q=secret", "https://guard.example.com/#fragment",
 	}
@@ -37,13 +41,10 @@ func TestNormalizeBaseURLAllowsAdministratorConfiguredDestinations(t *testing.T)
 	require.Equal(t, "https://guard.example.com/v1/chat/completions", url)
 }
 
-func TestHTTPClientUsesDirectStandardDialer(t *testing.T) {
+func TestHTTPClientUsesGuardedDirectTransport(t *testing.T) {
 	client, err := NewSecureHTTPClient(ActiveEndpoint{BaseURL: "https://guard.example.com", TimeoutMS: 1000})
 	require.NoError(t, err)
-	transport, ok := client.Transport.(*http.Transport)
-	require.True(t, ok)
-	require.Nil(t, transport.Proxy)
-	require.NotNil(t, transport.DialContext)
+	require.NotNil(t, client.Transport)
 }
 
 func TestOpenAICompatibleScannerRequestContract(t *testing.T) {

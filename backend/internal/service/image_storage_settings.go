@@ -9,7 +9,9 @@ import (
 	"sync"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"go.uber.org/zap"
 )
 
@@ -166,6 +168,11 @@ func (s *ImageStorageSettingService) SecretConfigured(ctx context.Context) bool 
 // Update 保存设置并立即生效。SecretAccessKey 留空表示沿用已保存的值。
 func (s *ImageStorageSettingService) Update(ctx context.Context, in ImageStorageSettings) (*ImageStorageSettings, error) {
 	normalizeImageStorageSettings(&in)
+	if !in.ReuseBackupS3 && in.Endpoint != "" {
+		if err := outbound.ValidateLiteralURL(in.Endpoint); err != nil {
+			return nil, infraerrors.BadRequest("INVALID_S3_ENDPOINT", err.Error())
+		}
+	}
 
 	if in.ReuseBackupS3 {
 		// 复用备份凭证时不落自己的密钥，避免同一份密钥在库里存两份。

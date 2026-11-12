@@ -58,14 +58,20 @@ func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	if _, configured := c.Get(proxyPolicyKey); configured {
+	value, configured := c.Get(proxyPolicyKey)
+	policy, valid := value.(ProxyPolicy)
+	legacyMetadata := configured && valid && policy.LegacyMetadata
+	if configured && !legacyMetadata {
 		return resolveTrustedClientIP(c)
 	}
 	if !requestUsesLegacyForwardedIPTrust(c) {
+		if legacyMetadata {
+			return normalizeIP(c.ClientIP())
+		}
 		return GetTrustedClientIP(c)
 	}
 	peer := peerAddress(c)
-	if peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
+	if !legacyMetadata && peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
 		return peer.String()
 	}
 
@@ -164,22 +170,9 @@ func GetTrustedClientIP(c *gin.Context) string {
 	return resolveTrustedClientIP(c)
 }
 
-// GetSecurityClientIP returns the address used by security-sensitive paths.
-// When legacy forwarded-IP trust is enabled, raw forwarding headers take over
-// client-IP resolution. When disabled, Gin's server.trusted_proxies chain is
-// authoritative.
-func GetSecurityClientIP(c *gin.Context, trustForwarded bool) string {
-	if c != nil {
-		if _, configured := c.Get(proxyPolicyKey); configured {
-			return resolveTrustedClientIP(c)
-		}
-	}
-	if requestSettings, ok := requestForwardedIPSettings(c); ok {
-		trustForwarded = requestSettings.trustForwarded
-	}
-	if trustForwarded {
-		return GetClientIP(c)
-	}
+// GetSecurityClientIP always uses the trusted proxy chain. The forwarding flag
+// remains in the signature for callers that also configure metadata handling.
+func GetSecurityClientIP(c *gin.Context, _ bool) string {
 	return GetTrustedClientIP(c)
 }
 

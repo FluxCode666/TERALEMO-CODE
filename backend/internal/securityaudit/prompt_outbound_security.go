@@ -9,6 +9,7 @@ import (
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 )
 
 const maxGuardResponseBytes int64 = 256 * 1024
@@ -29,6 +30,9 @@ func NormalizeBaseURL(raw string) (string, error) {
 	host := strings.TrimSpace(parsed.Hostname())
 	if host == "" {
 		return "", infraerrors.BadRequest("prompt_audit_invalid_base_url", "审计节点地址无效")
+	}
+	if err := outbound.ValidateLiteralURL(raw); err != nil {
+		return "", infraerrors.BadRequest("prompt_audit_unsafe_base_url", err.Error())
 	}
 	path := strings.TrimRight(parsed.EscapedPath(), "/")
 	if strings.EqualFold(path, "/v1") {
@@ -74,16 +78,13 @@ func NewSecureHTTPClient(endpoint ActiveEndpoint) (*http.Client, error) {
 		ExpectContinueTimeout: time.Second,
 		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 	}
-	// Endpoint ownership and destination trust are administrator concerns.
-	// Use the standard dialer so configured private, loopback, reserved, and
-	// DNS-resolved addresses are all reachable from the service environment.
-	transport.DialContext = dialer.DialContext
+	transport.DialContext = outbound.DialContext(dialer)
 	timeout := time.Duration(endpoint.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
 		timeout = DefaultTimeoutMS * time.Millisecond
 	}
 	return &http.Client{
-		Transport: transport,
+		Transport: outbound.WrapTransport(transport),
 		Timeout:   timeout,
 	}, nil
 }

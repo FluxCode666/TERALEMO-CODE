@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
@@ -26,7 +28,7 @@ func publicImageDialContext(lookup imageIPLookup, dial imageIPDial) imageIPDial 
 			return nil, errors.New("image download DNS resolution failed")
 		}
 		for _, ip := range ips {
-			if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			if outbound.IsPrivateIP(ip) {
 				return nil, errors.New("image download address is not public")
 			}
 		}
