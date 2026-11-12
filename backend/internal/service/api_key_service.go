@@ -28,7 +28,7 @@ var (
 	ErrGroupNotAllowed                = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrEnterpriseGatewayGroupRequired = infraerrors.BadRequest("ENTERPRISE_GROUP_NOT_ALLOWED", "企业成员必须绑定分组")
 	ErrAPIKeyExists                   = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
+	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 32 characters")
 	ErrAPIKeyTooLong                  = infraerrors.BadRequest("API_KEY_TOO_LONG", "api key must be at most 128 characters")
 	ErrAPIKeyInvalidChars             = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
 	ErrAPIKeyRateLimited              = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
@@ -48,6 +48,7 @@ var (
 )
 
 const (
+	MinCustomAPIKeyCharacters    = 32
 	MaxAPIKeyCredentialBytes     = 128
 	defaultAuthLookupConcurrency = 64
 	defaultNegativeAuthCacheSize = 16384
@@ -439,6 +440,9 @@ func (s *APIKeyService) GenerateKey() (string, error) {
 	}
 
 	key := prefix + hex.EncodeToString(bytes)
+	if len(key) > MaxAPIKeyCredentialBytes {
+		return "", ErrAPIKeyTooLong
+	}
 	return key, nil
 }
 
@@ -448,7 +452,7 @@ func (s *APIKeyService) ValidateCustomKey(key string) error {
 		return ErrAPIKeyTooLong
 	}
 	// 检查长度
-	if len(key) < 16 {
+	if len(key) < MinCustomAPIKeyCharacters {
 		return ErrAPIKeyTooShort
 	}
 
@@ -612,6 +616,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if err != nil {
 			return nil, fmt.Errorf("generate key: %w", err)
 		}
+	}
+
+	if len(key) > MaxAPIKeyCredentialBytes {
+		return nil, ErrAPIKeyTooLong
 	}
 
 	if err := s.checkAPIKeyCreateLimits(ctx, userID); err != nil {
@@ -792,7 +800,12 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 
 // GetByIDForAuth loads current permissions for an owned server-side replay.
 func (s *APIKeyService) GetByIDForAuth(ctx context.Context, id int64) (*APIKey, error) {
-	key, err := s.apiKeyRepo.GetByID(ctx, id)
+	if s == nil || s.apiKeyRepo == nil || id <= 0 {
+		return nil, ErrAPIKeyNotFound
+	}
+	key, err := s.withAuthLookupSlot(ctx, func() (*APIKey, error) {
+		return s.apiKeyRepo.GetByID(ctx, id)
+	})
 	if err != nil {
 		return nil, err
 	}

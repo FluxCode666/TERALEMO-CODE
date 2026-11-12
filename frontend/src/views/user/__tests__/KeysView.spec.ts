@@ -648,6 +648,40 @@ describe('user KeysView column settings', () => {
       wrapper.unmount()
     })
 
+    it.each([
+      [16, 'keys.customKeyTooShort'],
+      [31, 'keys.customKeyTooShort'],
+      [129, 'keys.customKeyTooLong'],
+    ])('rejects a %i-character custom credential before creating', async (length, error) => {
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Custom key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      const toggle = wrapper.findAll('button').find(button => button.classes().includes('w-9'))!
+      await toggle.trigger('click')
+      await wrapper.get('input[placeholder="keys.customKeyPlaceholder"]').setValue('a'.repeat(length))
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(keysAPI.create).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenCalledWith(error)
+      wrapper.unmount()
+    })
+
+    it.each([32, 128])('accepts a %i-character custom credential', async length => {
+      const credential = 'a'.repeat(length)
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), key: credential, key_hint: '...aaaa' })
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Custom key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      const toggle = wrapper.findAll('button').find(button => button.classes().includes('w-9'))!
+      await toggle.trigger('click')
+      await wrapper.get('input[placeholder="keys.customKeyPlaceholder"]').setValue(credential)
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 3)).toEqual(['Custom key', 1, credential])
+      expect(wrapper.get('[data-testid="created-api-key"]').text()).toBe(credential)
+      wrapper.unmount()
+    })
+
     it('defaults to a provider with available groups and disables empty categories', async () => {
       getAvailableGroups.mockResolvedValue([availableGroups[5]])
       const wrapper = await openCreate()

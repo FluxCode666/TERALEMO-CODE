@@ -1435,8 +1435,11 @@ const customKeyError = computed(() => {
     return ''
   }
   const key = formData.value.custom_key
-  if (key.length < 16) {
+  if (key.length < 32) {
     return t('keys.customKeyTooShort')
+  }
+  if (key.length > 128) {
+    return t('keys.customKeyTooLong')
   }
   // 检查字符：只允许字母、数字、下划线、连字符
   if (!/^[a-zA-Z0-9_-]+$/.test(key)) {

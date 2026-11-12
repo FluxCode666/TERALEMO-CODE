@@ -219,7 +219,7 @@ func TestAPIContracts(t *testing.T) {
 			name:   "POST /api/v1/keys",
 			method: http.MethodPost,
 			path:   "/api/v1/keys",
-			body:   `{"name":"Key One","custom_key":"sk_custom_1234567890"}`,
+			body:   `{"name":"Key One","custom_key":"sk_custom_1234567890abcdef1234567890"}`,
 			headers: map[string]string{
 				"Content-Type": "application/json",
 			},
@@ -230,8 +230,8 @@ func TestAPIContracts(t *testing.T) {
 				"data": {
 					"id": 100,
 					"user_id": 1,
-					"key": "sk_custom_1234567890",
-					"key_hint": "sk_cust...7890",
+					"key": "sk_custom_1234567890abcdef1234567890",
+					"key_hint": "...7890",
 					"name": "Key One",
 					"group_id": null,
 					"status": "active",
@@ -282,8 +282,8 @@ func TestAPIContracts(t *testing.T) {
 						{
 							"id": 100,
 							"user_id": 1,
-							"key": "sk_cust...7890",
-							"key_hint": "sk_cust...7890",
+							"key": "...",
+							"key_hint": "...",
 							"name": "Key One",
 							"group_id": null,
 							"status": "active",

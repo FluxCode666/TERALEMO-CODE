@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -75,11 +76,16 @@ func HashAPIKey(key string) string {
 }
 
 func MaskAPIKey(key string) string {
-	chars := []rune(key)
-	if len(chars) >= 12 {
-		return string(chars[:7]) + "..." + string(chars[len(chars)-4:])
+	prefix := ""
+	if strings.HasPrefix(key, "sk-") {
+		prefix, key = "sk-", strings.TrimPrefix(key, "sk-")
 	}
-	return string(chars[:min(3, len(chars)/2)]) + "..."
+	chars := []rune(key)
+	// Never infer a public prefix from user-controlled credential characters.
+	// Short legacy credentials reveal nothing; longer ones retain at least
+	// 24 hidden characters and 75% of their non-prefix characters.
+	visible := max(0, min(4, len(chars)-24, len(chars)/4))
+	return prefix + "..." + string(chars[len(chars)-visible:])
 }
 
 func (k *APIKey) DisplayHint() string {

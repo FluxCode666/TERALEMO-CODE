@@ -154,10 +154,10 @@ DROP FUNCTION IF EXISTS enqueue_auth_cache_invalidation(TEXT);
 -- Preserve the hash on repeated runs; never hash a hash or a display hint.
 UPDATE api_keys
 SET key_hash = COALESCE(NULLIF(key_hash, ''), encode(sha256(convert_to(key, 'UTF8')), 'hex')),
-    key_hint = COALESCE(NULLIF(key_hint, ''), CASE
-        WHEN char_length(key) >= 12 THEN left(key, 7) || '...' || right(key, 4)
-        ELSE left(key, LEAST(3, char_length(key) / 2)) || '...'
-    END)
+    key_hint = CASE WHEN left(key, 3) = 'sk-' THEN 'sk-' ELSE '' END || '...' ||
+        right(key, GREATEST(0, LEAST(4,
+            char_length(key) - CASE WHEN left(key, 3) = 'sk-' THEN 3 ELSE 0 END - 24,
+            (char_length(key) - CASE WHEN left(key, 3) = 'sk-' THEN 3 ELSE 0 END) / 4)))
 WHERE key IS NOT NULL;
 
 ALTER TABLE api_keys ALTER COLUMN key_hash SET NOT NULL;

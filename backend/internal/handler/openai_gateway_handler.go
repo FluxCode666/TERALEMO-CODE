@@ -2200,7 +2200,7 @@ func (k *openAIWSTurnBillingAPIKeys) forTurn(turn int, conn *service.APIKey) *se
 	return conn
 }
 
-// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：刷新认证快照
+// refreshOpenAIWSTurnBillingAPIKey 返回本 turn 计费用的 API Key：按 ID 回源刷新
 // 中的用户状态、完整企业用户与兼容的分组。付款身份或部门改变，或无法确认
 // 当前用户状态时返回 nil，由调用方关闭连接并要求重连。
 func refreshOpenAIWSTurnBillingAPIKey(ctx context.Context, lookup openAIWSTurnAPIKeyLookup, conn *service.APIKey) *service.APIKey {
@@ -3074,7 +3074,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// turn 级定价：首轮回退到 TurnStarted 的所属 turn 时刻；后续 turn 由
 		// BeforeTurn 重新冻结 pricingAt 并按最新门复核当前账号。
 		var turnPricing openAIWSTurnPricing
-		// 后续 turn 的计费分组同样在 BeforeTurn 经认证缓存重取，使分组调价对
+		// 后续 turn 的计费分组同样在 BeforeTurn 按 Key ID 回源重取，使分组调价对
 		// 已打开的连接生效。
 		var turnBillingAPIKeys openAIWSTurnBillingAPIKeys
 		// Passthrough ingress does not invoke BeforeTurn for the first frame.

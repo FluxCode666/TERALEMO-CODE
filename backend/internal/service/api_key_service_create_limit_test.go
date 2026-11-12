@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,13 +83,53 @@ func TestAPIKeyServiceCreate_RateLimitsGeneratedKeys(t *testing.T) {
 func TestAPIKeyServiceCreate_RateLimitsCustomKeys(t *testing.T) {
 	repo, cache := newCreateLimitStubs()
 	svc := newCreateLimitService(repo, cache, 0, 1)
-	custom := "sk-custom-key-0123456789"
+	custom := "sk-custom-key-0123456789abcdef0123456789"
 
 	_, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "k", CustomKey: &custom})
 	require.NoError(t, err)
 	_, err = svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "k", CustomKey: &custom})
 	require.ErrorIs(t, err, ErrAPIKeyCreateLimited)
 	require.Len(t, repo.created, 1)
+}
+
+func TestAPIKeyServiceCreate_GeneratedCredentialLengthBeforeLimits(t *testing.T) {
+	for _, prefixLength := range []int{64, 65} {
+		t.Run(strings.Repeat("p", prefixLength), func(t *testing.T) {
+			repo, cache := newCreateLimitStubs()
+			svc := newCreateLimitService(repo, cache, 5, 10)
+			svc.cfg.Default.APIKeyPrefix = strings.Repeat("p", prefixLength)
+			created, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "boundary"})
+			if prefixLength == 65 {
+				require.ErrorIs(t, err, ErrAPIKeyTooLong)
+				require.Nil(t, created)
+				require.Empty(t, repo.created)
+				require.Empty(t, cache.windows, "invalid generation must not consume a creation attempt")
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, created.Key, MaxAPIKeyCredentialBytes)
+			require.Len(t, repo.created, 1)
+			require.Equal(t, int64(1), cache.createCounts[7])
+		})
+	}
+}
+
+func TestAPIKeyServiceCreate_CustomCredentialMinimumBeforeLimits(t *testing.T) {
+	for _, length := range []int{16, 31, 32, 128, 129} {
+		repo, cache := newCreateLimitStubs()
+		svc := newCreateLimitService(repo, cache, 5, 10)
+		custom := strings.Repeat("a", length)
+		created, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{Name: "boundary", CustomKey: &custom})
+		if length < 32 || length > 128 {
+			require.Error(t, err)
+			require.Nil(t, created)
+			require.Empty(t, repo.created)
+			require.Empty(t, cache.windows)
+			continue
+		}
+		require.NoError(t, err)
+		require.Equal(t, custom, created.Key)
+	}
 }
 
 // 删除 Key 释放数量名额，但不返还创建次数，删建循环仍受每小时次数限制。

@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
@@ -53,15 +55,33 @@ func TestAPIKeyHashMigrationPostgres(t *testing.T) {
 		raw  string
 		hint string
 	}{
-		{1, "sk-apikey-migration-00123", "sk-apik...0123"},
+		{1, "sk-apikey-migration-00123", "sk-..."},
 		{2, "s", "..."},
-		{3, "sk-迁移测试字符-安全末尾1234", "sk-迁移测试...1234"},
-		{4, "__deleted__4__1234567890", "__delet...7890"},
+		{3, "sk-迁移测试字符-安全末尾1234", "sk-..."},
+		{4, "__deleted__4__1234567890", "..."},
+	}
+	for _, prefix := range []string{"", "sk-"} {
+		for length := 0; length <= 128-len(prefix); length++ {
+			raw := prefix + strings.Repeat("a", length)
+			keys = append(keys, struct {
+				id   int
+				raw  string
+				hint string
+			}{len(keys) + 10, raw, service.MaskAPIKey(raw)})
+		}
+		for _, length := range []int{1, 16, 24, 25, 26, 27, 28, 64, 128 - len(prefix)} {
+			raw := prefix + strings.Repeat("凭", length)
+			keys = append(keys, struct {
+				id   int
+				raw  string
+				hint string
+			}{len(keys) + 10, raw, service.MaskAPIKey(raw)})
+		}
 	}
 	for _, key := range keys {
 		_, err = conn.ExecContext(ctx, `INSERT INTO api_keys (id, user_id, group_id, key, name, quota, deleted_at)
 			VALUES ($1, 1, CASE WHEN $1::bigint = 1 THEN 1 ELSE 2 END, $2, 'fixture', 5,
-				CASE WHEN $1::bigint = 4 THEN NOW() ELSE NULL END)`, key.id, key.raw)
+				CASE WHEN $1::bigint >= 4 THEN NOW() ELSE NULL END)`, key.id, key.raw)
 		require.NoError(t, err)
 	}
 	_, err = conn.ExecContext(ctx, "INSERT INTO deleted_api_key_audits (key, key_name) VALUES ($1, 'retained audit metadata')", keys[0].raw)
@@ -92,6 +112,15 @@ func TestAPIKeyHashMigrationPostgres(t *testing.T) {
 			sum := sha256.Sum256([]byte(key.raw))
 			require.Equal(t, hex.EncodeToString(sum[:]), hash)
 			require.Equal(t, key.hint, hint)
+			secret := strings.TrimPrefix(key.raw, "sk-")
+			visible := len([]rune(strings.TrimPrefix(strings.TrimPrefix(hint, "sk-"), "...")))
+			hidden := len([]rune(secret)) - visible
+			if len([]rune(secret)) < 24 {
+				require.Zero(t, visible)
+			} else {
+				require.GreaterOrEqual(t, hidden, 24)
+			}
+			require.GreaterOrEqual(t, hidden*4, len([]rune(secret))*3)
 		}
 		var auditKey, auditName string
 		require.NoError(t, conn.QueryRowContext(ctx, "SELECT key, key_name FROM deleted_api_key_audits").Scan(&auditKey, &auditName))

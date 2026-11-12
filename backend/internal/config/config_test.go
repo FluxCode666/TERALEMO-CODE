@@ -54,6 +54,20 @@ func TestValidateMinOutputTokensMinimum(t *testing.T) {
 	require.EqualError(t, cfg.Validate(), "gateway.min_output_tokens must be at least 16")
 }
 
+func TestValidateAPIKeyPrefixLength(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	cfg, err := Load()
+	require.NoError(t, err)
+	for _, prefix := range []string{"", "sk-", strings.Repeat("p", 64), strings.Repeat("凭", 21)} {
+		cfg.Default.APIKeyPrefix = prefix
+		require.NoError(t, cfg.Validate())
+	}
+	for _, prefix := range []string{strings.Repeat("p", 65), strings.Repeat("凭", 22)} {
+		cfg.Default.APIKeyPrefix = prefix
+		require.EqualError(t, cfg.Validate(), "default.api_key_prefix must be at most 64 bytes")
+	}
+}
+
 func TestLoadTimezonePrecedence(t *testing.T) {
 	tests := []struct {
 		name         string

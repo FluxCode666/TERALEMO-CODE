@@ -1708,6 +1708,9 @@ type DefaultConfig struct {
 	RateMultiplier  float64 `mapstructure:"rate_multiplier"`
 }
 
+// Generated credentials append 64 hexadecimal characters to this prefix.
+const MaxAPIKeyPrefixBytes = 64
+
 type RateLimitConfig struct {
 	OverloadCooldownMinutes int `mapstructure:"overload_cooldown_minutes"`  // 529过载冷却时间(分钟)
 	OAuth401CooldownMinutes int `mapstructure:"oauth_401_cooldown_minutes"` // OAuth 401临时不可调度冷却(分钟)
@@ -2713,6 +2716,9 @@ func setEnvReachableDefaults() {
 func (c *Config) Validate() error {
 	if c.Gateway.MinOutputTokens < 16 {
 		return fmt.Errorf("gateway.min_output_tokens must be at least 16")
+	}
+	if len(c.Default.APIKeyPrefix) > MaxAPIKeyPrefixBytes {
+		return fmt.Errorf("default.api_key_prefix must be at most %d bytes", MaxAPIKeyPrefixBytes)
 	}
 	forwardedClientIPHeaders, err := NormalizeForwardedClientIPHeaders(c.Security.ForwardedClientIPHeaders)
 	if err != nil {

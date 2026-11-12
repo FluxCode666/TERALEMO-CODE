@@ -126,7 +126,7 @@ func TestAPIKeyShowOnceCreateThenReadOnlyHint(t *testing.T) {
 			router, repo := newShowOnceAPIKeyRouter(t, nil)
 			payload := map[string]string{"name": "show-once-key"}
 			if custom {
-				payload["custom_key"] = "sk-show-once-custom-key-12345678"
+				payload["custom_key"] = "sk-show-once-custom-key-1234567890abcdef"
 			}
 			body, err := json.Marshal(payload)
 			require.NoError(t, err)

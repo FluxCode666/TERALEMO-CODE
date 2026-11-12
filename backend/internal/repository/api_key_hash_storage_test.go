@@ -28,7 +28,7 @@ func TestAPIKeyRepositoryHashStorageAndAuthentication(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, key))
 	require.Equal(t, credential, key.Key, "only the creation result retains the credential")
 	require.Equal(t, service.HashAPIKey(credential), key.KeyHash)
-	require.Equal(t, "sk-stor...cdef", key.KeyHint)
+	require.Equal(t, "sk-...cdef", key.KeyHint)
 
 	var raw sql.NullString
 	var storedHash, storedHint string
@@ -76,6 +76,46 @@ func TestAPIKeyRepositoryHashStorageAndAuthentication(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, duplicate), "deleting a key releases its hash for reuse")
 	_, err = repo.GetByKey(ctx, credential)
 	require.NoError(t, err)
+}
+
+func TestAPIKeyServiceGeneratedPrefixBoundariesWithRepository(t *testing.T) {
+	ctx := context.Background()
+	repo, client := newAPIKeyRepoSQLite(t)
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "generated-boundary@example.invalid")
+	for _, prefixLength := range []int{64, 65} {
+		cfg := &config.Config{Default: config.DefaultConfig{APIKeyPrefix: strings.Repeat("p", prefixLength)}}
+		svc := service.NewAPIKeyService(repo, NewUserRepository(client, nil), nil, nil, nil, nil, cfg)
+		created, err := svc.Create(ctx, user.ID, service.CreateAPIKeyRequest{Name: "Generated boundary"})
+		if prefixLength == 65 {
+			require.ErrorIs(t, err, service.ErrAPIKeyTooLong)
+			require.Nil(t, created)
+			continue
+		}
+		require.NoError(t, err)
+		require.Len(t, created.Key, service.MaxAPIKeyCredentialBytes)
+		loaded, err := svc.GetByKey(ctx, created.Key)
+		require.NoError(t, err)
+		require.Equal(t, created.ID, loaded.ID)
+	}
+	count, err := repo.CountByUserID(ctx, user.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count, "an invalid prefix must not persist a credential")
+}
+
+func TestAPIKeyServiceLegacyShortCredentialStillAuthenticates(t *testing.T) {
+	ctx := context.Background()
+	repo, client := newAPIKeyRepoSQLite(t)
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "legacy-short@example.invalid")
+	const credential = "0123456789abcdef"
+	key := &service.APIKey{UserID: user.ID, Key: credential, Name: "Legacy short", Status: service.StatusActive}
+	require.NoError(t, repo.Create(ctx, key))
+	require.Equal(t, "...", key.KeyHint)
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, &config.Config{})
+	loaded, err := svc.GetByKey(ctx, credential)
+	require.NoError(t, err)
+	require.Equal(t, key.ID, loaded.ID)
+	require.Equal(t, "...", loaded.KeyHint)
+	require.ErrorIs(t, svc.ValidateCustomKey(credential), service.ErrAPIKeyTooShort)
 }
 
 func TestAPIKeyRepositoryPostgresHashAuthenticationSmoke(t *testing.T) {

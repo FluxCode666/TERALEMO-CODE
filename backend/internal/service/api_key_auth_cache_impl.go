@@ -314,8 +314,14 @@ func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*A
 	if s == nil || s.apiKeyRepo == nil {
 		return nil, ErrAPIKeyNotFound
 	}
-	if s.authLookupSlots == nil {
+	return s.withAuthLookupSlot(ctx, func() (*APIKey, error) {
 		return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+	})
+}
+
+func (s *APIKeyService) withAuthLookupSlot(ctx context.Context, lookup func() (*APIKey, error)) (*APIKey, error) {
+	if s.authLookupSlots == nil {
+		return lookup()
 	}
 	s.authLookupTotal.Add(1)
 	select {
@@ -331,7 +337,7 @@ func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*A
 		s.authLookupRejected.Add(1)
 		return nil, ErrAPIKeyAuthOverloaded
 	}
-	return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+	return lookup()
 }
 
 func (s *APIKeyService) applyAuthCacheEntry(key string, entry *APIKeyAuthCacheEntry) (*APIKey, bool, error) {

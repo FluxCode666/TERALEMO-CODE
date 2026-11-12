@@ -18,6 +18,7 @@ import (
 )
 
 type authRepoStub struct {
+	getByID           func(ctx context.Context, id int64) (*APIKey, error)
 	getByKeyForAuth   func(ctx context.Context, key string) (*APIKey, error)
 	listKeysByUserID  func(ctx context.Context, userID int64) ([]string, error)
 	listKeysByGroupID func(ctx context.Context, groupID int64) ([]string, error)
@@ -28,7 +29,10 @@ func (s *authRepoStub) Create(ctx context.Context, key *APIKey) error {
 }
 
 func (s *authRepoStub) GetByID(ctx context.Context, id int64) (*APIKey, error) {
-	panic("unexpected GetByID call")
+	if s.getByID == nil {
+		panic("unexpected GetByID call")
+	}
+	return s.getByID(ctx, id)
 }
 
 func (s *authRepoStub) GetKeyHashAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
@@ -642,6 +646,34 @@ func TestAPIKeyService_AuthLookupBulkheadRejectsExcessMisses(t *testing.T) {
 
 	close(release)
 	require.ErrorIs(t, <-done, ErrAPIKeyNotFound)
+}
+
+func TestAPIKeyService_IDAndCredentialLookupsShareConcurrencyLimit(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	repo := &authRepoStub{getByID: func(context.Context, int64) (*APIKey, error) {
+		close(entered)
+		<-release
+		return &APIKey{ID: 7}, nil
+	}}
+	svc := NewAPIKeyService(repo, nil, nil, nil, nil, nil, &config.Config{APIKeyAuth: config.APIKeyAuthCacheConfig{LookupConcurrency: 1}})
+	done := make(chan error, 1)
+	go func() {
+		_, err := svc.GetByIDForAuth(context.Background(), 7)
+		done <- err
+	}()
+	<-entered
+	_, idErr := svc.GetByIDForAuth(context.Background(), 8)
+	_, credentialErr := svc.GetByKey(context.Background(), "credential")
+	metrics := svc.AuthLookupMetrics()
+	close(release)
+	require.NoError(t, <-done)
+	require.ErrorIs(t, idErr, ErrAPIKeyAuthOverloaded)
+	require.ErrorIs(t, credentialErr, ErrAPIKeyAuthOverloaded)
+	require.Equal(t, uint64(3), metrics.Total)
+	require.Equal(t, uint64(2), metrics.Rejected)
+	require.Equal(t, int64(1), metrics.InFlight)
+	require.Zero(t, svc.AuthLookupMetrics().InFlight)
 }
 
 func TestAPIKeyService_GetByKey_SingleflightCollapses(t *testing.T) {
