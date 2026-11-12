@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type duplicateChannelMonitorHandlerRepoStub struct {
@@ -109,7 +110,7 @@ func TestDuplicateChannelMonitorHandlerRedactsKeyAndReplaysRetry(t *testing.T) {
 	require.Equal(t, http.StatusOK, first.Code)
 	require.Equal(t, 1, repo.createCalls)
 	require.Contains(t, first.Body.String(), `"name":"primary (Copy)"`)
-	require.Contains(t, first.Body.String(), `"api_key_masked":"top-***"`)
+	require.Contains(t, first.Body.String(), `"api_key_masked":"..."`)
 	require.Contains(t, first.Body.String(), `"created_by":77`)
 	require.Contains(t, first.Body.String(), `"enabled":false`)
 	require.NotContains(t, first.Body.String(), "top-secret")
@@ -165,6 +166,29 @@ func TestDuplicateChannelMonitorHandlerRecoversAfterMarkSucceededFailure(t *test
 	require.Equal(t, "true", second.Header().Get("X-Idempotency-Recovered"))
 	require.Equal(t, 1, repo.createCalls, "ambiguous retries must not repeat the create side effect")
 	require.Contains(t, second.Body.String(), `"id":101`)
-	require.Contains(t, second.Body.String(), `"api_key_masked":"top-***"`)
+	require.Contains(t, second.Body.String(), `"api_key_masked":"..."`)
 	require.NotContains(t, second.Body.String(), "top-secret")
+}
+
+func TestChannelMonitorCredentialHintMatchesAPIKeyAcrossReplay(t *testing.T) {
+	for _, credential := range []string{"4b9e6a1f80c2d573", "sk-1234567890abcdef", "tenant_1234567890abcdef", strings.Repeat("a", 64), "sk-" + strings.Repeat("b", 64)} {
+		t.Run(credential, func(t *testing.T) {
+			router, repo := setupDuplicateChannelMonitorRouter(t)
+			repo.source.APIKey = "ENC:" + credential
+			hint := service.MaskAPIKey(credential)
+			require.Equal(t, hint, channelMonitorToResponse(&service.ChannelMonitor{APIKey: credential}).APIKeyMasked)
+			for _, replay := range []bool{false, true} {
+				request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/channel-monitors/42/duplicate", nil)
+				request.Header.Set("Idempotency-Key", "monitor-hint")
+				response := httptest.NewRecorder()
+				router.ServeHTTP(response, request)
+				require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+				require.Equal(t, hint, gjson.GetBytes(response.Body.Bytes(), "data.api_key_masked").String())
+				if replay {
+					require.Equal(t, "true", response.Header().Get("X-Idempotency-Replayed"))
+				}
+			}
+			require.Equal(t, 1, repo.createCalls)
+		})
+	}
 }

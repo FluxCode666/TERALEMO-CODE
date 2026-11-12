@@ -3030,10 +3030,7 @@ func maskSecretTail(secret string) string {
 	if secret == "" {
 		return ""
 	}
-	if len(secret) <= 4 {
-		return "****"
-	}
-	return strings.Repeat("*", 8) + secret[len(secret)-4:]
+	return MaskAPIKey(secret)
 }
 
 // CyberPolicyRecordInput 是一次 cyber_policy 硬阻断的风控记录入参。

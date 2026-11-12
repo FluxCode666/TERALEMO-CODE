@@ -20,10 +20,6 @@ import (
 const (
 	// monitorMaxPageSize 列表分页上限。
 	monitorMaxPageSize = 100
-	// monitorAPIKeyMaskPrefix 脱敏时保留的明文前缀长度。
-	monitorAPIKeyMaskPrefix = 4
-	// monitorAPIKeyMaskSuffix 脱敏后追加的占位字符串。
-	monitorAPIKeyMaskSuffix = "***"
 )
 
 // ChannelMonitorHandler 渠道监控管理后台 handler。
@@ -141,14 +137,6 @@ type channelMonitorHistoryItemResponse struct {
 	Quota         *domain.MonitorQuotaSnapshot `json:"quota,omitempty"`
 }
 
-// maskAPIKey 对 API Key 明文做脱敏：前 4 字符 + "***"，长度 ≤ 4 时只显示 "***"。
-func maskAPIKey(plain string) string {
-	if len(plain) <= monitorAPIKeyMaskPrefix {
-		return monitorAPIKeyMaskSuffix
-	}
-	return plain[:monitorAPIKeyMaskPrefix] + monitorAPIKeyMaskSuffix
-}
-
 func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse {
 	if m == nil {
 		return nil
@@ -167,7 +155,7 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		Provider:            m.Provider,
 		APIMode:             m.APIMode,
 		Endpoint:            m.Endpoint,
-		APIKeyMasked:        maskAPIKey(m.APIKey),
+		APIKeyMasked:        service.MaskAPIKey(m.APIKey),
 		APIKeyDecryptFailed: m.APIKeyDecryptFailed,
 		PrimaryModel:        m.PrimaryModel,
 		ExtraModels:         extras,
