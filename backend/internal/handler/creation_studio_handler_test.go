@@ -5,6 +5,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -185,6 +187,83 @@ func TestCreationStudioSubmitReplaysAsTheSelectedKey(t *testing.T) {
 	require.Equal(t, "openai", gjson.GetBytes(payload, "data.protocol").String())
 	require.Positive(t, gjson.GetBytes(payload, "data.estimated_cost").Float())
 	require.NotContains(t, recorder.Body.String(), creationTestCredential, "the key plaintext must never leave the backend")
+}
+
+type creationProxySettingsRepo struct {
+	service.SettingRepository
+	values map[string]string
+}
+
+func (r creationProxySettingsRepo) GetMultiple(context.Context, []string) (map[string]string, error) {
+	return r.values, nil
+}
+
+func TestCreationStudioDispatchPreservesStrictProxyIdentity(t *testing.T) {
+	const allowedIP = "203.0.113.9"
+	for _, google := range []bool{false, true} {
+		for _, tc := range []struct {
+			name, peer string
+			headers    http.Header
+			status     int
+		}{
+			{"direct peer", "203.0.113.9:1234", http.Header{"X-Forwarded-For": {"198.51.100.7"}}, http.StatusNoContent},
+			{"untrusted spoof", "198.51.100.7:1234", http.Header{"X-Forwarded-For": {allowedIP}, "Cf-Connecting-Ip": {allowedIP}, "X-Viewer-Ip": {allowedIP}}, http.StatusForbidden},
+			{"trusted local XFF", "10.20.0.1:1234", http.Header{"X-Forwarded-For": {allowedIP}}, http.StatusNoContent},
+			{"all XFF values", "10.20.0.1:1234", http.Header{"X-Forwarded-For": {allowedIP, "198.51.100.7"}}, http.StatusForbidden},
+			{"cloudflare header", "172.69.1.2:1234", http.Header{"Cf-Connecting-Ip": {allowedIP}}, http.StatusNoContent},
+			{"custom CDN header", "10.30.0.1:1234", http.Header{"X-Viewer-Ip": {allowedIP}}, http.StatusNoContent},
+		} {
+			t.Run(fmt.Sprintf("%s/google=%t", tc.name, google), func(t *testing.T) {
+				cfg := &config.Config{RunMode: config.RunModeSimple, Server: config.ServerConfig{TrustedProxies: []string{"10.20.0.0/16"}}}
+				cfg.SetForwardedClientIPSettings(true, []string{"X-Viewer-IP", "Authorization", "Proxy-Authorization", "Cookie", "X-API-Key", "X-Goog-API-Key"})
+				settings := service.NewSettingService(creationProxySettingsRepo{values: map[string]string{
+					service.SettingKeyModelAllowlistEnabled: "false",
+					service.SettingKeyModelAllowlist:        `{"cloudflare":true,"trusted_cdn_proxies":["10.30.0.0/16"]}`,
+				}}, cfg)
+				key := &service.APIKey{ID: 9, UserID: 7, Status: service.StatusActive, IPWhitelist: []string{allowedIP},
+					CompiledIPWhitelist: ip.CompileIPRules([]string{allowedIP}), User: &service.User{ID: 7, Status: service.StatusActive}}
+				keys := service.NewAPIKeyService(&creationHandlerKeyRepo{keys: map[int64]*service.APIKey{key.ID: key}}, nil, nil, nil, nil, nil, cfg)
+				router := gin.New()
+				require.NoError(t, router.SetTrustedProxies(nil))
+				router.Use(middleware.SessionBindingContext(cfg), middleware.TrustedProxyContext(settings, cfg))
+				handler := NewCreationStudioHandler(keys, nil, nil)
+				handler.SetDispatcher(NewStudioDispatcher(router))
+				var outerIP string
+				router.POST("/panel", func(c *gin.Context) {
+					outerIP = ip.GetTrustedClientIP(c)
+					result := handler.dispatch(c, key, &service.NativeCreationRequest{Path: "/gateway", Body: []byte(`{}`)})
+					c.Status(result.status)
+				})
+				verifyReplay := func(c *gin.Context) {
+					require.Equal(t, outerIP, ip.GetSecurityClientIP(c, true))
+					require.Equal(t, outerIP, service.SessionBindingFromContext(c.Request.Context()).IP)
+					require.Equal(t, tc.peer, c.Request.RemoteAddr)
+					for _, name := range []string{"Authorization", "Proxy-Authorization", "Cookie", "X-API-Key", "X-Goog-API-Key"} {
+						require.Empty(t, c.GetHeader(name), "credentials must not be copied as custom IP headers")
+					}
+					c.Next()
+				}
+				var auth gin.HandlerFunc
+				if google {
+					auth = middleware.APIKeyAuthWithSubscriptionGoogle(keys, nil, cfg)
+				} else {
+					auth = gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(keys, nil, cfg))
+				}
+				router.POST("/gateway", verifyReplay, auth, func(c *gin.Context) { c.Status(http.StatusNoContent) })
+				request := httptest.NewRequest(http.MethodPost, "/panel", nil)
+				request.RemoteAddr = tc.peer
+				request.Header = tc.headers.Clone()
+				request.Header.Set("Authorization", "Bearer outer-jwt")
+				request.Header.Set("Proxy-Authorization", "Basic outer-proxy-secret")
+				request.Header.Set("Cookie", "session=outer-secret")
+				request.Header.Set("X-API-Key", "outer-api-key")
+				request.Header.Set("X-Goog-API-Key", "outer-google-key")
+				response := httptest.NewRecorder()
+				router.ServeHTTP(response, request)
+				require.Equal(t, tc.status, response.Code)
+			})
+		}
+	}
 }
 
 func TestCreationStudioSubmitReplaysThroughGatewayWithoutCredential(t *testing.T) {

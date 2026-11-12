@@ -13,6 +13,7 @@ import (
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -450,9 +451,15 @@ func (h *CreationStudioHandler) dispatch(c *gin.Context, key *service.APIKey, na
 	inner = inner.WithContext(ctx)
 	inner.RemoteAddr = outer.RemoteAddr
 	inner.Header.Set("Content-Type", "application/json")
-	for _, header := range []string{"User-Agent", "X-Forwarded-For", "X-Real-IP", "X-Request-ID"} {
-		if value := strings.TrimSpace(outer.Header.Get(header)); value != "" {
-			inner.Header.Set(header, value)
+	headers := append([]string{"User-Agent", "X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP", "X-Request-ID"}, ip.ForwardedClientIPHeaders(c)...)
+	for _, header := range headers {
+		switch strings.ToLower(header) {
+		case "authorization", "proxy-authorization", "cookie", "x-api-key", "x-goog-api-key":
+			continue
+		}
+		// Preserve every proxy-chain hop; the gateway resolves trust again.
+		if values := outer.Header.Values(header); len(values) > 0 {
+			inner.Header[http.CanonicalHeaderKey(header)] = append([]string(nil), values...)
 		}
 	}
 	recorder := httptest.NewRecorder()
