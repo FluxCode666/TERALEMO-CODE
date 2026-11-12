@@ -1,5 +1,6 @@
 export default {
   batchImage: {
+    savedKeyRequired: '请先为 {name} 粘贴并使用创建时保存的完整 Key。',
     columns: {
       taskName: '任务名称',
       model: '模型',
@@ -36,6 +37,7 @@ export default {
       notDownloaded: '未下载',
     },
     actions: {
+      useSavedKey: '使用已保存的 Key',
       usageGuide: '使用说明',
       createJob: '创建批量任务',
       downloadSelected: '下载选中',
@@ -137,7 +139,7 @@ export default {
     guide: {
       title: '批量生图使用说明',
       uiTitle: '当前界面如何使用',
-      step1: '1. 选择已开启批量生图的 Gemini API Key，模型列表会按该 Key 所属分组可用模型展示。',
+      step1: '1. 在页面顶部选择已开启批量生图的 Gemini API Key，粘贴创建时保存的完整 Key 并点击“使用已保存的 Key”。凭据只保存在当前页面内存中，离开后需重新输入。模型列表按该 Key 所属分组展示。',
       step2: '2. 任务名称可以留空，提交时会自动使用当前时间；Prompt 需要一条条添加到列表里，每条 Prompt 可附参考图，也可以设置重复生成张数。',
       step3: '3. 提交后任务会先排队，明细会展示已提交的 Prompt；图片预览默认不加载，点击明细里的预览按钮才会加载单张图。',
       step4: '4. 完成后可以下载 ZIP；部分失败时，更多菜单里可以只重试失败项。当前结算仍按成功输出图张数计算，不单独对参考图加价。',

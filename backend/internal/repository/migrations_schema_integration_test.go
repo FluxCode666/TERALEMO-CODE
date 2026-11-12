@@ -60,8 +60,13 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireColumn(t, tx, "groups", "force_openai_fast", "boolean", 0, false)
 	requireColumn(t, tx, "groups", "free_openai_fast", "boolean", 0, false)
 
-	// api_keys: key length should be 128
-	requireColumn(t, tx, "api_keys", "key", "character varying", 128, false)
+	// API credentials are hash-only; the retired plaintext column stays NULL.
+	requireColumn(t, tx, "api_keys", "key", "character varying", 128, true)
+	requireColumn(t, tx, "api_keys", "key_hash", "character varying", 64, false)
+	requireColumn(t, tx, "api_keys", "key_hint", "character varying", 32, false)
+	requirePartialUniqueIndexDefinition(t, tx, "api_keys", "api_keys_key_hash_key", "(key_hash)")
+	requireConstraintDefinitionContains(t, tx, "api_keys", "api_keys_no_plaintext_key", "key IS NULL")
+	requireConstraintDefinitionContains(t, tx, "api_keys", "api_keys_key_hash_format", "key_hash", "^[0-9a-f]{64}$")
 
 	// redeem_codes: subscription fields
 	requireColumn(t, tx, "redeem_codes", "group_id", "bigint", 0, true)

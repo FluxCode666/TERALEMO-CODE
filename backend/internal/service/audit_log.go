@@ -213,6 +213,10 @@ func redactStoredAuditLog(entry *AuditLog) *AuditLog {
 		return nil
 	}
 	copy := *entry
+	if copy.CredentialMasked != "" {
+		// Old partial masks cannot be safely converted without the credential.
+		copy.CredentialMasked = "..."
+	}
 	if copy.RequestBody != "" && !strings.HasPrefix(copy.RequestBody, "<") {
 		// Historical bodies may predate a sensitive key, or contain truncated JSON.
 		copy.RequestBody = RedactAuditBody([]byte(copy.RequestBody), "application/json")
@@ -248,17 +252,14 @@ func redactAuditValue(value any, depth int) any {
 	}
 }
 
-// MaskAuditCredential 对请求头中的凭证做首尾保留掩码：
-// 保留前 6 位与后 4 位，中间以 **** 表示；过短的凭证整体掩码。
+// MaskAuditCredential uses the shared API-key hint policy for API-key headers.
+// Callers must fully hide JWTs and other unclassified authorization values.
 func MaskAuditCredential(credential string) string {
 	credential = strings.TrimSpace(credential)
 	if credential == "" {
 		return ""
 	}
-	if len(credential) <= 14 {
-		return "****"
-	}
-	return credential[:6] + "****" + credential[len(credential)-4:]
+	return MaskAPIKey(credential)
 }
 
 // RedactAuditQuery 对 URL query 做轻量脱敏后返回。

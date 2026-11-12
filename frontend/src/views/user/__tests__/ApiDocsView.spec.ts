@@ -1,5 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,13 +27,24 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ isReady: () => Promise.resolv
 import ApiDocsView from '../ApiDocsView.vue'
 
 const userKey = { id: 5, name: 'Prod key', key: 'sk-full-secret-key-1234' }
+const mountedViews: VueWrapper[] = []
 
 function render() {
-  return mount(ApiDocsView, {
+  const wrapper = mount(ApiDocsView, {
     attachTo: document.body,
     global: { stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } }
   })
+  mountedViews.push(wrapper)
+  return wrapper
 }
+
+afterEach(() => {
+  // Failed assertions must not leave duplicate anchor IDs for the next test.
+  for (const wrapper of mountedViews.splice(0)) {
+    if (wrapper.exists()) wrapper.unmount()
+  }
+  document.body.replaceChildren()
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -79,18 +90,18 @@ describe('ApiDocsView', () => {
     wrapper.unmount()
   })
 
-  it('fills the selected full key into examples and shows the placeholder otherwise', async () => {
+  it('keeps placeholders in examples regardless of key selection', async () => {
     const wrapper = render()
     await flushPromises()
-    expect(wrapper.text()).toContain('sk-YOUR_KEY')
+    expect(wrapper.text()).toContain('YOUR_API_KEY')
     expect(wrapper.text()).not.toContain('sk-full-secret-key-1234')
     const select = wrapper.get('#api-docs-key')
-    expect(select.text()).toContain('Prod key (sk-ful…1234)')
+    expect(select.text()).toContain('Prod key (sk-...)')
     await select.setValue('5')
-    expect(wrapper.text()).toContain('Authorization: Bearer sk-full-secret-key-1234')
-    expect(wrapper.text()).not.toContain('sk-YOUR_KEY')
+    expect(wrapper.text()).toContain('Authorization: Bearer YOUR_API_KEY')
+    expect(wrapper.text()).not.toContain('sk-full-secret-key-1234')
     await select.setValue('0')
-    expect(wrapper.text()).toContain('sk-YOUR_KEY')
+    expect(wrapper.text()).toContain('YOUR_API_KEY')
     wrapper.unmount()
   })
 
@@ -104,12 +115,24 @@ describe('ApiDocsView', () => {
     await flushPromises()
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1)
     const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]![0] as string
-    expect(copied).toContain('Authorization: Bearer sk-YOUR_KEY')
+    expect(copied).toContain('Authorization: Bearer YOUR_API_KEY')
     expect(copied).toContain(window.location.origin)
     expect(copied).not.toContain('{{API_KEY}}')
     expect(copied).not.toContain('{{BASE_URL}}')
     expect(mocks.showSuccess).toHaveBeenCalled()
     wrapper.unmount()
+  })
+
+  it('shows server-provided hints without filling them into examples', async () => {
+    mocks.listKeys.mockResolvedValue({ items: [{ ...userKey, key: 'sk-...9xYz', key_hint: 'sk-...9xYz' }] })
+    const wrapper = render()
+    await flushPromises()
+    expect(wrapper.get('#api-docs-key').text()).toContain('Prod key (sk-...9xYz)')
+    await wrapper.get('#api-docs-key').setValue('5')
+    const examples = wrapper.findAll('pre').map(block => block.text()).join('\n')
+    expect(examples).toContain('Authorization: Bearer YOUR_API_KEY')
+    expect(examples).not.toContain('sk-...9xYz')
+    // Exercise automatic cleanup instead of relying on a trailing unmount.
   })
 
   it('switches the docs body between English and Chinese with the locale', async () => {
@@ -132,7 +155,7 @@ describe('ApiDocsView', () => {
     mocks.listKeys.mockRejectedValue(new Error('offline'))
     const wrapper = render()
     await flushPromises()
-    expect(wrapper.text()).toContain('sk-YOUR_KEY')
+    expect(wrapper.text()).toContain('YOUR_API_KEY')
     expect(wrapper.get('#api-docs-key').findAll('option')).toHaveLength(1)
     wrapper.unmount()
   })
@@ -141,13 +164,13 @@ describe('ApiDocsView', () => {
     const first = render()
     await flushPromises()
     await first.get('#api-docs-key').setValue('5')
-    expect(first.text()).toContain('Authorization: Bearer sk-full-secret-key-1234')
+    expect(first.text()).toContain('Authorization: Bearer YOUR_API_KEY')
     first.unmount()
     mocks.setLocale('zh')
     const second = render()
     await flushPromises()
-    expect(second.text()).toContain('Authorization: Bearer sk-full-secret-key-1234')
-    expect(second.text()).not.toContain('sk-YOUR_KEY')
+    expect(second.text()).toContain('Authorization: Bearer YOUR_API_KEY')
+    expect(second.text()).not.toContain('sk-full-secret-key-1234')
     expect((second.get('#api-docs-key').element as HTMLSelectElement).value).toBe('5')
     second.unmount()
   })

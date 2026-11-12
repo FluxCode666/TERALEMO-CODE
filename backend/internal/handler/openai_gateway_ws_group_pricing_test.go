@@ -73,8 +73,15 @@ func (s *wsGroupPricingAPIKeyRepoStub) GetByKeyForAuth(ctx context.Context, key 
 	return &apiKey, nil
 }
 
-func (s *wsGroupPricingAPIKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
-	return []string{s.apiKey.Key}, nil
+func (s *wsGroupPricingAPIKeyRepoStub) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
+	if id != s.apiKey.ID {
+		return nil, service.ErrAPIKeyNotFound
+	}
+	return s.GetByKeyForAuth(ctx, s.apiKey.Key)
+}
+
+func (s *wsGroupPricingAPIKeyRepoStub) ListKeyHashesByGroupID(ctx context.Context, groupID int64) ([]string, error) {
+	return []string{service.HashAPIKey(s.apiKey.Key)}, nil
 }
 
 // adminUpdate 模拟管理端改 Key/分组后按分组失效认证缓存（与 admin 分组更新同一入口）。
@@ -189,10 +196,10 @@ func TestOpenAIResponsesWebSocket_FailedKeyRefreshRequiresReconnect(t *testing.T
 	require.GreaterOrEqual(t, repo.lookupCount(), 2, "the second turn must have attempted a refresh")
 }
 
-type wsTurnAPIKeyLookupFunc func(ctx context.Context, key string) (*service.APIKey, error)
+type wsTurnAPIKeyLookupFunc func(ctx context.Context, id int64) (*service.APIKey, error)
 
-func (f wsTurnAPIKeyLookupFunc) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
-	return f(ctx, key)
+func (f wsTurnAPIKeyLookupFunc) GetByIDForAuth(ctx context.Context, id int64) (*service.APIKey, error) {
+	return f(ctx, id)
 }
 
 func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
@@ -220,8 +227,8 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 	}
 
 	t.Run("same group adopts the latest group and user snapshot", func(t *testing.T) {
-		got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(ctx context.Context, key string) (*service.APIKey, error) {
-			require.Equal(t, "sk-conn", key)
+		got := refreshOpenAIWSTurnBillingAPIKey(context.Background(), wsTurnAPIKeyLookupFunc(func(ctx context.Context, id int64) (*service.APIKey, error) {
+			require.Equal(t, conn.ID, id)
 			return latestWith(nil), nil
 		}), conn)
 		require.NotSame(t, conn, got)
@@ -233,26 +240,26 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 	})
 
 	keep := map[string]wsTurnAPIKeyLookupFunc{
-		"lookup error": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"lookup error": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return nil, errors.New("boom")
 		},
-		"not found": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"not found": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return nil, service.ErrAPIKeyNotFound
 		},
-		"nil key": func(ctx context.Context, key string) (*service.APIKey, error) { return nil, nil },
-		"different key id": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"nil key": func(ctx context.Context, id int64) (*service.APIKey, error) { return nil, nil },
+		"different key id": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return latestWith(func(k *service.APIKey) { k.ID = 6 }), nil
 		},
-		"moved group": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"moved group": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return latestWith(func(k *service.APIKey) { other := int64(78); k.GroupID = &other; k.Group.ID = other }), nil
 		},
-		"no group": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"no group": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return latestWith(func(k *service.APIKey) { k.Group = nil }), nil
 		},
-		"platform changed": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"platform changed": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return latestWith(func(k *service.APIKey) { k.Group.Platform = service.PlatformAnthropic }), nil
 		},
-		"billing type changed": func(ctx context.Context, key string) (*service.APIKey, error) {
+		"billing type changed": func(ctx context.Context, id int64) (*service.APIKey, error) {
 			return latestWith(func(k *service.APIKey) { k.Group.SubscriptionType = service.SubscriptionTypeSubscription }), nil
 		},
 	}
@@ -268,14 +275,14 @@ func TestRefreshOpenAIWSTurnBillingAPIKey(t *testing.T) {
 		})
 	}
 
-	t.Run("no credential closes and no group still refreshes status", func(t *testing.T) {
+	t.Run("no identity closes and no group still refreshes status", func(t *testing.T) {
 		called := false
-		lookup := wsTurnAPIKeyLookupFunc(func(ctx context.Context, key string) (*service.APIKey, error) {
+		lookup := wsTurnAPIKeyLookupFunc(func(ctx context.Context, id int64) (*service.APIKey, error) {
 			called = true
 			return latestWith(nil), nil
 		})
 		noKey := *conn
-		noKey.Key = ""
+		noKey.ID = 0
 		require.Nil(t, refreshOpenAIWSTurnBillingAPIKey(context.Background(), lookup, &noKey))
 		noGroup := *conn
 		noGroup.Group = nil

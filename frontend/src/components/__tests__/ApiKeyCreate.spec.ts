@@ -6,6 +6,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { defineComponent, ref, reactive } from 'vue'
+import CreatedKeyDialog from '@/components/keys/CreatedKeyDialog.vue'
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
+const copyCreatedKey = vi.fn().mockResolvedValue(true)
+vi.mock('@/composables/useClipboard', () => ({
+  useClipboard: () => ({ copyToClipboard: (...args: unknown[]) => copyCreatedKey(...args) }),
+}))
 
 // Mock keysAPI
 const mockCreate = vi.fn()
@@ -180,5 +190,36 @@ describe('ApiKey 创建流程', () => {
     await flushPromises()
 
     expect(wrapper.find('button').attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('CreatedKeyDialog', () => {
+  it('requires a saved acknowledgement and ignores escape and backdrop clicks', async () => {
+    const wrapper = mount(CreatedKeyDialog, { props: { apiKey: 'sk-one-time-test-credential' } })
+    await flushPromises()
+    expect(document.body.textContent).toContain('sk-one-time-test-credential')
+    const close = document.body.querySelector<HTMLButtonElement>('[data-testid="close-created-key"]')!
+    expect(close.disabled).toBe(true)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.body.querySelector('.modal-overlay')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+    expect(document.body.querySelector('.modal-overlay')).not.toBeNull()
+    expect(document.body.querySelector('[aria-label="Close modal"]')).toBeNull()
+    document.body.querySelector<HTMLButtonElement>('[data-testid="copy-created-key"]')!.click()
+    await flushPromises()
+    expect(copyCreatedKey).toHaveBeenCalledWith('sk-one-time-test-credential', 'keys.copied')
+    const checkbox = document.body.querySelector<HTMLInputElement>('[data-testid="confirm-key-saved"]')!
+    checkbox.checked = true
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+    expect(close.disabled).toBe(false)
+    close.click()
+    await flushPromises()
+    expect(wrapper.emitted('saved')).toHaveLength(1)
+    await wrapper.setProps({ apiKey: '' })
+    await flushPromises()
+    expect(document.body.textContent).not.toContain('sk-one-time-test-credential')
+    wrapper.unmount()
   })
 })

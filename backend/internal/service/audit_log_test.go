@@ -13,9 +13,12 @@ func TestMaskAuditCredential(t *testing.T) {
 		want string
 	}{
 		{"empty", "", ""},
-		{"short", "abc", "****"},
-		{"boundary_14", "12345678901234", "****"},
-		{"long", "sk-ant-api03-abcdefghijklmnop1234", "sk-ant****1234"},
+		{"short", "abc", "..."},
+		{"legacy_custom", "4b9e6a1f80c2d573", "..."},
+		{"boundary_14", "12345678901234", "..."},
+		{"long", "sk-ant-api03-abcdefghijklmnop1234", "sk-...1234"},
+		{"unknown_prefix", "tenant_" + strings.Repeat("a", 32), "...aaaa"},
+		{"whitespace", " sk-" + strings.Repeat("a", 32) + " ", "sk-...aaaa"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

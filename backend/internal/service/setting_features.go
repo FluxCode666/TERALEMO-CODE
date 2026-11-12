@@ -601,14 +601,7 @@ func (s *SettingService) GetAdminAPIKeyStatus(ctx context.Context) (maskedKey st
 		return "", false, nil
 	}
 
-	// 脱敏：显示前 10 位和后 4 位
-	if len(key) > 14 {
-		maskedKey = key[:10] + "..." + key[len(key)-4:]
-	} else {
-		maskedKey = key
-	}
-
-	return maskedKey, true, nil
+	return MaskAPIKey(key), true, nil
 }
 
 // GetAdminAPIKey 获取完整的管理员 API Key（仅供内部验证使用）

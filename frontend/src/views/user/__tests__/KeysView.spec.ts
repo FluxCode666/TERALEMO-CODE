@@ -172,6 +172,7 @@ const DataTableStub = {
         >
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
+        <div data-test="key-value"><slot name="cell-key" :value="row.key" :row="row" /></div>
         <slot name="cell-name" :value="row.name" :row="row" />
         <slot name="cell-actions" :row="row" />
         <div data-test="current-concurrency">
@@ -295,6 +296,16 @@ describe('user KeysView column settings', () => {
     getAvailableGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
+  })
+
+  it('shows a masked identifier without any copy action in the key column', async () => {
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), key_hint: 'sk-test...abcd' }], total: 1, pages: 1 })
+    const wrapper = await mountView()
+    const cell = wrapper.get('[data-test="key-value"]')
+    expect(cell.text()).toBe('sk-test...abcd')
+    expect(cell.find('button').exists()).toBe(false)
+    expect(copyToClipboard).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it.each([
@@ -616,6 +627,59 @@ describe('user KeysView column settings', () => {
       await flushPromises()
       expect(keysAPI.create).toHaveBeenCalledOnce()
       expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 5])
+      expect(wrapper.get('[data-testid="created-api-key"]').text()).toBe('sk-test-key')
+      expect(wrapper.get('[data-testid="close-created-key"]').attributes('disabled')).toBeDefined()
+      await wrapper.get('[data-testid="confirm-key-saved"]').setValue(true)
+      await wrapper.get('[data-testid="close-created-key"]').trigger('click')
+      expect(wrapper.find('[data-testid="created-api-key"]').exists()).toBe(false)
+      await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
+      expect(wrapper.find('[data-testid="created-api-key"]').exists()).toBe(false)
+    })
+
+    it('does not present a masked replay result as a new full key', async () => {
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), key: 'sk-test...abcd', key_hint: 'sk-test...abcd', group_id: 1 })
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('My key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="created-api-key"]').exists()).toBe(false)
+      expect(showSuccess).toHaveBeenCalledWith('keys.showOnce.replayed')
+      wrapper.unmount()
+    })
+
+    it.each([
+      [16, 'keys.customKeyTooShort'],
+      [31, 'keys.customKeyTooShort'],
+      [129, 'keys.customKeyTooLong'],
+    ])('rejects a %i-character custom credential before creating', async (length, error) => {
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Custom key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      const toggle = wrapper.findAll('button').find(button => button.classes().includes('w-9'))!
+      await toggle.trigger('click')
+      await wrapper.get('input[placeholder="keys.customKeyPlaceholder"]').setValue('a'.repeat(length))
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(keysAPI.create).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenCalledWith(error)
+      wrapper.unmount()
+    })
+
+    it.each([32, 128])('accepts a %i-character custom credential', async length => {
+      const credential = 'a'.repeat(length)
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), key: credential, key_hint: '...aaaa' })
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Custom key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      const toggle = wrapper.findAll('button').find(button => button.classes().includes('w-9'))!
+      await toggle.trigger('click')
+      await wrapper.get('input[placeholder="keys.customKeyPlaceholder"]').setValue(credential)
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 3)).toEqual(['Custom key', 1, credential])
+      expect(wrapper.get('[data-testid="created-api-key"]').text()).toBe(credential)
+      wrapper.unmount()
     })
 
     it('defaults to a provider with available groups and disables empty categories', async () => {

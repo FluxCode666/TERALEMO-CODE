@@ -21,6 +21,24 @@ func executeUserIdempotentJSON(
 	ttl time.Duration,
 	execute func(context.Context) (any, error),
 ) {
+	executeUserIdempotentJSONWithPresenter(c, scope, payload, ttl, execute, nil)
+}
+
+// present runs after persistence so one-time secrets never enter replay storage.
+func executeUserIdempotentJSONWithPresenter(
+	c *gin.Context,
+	scope string,
+	payload any,
+	ttl time.Duration,
+	execute func(context.Context) (any, error),
+	present func(any) any,
+) {
+	writeSuccess := func(data any) {
+		if present != nil {
+			data = present(data)
+		}
+		response.Success(c, data)
+	}
 	coordinator := service.DefaultIdempotencyCoordinator()
 	if coordinator == nil {
 		data, err := execute(c.Request.Context())
@@ -28,7 +46,7 @@ func executeUserIdempotentJSON(
 			response.ErrorFrom(c, err)
 			return
 		}
-		response.Success(c, data)
+		writeSuccess(data)
 		return
 	}
 
@@ -61,5 +79,5 @@ func executeUserIdempotentJSON(
 	if result != nil && result.Replayed {
 		c.Header("X-Idempotency-Replayed", "true")
 	}
-	response.Success(c, result.Data)
+	writeSuccess(result.Data)
 }

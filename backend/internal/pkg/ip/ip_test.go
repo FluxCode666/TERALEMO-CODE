@@ -10,6 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestForwardedClientIPHeadersReturnsSnapshotCopy(t *testing.T) {
+	require.Empty(t, ForwardedClientIPHeaders(nil))
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	headers := []string{"X-Viewer-IP"}
+	SetForwardedIPSettings(c, true, headers)
+	headers[0] = "X-Changed-Input"
+	copyHeaders := ForwardedClientIPHeaders(c)
+	require.Equal(t, []string{"X-Viewer-IP"}, copyHeaders)
+	copyHeaders[0] = "X-Changed-Output"
+	require.Equal(t, []string{"X-Viewer-IP"}, ForwardedClientIPHeaders(c))
+}
+
 func TestGetTrustedClientIPUsesGinClientIP(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

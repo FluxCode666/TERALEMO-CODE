@@ -28,7 +28,8 @@ var (
 	ErrGroupNotAllowed                = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrEnterpriseGatewayGroupRequired = infraerrors.BadRequest("ENTERPRISE_GROUP_NOT_ALLOWED", "企业成员必须绑定分组")
 	ErrAPIKeyExists                   = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
+	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 32 characters")
+	ErrAPIKeyTooLong                  = infraerrors.BadRequest("API_KEY_TOO_LONG", "api key must be at most 128 characters")
 	ErrAPIKeyInvalidChars             = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
 	ErrAPIKeyRateLimited              = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrAPIKeyCreateLimited            = infraerrors.TooManyRequests("API_KEY_CREATE_RATE_LIMITED", "too many api keys created recently, please try again later")
@@ -47,6 +48,7 @@ var (
 )
 
 const (
+	MinCustomAPIKeyCharacters    = 32
 	MaxAPIKeyCredentialBytes     = 128
 	defaultAuthLookupConcurrency = 64
 	defaultNegativeAuthCacheSize = 16384
@@ -89,8 +91,8 @@ func (f APIKeyUpdateFields) IsEmpty() bool {
 type APIKeyRepository interface {
 	Create(ctx context.Context, key *APIKey) error
 	GetByID(ctx context.Context, id int64) (*APIKey, error)
-	// GetKeyAndOwnerID 仅获取 API Key 的 key 与所有者 ID，用于删除等轻量场景
-	GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error)
+	// GetKeyHashAndOwnerID returns the cache hash and owner, never a credential.
+	GetKeyHashAndOwnerID(ctx context.Context, id int64) (string, int64, error)
 	GetByKey(ctx context.Context, key string) (*APIKey, error)
 	// GetByKeyForAuth 认证专用查询，返回最小字段集
 	GetByKeyForAuth(ctx context.Context, key string) (*APIKey, error)
@@ -112,8 +114,8 @@ type APIKeyRepository interface {
 	// UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 	UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error)
 	CountByGroupID(ctx context.Context, groupID int64) (int64, error)
-	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)
-	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error)
+	ListKeyHashesByUserID(ctx context.Context, userID int64) ([]string, error)
+	ListKeyHashesByGroupID(ctx context.Context, groupID int64) ([]string, error)
 
 	// Quota methods
 	IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error)
@@ -185,7 +187,7 @@ func (d *APIKeyRateLimitData) EffectiveUsage7d() float64 {
 type APIKeyQuotaUsageState struct {
 	QuotaUsed float64
 	Quota     float64
-	Key       string
+	KeyHash   string
 	Status    string
 }
 
@@ -223,7 +225,7 @@ func NotifyAuthCacheSubscriptionReady(ctx context.Context) {
 
 // APIKeyAuthCacheInvalidator 提供认证缓存失效能力
 type APIKeyAuthCacheInvalidator interface {
-	InvalidateAuthCacheByKey(ctx context.Context, key string)
+	InvalidateAuthCacheByHash(ctx context.Context, key string)
 	InvalidateAuthCacheByUserID(ctx context.Context, userID int64)
 	InvalidateAuthCacheByGroupID(ctx context.Context, groupID int64)
 }
@@ -438,13 +440,19 @@ func (s *APIKeyService) GenerateKey() (string, error) {
 	}
 
 	key := prefix + hex.EncodeToString(bytes)
+	if len(key) > MaxAPIKeyCredentialBytes {
+		return "", ErrAPIKeyTooLong
+	}
 	return key, nil
 }
 
 // ValidateCustomKey 验证自定义API Key格式
 func (s *APIKeyService) ValidateCustomKey(key string) error {
+	if len(key) > MaxAPIKeyCredentialBytes {
+		return ErrAPIKeyTooLong
+	}
 	// 检查长度
-	if len(key) < 16 {
+	if len(key) < MinCustomAPIKeyCharacters {
 		return ErrAPIKeyTooShort
 	}
 
@@ -610,6 +618,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
+	if len(key) > MaxAPIKeyCredentialBytes {
+		return nil, ErrAPIKeyTooLong
+	}
+
 	if err := s.checkAPIKeyCreateLimits(ctx, userID); err != nil {
 		return nil, err
 	}
@@ -618,6 +630,8 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	apiKey := &APIKey{
 		UserID:      userID,
 		Key:         key,
+		KeyHash:     HashAPIKey(key),
+		KeyHint:     MaskAPIKey(key),
 		Name:        html.EscapeString(req.Name),
 		GroupID:     req.GroupID,
 		Status:      StatusActive,
@@ -640,7 +654,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		return nil, fmt.Errorf("create api key: %w", err)
 	}
 
-	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+	s.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 	s.compileAPIKeyIPRules(apiKey)
 
 	return apiKey, nil
@@ -784,6 +798,21 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 	return apiKey, nil
 }
 
+// GetByIDForAuth loads current permissions for an owned server-side replay.
+func (s *APIKeyService) GetByIDForAuth(ctx context.Context, id int64) (*APIKey, error) {
+	if s == nil || s.apiKeyRepo == nil || id <= 0 {
+		return nil, ErrAPIKeyNotFound
+	}
+	key, err := s.withAuthLookupSlot(ctx, func() (*APIKey, error) {
+		return s.apiKeyRepo.GetByID(ctx, id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.compileAPIKeyIPRules(key)
+	return key, nil
+}
+
 // GetTaskMetadataByIDs loads one page's display identities without full key
 // hydration or per-key concurrency/enterprise queries. Legacy repositories may
 // fall back to one lookup per distinct key; a failed batch never fans out.
@@ -872,7 +901,9 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	if err != nil {
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
-	apiKey.Key = key
+	apiKey.Key = ""
+	apiKey.KeyHash = HashAPIKey(key)
+	apiKey.KeyHint = MaskAPIKey(key)
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey, nil
 }
@@ -1029,7 +1060,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		return nil, fmt.Errorf("update api key: %w", err)
 	}
 
-	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+	s.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 	s.compileAPIKeyIPRules(apiKey)
 
 	// Invalidate Redis rate limit cache so reset takes effect immediately
@@ -1042,7 +1073,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 // Delete 删除API Key
 func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) error {
-	key, ownerID, err := s.apiKeyRepo.GetKeyAndOwnerID(ctx, id)
+	key, ownerID, err := s.apiKeyRepo.GetKeyHashAndOwnerID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get api key: %w", err)
 	}
@@ -1059,7 +1090,7 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 
 	// 删除成功后再清理缓存,避免"缓存已清但删除失败"的竞态。
 	// 注意:不清零创建相关计数,否则"删除后反复新建"即可绕过创建限流。
-	s.InvalidateAuthCacheByKey(ctx, key)
+	s.InvalidateAuthCacheByHash(ctx, key)
 	s.lastUsedTouchL1.Delete(id)
 
 	return nil
@@ -1286,8 +1317,8 @@ func (s *APIKeyService) UpdateQuotaUsed(ctx context.Context, apiKeyID int64, cos
 		if err != nil {
 			return fmt.Errorf("increment quota used: %w", err)
 		}
-		if state != nil && state.Status == StatusAPIKeyQuotaExhausted && strings.TrimSpace(state.Key) != "" {
-			s.InvalidateAuthCacheByKey(ctx, state.Key)
+		if state != nil && state.Status == StatusAPIKeyQuotaExhausted && strings.TrimSpace(state.KeyHash) != "" {
+			s.InvalidateAuthCacheByHash(ctx, state.KeyHash)
 		}
 		return nil
 	}
@@ -1313,7 +1344,7 @@ func (s *APIKeyService) UpdateQuotaUsed(ctx context.Context, apiKeyID int64, cos
 			return nil // Don't fail the request
 		}
 		// Invalidate cache so next request sees the new status
-		s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		s.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 	}
 
 	return nil

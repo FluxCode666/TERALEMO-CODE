@@ -45,6 +45,12 @@ func requestForwardedIPSettings(c *gin.Context) (forwardedIPSettings, bool) {
 	return settings, ok
 }
 
+// ForwardedClientIPHeaders returns a copy of this request's custom IP headers.
+func ForwardedClientIPHeaders(c *gin.Context) []string {
+	settings, _ := requestForwardedIPSettings(c)
+	return append([]string(nil), settings.headers...)
+}
+
 func requestUsesLegacyForwardedIPTrust(c *gin.Context) bool {
 	settings, ok := requestForwardedIPSettings(c)
 	return !ok || settings.trustForwarded

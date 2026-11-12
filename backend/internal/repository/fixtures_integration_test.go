@@ -273,7 +273,8 @@ func mustCreateApiKey(t *testing.T, client *dbent.Client, k *service.APIKey) *se
 
 	create := client.APIKey.Create().
 		SetUserID(k.UserID).
-		SetKey(k.Key).
+		SetKeyHash(service.HashAPIKey(k.Key)).
+		SetKeyHint(service.MaskAPIKey(k.Key)).
 		SetName(k.Name).
 		SetStatus(k.Status)
 	if k.Quota != 0 {
@@ -326,6 +327,8 @@ func mustCreateApiKey(t *testing.T, client *dbent.Client, k *service.APIKey) *se
 	require.NoError(t, err, "create api key")
 
 	k.ID = created.ID
+	k.KeyHash = created.KeyHash
+	k.KeyHint = created.KeyHint
 	k.CreatedAt = created.CreatedAt
 	k.UpdatedAt = created.UpdatedAt
 	return k

@@ -21,6 +21,7 @@ type APIKey struct {
 func (APIKey) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Table: "api_keys"},
+		entsql.Checks(map[string]string{"api_keys_no_plaintext_key": "key IS NULL"}),
 	}
 }
 
@@ -36,8 +37,17 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("user_id"),
 		field.String("key").
 			MaxLen(128).
-			NotEmpty().
+			Optional().
+			Sensitive().
 			Unique(),
+		field.String("key_hash").
+			MaxLen(64).
+			NotEmpty().
+			Sensitive().
+			Unique(),
+		field.String("key_hint").
+			MaxLen(32).
+			NotEmpty(),
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),
@@ -135,7 +145,7 @@ func (APIKey) Edges() []ent.Edge {
 
 func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
-		// key 字段已在 Fields() 中声明 Unique()，无需重复索引
+		// Credential fields declare their unique indexes in Fields().
 		index.Fields("user_id"),
 		index.Fields("group_id"),
 		index.Fields("status"),

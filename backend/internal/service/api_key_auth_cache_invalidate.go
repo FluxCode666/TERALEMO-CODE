@@ -2,13 +2,12 @@ package service
 
 import "context"
 
-// InvalidateAuthCacheByKey 清除指定 API Key 的认证缓存
-func (s *APIKeyService) InvalidateAuthCacheByKey(ctx context.Context, key string) {
-	if key == "" {
+// InvalidateAuthCacheByHash accepts the stored SHA-256 index without hashing again.
+func (s *APIKeyService) InvalidateAuthCacheByHash(ctx context.Context, keyHash string) {
+	if keyHash == "" {
 		return
 	}
-	cacheKey := s.authCacheKey(key)
-	s.deleteAuthCache(ctx, cacheKey)
+	s.deleteAuthCache(ctx, keyHash)
 }
 
 // InvalidateAuthCacheByUserID 清除用户相关的 API Key 认证缓存
@@ -16,11 +15,11 @@ func (s *APIKeyService) InvalidateAuthCacheByUserID(ctx context.Context, userID 
 	if userID <= 0 {
 		return
 	}
-	keys, err := s.apiKeyRepo.ListKeysByUserID(ctx, userID)
+	keys, err := s.apiKeyRepo.ListKeyHashesByUserID(ctx, userID)
 	if err != nil {
 		return
 	}
-	s.deleteAuthCacheByKeys(ctx, keys)
+	s.deleteAuthCacheByHashes(ctx, keys)
 }
 
 // InvalidateAuthCacheByGroupID 清除分组相关的 API Key 认证缓存
@@ -28,14 +27,14 @@ func (s *APIKeyService) InvalidateAuthCacheByGroupID(ctx context.Context, groupI
 	if groupID <= 0 {
 		return
 	}
-	keys, err := s.apiKeyRepo.ListKeysByGroupID(ctx, groupID)
+	keys, err := s.apiKeyRepo.ListKeyHashesByGroupID(ctx, groupID)
 	if err != nil {
 		return
 	}
-	s.deleteAuthCacheByKeys(ctx, keys)
+	s.deleteAuthCacheByHashes(ctx, keys)
 }
 
-func (s *APIKeyService) deleteAuthCacheByKeys(ctx context.Context, keys []string) {
+func (s *APIKeyService) deleteAuthCacheByHashes(ctx context.Context, keys []string) {
 	if len(keys) == 0 {
 		return
 	}
@@ -43,6 +42,6 @@ func (s *APIKeyService) deleteAuthCacheByKeys(ctx context.Context, keys []string
 		if key == "" {
 			continue
 		}
-		s.deleteAuthCache(ctx, s.authCacheKey(key))
+		s.deleteAuthCache(ctx, key)
 	}
 }

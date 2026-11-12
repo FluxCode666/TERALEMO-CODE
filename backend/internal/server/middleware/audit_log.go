@@ -277,7 +277,7 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 			}
 		}
 
-		// 请求头凭证掩码（仅保留首尾）。
+		// API keys share the credential hint policy; session tokens are hidden.
 		entry.CredentialMasked = MaskedRequestCredential(c)
 
 		extra := map[string]any{}
@@ -315,7 +315,7 @@ type restoredBody struct {
 
 func (b *restoredBody) Close() error { return b.closer.Close() }
 
-// MaskedRequestCredential 提取请求头中的凭证并做首尾掩码。
+// MaskedRequestCredential masks API keys and fully hides other credentials.
 func MaskedRequestCredential(c *gin.Context) string {
 	if apiKey := strings.TrimSpace(c.GetHeader("x-api-key")); apiKey != "" {
 		return "x-api-key " + service.MaskAuditCredential(apiKey)
@@ -326,9 +326,17 @@ func MaskedRequestCredential(c *gin.Context) string {
 	}
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) == 2 {
-		return parts[0] + " " + service.MaskAuditCredential(strings.TrimSpace(parts[1]))
+		if c.GetString("auth_method") == service.AuditAuthMethodAdminAPIKey {
+			return "Bearer " + service.MaskAuditCredential(strings.TrimSpace(parts[1]))
+		}
+		switch strings.ToLower(parts[0]) {
+		case "bearer":
+			return "Bearer ..."
+		case "basic":
+			return "Basic ..."
+		}
 	}
-	return service.MaskAuditCredential(authHeader)
+	return "..."
 }
 
 // deriveAuditAction 由 method + 路由模板自动推导动作名，
