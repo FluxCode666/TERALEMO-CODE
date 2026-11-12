@@ -58,14 +58,20 @@ func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	if _, configured := c.Get(proxyPolicyKey); configured {
+	value, configured := c.Get(proxyPolicyKey)
+	policy, valid := value.(ProxyPolicy)
+	legacyMetadata := configured && valid && policy.LegacyMetadata
+	if configured && !legacyMetadata {
 		return resolveTrustedClientIP(c)
 	}
 	if !requestUsesLegacyForwardedIPTrust(c) {
+		if legacyMetadata {
+			return normalizeIP(c.ClientIP())
+		}
 		return GetTrustedClientIP(c)
 	}
 	peer := peerAddress(c)
-	if peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
+	if !legacyMetadata && peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
 		return peer.String()
 	}
 

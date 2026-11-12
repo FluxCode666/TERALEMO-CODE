@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -19,6 +20,44 @@ import (
 type allowlistSettingRepo struct {
 	service.SettingRepository
 	values map[string]string
+}
+
+func TestTrustedProxyContextMetadataCompatibilityAndSecurity(t *testing.T) {
+	for _, test := range []struct {
+		name               string
+		enabled            bool
+		trustForwarded     bool
+		proxies            []string
+		metadata, security string
+	}{
+		{"legacy metadata", false, true, nil, "203.0.113.42", "172.18.0.1"},
+		{"legacy forwarding disabled", false, false, nil, "172.18.0.1", "172.18.0.1"},
+		{"allowlist enabled", true, true, nil, "172.18.0.1", "172.18.0.1"},
+		{"configured proxy", false, true, []string{"172.18.0.1"}, "198.51.100.2", "198.51.100.2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := &config.Config{Server: config.ServerConfig{TrustedProxies: test.proxies}}
+			cfg.SetTrustForwardedIPForAPIKeyACL(test.trustForwarded)
+			settings := service.NewSettingService(&allowlistSettingRepo{values: map[string]string{
+				service.SettingKeyModelAllowlistEnabled: strconv.FormatBool(test.enabled),
+			}}, cfg)
+			router := gin.New()
+			require.NoError(t, router.SetTrustedProxies(test.proxies))
+			router.Use(SessionBindingContext(cfg), TrustedProxyContext(settings, cfg))
+			router.GET("/", func(c *gin.Context) {
+				require.Equal(t, test.metadata, ip.GetClientIP(c))
+				require.Equal(t, test.metadata, SecurityClientIP(c))
+				require.Equal(t, test.security, ip.GetSecurityClientIP(c, true))
+				c.Status(http.StatusOK)
+			})
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			request.RemoteAddr = "172.18.0.1:1234"
+			request.Header.Set("X-Real-IP", "172.18.0.1")
+			request.Header.Set("CF-Connecting-IP", "203.0.113.42")
+			request.Header.Set("X-Forwarded-For", "198.51.100.2")
+			router.ServeHTTP(httptest.NewRecorder(), request)
+		})
+	}
 }
 
 func (repo *allowlistSettingRepo) GetMultiple(context.Context, []string) (map[string]string, error) {

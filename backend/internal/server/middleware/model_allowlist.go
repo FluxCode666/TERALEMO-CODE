@@ -20,11 +20,16 @@ func TrustedProxyContext(settings *service.SettingService, cfg *config.Config) g
 			resolved, err := settings.ModelProxyPolicy(c.Request.Context())
 			if err == nil {
 				policy = resolved
+				allowlist, settingsErr := settings.GetModelAllowlist(c.Request.Context())
+				policy.LegacyMetadata = settingsErr == nil && !allowlist.Enabled && len(policy.Local) == 0
 			} else {
 				slog.Warn("trusted proxy settings unavailable", "error", err)
 			}
 		} else if cfg != nil {
 			policy.Local, _ = ip.ParseProxyRanges(cfg.Server.TrustedProxies)
+			policy.LegacyMetadata = len(cfg.Server.TrustedProxies) == 0
+		} else {
+			policy.LegacyMetadata = true
 		}
 		ip.SetProxyPolicy(c, policy)
 		binding := &service.SessionBinding{IP: ip.GetClientIP(c), UserAgent: c.Request.UserAgent()}
