@@ -32,7 +32,8 @@ func TestVideoSubmissionTransportPostgresNoFrozenResidual(t *testing.T) {
 		`INSERT INTO users(id,email,password_hash,balance) VALUES(10,'unsent@video.test','local-test',1)`,
 		`INSERT INTO groups(id,name,platform) VALUES(24,'unsent-video','video')`,
 		`INSERT INTO accounts(id,name,platform,type) VALUES(1,'unsent-video','video','apikey')`,
-		`INSERT INTO api_keys(id,user_id,key,name,group_id) VALUES(20,10,'sk-local-unsent-test','unsent-video',24)`,
+		`INSERT INTO api_keys(id,user_id,key_hash,key_hint,name,group_id)
+		 VALUES(20,10,encode(sha256(convert_to('sk-local-unsent-test','UTF8')),'hex'),'sk-...','unsent-video',24)`,
 	} {
 		_, err := db.Exec(query)
 		require.NoError(t, err)

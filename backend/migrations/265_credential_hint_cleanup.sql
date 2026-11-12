@@ -64,7 +64,8 @@ BEGIN
         last_id := record_row.id;
         BEGIN
             payload := record_row.response_body::jsonb;
-        EXCEPTION WHEN invalid_text_representation THEN
+        -- JSONB also rejects valid JSON containing unsupported Unicode escapes.
+        EXCEPTION WHEN invalid_text_representation OR untranslatable_character THEN
             payload := NULL;
         END;
         IF jsonb_typeof(payload) IS DISTINCT FROM 'object' THEN

@@ -5,6 +5,7 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -60,7 +61,11 @@ func TestCredentialHintCleanupPostgres(t *testing.T) {
 		body  any
 		want  string
 	}
+	nulResponse := `{"id":44,"api_key_masked":"a\u0000bc***"}`
+	require.True(t, json.Valid([]byte(nulResponse)), "escaped NUL is valid JSON even though JSONB cannot represent it")
 	fixtures := []replayFixture{
+		{"admin.channel_monitors.duplicate", nulResponse, `{"api_key_masked":"..."}`},
+		{"admin.channel_monitors.duplicate", `{"data":{"id":45,"api_key_masked":"a\u0000bc***"}}`, `{"api_key_masked":"..."}`},
 		{"admin.channel_monitors.duplicate", `{"id":42,"name":"retained","api_key_masked":"4b9e***","api_key":"legacy-key"}`, `{"id":42,"name":"retained","api_key_masked":"..."}`},
 		{"admin.channel_monitors.duplicate", `{"code":0,"data":{"id":43,"name":"retained","api_key_masked":"4b9e***","api_key":"legacy-key"}}`, `{"code":0,"api_key_masked":"...","data":{"id":43,"name":"retained","api_key_masked":"..."}}`},
 		{"admin.channel_monitors.duplicate", `{"data":["legacy-key"]}`, `{"api_key_masked":"...","data":{"api_key_masked":"..."}}`},

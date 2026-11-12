@@ -70,7 +70,8 @@ func videoFixture(t *testing.T, db *sql.DB, balance, hold float64) *service.Vide
 			t.Fatal(err)
 		}
 	}
-	if err := db.QueryRow(`INSERT INTO api_keys(user_id,key,name,group_id) VALUES($1,$2,'video-test',$3) RETURNING id`, v.UserID, "sk-video-"+unique, v.GroupID).Scan(&v.APIKeyID); err != nil {
+	credential := "sk-video-" + unique
+	if err := db.QueryRow(`INSERT INTO api_keys(user_id,key_hash,key_hint,name,group_id) VALUES($1,$2,$3,'video-test',$4) RETURNING id`, v.UserID, service.HashAPIKey(credential), service.MaskAPIKey(credential), v.GroupID).Scan(&v.APIKeyID); err != nil {
 		t.Fatal(err)
 	}
 	return v

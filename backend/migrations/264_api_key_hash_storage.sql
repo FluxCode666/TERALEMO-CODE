@@ -182,7 +182,8 @@ BEGIN
     LOOP
         BEGIN
             payload := record_row.response_body::jsonb;
-        EXCEPTION WHEN invalid_text_representation THEN
+        -- JSONB also rejects valid JSON containing unsupported Unicode escapes.
+        EXCEPTION WHEN invalid_text_representation OR untranslatable_character THEN
             UPDATE idempotency_records
             SET response_body = jsonb_build_object('key', '...', 'key_hint', '...')::text
             WHERE id = record_row.id;

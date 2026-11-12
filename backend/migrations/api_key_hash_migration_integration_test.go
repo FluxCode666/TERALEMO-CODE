@@ -91,7 +91,8 @@ func TestAPIKeyHashMigrationPostgres(t *testing.T) {
 		('user.api_keys.create', $1),
 		('unrelated.scope', '{"value":"unchanged"}'),
 		('user.api_keys.create', '"sk-json-scalar-credential"'),
-		('user.api_keys.create', '{"id":-1,"key":"sk-deleted-credential"}')`, keys[0].raw)
+		('user.api_keys.create', '{"id":-1,"key":"sk-deleted-credential"}'),
+		('user.api_keys.create', $2)`, keys[0].raw, `{"id":1,"key":"sk-a\u0000bcdefghijklmnop"}`)
 	require.NoError(t, err)
 	content, err := FS.ReadFile("264_api_key_hash_storage.sql")
 	require.NoError(t, err)
@@ -142,6 +143,8 @@ func TestAPIKeyHashMigrationPostgres(t *testing.T) {
 		require.JSONEq(t, `{"key":"...","key_hint":"..."}`, body)
 		require.NoError(t, conn.QueryRowContext(ctx, "SELECT response_body FROM idempotency_records WHERE id = 5").Scan(&body))
 		require.JSONEq(t, `{"id":-1,"key":"...","key_hint":"..."}`, body)
+		require.NoError(t, conn.QueryRowContext(ctx, "SELECT response_body FROM idempotency_records WHERE id = 6").Scan(&body))
+		require.JSONEq(t, `{"key":"...","key_hint":"..."}`, body, "JSONB-incompatible historical credentials must be discarded")
 	}
 	apply()
 	assertMigrated()
