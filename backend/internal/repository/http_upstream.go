@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -205,7 +206,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		return s.doPublicImageDownload(req, proxyURL)
 	}
 	applyGrokCLIProxyHeaders(req)
-	if err := s.validateRequestHost(req); err != nil {
+	if err := s.validateRequestHostForRoute(req, strings.TrimSpace(proxyURL) != ""); err != nil {
 		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
@@ -273,7 +274,7 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	}
 	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo, "profile", profile.Name)
 
-	if err := s.validateRequestHost(req); err != nil {
+	if err := s.validateRequestHostForRoute(req, strings.TrimSpace(proxyURL) != ""); err != nil {
 		service.ConfirmHTTPUpstreamWriteTrace(req)
 		return nil, err
 	}
@@ -431,6 +432,9 @@ func (t *grokAccessDeniedFallbackTransport) RoundTrip(req *http.Request) (*http.
 
 	fallbackReq, err := newGrokOfficialAPIFallbackRequest(req)
 	if err != nil {
+		return resp, nil
+	}
+	if err := outbound.Default().ValidateURL(fallbackReq.Context(), fallbackReq.URL); err != nil {
 		return resp, nil
 	}
 	fallbackResp, fallbackErr := t.base.RoundTrip(fallbackReq)
@@ -646,10 +650,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		return nil, fmt.Errorf("build TLS fingerprint transport: %w", err)
 	}
 
-	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
-		client.CheckRedirect = s.redirectChecker
-	}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectCheckerForRoute(strings.TrimSpace(proxyURL) != "")}
 
 	entry := &upstreamClientEntry{
 		client:   client,
@@ -678,15 +679,22 @@ func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
 	return !s.cfg.Security.URLAllowlist.AllowPrivateHosts
 }
 
-// validateRequestHost 校验请求主机的解析结果不落在回环、私网、链路本地或未指定地址。
-// 是否全局启用由 security.url_allowlist 决定；带 WithHTTPUpstreamPublicHostsOnly 标记的请求无论配置如何都校验。
+// validateRequestHost always enforces outbound policy. Public-only downloads and
+// the optional legacy host policy can impose stricter checks.
 func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
-	publicHostsOnly := req != nil && service.HTTPUpstreamPublicHostsOnly(req.Context())
-	if !s.shouldValidateResolvedIP() && !publicHostsOnly {
-		return nil
-	}
+	return s.validateRequestHostForRoute(req, true)
+}
+
+func (s *httpUpstreamService) validateRequestHostForRoute(req *http.Request, proxied bool) error {
 	if req == nil || req.URL == nil {
 		return errors.New("request url is nil")
+	}
+	if err := outbound.Default().ValidateRequest(req.Context(), req.URL, proxied); err != nil {
+		return err
+	}
+	publicHostsOnly := service.HTTPUpstreamPublicHostsOnly(req.Context())
+	if !s.shouldValidateResolvedIP() && !publicHostsOnly {
+		return nil
 	}
 	host := strings.TrimSpace(req.URL.Hostname())
 	if host == "" {
@@ -703,6 +711,15 @@ func (s *httpUpstreamService) redirectChecker(req *http.Request, via []*http.Req
 		return errors.New("stopped after 10 redirects")
 	}
 	return s.validateRequestHost(req)
+}
+
+func (s *httpUpstreamService) redirectCheckerForRoute(proxied bool) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return s.validateRequestHostForRoute(req, proxied)
+	}
 }
 
 // acquireClient 获取或创建客户端，并标记为进行中请求
@@ -801,10 +818,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		s.mu.Unlock()
 		return nil, fmt.Errorf("build transport: %w", err)
 	}
-	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
-		client.CheckRedirect = s.redirectChecker
-	}
+	client := &http.Client{Transport: transport, CheckRedirect: s.redirectCheckerForRoute(strings.TrimSpace(proxyURL) != "")}
 	entry := &upstreamClientEntry{
 		client:       client,
 		proxyKey:     proxyKey,
@@ -1405,7 +1419,7 @@ func newUpstreamDialer() *net.Dialer {
 //   - ResponseHeaderTimeout: 等待响应头超时（不影响流式传输）
 func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMode string) (*http.Transport, error) {
 	transport := &http.Transport{
-		DialContext:           newUpstreamDialer().DialContext,
+		DialContext:           outbound.DialContext(newUpstreamDialer()),
 		TLSHandshakeTimeout:   defaultUpstreamTLSHandshakeTimeout,
 		MaxIdleConns:          settings.maxIdleConns,
 		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,
@@ -1473,6 +1487,7 @@ func enableHTTP2KeepAlive(transport *http.Transport, protocolMode string) (*http
 //   - socks5: SOCKS5 代理，使用 SOCKS5ProxyDialer（SOCKS5 隧道 + utls 握手）
 func buildUpstreamTransportWithTLSFingerprint(settings poolSettings, proxyURL *url.URL, profile *tlsfingerprint.Profile) (*http.Transport, error) {
 	transport := &http.Transport{
+		DialContext:           outbound.DialContext(newUpstreamDialer()),
 		MaxIdleConns:          settings.maxIdleConns,
 		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,
 		MaxConnsPerHost:       settings.maxConnsPerHost,
@@ -1486,7 +1501,7 @@ func buildUpstreamTransportWithTLSFingerprint(settings poolSettings, proxyURL *u
 	if proxyURL == nil {
 		// 直连：使用 TLSFingerprintDialer
 		slog.Debug("tls_fingerprint_transport_direct")
-		dialer := tlsfingerprint.NewDialer(profile, nil)
+		dialer := tlsfingerprint.NewDialer(profile, outbound.DialContext(newUpstreamDialer()))
 		transport.DialTLSContext = dialer.DialTLSContext
 	} else {
 		scheme := strings.ToLower(proxyURL.Scheme)

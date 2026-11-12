@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
@@ -263,7 +265,7 @@ func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, pro
 
 func createReqClient(proxyURL string) (*req.Client, error) {
 	// 禁用 CookieJar，确保每次授权都是干净的会话
-	client := req.C().
+	client := outboundreq.New().
 		SetTimeout(60 * time.Second).
 		ImpersonateChrome().
 		SetCookieJar(nil) // 禁用 CookieJar

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -25,6 +26,11 @@ type s3ClientParams struct {
 // 通过 SwapComputePayloadSHA256ForUnsignedPayloadMiddleware + RequestChecksumCalculationWhenRequired
 // 规避阿里云 OSS 不兼容 s3manager 分片签名的问题（backup 与 image storage 共用此构造）。
 func newS3Client(ctx context.Context, p s3ClientParams) (*s3.Client, error) {
+	if p.Endpoint != "" {
+		if err := outbound.ValidateLiteralURL(p.Endpoint); err != nil {
+			return nil, err
+		}
+	}
 	region := p.Region
 	if region == "" {
 		region = "auto" // Cloudflare R2 默认 region
@@ -32,6 +38,7 @@ func newS3Client(ctx context.Context, p s3ClientParams) (*s3.Client, error) {
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(region),
+		awsconfig.WithHTTPClient(outbound.NewClient(0)),
 		awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(p.AccessKeyID, p.SecretAccessKey, ""),
 		),

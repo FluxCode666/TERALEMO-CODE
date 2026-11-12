@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -208,7 +209,7 @@ func vertexServiceAccountProxyURL(account *Account) string {
 func newVertexServiceAccountHTTPClient(proxyURL string) (*http.Client, error) {
 	proxyURL = strings.TrimSpace(proxyURL)
 	if proxyURL == "" {
-		return servertiming.InstrumentClient(&http.Client{Timeout: 15 * time.Second}), nil
+		return servertiming.InstrumentClient(outbound.NewClient(15 * time.Second)), nil
 	}
 
 	_, parsedProxy, err := proxyurl.Parse(proxyURL)
@@ -220,11 +221,12 @@ func newVertexServiceAccountHTTPClient(proxyURL string) (*http.Client, error) {
 		return nil, fmt.Errorf("unexpected default transport type %T", http.DefaultTransport)
 	}
 	transport := defaultTransport.Clone()
+	transport.DialContext = outbound.NewTransport().DialContext
 	transport.Proxy = nil
 	if err := proxyutil.ConfigureTransportProxy(transport, parsedProxy); err != nil {
 		return nil, err
 	}
-	return servertiming.InstrumentClient(&http.Client{Timeout: 15 * time.Second, Transport: transport}), nil
+	return servertiming.InstrumentClient(&http.Client{Timeout: 15 * time.Second, Transport: outbound.WrapTransportWithProxy(transport, http.ProxyURL(parsedProxy))}), nil
 }
 
 func exchangeVertexServiceAccountToken(ctx context.Context, key *vertexServiceAccountKey, proxyURL string) (string, time.Duration, error) {

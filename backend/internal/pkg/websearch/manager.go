@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/redis/go-redis/v9"
 )
@@ -408,10 +409,11 @@ func (m *Manager) getOrCreateHTTPClient(proxyURL string) (*http.Client, error) {
 func newHTTPClient(proxyURL string) (*http.Client, error) {
 	transport := &http.Transport{
 		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
-		DialContext:           (&net.Dialer{Timeout: proxyDialTimeout}).DialContext,
+		DialContext:           outbound.DialContext(&net.Dialer{Timeout: proxyDialTimeout}),
 		TLSHandshakeTimeout:   proxyTLSTimeout,
 		ResponseHeaderTimeout: searchDataTimeout,
 	}
+	var proxy func(*http.Request) (*url.URL, error)
 	if proxyURL != "" {
 		parsed, err := url.Parse(proxyURL)
 		if err != nil {
@@ -420,8 +422,9 @@ func newHTTPClient(proxyURL string) (*http.Client, error) {
 		if err := proxyutil.ConfigureTransportProxy(transport, parsed); err != nil {
 			return nil, fmt.Errorf("configure proxy: %w", err)
 		}
+		proxy = http.ProxyURL(parsed)
 	}
-	return &http.Client{Transport: transport, Timeout: searchRequestTimeout}, nil
+	return &http.Client{Transport: outbound.WrapTransportWithProxy(transport, proxy), Timeout: searchRequestTimeout}, nil
 }
 
 // GetUsage returns the current usage count for the given provider.

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 
@@ -45,7 +47,7 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 		}
 	}
 
-	client := req.C().SetTimeout(opts.Timeout)
+	client := outboundreq.New().SetTimeout(opts.Timeout)
 	if opts.ForceHTTP2 {
 		client = client.EnableForceHTTP2()
 	}

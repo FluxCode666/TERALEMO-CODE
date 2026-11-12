@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
@@ -156,6 +157,7 @@ var defaultImageDownloadHTTPClient = sync.OnceValue(func() *http.Client {
 func newImageDownloadHTTPClient(proxy func(*http.Request) (*url.URL, error)) *http.Client {
 	direct := newImageDownloadBaseTransport(imageDownloadDialControl)
 	proxied := newImageDownloadBaseTransport(nil)
+	proxied.DialContext = outbound.NewTransport().DialContext
 	proxied.Proxy = proxy
 	return &http.Client{
 		Timeout:   60 * time.Second,

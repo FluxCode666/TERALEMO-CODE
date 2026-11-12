@@ -11,6 +11,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
@@ -121,7 +124,7 @@ var (
 // If baseDialer is nil, direct TCP dial is used.
 func NewDialer(profile *Profile, baseDialer func(ctx context.Context, network, addr string) (net.Conn, error)) *Dialer {
 	if baseDialer == nil {
-		baseDialer = (&net.Dialer{}).DialContext
+		baseDialer = outbound.DialContext(&net.Dialer{Timeout: 10 * time.Second})
 	}
 	return &Dialer{profile: profile, baseDialer: baseDialer}
 }
@@ -160,7 +163,7 @@ func (d *SOCKS5ProxyDialer) DialTLSContext(ctx context.Context, network, addr st
 		proxyAddr = net.JoinHostPort(d.proxyURL.Hostname(), "1080") // Default SOCKS5 port
 	}
 
-	socksDialer, err := proxy.SOCKS5("tcp", proxyAddr, auth, proxy.Direct)
+	socksDialer, err := proxy.SOCKS5("tcp", proxyAddr, auth, fingerprintProxyDialer{})
 	if err != nil {
 		slog.Debug("tls_fingerprint_socks5_dialer_failed", "error", err)
 		return nil, fmt.Errorf("create SOCKS5 dialer: %w", err)
@@ -168,7 +171,11 @@ func (d *SOCKS5ProxyDialer) DialTLSContext(ctx context.Context, network, addr st
 
 	// Step 2: Establish SOCKS5 tunnel to target
 	slog.Debug("tls_fingerprint_socks5_establishing_tunnel", "target", addr)
-	conn, err := socksDialer.Dial("tcp", addr)
+	contextDialer, ok := socksDialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, fmt.Errorf("socks5 dialer does not support context")
+	}
+	conn, err := contextDialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		slog.Debug("tls_fingerprint_socks5_connect_failed", "error", err)
 		return nil, fmt.Errorf("SOCKS5 connect: %w", err)
@@ -198,7 +205,7 @@ func (d *HTTPProxyDialer) DialTLSContext(ctx context.Context, network, addr stri
 	}
 
 	dialer := &net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "tcp", proxyAddr)
+	conn, err := outbound.Default().DialContext(ctx, dialer, "tcp", proxyAddr)
 	if err != nil {
 		slog.Debug("tls_fingerprint_http_proxy_connect_failed", "error", err)
 		return nil, fmt.Errorf("connect to proxy: %w", err)
@@ -296,6 +303,16 @@ func performTLSHandshake(ctx context.Context, conn net.Conn, profile *Profile, a
 		"alpn", state.NegotiatedProtocol)
 
 	return tlsConn, nil
+}
+
+type fingerprintProxyDialer struct{}
+
+func (fingerprintProxyDialer) Dial(network, address string) (net.Conn, error) {
+	return fingerprintProxyDialer{}.DialContext(context.Background(), network, address)
+}
+
+func (fingerprintProxyDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return outbound.Default().DialContext(ctx, &net.Dialer{Timeout: 10 * time.Second}, network, address)
 }
 
 // toUTLSCurves converts uint16 slice to utls.CurveID slice.

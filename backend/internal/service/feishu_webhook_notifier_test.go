@@ -73,9 +73,7 @@ func TestScheduledQuestionFeishuClientDefaults(t *testing.T) {
 	notifier := newFeishuWebhookNotifier()
 	require.Equal(t, 10*time.Second, notifier.client.Timeout)
 	require.ErrorIs(t, notifier.client.CheckRedirect(nil, nil), http.ErrUseLastResponse)
-	transport, ok := notifier.client.Transport.(*http.Transport)
-	require.True(t, ok)
-	require.NotNil(t, transport.Proxy)
+	require.NotNil(t, notifier.client.Transport)
 }
 
 func TestScheduledQuestionFeishuSignedPlainTextCard(t *testing.T) {

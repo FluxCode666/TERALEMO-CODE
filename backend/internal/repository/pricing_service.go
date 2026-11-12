@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -48,7 +50,7 @@ func NewPricingRemoteClient(proxyURL string, allowDirectOnProxyError bool) servi
 			slog.Warn("proxy client init failed, all requests will fail", "service", "pricing", "error", err)
 			return &pricingRemoteClientError{err: fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)}
 		}
-		sharedClient = &http.Client{Timeout: 30 * time.Second}
+		sharedClient = outbound.NewClient(30 * time.Second)
 	}
 	return &pricingRemoteClient{
 		httpClient: sharedClient,

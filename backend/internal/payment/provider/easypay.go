@@ -19,6 +19,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
@@ -62,10 +64,13 @@ func NewEasyPay(instanceID string, config map[string]string) (*EasyPay, error) {
 		cfg[k] = v
 	}
 	cfg["apiBase"] = normalizeEasyPayAPIBase(cfg["apiBase"])
+	if err := outbound.ValidateLiteralURL(cfg["apiBase"]); err != nil {
+		return nil, fmt.Errorf("easypay apiBase: %w", err)
+	}
 	return &EasyPay{
 		instanceID: instanceID,
 		config:     cfg,
-		httpClient: &http.Client{Timeout: easypayHTTPTimeout},
+		httpClient: outbound.NewClient(easypayHTTPTimeout),
 	}, nil
 }
 
@@ -664,7 +669,7 @@ func (e *EasyPay) postRaw(ctx context.Context, endpoint string, params map[strin
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	client := e.httpClient
 	if client == nil {
-		client = &http.Client{Timeout: easypayHTTPTimeout}
+		client = outbound.NewClient(easypayHTTPTimeout)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

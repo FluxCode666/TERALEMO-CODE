@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 	"github.com/tidwall/gjson"
 )
@@ -35,7 +36,7 @@ func newSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
 		TLSHandshakeTimeout:   monitorTLSHandshakeTimeout,
 		ResponseHeaderTimeout: monitorResponseHeaderTimeout,
 	}
-	return &http.Client{Timeout: timeout, Transport: servertiming.WrapRoundTripper(tr)}
+	return &http.Client{Timeout: timeout, Transport: servertiming.WrapRoundTripper(outbound.WrapTransport(tr))}
 }
 
 // CheckOptions 承载一次检测的自定义入参。

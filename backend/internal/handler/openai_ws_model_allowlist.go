@@ -6,14 +6,19 @@ import (
 	"log/slog"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 func (h *OpenAIGatewayHandler) checkOpenAIWSModelRequestIP(ctx context.Context, clientIP string, key *service.APIKey) error {
-	if h.apiKeyService == nil {
-		return nil
+	allowed := true
+	if key != nil && (len(key.IPWhitelist) > 0 || len(key.IPBlacklist) > 0) {
+		allowed, _ = ip.CheckIPRestriction(clientIP, key.IPWhitelist, key.IPBlacklist)
 	}
-	allowed, err := h.apiKeyService.CheckModelRequestIP(ctx, clientIP, key)
+	var err error
+	if allowed && h.apiKeyService != nil {
+		allowed, err = h.apiKeyService.CheckModelRequestIP(ctx, clientIP, key)
+	}
 	if err == nil && allowed {
 		return nil
 	}
