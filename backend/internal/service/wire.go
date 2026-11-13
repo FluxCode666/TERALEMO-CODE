@@ -701,6 +701,19 @@ func ProvideScheduledQuestionTestRunnerService(repo ScheduledQuestionTestReposit
 	return svc
 }
 
+// ProvideMassEmailRunner 创建并启动邮件群发后台驱动（调度到期任务 + 逐封发送）。
+func ProvideMassEmailRunner(
+	repo MassEmailRepository,
+	svc *MassEmailService,
+	email *EmailService,
+	leaderLock LeaderLockCache,
+	db *sql.DB,
+) *MassEmailRunner {
+	runner := NewMassEmailRunner(repo, svc, email, leaderLock, db)
+	runner.Start()
+	return runner
+}
+
 // ProvideScheduledTestRunnerService creates and starts ScheduledTestRunnerService.
 func ProvideScheduledTestRunnerService(
 	planRepo ScheduledTestPlanRepository,
@@ -936,6 +949,8 @@ var ProviderSet = wire.NewSet(
 	NewBillingService,
 	ProvideBillingCacheService,
 	NewAnnouncementService,
+	NewMassEmailService,
+	ProvideMassEmailRunner, // 邮件群发后台驱动（调度 + 限速发送 + 续发）
 	ProvideAdminService,
 	NewGatewayService,
 	ProvideOpenAIGatewayService,

@@ -609,6 +609,54 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/mass-emails',
+    name: 'AdminMassEmails',
+    component: () => import('@/views/admin/massEmails/MassEmailsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Mass Email',
+      titleKey: 'admin.massEmails.title',
+      descriptionKey: 'admin.massEmails.description'
+    }
+  },
+  {
+    path: '/admin/mass-emails/create',
+    name: 'AdminMassEmailCreate',
+    component: () => import('@/views/admin/massEmails/MassEmailEditView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Mass Email',
+      titleKey: 'admin.massEmails.title',
+      descriptionKey: 'admin.massEmails.description'
+    }
+  },
+  {
+    path: '/admin/mass-emails/:id(\\d+)/edit',
+    name: 'AdminMassEmailEdit',
+    component: () => import('@/views/admin/massEmails/MassEmailEditView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Mass Email',
+      titleKey: 'admin.massEmails.title',
+      descriptionKey: 'admin.massEmails.description'
+    }
+  },
+  {
+    path: '/admin/mass-emails/:id(\\d+)',
+    name: 'AdminMassEmailDetail',
+    component: () => import('@/views/admin/massEmails/MassEmailDetailView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Mass Email',
+      titleKey: 'admin.massEmails.title',
+      descriptionKey: 'admin.massEmails.description'
+    }
+  },
+  {
     path: '/admin/proxies',
     name: 'AdminProxies',
     component: () => import('@/views/admin/ProxiesView.vue'),

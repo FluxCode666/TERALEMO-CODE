@@ -41,6 +41,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/massemailcampaign"
+	"github.com/Wei-Shaw/sub2api/ent/massemailrecipient"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -103,6 +105,8 @@ const (
 	TypeGroup                         = "Group"
 	TypeIdempotencyRecord             = "IdempotencyRecord"
 	TypeIdentityAdoptionDecision      = "IdentityAdoptionDecision"
+	TypeMassEmailCampaign             = "MassEmailCampaign"
+	TypeMassEmailRecipient            = "MassEmailRecipient"
 	TypePaymentAuditLog               = "PaymentAuditLog"
 	TypePaymentOrder                  = "PaymentOrder"
 	TypePaymentProviderInstance       = "PaymentProviderInstance"
@@ -39867,6 +39871,2873 @@ func (m *IdentityAdoptionDecisionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown IdentityAdoptionDecision edge %s", name)
+}
+
+// MassEmailCampaignMutation represents an operation that mutates the MassEmailCampaign nodes in the graph.
+type MassEmailCampaignMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int64
+	created_at        *time.Time
+	updated_at        *time.Time
+	subject           *string
+	body_html         *string
+	recipient_filter  *domain.MassEmailRecipientFilter
+	status            *string
+	scheduled_at      *time.Time
+	total_count       *int
+	addtotal_count    *int
+	sent_count        *int
+	addsent_count     *int
+	failed_count      *int
+	addfailed_count   *int
+	opened_count      *int
+	addopened_count   *int
+	created_by        *int64
+	addcreated_by     *int64
+	started_at        *time.Time
+	finished_at       *time.Time
+	last_error        *string
+	clearedFields     map[string]struct{}
+	recipients        map[int64]struct{}
+	removedrecipients map[int64]struct{}
+	clearedrecipients bool
+	done              bool
+	oldValue          func(context.Context) (*MassEmailCampaign, error)
+	predicates        []predicate.MassEmailCampaign
+}
+
+var _ ent.Mutation = (*MassEmailCampaignMutation)(nil)
+
+// massemailcampaignOption allows management of the mutation configuration using functional options.
+type massemailcampaignOption func(*MassEmailCampaignMutation)
+
+// newMassEmailCampaignMutation creates new mutation for the MassEmailCampaign entity.
+func newMassEmailCampaignMutation(c config, op Op, opts ...massemailcampaignOption) *MassEmailCampaignMutation {
+	m := &MassEmailCampaignMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMassEmailCampaign,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMassEmailCampaignID sets the ID field of the mutation.
+func withMassEmailCampaignID(id int64) massemailcampaignOption {
+	return func(m *MassEmailCampaignMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MassEmailCampaign
+		)
+		m.oldValue = func(ctx context.Context) (*MassEmailCampaign, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MassEmailCampaign.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMassEmailCampaign sets the old MassEmailCampaign of the mutation.
+func withMassEmailCampaign(node *MassEmailCampaign) massemailcampaignOption {
+	return func(m *MassEmailCampaignMutation) {
+		m.oldValue = func(context.Context) (*MassEmailCampaign, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MassEmailCampaignMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MassEmailCampaignMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MassEmailCampaignMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MassEmailCampaignMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MassEmailCampaign.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MassEmailCampaignMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MassEmailCampaignMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MassEmailCampaignMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MassEmailCampaignMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MassEmailCampaignMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MassEmailCampaignMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetSubject sets the "subject" field.
+func (m *MassEmailCampaignMutation) SetSubject(s string) {
+	m.subject = &s
+}
+
+// Subject returns the value of the "subject" field in the mutation.
+func (m *MassEmailCampaignMutation) Subject() (r string, exists bool) {
+	v := m.subject
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubject returns the old "subject" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldSubject(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubject is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubject requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubject: %w", err)
+	}
+	return oldValue.Subject, nil
+}
+
+// ResetSubject resets all changes to the "subject" field.
+func (m *MassEmailCampaignMutation) ResetSubject() {
+	m.subject = nil
+}
+
+// SetBodyHTML sets the "body_html" field.
+func (m *MassEmailCampaignMutation) SetBodyHTML(s string) {
+	m.body_html = &s
+}
+
+// BodyHTML returns the value of the "body_html" field in the mutation.
+func (m *MassEmailCampaignMutation) BodyHTML() (r string, exists bool) {
+	v := m.body_html
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBodyHTML returns the old "body_html" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldBodyHTML(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBodyHTML is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBodyHTML requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBodyHTML: %w", err)
+	}
+	return oldValue.BodyHTML, nil
+}
+
+// ResetBodyHTML resets all changes to the "body_html" field.
+func (m *MassEmailCampaignMutation) ResetBodyHTML() {
+	m.body_html = nil
+}
+
+// SetRecipientFilter sets the "recipient_filter" field.
+func (m *MassEmailCampaignMutation) SetRecipientFilter(derf domain.MassEmailRecipientFilter) {
+	m.recipient_filter = &derf
+}
+
+// RecipientFilter returns the value of the "recipient_filter" field in the mutation.
+func (m *MassEmailCampaignMutation) RecipientFilter() (r domain.MassEmailRecipientFilter, exists bool) {
+	v := m.recipient_filter
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientFilter returns the old "recipient_filter" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldRecipientFilter(ctx context.Context) (v domain.MassEmailRecipientFilter, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientFilter is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientFilter requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientFilter: %w", err)
+	}
+	return oldValue.RecipientFilter, nil
+}
+
+// ResetRecipientFilter resets all changes to the "recipient_filter" field.
+func (m *MassEmailCampaignMutation) ResetRecipientFilter() {
+	m.recipient_filter = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *MassEmailCampaignMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *MassEmailCampaignMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *MassEmailCampaignMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetScheduledAt sets the "scheduled_at" field.
+func (m *MassEmailCampaignMutation) SetScheduledAt(t time.Time) {
+	m.scheduled_at = &t
+}
+
+// ScheduledAt returns the value of the "scheduled_at" field in the mutation.
+func (m *MassEmailCampaignMutation) ScheduledAt() (r time.Time, exists bool) {
+	v := m.scheduled_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScheduledAt returns the old "scheduled_at" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldScheduledAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScheduledAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScheduledAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScheduledAt: %w", err)
+	}
+	return oldValue.ScheduledAt, nil
+}
+
+// ClearScheduledAt clears the value of the "scheduled_at" field.
+func (m *MassEmailCampaignMutation) ClearScheduledAt() {
+	m.scheduled_at = nil
+	m.clearedFields[massemailcampaign.FieldScheduledAt] = struct{}{}
+}
+
+// ScheduledAtCleared returns if the "scheduled_at" field was cleared in this mutation.
+func (m *MassEmailCampaignMutation) ScheduledAtCleared() bool {
+	_, ok := m.clearedFields[massemailcampaign.FieldScheduledAt]
+	return ok
+}
+
+// ResetScheduledAt resets all changes to the "scheduled_at" field.
+func (m *MassEmailCampaignMutation) ResetScheduledAt() {
+	m.scheduled_at = nil
+	delete(m.clearedFields, massemailcampaign.FieldScheduledAt)
+}
+
+// SetTotalCount sets the "total_count" field.
+func (m *MassEmailCampaignMutation) SetTotalCount(i int) {
+	m.total_count = &i
+	m.addtotal_count = nil
+}
+
+// TotalCount returns the value of the "total_count" field in the mutation.
+func (m *MassEmailCampaignMutation) TotalCount() (r int, exists bool) {
+	v := m.total_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTotalCount returns the old "total_count" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldTotalCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTotalCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTotalCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTotalCount: %w", err)
+	}
+	return oldValue.TotalCount, nil
+}
+
+// AddTotalCount adds i to the "total_count" field.
+func (m *MassEmailCampaignMutation) AddTotalCount(i int) {
+	if m.addtotal_count != nil {
+		*m.addtotal_count += i
+	} else {
+		m.addtotal_count = &i
+	}
+}
+
+// AddedTotalCount returns the value that was added to the "total_count" field in this mutation.
+func (m *MassEmailCampaignMutation) AddedTotalCount() (r int, exists bool) {
+	v := m.addtotal_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTotalCount resets all changes to the "total_count" field.
+func (m *MassEmailCampaignMutation) ResetTotalCount() {
+	m.total_count = nil
+	m.addtotal_count = nil
+}
+
+// SetSentCount sets the "sent_count" field.
+func (m *MassEmailCampaignMutation) SetSentCount(i int) {
+	m.sent_count = &i
+	m.addsent_count = nil
+}
+
+// SentCount returns the value of the "sent_count" field in the mutation.
+func (m *MassEmailCampaignMutation) SentCount() (r int, exists bool) {
+	v := m.sent_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSentCount returns the old "sent_count" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldSentCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSentCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSentCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSentCount: %w", err)
+	}
+	return oldValue.SentCount, nil
+}
+
+// AddSentCount adds i to the "sent_count" field.
+func (m *MassEmailCampaignMutation) AddSentCount(i int) {
+	if m.addsent_count != nil {
+		*m.addsent_count += i
+	} else {
+		m.addsent_count = &i
+	}
+}
+
+// AddedSentCount returns the value that was added to the "sent_count" field in this mutation.
+func (m *MassEmailCampaignMutation) AddedSentCount() (r int, exists bool) {
+	v := m.addsent_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSentCount resets all changes to the "sent_count" field.
+func (m *MassEmailCampaignMutation) ResetSentCount() {
+	m.sent_count = nil
+	m.addsent_count = nil
+}
+
+// SetFailedCount sets the "failed_count" field.
+func (m *MassEmailCampaignMutation) SetFailedCount(i int) {
+	m.failed_count = &i
+	m.addfailed_count = nil
+}
+
+// FailedCount returns the value of the "failed_count" field in the mutation.
+func (m *MassEmailCampaignMutation) FailedCount() (r int, exists bool) {
+	v := m.failed_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailedCount returns the old "failed_count" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldFailedCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailedCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailedCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailedCount: %w", err)
+	}
+	return oldValue.FailedCount, nil
+}
+
+// AddFailedCount adds i to the "failed_count" field.
+func (m *MassEmailCampaignMutation) AddFailedCount(i int) {
+	if m.addfailed_count != nil {
+		*m.addfailed_count += i
+	} else {
+		m.addfailed_count = &i
+	}
+}
+
+// AddedFailedCount returns the value that was added to the "failed_count" field in this mutation.
+func (m *MassEmailCampaignMutation) AddedFailedCount() (r int, exists bool) {
+	v := m.addfailed_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFailedCount resets all changes to the "failed_count" field.
+func (m *MassEmailCampaignMutation) ResetFailedCount() {
+	m.failed_count = nil
+	m.addfailed_count = nil
+}
+
+// SetOpenedCount sets the "opened_count" field.
+func (m *MassEmailCampaignMutation) SetOpenedCount(i int) {
+	m.opened_count = &i
+	m.addopened_count = nil
+}
+
+// OpenedCount returns the value of the "opened_count" field in the mutation.
+func (m *MassEmailCampaignMutation) OpenedCount() (r int, exists bool) {
+	v := m.opened_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpenedCount returns the old "opened_count" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldOpenedCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpenedCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpenedCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpenedCount: %w", err)
+	}
+	return oldValue.OpenedCount, nil
+}
+
+// AddOpenedCount adds i to the "opened_count" field.
+func (m *MassEmailCampaignMutation) AddOpenedCount(i int) {
+	if m.addopened_count != nil {
+		*m.addopened_count += i
+	} else {
+		m.addopened_count = &i
+	}
+}
+
+// AddedOpenedCount returns the value that was added to the "opened_count" field in this mutation.
+func (m *MassEmailCampaignMutation) AddedOpenedCount() (r int, exists bool) {
+	v := m.addopened_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOpenedCount resets all changes to the "opened_count" field.
+func (m *MassEmailCampaignMutation) ResetOpenedCount() {
+	m.opened_count = nil
+	m.addopened_count = nil
+}
+
+// SetCreatedBy sets the "created_by" field.
+func (m *MassEmailCampaignMutation) SetCreatedBy(i int64) {
+	m.created_by = &i
+	m.addcreated_by = nil
+}
+
+// CreatedBy returns the value of the "created_by" field in the mutation.
+func (m *MassEmailCampaignMutation) CreatedBy() (r int64, exists bool) {
+	v := m.created_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedBy returns the old "created_by" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldCreatedBy(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedBy: %w", err)
+	}
+	return oldValue.CreatedBy, nil
+}
+
+// AddCreatedBy adds i to the "created_by" field.
+func (m *MassEmailCampaignMutation) AddCreatedBy(i int64) {
+	if m.addcreated_by != nil {
+		*m.addcreated_by += i
+	} else {
+		m.addcreated_by = &i
+	}
+}
+
+// AddedCreatedBy returns the value that was added to the "created_by" field in this mutation.
+func (m *MassEmailCampaignMutation) AddedCreatedBy() (r int64, exists bool) {
+	v := m.addcreated_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCreatedBy clears the value of the "created_by" field.
+func (m *MassEmailCampaignMutation) ClearCreatedBy() {
+	m.created_by = nil
+	m.addcreated_by = nil
+	m.clearedFields[massemailcampaign.FieldCreatedBy] = struct{}{}
+}
+
+// CreatedByCleared returns if the "created_by" field was cleared in this mutation.
+func (m *MassEmailCampaignMutation) CreatedByCleared() bool {
+	_, ok := m.clearedFields[massemailcampaign.FieldCreatedBy]
+	return ok
+}
+
+// ResetCreatedBy resets all changes to the "created_by" field.
+func (m *MassEmailCampaignMutation) ResetCreatedBy() {
+	m.created_by = nil
+	m.addcreated_by = nil
+	delete(m.clearedFields, massemailcampaign.FieldCreatedBy)
+}
+
+// SetStartedAt sets the "started_at" field.
+func (m *MassEmailCampaignMutation) SetStartedAt(t time.Time) {
+	m.started_at = &t
+}
+
+// StartedAt returns the value of the "started_at" field in the mutation.
+func (m *MassEmailCampaignMutation) StartedAt() (r time.Time, exists bool) {
+	v := m.started_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartedAt returns the old "started_at" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldStartedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartedAt: %w", err)
+	}
+	return oldValue.StartedAt, nil
+}
+
+// ClearStartedAt clears the value of the "started_at" field.
+func (m *MassEmailCampaignMutation) ClearStartedAt() {
+	m.started_at = nil
+	m.clearedFields[massemailcampaign.FieldStartedAt] = struct{}{}
+}
+
+// StartedAtCleared returns if the "started_at" field was cleared in this mutation.
+func (m *MassEmailCampaignMutation) StartedAtCleared() bool {
+	_, ok := m.clearedFields[massemailcampaign.FieldStartedAt]
+	return ok
+}
+
+// ResetStartedAt resets all changes to the "started_at" field.
+func (m *MassEmailCampaignMutation) ResetStartedAt() {
+	m.started_at = nil
+	delete(m.clearedFields, massemailcampaign.FieldStartedAt)
+}
+
+// SetFinishedAt sets the "finished_at" field.
+func (m *MassEmailCampaignMutation) SetFinishedAt(t time.Time) {
+	m.finished_at = &t
+}
+
+// FinishedAt returns the value of the "finished_at" field in the mutation.
+func (m *MassEmailCampaignMutation) FinishedAt() (r time.Time, exists bool) {
+	v := m.finished_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinishedAt returns the old "finished_at" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldFinishedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinishedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinishedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinishedAt: %w", err)
+	}
+	return oldValue.FinishedAt, nil
+}
+
+// ClearFinishedAt clears the value of the "finished_at" field.
+func (m *MassEmailCampaignMutation) ClearFinishedAt() {
+	m.finished_at = nil
+	m.clearedFields[massemailcampaign.FieldFinishedAt] = struct{}{}
+}
+
+// FinishedAtCleared returns if the "finished_at" field was cleared in this mutation.
+func (m *MassEmailCampaignMutation) FinishedAtCleared() bool {
+	_, ok := m.clearedFields[massemailcampaign.FieldFinishedAt]
+	return ok
+}
+
+// ResetFinishedAt resets all changes to the "finished_at" field.
+func (m *MassEmailCampaignMutation) ResetFinishedAt() {
+	m.finished_at = nil
+	delete(m.clearedFields, massemailcampaign.FieldFinishedAt)
+}
+
+// SetLastError sets the "last_error" field.
+func (m *MassEmailCampaignMutation) SetLastError(s string) {
+	m.last_error = &s
+}
+
+// LastError returns the value of the "last_error" field in the mutation.
+func (m *MassEmailCampaignMutation) LastError() (r string, exists bool) {
+	v := m.last_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastError returns the old "last_error" field's value of the MassEmailCampaign entity.
+// If the MassEmailCampaign object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailCampaignMutation) OldLastError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastError: %w", err)
+	}
+	return oldValue.LastError, nil
+}
+
+// ResetLastError resets all changes to the "last_error" field.
+func (m *MassEmailCampaignMutation) ResetLastError() {
+	m.last_error = nil
+}
+
+// AddRecipientIDs adds the "recipients" edge to the MassEmailRecipient entity by ids.
+func (m *MassEmailCampaignMutation) AddRecipientIDs(ids ...int64) {
+	if m.recipients == nil {
+		m.recipients = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.recipients[ids[i]] = struct{}{}
+	}
+}
+
+// ClearRecipients clears the "recipients" edge to the MassEmailRecipient entity.
+func (m *MassEmailCampaignMutation) ClearRecipients() {
+	m.clearedrecipients = true
+}
+
+// RecipientsCleared reports if the "recipients" edge to the MassEmailRecipient entity was cleared.
+func (m *MassEmailCampaignMutation) RecipientsCleared() bool {
+	return m.clearedrecipients
+}
+
+// RemoveRecipientIDs removes the "recipients" edge to the MassEmailRecipient entity by IDs.
+func (m *MassEmailCampaignMutation) RemoveRecipientIDs(ids ...int64) {
+	if m.removedrecipients == nil {
+		m.removedrecipients = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.recipients, ids[i])
+		m.removedrecipients[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedRecipients returns the removed IDs of the "recipients" edge to the MassEmailRecipient entity.
+func (m *MassEmailCampaignMutation) RemovedRecipientsIDs() (ids []int64) {
+	for id := range m.removedrecipients {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// RecipientsIDs returns the "recipients" edge IDs in the mutation.
+func (m *MassEmailCampaignMutation) RecipientsIDs() (ids []int64) {
+	for id := range m.recipients {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetRecipients resets all changes to the "recipients" edge.
+func (m *MassEmailCampaignMutation) ResetRecipients() {
+	m.recipients = nil
+	m.clearedrecipients = false
+	m.removedrecipients = nil
+}
+
+// Where appends a list predicates to the MassEmailCampaignMutation builder.
+func (m *MassEmailCampaignMutation) Where(ps ...predicate.MassEmailCampaign) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MassEmailCampaignMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MassEmailCampaignMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MassEmailCampaign, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MassEmailCampaignMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MassEmailCampaignMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MassEmailCampaign).
+func (m *MassEmailCampaignMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MassEmailCampaignMutation) Fields() []string {
+	fields := make([]string, 0, 15)
+	if m.created_at != nil {
+		fields = append(fields, massemailcampaign.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, massemailcampaign.FieldUpdatedAt)
+	}
+	if m.subject != nil {
+		fields = append(fields, massemailcampaign.FieldSubject)
+	}
+	if m.body_html != nil {
+		fields = append(fields, massemailcampaign.FieldBodyHTML)
+	}
+	if m.recipient_filter != nil {
+		fields = append(fields, massemailcampaign.FieldRecipientFilter)
+	}
+	if m.status != nil {
+		fields = append(fields, massemailcampaign.FieldStatus)
+	}
+	if m.scheduled_at != nil {
+		fields = append(fields, massemailcampaign.FieldScheduledAt)
+	}
+	if m.total_count != nil {
+		fields = append(fields, massemailcampaign.FieldTotalCount)
+	}
+	if m.sent_count != nil {
+		fields = append(fields, massemailcampaign.FieldSentCount)
+	}
+	if m.failed_count != nil {
+		fields = append(fields, massemailcampaign.FieldFailedCount)
+	}
+	if m.opened_count != nil {
+		fields = append(fields, massemailcampaign.FieldOpenedCount)
+	}
+	if m.created_by != nil {
+		fields = append(fields, massemailcampaign.FieldCreatedBy)
+	}
+	if m.started_at != nil {
+		fields = append(fields, massemailcampaign.FieldStartedAt)
+	}
+	if m.finished_at != nil {
+		fields = append(fields, massemailcampaign.FieldFinishedAt)
+	}
+	if m.last_error != nil {
+		fields = append(fields, massemailcampaign.FieldLastError)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MassEmailCampaignMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case massemailcampaign.FieldCreatedAt:
+		return m.CreatedAt()
+	case massemailcampaign.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case massemailcampaign.FieldSubject:
+		return m.Subject()
+	case massemailcampaign.FieldBodyHTML:
+		return m.BodyHTML()
+	case massemailcampaign.FieldRecipientFilter:
+		return m.RecipientFilter()
+	case massemailcampaign.FieldStatus:
+		return m.Status()
+	case massemailcampaign.FieldScheduledAt:
+		return m.ScheduledAt()
+	case massemailcampaign.FieldTotalCount:
+		return m.TotalCount()
+	case massemailcampaign.FieldSentCount:
+		return m.SentCount()
+	case massemailcampaign.FieldFailedCount:
+		return m.FailedCount()
+	case massemailcampaign.FieldOpenedCount:
+		return m.OpenedCount()
+	case massemailcampaign.FieldCreatedBy:
+		return m.CreatedBy()
+	case massemailcampaign.FieldStartedAt:
+		return m.StartedAt()
+	case massemailcampaign.FieldFinishedAt:
+		return m.FinishedAt()
+	case massemailcampaign.FieldLastError:
+		return m.LastError()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MassEmailCampaignMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case massemailcampaign.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case massemailcampaign.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case massemailcampaign.FieldSubject:
+		return m.OldSubject(ctx)
+	case massemailcampaign.FieldBodyHTML:
+		return m.OldBodyHTML(ctx)
+	case massemailcampaign.FieldRecipientFilter:
+		return m.OldRecipientFilter(ctx)
+	case massemailcampaign.FieldStatus:
+		return m.OldStatus(ctx)
+	case massemailcampaign.FieldScheduledAt:
+		return m.OldScheduledAt(ctx)
+	case massemailcampaign.FieldTotalCount:
+		return m.OldTotalCount(ctx)
+	case massemailcampaign.FieldSentCount:
+		return m.OldSentCount(ctx)
+	case massemailcampaign.FieldFailedCount:
+		return m.OldFailedCount(ctx)
+	case massemailcampaign.FieldOpenedCount:
+		return m.OldOpenedCount(ctx)
+	case massemailcampaign.FieldCreatedBy:
+		return m.OldCreatedBy(ctx)
+	case massemailcampaign.FieldStartedAt:
+		return m.OldStartedAt(ctx)
+	case massemailcampaign.FieldFinishedAt:
+		return m.OldFinishedAt(ctx)
+	case massemailcampaign.FieldLastError:
+		return m.OldLastError(ctx)
+	}
+	return nil, fmt.Errorf("unknown MassEmailCampaign field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MassEmailCampaignMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case massemailcampaign.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case massemailcampaign.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case massemailcampaign.FieldSubject:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubject(v)
+		return nil
+	case massemailcampaign.FieldBodyHTML:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBodyHTML(v)
+		return nil
+	case massemailcampaign.FieldRecipientFilter:
+		v, ok := value.(domain.MassEmailRecipientFilter)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientFilter(v)
+		return nil
+	case massemailcampaign.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case massemailcampaign.FieldScheduledAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScheduledAt(v)
+		return nil
+	case massemailcampaign.FieldTotalCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTotalCount(v)
+		return nil
+	case massemailcampaign.FieldSentCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSentCount(v)
+		return nil
+	case massemailcampaign.FieldFailedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailedCount(v)
+		return nil
+	case massemailcampaign.FieldOpenedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpenedCount(v)
+		return nil
+	case massemailcampaign.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedBy(v)
+		return nil
+	case massemailcampaign.FieldStartedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartedAt(v)
+		return nil
+	case massemailcampaign.FieldFinishedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinishedAt(v)
+		return nil
+	case massemailcampaign.FieldLastError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastError(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailCampaign field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MassEmailCampaignMutation) AddedFields() []string {
+	var fields []string
+	if m.addtotal_count != nil {
+		fields = append(fields, massemailcampaign.FieldTotalCount)
+	}
+	if m.addsent_count != nil {
+		fields = append(fields, massemailcampaign.FieldSentCount)
+	}
+	if m.addfailed_count != nil {
+		fields = append(fields, massemailcampaign.FieldFailedCount)
+	}
+	if m.addopened_count != nil {
+		fields = append(fields, massemailcampaign.FieldOpenedCount)
+	}
+	if m.addcreated_by != nil {
+		fields = append(fields, massemailcampaign.FieldCreatedBy)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MassEmailCampaignMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case massemailcampaign.FieldTotalCount:
+		return m.AddedTotalCount()
+	case massemailcampaign.FieldSentCount:
+		return m.AddedSentCount()
+	case massemailcampaign.FieldFailedCount:
+		return m.AddedFailedCount()
+	case massemailcampaign.FieldOpenedCount:
+		return m.AddedOpenedCount()
+	case massemailcampaign.FieldCreatedBy:
+		return m.AddedCreatedBy()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MassEmailCampaignMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case massemailcampaign.FieldTotalCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTotalCount(v)
+		return nil
+	case massemailcampaign.FieldSentCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSentCount(v)
+		return nil
+	case massemailcampaign.FieldFailedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFailedCount(v)
+		return nil
+	case massemailcampaign.FieldOpenedCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOpenedCount(v)
+		return nil
+	case massemailcampaign.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreatedBy(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailCampaign numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MassEmailCampaignMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(massemailcampaign.FieldScheduledAt) {
+		fields = append(fields, massemailcampaign.FieldScheduledAt)
+	}
+	if m.FieldCleared(massemailcampaign.FieldCreatedBy) {
+		fields = append(fields, massemailcampaign.FieldCreatedBy)
+	}
+	if m.FieldCleared(massemailcampaign.FieldStartedAt) {
+		fields = append(fields, massemailcampaign.FieldStartedAt)
+	}
+	if m.FieldCleared(massemailcampaign.FieldFinishedAt) {
+		fields = append(fields, massemailcampaign.FieldFinishedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MassEmailCampaignMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MassEmailCampaignMutation) ClearField(name string) error {
+	switch name {
+	case massemailcampaign.FieldScheduledAt:
+		m.ClearScheduledAt()
+		return nil
+	case massemailcampaign.FieldCreatedBy:
+		m.ClearCreatedBy()
+		return nil
+	case massemailcampaign.FieldStartedAt:
+		m.ClearStartedAt()
+		return nil
+	case massemailcampaign.FieldFinishedAt:
+		m.ClearFinishedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailCampaign nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MassEmailCampaignMutation) ResetField(name string) error {
+	switch name {
+	case massemailcampaign.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case massemailcampaign.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case massemailcampaign.FieldSubject:
+		m.ResetSubject()
+		return nil
+	case massemailcampaign.FieldBodyHTML:
+		m.ResetBodyHTML()
+		return nil
+	case massemailcampaign.FieldRecipientFilter:
+		m.ResetRecipientFilter()
+		return nil
+	case massemailcampaign.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case massemailcampaign.FieldScheduledAt:
+		m.ResetScheduledAt()
+		return nil
+	case massemailcampaign.FieldTotalCount:
+		m.ResetTotalCount()
+		return nil
+	case massemailcampaign.FieldSentCount:
+		m.ResetSentCount()
+		return nil
+	case massemailcampaign.FieldFailedCount:
+		m.ResetFailedCount()
+		return nil
+	case massemailcampaign.FieldOpenedCount:
+		m.ResetOpenedCount()
+		return nil
+	case massemailcampaign.FieldCreatedBy:
+		m.ResetCreatedBy()
+		return nil
+	case massemailcampaign.FieldStartedAt:
+		m.ResetStartedAt()
+		return nil
+	case massemailcampaign.FieldFinishedAt:
+		m.ResetFinishedAt()
+		return nil
+	case massemailcampaign.FieldLastError:
+		m.ResetLastError()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailCampaign field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MassEmailCampaignMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.recipients != nil {
+		edges = append(edges, massemailcampaign.EdgeRecipients)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MassEmailCampaignMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case massemailcampaign.EdgeRecipients:
+		ids := make([]ent.Value, 0, len(m.recipients))
+		for id := range m.recipients {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MassEmailCampaignMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedrecipients != nil {
+		edges = append(edges, massemailcampaign.EdgeRecipients)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MassEmailCampaignMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case massemailcampaign.EdgeRecipients:
+		ids := make([]ent.Value, 0, len(m.removedrecipients))
+		for id := range m.removedrecipients {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MassEmailCampaignMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedrecipients {
+		edges = append(edges, massemailcampaign.EdgeRecipients)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MassEmailCampaignMutation) EdgeCleared(name string) bool {
+	switch name {
+	case massemailcampaign.EdgeRecipients:
+		return m.clearedrecipients
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MassEmailCampaignMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown MassEmailCampaign unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MassEmailCampaignMutation) ResetEdge(name string) error {
+	switch name {
+	case massemailcampaign.EdgeRecipients:
+		m.ResetRecipients()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailCampaign edge %s", name)
+}
+
+// MassEmailRecipientMutation represents an operation that mutates the MassEmailRecipient nodes in the graph.
+type MassEmailRecipientMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int64
+	created_at       *time.Time
+	updated_at       *time.Time
+	email            *string
+	name             *string
+	user_id          *int64
+	adduser_id       *int64
+	enterprise_id    *int64
+	addenterprise_id *int64
+	status           *string
+	error            *string
+	attempts         *int
+	addattempts      *int
+	claimed_at       *time.Time
+	sent_at          *time.Time
+	tracking_token   *string
+	first_opened_at  *time.Time
+	last_opened_at   *time.Time
+	open_count       *int
+	addopen_count    *int
+	clearedFields    map[string]struct{}
+	campaign         *int64
+	clearedcampaign  bool
+	done             bool
+	oldValue         func(context.Context) (*MassEmailRecipient, error)
+	predicates       []predicate.MassEmailRecipient
+}
+
+var _ ent.Mutation = (*MassEmailRecipientMutation)(nil)
+
+// massemailrecipientOption allows management of the mutation configuration using functional options.
+type massemailrecipientOption func(*MassEmailRecipientMutation)
+
+// newMassEmailRecipientMutation creates new mutation for the MassEmailRecipient entity.
+func newMassEmailRecipientMutation(c config, op Op, opts ...massemailrecipientOption) *MassEmailRecipientMutation {
+	m := &MassEmailRecipientMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMassEmailRecipient,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMassEmailRecipientID sets the ID field of the mutation.
+func withMassEmailRecipientID(id int64) massemailrecipientOption {
+	return func(m *MassEmailRecipientMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MassEmailRecipient
+		)
+		m.oldValue = func(ctx context.Context) (*MassEmailRecipient, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MassEmailRecipient.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMassEmailRecipient sets the old MassEmailRecipient of the mutation.
+func withMassEmailRecipient(node *MassEmailRecipient) massemailrecipientOption {
+	return func(m *MassEmailRecipientMutation) {
+		m.oldValue = func(context.Context) (*MassEmailRecipient, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MassEmailRecipientMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MassEmailRecipientMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MassEmailRecipientMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MassEmailRecipientMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MassEmailRecipient.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MassEmailRecipientMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MassEmailRecipientMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MassEmailRecipientMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MassEmailRecipientMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MassEmailRecipientMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MassEmailRecipientMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetCampaignID sets the "campaign_id" field.
+func (m *MassEmailRecipientMutation) SetCampaignID(i int64) {
+	m.campaign = &i
+}
+
+// CampaignID returns the value of the "campaign_id" field in the mutation.
+func (m *MassEmailRecipientMutation) CampaignID() (r int64, exists bool) {
+	v := m.campaign
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCampaignID returns the old "campaign_id" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldCampaignID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCampaignID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCampaignID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCampaignID: %w", err)
+	}
+	return oldValue.CampaignID, nil
+}
+
+// ResetCampaignID resets all changes to the "campaign_id" field.
+func (m *MassEmailRecipientMutation) ResetCampaignID() {
+	m.campaign = nil
+}
+
+// SetEmail sets the "email" field.
+func (m *MassEmailRecipientMutation) SetEmail(s string) {
+	m.email = &s
+}
+
+// Email returns the value of the "email" field in the mutation.
+func (m *MassEmailRecipientMutation) Email() (r string, exists bool) {
+	v := m.email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmail returns the old "email" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmail: %w", err)
+	}
+	return oldValue.Email, nil
+}
+
+// ResetEmail resets all changes to the "email" field.
+func (m *MassEmailRecipientMutation) ResetEmail() {
+	m.email = nil
+}
+
+// SetName sets the "name" field.
+func (m *MassEmailRecipientMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *MassEmailRecipientMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *MassEmailRecipientMutation) ResetName() {
+	m.name = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *MassEmailRecipientMutation) SetUserID(i int64) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *MassEmailRecipientMutation) UserID() (r int64, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldUserID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *MassEmailRecipientMutation) AddUserID(i int64) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *MassEmailRecipientMutation) AddedUserID() (r int64, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (m *MassEmailRecipientMutation) ClearUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+	m.clearedFields[massemailrecipient.FieldUserID] = struct{}{}
+}
+
+// UserIDCleared returns if the "user_id" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) UserIDCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldUserID]
+	return ok
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *MassEmailRecipientMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+	delete(m.clearedFields, massemailrecipient.FieldUserID)
+}
+
+// SetEnterpriseID sets the "enterprise_id" field.
+func (m *MassEmailRecipientMutation) SetEnterpriseID(i int64) {
+	m.enterprise_id = &i
+	m.addenterprise_id = nil
+}
+
+// EnterpriseID returns the value of the "enterprise_id" field in the mutation.
+func (m *MassEmailRecipientMutation) EnterpriseID() (r int64, exists bool) {
+	v := m.enterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnterpriseID returns the old "enterprise_id" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldEnterpriseID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnterpriseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnterpriseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnterpriseID: %w", err)
+	}
+	return oldValue.EnterpriseID, nil
+}
+
+// AddEnterpriseID adds i to the "enterprise_id" field.
+func (m *MassEmailRecipientMutation) AddEnterpriseID(i int64) {
+	if m.addenterprise_id != nil {
+		*m.addenterprise_id += i
+	} else {
+		m.addenterprise_id = &i
+	}
+}
+
+// AddedEnterpriseID returns the value that was added to the "enterprise_id" field in this mutation.
+func (m *MassEmailRecipientMutation) AddedEnterpriseID() (r int64, exists bool) {
+	v := m.addenterprise_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearEnterpriseID clears the value of the "enterprise_id" field.
+func (m *MassEmailRecipientMutation) ClearEnterpriseID() {
+	m.enterprise_id = nil
+	m.addenterprise_id = nil
+	m.clearedFields[massemailrecipient.FieldEnterpriseID] = struct{}{}
+}
+
+// EnterpriseIDCleared returns if the "enterprise_id" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) EnterpriseIDCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldEnterpriseID]
+	return ok
+}
+
+// ResetEnterpriseID resets all changes to the "enterprise_id" field.
+func (m *MassEmailRecipientMutation) ResetEnterpriseID() {
+	m.enterprise_id = nil
+	m.addenterprise_id = nil
+	delete(m.clearedFields, massemailrecipient.FieldEnterpriseID)
+}
+
+// SetStatus sets the "status" field.
+func (m *MassEmailRecipientMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *MassEmailRecipientMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *MassEmailRecipientMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetError sets the "error" field.
+func (m *MassEmailRecipientMutation) SetError(s string) {
+	m.error = &s
+}
+
+// Error returns the value of the "error" field in the mutation.
+func (m *MassEmailRecipientMutation) Error() (r string, exists bool) {
+	v := m.error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldError returns the old "error" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldError: %w", err)
+	}
+	return oldValue.Error, nil
+}
+
+// ResetError resets all changes to the "error" field.
+func (m *MassEmailRecipientMutation) ResetError() {
+	m.error = nil
+}
+
+// SetAttempts sets the "attempts" field.
+func (m *MassEmailRecipientMutation) SetAttempts(i int) {
+	m.attempts = &i
+	m.addattempts = nil
+}
+
+// Attempts returns the value of the "attempts" field in the mutation.
+func (m *MassEmailRecipientMutation) Attempts() (r int, exists bool) {
+	v := m.attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttempts returns the old "attempts" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttempts: %w", err)
+	}
+	return oldValue.Attempts, nil
+}
+
+// AddAttempts adds i to the "attempts" field.
+func (m *MassEmailRecipientMutation) AddAttempts(i int) {
+	if m.addattempts != nil {
+		*m.addattempts += i
+	} else {
+		m.addattempts = &i
+	}
+}
+
+// AddedAttempts returns the value that was added to the "attempts" field in this mutation.
+func (m *MassEmailRecipientMutation) AddedAttempts() (r int, exists bool) {
+	v := m.addattempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttempts resets all changes to the "attempts" field.
+func (m *MassEmailRecipientMutation) ResetAttempts() {
+	m.attempts = nil
+	m.addattempts = nil
+}
+
+// SetClaimedAt sets the "claimed_at" field.
+func (m *MassEmailRecipientMutation) SetClaimedAt(t time.Time) {
+	m.claimed_at = &t
+}
+
+// ClaimedAt returns the value of the "claimed_at" field in the mutation.
+func (m *MassEmailRecipientMutation) ClaimedAt() (r time.Time, exists bool) {
+	v := m.claimed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimedAt returns the old "claimed_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldClaimedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimedAt: %w", err)
+	}
+	return oldValue.ClaimedAt, nil
+}
+
+// ClearClaimedAt clears the value of the "claimed_at" field.
+func (m *MassEmailRecipientMutation) ClearClaimedAt() {
+	m.claimed_at = nil
+	m.clearedFields[massemailrecipient.FieldClaimedAt] = struct{}{}
+}
+
+// ClaimedAtCleared returns if the "claimed_at" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) ClaimedAtCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldClaimedAt]
+	return ok
+}
+
+// ResetClaimedAt resets all changes to the "claimed_at" field.
+func (m *MassEmailRecipientMutation) ResetClaimedAt() {
+	m.claimed_at = nil
+	delete(m.clearedFields, massemailrecipient.FieldClaimedAt)
+}
+
+// SetSentAt sets the "sent_at" field.
+func (m *MassEmailRecipientMutation) SetSentAt(t time.Time) {
+	m.sent_at = &t
+}
+
+// SentAt returns the value of the "sent_at" field in the mutation.
+func (m *MassEmailRecipientMutation) SentAt() (r time.Time, exists bool) {
+	v := m.sent_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSentAt returns the old "sent_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldSentAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSentAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSentAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSentAt: %w", err)
+	}
+	return oldValue.SentAt, nil
+}
+
+// ClearSentAt clears the value of the "sent_at" field.
+func (m *MassEmailRecipientMutation) ClearSentAt() {
+	m.sent_at = nil
+	m.clearedFields[massemailrecipient.FieldSentAt] = struct{}{}
+}
+
+// SentAtCleared returns if the "sent_at" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) SentAtCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldSentAt]
+	return ok
+}
+
+// ResetSentAt resets all changes to the "sent_at" field.
+func (m *MassEmailRecipientMutation) ResetSentAt() {
+	m.sent_at = nil
+	delete(m.clearedFields, massemailrecipient.FieldSentAt)
+}
+
+// SetTrackingToken sets the "tracking_token" field.
+func (m *MassEmailRecipientMutation) SetTrackingToken(s string) {
+	m.tracking_token = &s
+}
+
+// TrackingToken returns the value of the "tracking_token" field in the mutation.
+func (m *MassEmailRecipientMutation) TrackingToken() (r string, exists bool) {
+	v := m.tracking_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTrackingToken returns the old "tracking_token" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldTrackingToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTrackingToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTrackingToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTrackingToken: %w", err)
+	}
+	return oldValue.TrackingToken, nil
+}
+
+// ResetTrackingToken resets all changes to the "tracking_token" field.
+func (m *MassEmailRecipientMutation) ResetTrackingToken() {
+	m.tracking_token = nil
+}
+
+// SetFirstOpenedAt sets the "first_opened_at" field.
+func (m *MassEmailRecipientMutation) SetFirstOpenedAt(t time.Time) {
+	m.first_opened_at = &t
+}
+
+// FirstOpenedAt returns the value of the "first_opened_at" field in the mutation.
+func (m *MassEmailRecipientMutation) FirstOpenedAt() (r time.Time, exists bool) {
+	v := m.first_opened_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFirstOpenedAt returns the old "first_opened_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldFirstOpenedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFirstOpenedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFirstOpenedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFirstOpenedAt: %w", err)
+	}
+	return oldValue.FirstOpenedAt, nil
+}
+
+// ClearFirstOpenedAt clears the value of the "first_opened_at" field.
+func (m *MassEmailRecipientMutation) ClearFirstOpenedAt() {
+	m.first_opened_at = nil
+	m.clearedFields[massemailrecipient.FieldFirstOpenedAt] = struct{}{}
+}
+
+// FirstOpenedAtCleared returns if the "first_opened_at" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) FirstOpenedAtCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldFirstOpenedAt]
+	return ok
+}
+
+// ResetFirstOpenedAt resets all changes to the "first_opened_at" field.
+func (m *MassEmailRecipientMutation) ResetFirstOpenedAt() {
+	m.first_opened_at = nil
+	delete(m.clearedFields, massemailrecipient.FieldFirstOpenedAt)
+}
+
+// SetLastOpenedAt sets the "last_opened_at" field.
+func (m *MassEmailRecipientMutation) SetLastOpenedAt(t time.Time) {
+	m.last_opened_at = &t
+}
+
+// LastOpenedAt returns the value of the "last_opened_at" field in the mutation.
+func (m *MassEmailRecipientMutation) LastOpenedAt() (r time.Time, exists bool) {
+	v := m.last_opened_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastOpenedAt returns the old "last_opened_at" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldLastOpenedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastOpenedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastOpenedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastOpenedAt: %w", err)
+	}
+	return oldValue.LastOpenedAt, nil
+}
+
+// ClearLastOpenedAt clears the value of the "last_opened_at" field.
+func (m *MassEmailRecipientMutation) ClearLastOpenedAt() {
+	m.last_opened_at = nil
+	m.clearedFields[massemailrecipient.FieldLastOpenedAt] = struct{}{}
+}
+
+// LastOpenedAtCleared returns if the "last_opened_at" field was cleared in this mutation.
+func (m *MassEmailRecipientMutation) LastOpenedAtCleared() bool {
+	_, ok := m.clearedFields[massemailrecipient.FieldLastOpenedAt]
+	return ok
+}
+
+// ResetLastOpenedAt resets all changes to the "last_opened_at" field.
+func (m *MassEmailRecipientMutation) ResetLastOpenedAt() {
+	m.last_opened_at = nil
+	delete(m.clearedFields, massemailrecipient.FieldLastOpenedAt)
+}
+
+// SetOpenCount sets the "open_count" field.
+func (m *MassEmailRecipientMutation) SetOpenCount(i int) {
+	m.open_count = &i
+	m.addopen_count = nil
+}
+
+// OpenCount returns the value of the "open_count" field in the mutation.
+func (m *MassEmailRecipientMutation) OpenCount() (r int, exists bool) {
+	v := m.open_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpenCount returns the old "open_count" field's value of the MassEmailRecipient entity.
+// If the MassEmailRecipient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MassEmailRecipientMutation) OldOpenCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpenCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpenCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpenCount: %w", err)
+	}
+	return oldValue.OpenCount, nil
+}
+
+// AddOpenCount adds i to the "open_count" field.
+func (m *MassEmailRecipientMutation) AddOpenCount(i int) {
+	if m.addopen_count != nil {
+		*m.addopen_count += i
+	} else {
+		m.addopen_count = &i
+	}
+}
+
+// AddedOpenCount returns the value that was added to the "open_count" field in this mutation.
+func (m *MassEmailRecipientMutation) AddedOpenCount() (r int, exists bool) {
+	v := m.addopen_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOpenCount resets all changes to the "open_count" field.
+func (m *MassEmailRecipientMutation) ResetOpenCount() {
+	m.open_count = nil
+	m.addopen_count = nil
+}
+
+// ClearCampaign clears the "campaign" edge to the MassEmailCampaign entity.
+func (m *MassEmailRecipientMutation) ClearCampaign() {
+	m.clearedcampaign = true
+	m.clearedFields[massemailrecipient.FieldCampaignID] = struct{}{}
+}
+
+// CampaignCleared reports if the "campaign" edge to the MassEmailCampaign entity was cleared.
+func (m *MassEmailRecipientMutation) CampaignCleared() bool {
+	return m.clearedcampaign
+}
+
+// CampaignIDs returns the "campaign" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CampaignID instead. It exists only for internal usage by the builders.
+func (m *MassEmailRecipientMutation) CampaignIDs() (ids []int64) {
+	if id := m.campaign; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCampaign resets all changes to the "campaign" edge.
+func (m *MassEmailRecipientMutation) ResetCampaign() {
+	m.campaign = nil
+	m.clearedcampaign = false
+}
+
+// Where appends a list predicates to the MassEmailRecipientMutation builder.
+func (m *MassEmailRecipientMutation) Where(ps ...predicate.MassEmailRecipient) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MassEmailRecipientMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MassEmailRecipientMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MassEmailRecipient, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MassEmailRecipientMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MassEmailRecipientMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MassEmailRecipient).
+func (m *MassEmailRecipientMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MassEmailRecipientMutation) Fields() []string {
+	fields := make([]string, 0, 16)
+	if m.created_at != nil {
+		fields = append(fields, massemailrecipient.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, massemailrecipient.FieldUpdatedAt)
+	}
+	if m.campaign != nil {
+		fields = append(fields, massemailrecipient.FieldCampaignID)
+	}
+	if m.email != nil {
+		fields = append(fields, massemailrecipient.FieldEmail)
+	}
+	if m.name != nil {
+		fields = append(fields, massemailrecipient.FieldName)
+	}
+	if m.user_id != nil {
+		fields = append(fields, massemailrecipient.FieldUserID)
+	}
+	if m.enterprise_id != nil {
+		fields = append(fields, massemailrecipient.FieldEnterpriseID)
+	}
+	if m.status != nil {
+		fields = append(fields, massemailrecipient.FieldStatus)
+	}
+	if m.error != nil {
+		fields = append(fields, massemailrecipient.FieldError)
+	}
+	if m.attempts != nil {
+		fields = append(fields, massemailrecipient.FieldAttempts)
+	}
+	if m.claimed_at != nil {
+		fields = append(fields, massemailrecipient.FieldClaimedAt)
+	}
+	if m.sent_at != nil {
+		fields = append(fields, massemailrecipient.FieldSentAt)
+	}
+	if m.tracking_token != nil {
+		fields = append(fields, massemailrecipient.FieldTrackingToken)
+	}
+	if m.first_opened_at != nil {
+		fields = append(fields, massemailrecipient.FieldFirstOpenedAt)
+	}
+	if m.last_opened_at != nil {
+		fields = append(fields, massemailrecipient.FieldLastOpenedAt)
+	}
+	if m.open_count != nil {
+		fields = append(fields, massemailrecipient.FieldOpenCount)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MassEmailRecipientMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case massemailrecipient.FieldCreatedAt:
+		return m.CreatedAt()
+	case massemailrecipient.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case massemailrecipient.FieldCampaignID:
+		return m.CampaignID()
+	case massemailrecipient.FieldEmail:
+		return m.Email()
+	case massemailrecipient.FieldName:
+		return m.Name()
+	case massemailrecipient.FieldUserID:
+		return m.UserID()
+	case massemailrecipient.FieldEnterpriseID:
+		return m.EnterpriseID()
+	case massemailrecipient.FieldStatus:
+		return m.Status()
+	case massemailrecipient.FieldError:
+		return m.Error()
+	case massemailrecipient.FieldAttempts:
+		return m.Attempts()
+	case massemailrecipient.FieldClaimedAt:
+		return m.ClaimedAt()
+	case massemailrecipient.FieldSentAt:
+		return m.SentAt()
+	case massemailrecipient.FieldTrackingToken:
+		return m.TrackingToken()
+	case massemailrecipient.FieldFirstOpenedAt:
+		return m.FirstOpenedAt()
+	case massemailrecipient.FieldLastOpenedAt:
+		return m.LastOpenedAt()
+	case massemailrecipient.FieldOpenCount:
+		return m.OpenCount()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MassEmailRecipientMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case massemailrecipient.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case massemailrecipient.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case massemailrecipient.FieldCampaignID:
+		return m.OldCampaignID(ctx)
+	case massemailrecipient.FieldEmail:
+		return m.OldEmail(ctx)
+	case massemailrecipient.FieldName:
+		return m.OldName(ctx)
+	case massemailrecipient.FieldUserID:
+		return m.OldUserID(ctx)
+	case massemailrecipient.FieldEnterpriseID:
+		return m.OldEnterpriseID(ctx)
+	case massemailrecipient.FieldStatus:
+		return m.OldStatus(ctx)
+	case massemailrecipient.FieldError:
+		return m.OldError(ctx)
+	case massemailrecipient.FieldAttempts:
+		return m.OldAttempts(ctx)
+	case massemailrecipient.FieldClaimedAt:
+		return m.OldClaimedAt(ctx)
+	case massemailrecipient.FieldSentAt:
+		return m.OldSentAt(ctx)
+	case massemailrecipient.FieldTrackingToken:
+		return m.OldTrackingToken(ctx)
+	case massemailrecipient.FieldFirstOpenedAt:
+		return m.OldFirstOpenedAt(ctx)
+	case massemailrecipient.FieldLastOpenedAt:
+		return m.OldLastOpenedAt(ctx)
+	case massemailrecipient.FieldOpenCount:
+		return m.OldOpenCount(ctx)
+	}
+	return nil, fmt.Errorf("unknown MassEmailRecipient field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MassEmailRecipientMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case massemailrecipient.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case massemailrecipient.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case massemailrecipient.FieldCampaignID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCampaignID(v)
+		return nil
+	case massemailrecipient.FieldEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmail(v)
+		return nil
+	case massemailrecipient.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case massemailrecipient.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case massemailrecipient.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnterpriseID(v)
+		return nil
+	case massemailrecipient.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case massemailrecipient.FieldError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetError(v)
+		return nil
+	case massemailrecipient.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttempts(v)
+		return nil
+	case massemailrecipient.FieldClaimedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimedAt(v)
+		return nil
+	case massemailrecipient.FieldSentAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSentAt(v)
+		return nil
+	case massemailrecipient.FieldTrackingToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTrackingToken(v)
+		return nil
+	case massemailrecipient.FieldFirstOpenedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFirstOpenedAt(v)
+		return nil
+	case massemailrecipient.FieldLastOpenedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastOpenedAt(v)
+		return nil
+	case massemailrecipient.FieldOpenCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpenCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MassEmailRecipientMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, massemailrecipient.FieldUserID)
+	}
+	if m.addenterprise_id != nil {
+		fields = append(fields, massemailrecipient.FieldEnterpriseID)
+	}
+	if m.addattempts != nil {
+		fields = append(fields, massemailrecipient.FieldAttempts)
+	}
+	if m.addopen_count != nil {
+		fields = append(fields, massemailrecipient.FieldOpenCount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MassEmailRecipientMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case massemailrecipient.FieldUserID:
+		return m.AddedUserID()
+	case massemailrecipient.FieldEnterpriseID:
+		return m.AddedEnterpriseID()
+	case massemailrecipient.FieldAttempts:
+		return m.AddedAttempts()
+	case massemailrecipient.FieldOpenCount:
+		return m.AddedOpenCount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MassEmailRecipientMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case massemailrecipient.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	case massemailrecipient.FieldEnterpriseID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEnterpriseID(v)
+		return nil
+	case massemailrecipient.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttempts(v)
+		return nil
+	case massemailrecipient.FieldOpenCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOpenCount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MassEmailRecipientMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(massemailrecipient.FieldUserID) {
+		fields = append(fields, massemailrecipient.FieldUserID)
+	}
+	if m.FieldCleared(massemailrecipient.FieldEnterpriseID) {
+		fields = append(fields, massemailrecipient.FieldEnterpriseID)
+	}
+	if m.FieldCleared(massemailrecipient.FieldClaimedAt) {
+		fields = append(fields, massemailrecipient.FieldClaimedAt)
+	}
+	if m.FieldCleared(massemailrecipient.FieldSentAt) {
+		fields = append(fields, massemailrecipient.FieldSentAt)
+	}
+	if m.FieldCleared(massemailrecipient.FieldFirstOpenedAt) {
+		fields = append(fields, massemailrecipient.FieldFirstOpenedAt)
+	}
+	if m.FieldCleared(massemailrecipient.FieldLastOpenedAt) {
+		fields = append(fields, massemailrecipient.FieldLastOpenedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MassEmailRecipientMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MassEmailRecipientMutation) ClearField(name string) error {
+	switch name {
+	case massemailrecipient.FieldUserID:
+		m.ClearUserID()
+		return nil
+	case massemailrecipient.FieldEnterpriseID:
+		m.ClearEnterpriseID()
+		return nil
+	case massemailrecipient.FieldClaimedAt:
+		m.ClearClaimedAt()
+		return nil
+	case massemailrecipient.FieldSentAt:
+		m.ClearSentAt()
+		return nil
+	case massemailrecipient.FieldFirstOpenedAt:
+		m.ClearFirstOpenedAt()
+		return nil
+	case massemailrecipient.FieldLastOpenedAt:
+		m.ClearLastOpenedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MassEmailRecipientMutation) ResetField(name string) error {
+	switch name {
+	case massemailrecipient.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case massemailrecipient.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case massemailrecipient.FieldCampaignID:
+		m.ResetCampaignID()
+		return nil
+	case massemailrecipient.FieldEmail:
+		m.ResetEmail()
+		return nil
+	case massemailrecipient.FieldName:
+		m.ResetName()
+		return nil
+	case massemailrecipient.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case massemailrecipient.FieldEnterpriseID:
+		m.ResetEnterpriseID()
+		return nil
+	case massemailrecipient.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case massemailrecipient.FieldError:
+		m.ResetError()
+		return nil
+	case massemailrecipient.FieldAttempts:
+		m.ResetAttempts()
+		return nil
+	case massemailrecipient.FieldClaimedAt:
+		m.ResetClaimedAt()
+		return nil
+	case massemailrecipient.FieldSentAt:
+		m.ResetSentAt()
+		return nil
+	case massemailrecipient.FieldTrackingToken:
+		m.ResetTrackingToken()
+		return nil
+	case massemailrecipient.FieldFirstOpenedAt:
+		m.ResetFirstOpenedAt()
+		return nil
+	case massemailrecipient.FieldLastOpenedAt:
+		m.ResetLastOpenedAt()
+		return nil
+	case massemailrecipient.FieldOpenCount:
+		m.ResetOpenCount()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MassEmailRecipientMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.campaign != nil {
+		edges = append(edges, massemailrecipient.EdgeCampaign)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MassEmailRecipientMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case massemailrecipient.EdgeCampaign:
+		if id := m.campaign; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MassEmailRecipientMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MassEmailRecipientMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MassEmailRecipientMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedcampaign {
+		edges = append(edges, massemailrecipient.EdgeCampaign)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MassEmailRecipientMutation) EdgeCleared(name string) bool {
+	switch name {
+	case massemailrecipient.EdgeCampaign:
+		return m.clearedcampaign
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MassEmailRecipientMutation) ClearEdge(name string) error {
+	switch name {
+	case massemailrecipient.EdgeCampaign:
+		m.ClearCampaign()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MassEmailRecipientMutation) ResetEdge(name string) error {
+	switch name {
+	case massemailrecipient.EdgeCampaign:
+		m.ResetCampaign()
+		return nil
+	}
+	return fmt.Errorf("unknown MassEmailRecipient edge %s", name)
 }
 
 // PaymentAuditLogMutation represents an operation that mutates the PaymentAuditLog nodes in the graph.

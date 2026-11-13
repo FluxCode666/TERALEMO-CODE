@@ -17,6 +17,11 @@ func RegisterUserRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	// 邮件打开追踪像素：公开接口，无需鉴权，任何情况下都返回 1x1 GIF。
+	if h.Admin != nil && h.Admin.MassEmail != nil {
+		v1.GET("/mail/o/:token.gif", h.Admin.MassEmail.Pixel)
+	}
+
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))

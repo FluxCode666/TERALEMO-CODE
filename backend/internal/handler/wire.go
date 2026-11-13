@@ -59,6 +59,7 @@ func ProvideAdminHandlers(
 	opencodeGoUsage *service.OpenCodeGoUsageService,
 	claudeResetCredits *service.ClaudeResetCreditService,
 	enterprises service.EnterpriseRepository,
+	massEmailHandler *admin.MassEmailHandler,
 ) *AdminHandlers {
 	userHandler.SetEnterpriseRepository(enterprises)
 	accountHandler.SetUpstreamBillingProbeService(upstreamBillingProbe)
@@ -109,6 +110,7 @@ func ProvideAdminHandlers(
 		Affiliate:                affiliateHandler,
 		Compliance:               complianceHandler,
 		AuditLog:                 auditLogHandler,
+		MassEmail:                massEmailHandler,
 	}
 }
 
@@ -289,6 +291,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewGroupHandlerWithConfig,
 	admin.ProvideAccountHandler,
 	admin.NewAnnouncementHandler,
+	admin.NewMassEmailHandler,
 	admin.NewDataManagementHandler,
 	admin.NewBackupHandler,
 	admin.NewOAuthHandler,

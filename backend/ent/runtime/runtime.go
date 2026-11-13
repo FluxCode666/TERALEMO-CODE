@@ -34,6 +34,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/massemailcampaign"
+	"github.com/Wei-Shaw/sub2api/ent/massemailrecipient"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -1674,6 +1676,144 @@ func init() {
 	identityadoptiondecisionDescDecidedAt := identityadoptiondecisionFields[4].Descriptor()
 	// identityadoptiondecision.DefaultDecidedAt holds the default value on creation for the decided_at field.
 	identityadoptiondecision.DefaultDecidedAt = identityadoptiondecisionDescDecidedAt.Default.(func() time.Time)
+	massemailcampaignMixin := schema.MassEmailCampaign{}.Mixin()
+	massemailcampaignMixinFields0 := massemailcampaignMixin[0].Fields()
+	_ = massemailcampaignMixinFields0
+	massemailcampaignFields := schema.MassEmailCampaign{}.Fields()
+	_ = massemailcampaignFields
+	// massemailcampaignDescCreatedAt is the schema descriptor for created_at field.
+	massemailcampaignDescCreatedAt := massemailcampaignMixinFields0[0].Descriptor()
+	// massemailcampaign.DefaultCreatedAt holds the default value on creation for the created_at field.
+	massemailcampaign.DefaultCreatedAt = massemailcampaignDescCreatedAt.Default.(func() time.Time)
+	// massemailcampaignDescUpdatedAt is the schema descriptor for updated_at field.
+	massemailcampaignDescUpdatedAt := massemailcampaignMixinFields0[1].Descriptor()
+	// massemailcampaign.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	massemailcampaign.DefaultUpdatedAt = massemailcampaignDescUpdatedAt.Default.(func() time.Time)
+	// massemailcampaign.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	massemailcampaign.UpdateDefaultUpdatedAt = massemailcampaignDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// massemailcampaignDescSubject is the schema descriptor for subject field.
+	massemailcampaignDescSubject := massemailcampaignFields[0].Descriptor()
+	// massemailcampaign.SubjectValidator is a validator for the "subject" field. It is called by the builders before save.
+	massemailcampaign.SubjectValidator = func() func(string) error {
+		validators := massemailcampaignDescSubject.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(subject string) error {
+			for _, fn := range fns {
+				if err := fn(subject); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// massemailcampaignDescBodyHTML is the schema descriptor for body_html field.
+	massemailcampaignDescBodyHTML := massemailcampaignFields[1].Descriptor()
+	// massemailcampaign.DefaultBodyHTML holds the default value on creation for the body_html field.
+	massemailcampaign.DefaultBodyHTML = massemailcampaignDescBodyHTML.Default.(string)
+	// massemailcampaignDescStatus is the schema descriptor for status field.
+	massemailcampaignDescStatus := massemailcampaignFields[3].Descriptor()
+	// massemailcampaign.DefaultStatus holds the default value on creation for the status field.
+	massemailcampaign.DefaultStatus = massemailcampaignDescStatus.Default.(string)
+	// massemailcampaign.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	massemailcampaign.StatusValidator = massemailcampaignDescStatus.Validators[0].(func(string) error)
+	// massemailcampaignDescTotalCount is the schema descriptor for total_count field.
+	massemailcampaignDescTotalCount := massemailcampaignFields[5].Descriptor()
+	// massemailcampaign.DefaultTotalCount holds the default value on creation for the total_count field.
+	massemailcampaign.DefaultTotalCount = massemailcampaignDescTotalCount.Default.(int)
+	// massemailcampaignDescSentCount is the schema descriptor for sent_count field.
+	massemailcampaignDescSentCount := massemailcampaignFields[6].Descriptor()
+	// massemailcampaign.DefaultSentCount holds the default value on creation for the sent_count field.
+	massemailcampaign.DefaultSentCount = massemailcampaignDescSentCount.Default.(int)
+	// massemailcampaignDescFailedCount is the schema descriptor for failed_count field.
+	massemailcampaignDescFailedCount := massemailcampaignFields[7].Descriptor()
+	// massemailcampaign.DefaultFailedCount holds the default value on creation for the failed_count field.
+	massemailcampaign.DefaultFailedCount = massemailcampaignDescFailedCount.Default.(int)
+	// massemailcampaignDescOpenedCount is the schema descriptor for opened_count field.
+	massemailcampaignDescOpenedCount := massemailcampaignFields[8].Descriptor()
+	// massemailcampaign.DefaultOpenedCount holds the default value on creation for the opened_count field.
+	massemailcampaign.DefaultOpenedCount = massemailcampaignDescOpenedCount.Default.(int)
+	// massemailcampaignDescLastError is the schema descriptor for last_error field.
+	massemailcampaignDescLastError := massemailcampaignFields[12].Descriptor()
+	// massemailcampaign.DefaultLastError holds the default value on creation for the last_error field.
+	massemailcampaign.DefaultLastError = massemailcampaignDescLastError.Default.(string)
+	massemailrecipientMixin := schema.MassEmailRecipient{}.Mixin()
+	massemailrecipientMixinFields0 := massemailrecipientMixin[0].Fields()
+	_ = massemailrecipientMixinFields0
+	massemailrecipientFields := schema.MassEmailRecipient{}.Fields()
+	_ = massemailrecipientFields
+	// massemailrecipientDescCreatedAt is the schema descriptor for created_at field.
+	massemailrecipientDescCreatedAt := massemailrecipientMixinFields0[0].Descriptor()
+	// massemailrecipient.DefaultCreatedAt holds the default value on creation for the created_at field.
+	massemailrecipient.DefaultCreatedAt = massemailrecipientDescCreatedAt.Default.(func() time.Time)
+	// massemailrecipientDescUpdatedAt is the schema descriptor for updated_at field.
+	massemailrecipientDescUpdatedAt := massemailrecipientMixinFields0[1].Descriptor()
+	// massemailrecipient.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	massemailrecipient.DefaultUpdatedAt = massemailrecipientDescUpdatedAt.Default.(func() time.Time)
+	// massemailrecipient.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	massemailrecipient.UpdateDefaultUpdatedAt = massemailrecipientDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// massemailrecipientDescEmail is the schema descriptor for email field.
+	massemailrecipientDescEmail := massemailrecipientFields[1].Descriptor()
+	// massemailrecipient.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	massemailrecipient.EmailValidator = func() func(string) error {
+		validators := massemailrecipientDescEmail.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(email string) error {
+			for _, fn := range fns {
+				if err := fn(email); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// massemailrecipientDescName is the schema descriptor for name field.
+	massemailrecipientDescName := massemailrecipientFields[2].Descriptor()
+	// massemailrecipient.DefaultName holds the default value on creation for the name field.
+	massemailrecipient.DefaultName = massemailrecipientDescName.Default.(string)
+	// massemailrecipient.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	massemailrecipient.NameValidator = massemailrecipientDescName.Validators[0].(func(string) error)
+	// massemailrecipientDescStatus is the schema descriptor for status field.
+	massemailrecipientDescStatus := massemailrecipientFields[5].Descriptor()
+	// massemailrecipient.DefaultStatus holds the default value on creation for the status field.
+	massemailrecipient.DefaultStatus = massemailrecipientDescStatus.Default.(string)
+	// massemailrecipient.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	massemailrecipient.StatusValidator = massemailrecipientDescStatus.Validators[0].(func(string) error)
+	// massemailrecipientDescError is the schema descriptor for error field.
+	massemailrecipientDescError := massemailrecipientFields[6].Descriptor()
+	// massemailrecipient.DefaultError holds the default value on creation for the error field.
+	massemailrecipient.DefaultError = massemailrecipientDescError.Default.(string)
+	// massemailrecipientDescAttempts is the schema descriptor for attempts field.
+	massemailrecipientDescAttempts := massemailrecipientFields[7].Descriptor()
+	// massemailrecipient.DefaultAttempts holds the default value on creation for the attempts field.
+	massemailrecipient.DefaultAttempts = massemailrecipientDescAttempts.Default.(int)
+	// massemailrecipientDescTrackingToken is the schema descriptor for tracking_token field.
+	massemailrecipientDescTrackingToken := massemailrecipientFields[10].Descriptor()
+	// massemailrecipient.TrackingTokenValidator is a validator for the "tracking_token" field. It is called by the builders before save.
+	massemailrecipient.TrackingTokenValidator = func() func(string) error {
+		validators := massemailrecipientDescTrackingToken.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(tracking_token string) error {
+			for _, fn := range fns {
+				if err := fn(tracking_token); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// massemailrecipientDescOpenCount is the schema descriptor for open_count field.
+	massemailrecipientDescOpenCount := massemailrecipientFields[13].Descriptor()
+	// massemailrecipient.DefaultOpenCount holds the default value on creation for the open_count field.
+	massemailrecipient.DefaultOpenCount = massemailrecipientDescOpenCount.Default.(int)
 	paymentauditlogFields := schema.PaymentAuditLog{}.Fields()
 	_ = paymentauditlogFields
 	// paymentauditlogDescOrderID is the schema descriptor for order_id field.

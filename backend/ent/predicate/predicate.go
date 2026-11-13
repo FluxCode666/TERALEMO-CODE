@@ -93,6 +93,12 @@ type IdempotencyRecord func(*sql.Selector)
 // IdentityAdoptionDecision is the predicate function for identityadoptiondecision builders.
 type IdentityAdoptionDecision func(*sql.Selector)
 
+// MassEmailCampaign is the predicate function for massemailcampaign builders.
+type MassEmailCampaign func(*sql.Selector)
+
+// MassEmailRecipient is the predicate function for massemailrecipient builders.
+type MassEmailRecipient func(*sql.Selector)
+
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
 

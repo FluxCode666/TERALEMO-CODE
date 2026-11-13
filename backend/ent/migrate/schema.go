@@ -1481,6 +1481,104 @@ var (
 			},
 		},
 	}
+	// MassEmailCampaignColumns holds the columns for the "mass_email_campaign" table.
+	MassEmailCampaignColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "subject", Type: field.TypeString, Size: 200},
+		{Name: "body_html", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "recipient_filter", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "draft"},
+		{Name: "scheduled_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "total_count", Type: field.TypeInt, Default: 0},
+		{Name: "sent_count", Type: field.TypeInt, Default: 0},
+		{Name: "failed_count", Type: field.TypeInt, Default: 0},
+		{Name: "opened_count", Type: field.TypeInt, Default: 0},
+		{Name: "created_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "last_error", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+	}
+	// MassEmailCampaignTable holds the schema information for the "mass_email_campaign" table.
+	MassEmailCampaignTable = &schema.Table{
+		Name:       "mass_email_campaign",
+		Columns:    MassEmailCampaignColumns,
+		PrimaryKey: []*schema.Column{MassEmailCampaignColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "massemailcampaign_status",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailCampaignColumns[6]},
+			},
+			{
+				Name:    "massemailcampaign_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailCampaignColumns[1]},
+			},
+			{
+				Name:    "massemailcampaign_scheduled_at",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailCampaignColumns[7]},
+			},
+			{
+				Name:    "massemailcampaign_status_scheduled_at",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailCampaignColumns[6], MassEmailCampaignColumns[7]},
+			},
+		},
+	}
+	// MassEmailRecipientColumns holds the columns for the "mass_email_recipient" table.
+	MassEmailRecipientColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "email", Type: field.TypeString, Size: 255},
+		{Name: "name", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "user_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "enterprise_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "pending"},
+		{Name: "error", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "claimed_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "sent_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "tracking_token", Type: field.TypeString, Size: 32},
+		{Name: "first_opened_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "last_opened_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "open_count", Type: field.TypeInt, Default: 0},
+		{Name: "campaign_id", Type: field.TypeInt64},
+	}
+	// MassEmailRecipientTable holds the schema information for the "mass_email_recipient" table.
+	MassEmailRecipientTable = &schema.Table{
+		Name:       "mass_email_recipient",
+		Columns:    MassEmailRecipientColumns,
+		PrimaryKey: []*schema.Column{MassEmailRecipientColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "mass_email_recipient_mass_email_campaign_recipients",
+				Columns:    []*schema.Column{MassEmailRecipientColumns[16]},
+				RefColumns: []*schema.Column{MassEmailCampaignColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "massemailrecipient_campaign_id",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailRecipientColumns[16]},
+			},
+			{
+				Name:    "massemailrecipient_campaign_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{MassEmailRecipientColumns[16], MassEmailRecipientColumns[7]},
+			},
+			{
+				Name:    "idx_mass_email_recipient_tracking_token",
+				Unique:  true,
+				Columns: []*schema.Column{MassEmailRecipientColumns[12]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2520,6 +2618,8 @@ var (
 		GroupsTable,
 		IdempotencyRecordsTable,
 		IdentityAdoptionDecisionsTable,
+		MassEmailCampaignTable,
+		MassEmailRecipientTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
@@ -2654,6 +2754,13 @@ func init() {
 	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
 	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
 		Table: "identity_adoption_decisions",
+	}
+	MassEmailCampaignTable.Annotation = &entsql.Annotation{
+		Table: "mass_email_campaign",
+	}
+	MassEmailRecipientTable.ForeignKeys[0].RefTable = MassEmailCampaignTable
+	MassEmailRecipientTable.Annotation = &entsql.Annotation{
+		Table: "mass_email_recipient",
 	}
 	PaymentAuditLogsTable.Annotation = &entsql.Annotation{
 		Table: "payment_audit_logs",

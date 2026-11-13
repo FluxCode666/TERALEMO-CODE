@@ -180,6 +180,7 @@ export default {
     enterprises: 'Enterprises',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
+    massEmails: 'Mass Email',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',
     usage: 'Usage',

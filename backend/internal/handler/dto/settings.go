@@ -58,6 +58,9 @@ type SystemSettings struct {
 	SMTPFromName           string `json:"smtp_from_name"`
 	SMTPUseTLS             bool   `json:"smtp_use_tls"`
 
+	// 邮件群发发送速率（封/秒），默认 2，范围 1~50。
+	MassEmailRateLimitPerSecond int `json:"mass_email_rate_limit_per_second"`
+
 	TurnstileEnabled                       bool     `json:"turnstile_enabled"`
 	TurnstileSiteKey                       string   `json:"turnstile_site_key"`
 	TurnstileSecretKeyConfigured           bool     `json:"turnstile_secret_key_configured"`
