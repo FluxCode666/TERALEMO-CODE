@@ -72,7 +72,7 @@ func TestMassEmailRateLimiterSetRateClamps(t *testing.T) {
 // Runner 行为
 // ---------------------------------------------------------------------------
 
-func newRunnerForTest(repo *fakeMassEmailRepo) *MassEmailRunner {
+func newMassEmailRunnerForTest(repo *fakeMassEmailRepo) *MassEmailRunner {
 	runner := NewMassEmailRunner(repo, newMassEmailServiceForTest(repo), nil, nil, nil)
 	// 单测里没有 Redis：本地模式直接持锁（真实环境由 Redis 锁 + 续期决定）。
 	runner.leaderMu.Lock()
@@ -92,7 +92,7 @@ func TestMassEmailRunnerStopsOnCancelledCampaign(t *testing.T) {
 		{ID: 11, CampaignID: 1, Email: "a@example.com", Status: domain.MassEmailRecipientStatusPending},
 	}
 
-	newRunnerForTest(repo).drain(context.Background(), 1)
+	newMassEmailRunnerForTest(repo).drain(context.Background(), 1)
 
 	require.Equal(t, 0, repo.lastClaimLimit, "已取消的任务不应再领取收件人")
 	require.Equal(t, domain.MassEmailRecipientStatusPending, repo.recipients[1][0].Status)
@@ -125,7 +125,7 @@ func TestMassEmailRunnerReleaseRemainingAlsoRollsBackAttempts(t *testing.T) {
 		{ID: 12, CampaignID: 1, Email: "b@example.com", Status: domain.MassEmailRecipientStatusPending, ClaimedAt: &claimed, Attempts: 1},
 	}
 
-	newRunnerForTest(repo).releaseRemaining(1, []domain.MassEmailRecipient{{ID: 11}})
+	newMassEmailRunnerForTest(repo).releaseRemaining(1, []domain.MassEmailRecipient{{ID: 11}})
 
 	require.Nil(t, repo.recipients[1][0].ClaimedAt, "已领取未发送的收件人要放回队列")
 	require.Equal(t, 0, repo.recipients[1][0].Attempts, "attempts 要减回，不能虚增")
@@ -140,7 +140,7 @@ func TestMassEmailRunnerTickPromotesDueScheduledCampaign(t *testing.T) {
 	past := time.Now().Add(-time.Minute)
 	repo.campaigns[1] = &domain.MassEmailCampaign{ID: 1, Status: domain.MassEmailStatusScheduled, ScheduledAt: &past}
 
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	runner.tick(context.Background())
 
 	require.Equal(t, domain.MassEmailStatusSending, repo.campaigns[1].Status, "到点的定时任务应被推进到 sending")
@@ -153,7 +153,7 @@ func TestMassEmailRunnerTickIgnoresFutureScheduledCampaign(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 	repo.campaigns[1] = &domain.MassEmailCampaign{ID: 1, Status: domain.MassEmailStatusScheduled, ScheduledAt: &future}
 
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	runner.tick(context.Background())
 
 	require.Equal(t, domain.MassEmailStatusScheduled, repo.campaigns[1].Status)
@@ -243,7 +243,7 @@ func TestCreateMaterialisesRecipientsBeforeLeavingDraft(t *testing.T) {
 	require.Equal(t, 2, campaign.TotalCount)
 
 	// worker 只有在收件人已经存在时才可能看到 sending：这里 draft 状态下不发送。
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	runner.tick(context.Background())
 	require.Equal(t, domain.MassEmailStatusDraft, repo.campaigns[campaign.ID].Status)
 }
@@ -382,7 +382,7 @@ func TestMassEmailRunnerLockExpiryFailsClosed(t *testing.T) {
 		{ID: 11, CampaignID: 1, Email: "a@example.com", Status: domain.MassEmailRecipientStatusPending},
 	}
 
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	require.True(t, runner.LockHeld())
 
 	// 模拟进程停顿超过 TTL、heartbeat 没能续期：本地截止时间已过 → fail-closed。
@@ -415,7 +415,7 @@ func TestMassEmailRunnerLostLeadershipCancelsEpoch(t *testing.T) {
 	t.Parallel()
 
 	repo := newFakeMassEmailRepo()
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	oldEpoch := runner.epochCtx()
 	require.NoError(t, oldEpoch.Err())
 
@@ -448,7 +448,7 @@ func TestMassEmailRunnerDrainStopsWhenEpochCancelled(t *testing.T) {
 		{ID: 11, CampaignID: 1, Email: "a@example.com", Status: domain.MassEmailRecipientStatusPending},
 	}
 
-	runner := newRunnerForTest(repo)
+	runner := newMassEmailRunnerForTest(repo)
 	epoch := runner.epochCtx()
 	runner.leaderMu.Lock()
 	runner.leaderCancel() // 模拟等待限速时隙期间失锁/取消
@@ -469,7 +469,7 @@ func TestMassEmailRunnerReleaseRemainingUsesCleanupContext(t *testing.T) {
 	}
 
 	// 调用方正处于取消路径（ctx 已取消），释放仍然必须成功。
-	newRunnerForTest(repo).releaseRemaining(1, []domain.MassEmailRecipient{{ID: 11}})
+	newMassEmailRunnerForTest(repo).releaseRemaining(1, []domain.MassEmailRecipient{{ID: 11}})
 
 	require.Nil(t, repo.recipients[1][0].ClaimedAt)
 	require.Equal(t, 0, repo.recipients[1][0].Attempts)

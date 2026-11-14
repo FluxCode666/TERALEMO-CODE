@@ -164,7 +164,7 @@ func sanitizeMassEmailAttrs(tag string, attrs []xhtml.Attribute) string {
 				continue
 			}
 		}
-		builder.WriteString(" " + name + `="` + html.EscapeString(value) + `"`)
+		_, _ = builder.WriteString(" " + name + `="` + html.EscapeString(value) + `"`)
 	}
 	return builder.String()
 }

@@ -21,9 +21,6 @@ const massEmailRecipientColumns = `id, campaign_id, email, name, user_id, enterp
 // massEmailRecipientInsertBatchSize 单条 INSERT 的最大行数，避免参数个数超限。
 const massEmailRecipientInsertBatchSize = 200
 
-// massEmailMaxErrorLen 单个收件人错误文本上限。
-const massEmailMaxErrorLen = 2000
-
 func (r *massEmailRepository) ReplaceRecipients(ctx context.Context, campaignID int64, recipients []domain.MassEmailRecipient) (int, error) {
 	if campaignID <= 0 {
 		return 0, domain.ErrMassEmailCampaignNotFound
