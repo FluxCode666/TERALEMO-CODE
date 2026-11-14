@@ -10,7 +10,7 @@ export default {
         users: '用户默认值',
         gateway: '网关服务',
         email: '邮件设置',
-        backup: '数据备份',
+        backup: '对象存储',
         payment: '支付设置',
       },
       features: {
@@ -279,13 +279,13 @@ export default {
       apiKeyAcl: {
         title: 'API Key IP 访问控制',
         description: '控制 API Key 白/黑名单、操作审计日志与会话 IP/UA 绑定使用哪个客户端 IP 判断',
-        trustForwardedIp: '信任反代传递的客户端 IP',
+        trustForwardedIp: '兼容旧版客户端 IP 设置',
         trustForwardedIpHint:
-          '为保证升级兼容默认开启。开启后 CF-Connecting-IP、X-Real-IP 或 X-Forwarded-For 会直接接管客户端 IP 解析并覆盖 server.trusted_proxies；关闭后严格使用 server.trusted_proxies 配置的 Gin 可信代理链。仅在源站无法被直接访问时开启接管模式。切换会改变现有会话的 IP 指纹。',
+          '此旧设置为升级兼容保留。所有请求始终校验直接对端和可信代理链；请在下方模型白名单面板配置 CDN 网段，并在 server.trusted_proxies 中仅配置 nginx 或 Docker 网关的实际连接地址。',
         forwardedClientIpHeaders: '自定义客户端 IP 请求头',
-        forwardedClientIpHeadersHint: '添加 CDN 或反代请求头名称，解析时优先于内置请求头。',
+        forwardedClientIpHeadersHint: '仅当代理链已确认来自可信 CDN，且 X-Forwarded-For 未提供客户端地址时，使用这些单 IP 请求头补充解析。',
         forwardedClientIpHeadersPlaceholder: 'X-Client-IP',
-        forwardedClientIpHeadersRiskHint: '源站可被直接访问时，这些原始请求头可被伪造；请先限制源站访问再信任它们。',
+        forwardedClientIpHeadersRiskHint: 'CDN 必须覆写对应请求头。推荐 nginx 完成 real_ip 校验后，向应用覆写 X-Forwarded-For 并清除其他客户端 IP 头。',
         forwardedClientIpHeaderInvalid: '请输入有效的 HTTP 请求头名称。',
         forwardedClientIpHeadersLimit: '自定义客户端 IP 请求头最多允许 {max} 个。',
         removeForwardedClientIpHeader: '移除 {header}'

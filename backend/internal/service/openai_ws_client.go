@@ -12,6 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
+
 	openaiwsv2 "github.com/Wei-Shaw/sub2api/internal/service/openai_ws_v2"
 	coderws "github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
@@ -122,9 +125,29 @@ func (d *coderOpenAIWSClientDialer) Dial(
 	if targetURL == "" {
 		return nil, 0, nil, errors.New("ws url is empty")
 	}
+	parsedTarget, err := url.Parse(targetURL)
+	if err != nil {
+		return nil, 0, nil, errors.New("invalid ws url")
+	}
+	proxied := strings.TrimSpace(proxyURL) != ""
+	if !proxied {
+		probe := &http.Request{URL: parsedTarget}
+		copyURL := *parsedTarget
+		copyURL.Scheme = strings.Replace(copyURL.Scheme, "ws", "http", 1)
+		probe.URL = &copyURL
+		environmentProxy, err := http.ProxyFromEnvironment(probe)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+		proxied = environmentProxy != nil
+	}
+	if err := outbound.Default().ValidateRequest(ctx, parsedTarget, proxied); err != nil {
+		return nil, 0, nil, err
+	}
 
 	wrapped := &coderOpenAIWSClientConn{}
 	opts := &coderws.DialOptions{
+		HTTPClient:      outbound.NewClient(0),
 		HTTPHeader:      cloneHeader(headers),
 		CompressionMode: coderws.CompressionContextTakeover,
 		OnPingReceived: func(context.Context, []byte) bool {
@@ -174,7 +197,7 @@ func (d *coderOpenAIWSClientDialer) proxyHTTPClient(proxy string) (*http.Client,
 	if normalizedProxy == "" {
 		return nil, errors.New("proxy url is empty")
 	}
-	parsedProxyURL, err := url.Parse(normalizedProxy)
+	_, parsedProxyURL, err := proxyurl.Parse(normalizedProxy)
 	if err != nil {
 		return nil, fmt.Errorf("invalid proxy url: %w", err)
 	}
@@ -189,6 +212,7 @@ func (d *coderOpenAIWSClientDialer) proxyHTTPClient(proxy string) (*http.Client,
 	}
 	d.cleanupProxyClientsLocked(now)
 	transport := &http.Transport{
+		DialContext:         outbound.NewTransport().DialContext,
 		Proxy:               http.ProxyURL(parsedProxyURL),
 		MaxIdleConns:        openAIWSProxyTransportMaxIdleConns,
 		MaxIdleConnsPerHost: openAIWSProxyTransportMaxIdleConnsPerHost,
@@ -196,7 +220,12 @@ func (d *coderOpenAIWSClientDialer) proxyHTTPClient(proxy string) (*http.Client,
 		TLSHandshakeTimeout: 10 * time.Second,
 		ForceAttemptHTTP2:   true,
 	}
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: transport, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return outbound.Default().ValidateURL(req.Context(), req.URL)
+	}}
 	d.proxyClients[normalizedProxy] = &openAIWSProxyClientEntry{
 		client:           client,
 		lastUsedUnixNano: now,

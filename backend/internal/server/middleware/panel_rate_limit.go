@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"log/slog"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,8 +27,7 @@ type panelRateLimitAllower interface {
 // 设计要点：
 //   - 认证接口按「用户 ID」维度计数：与客户端 IP 完全无关，反向代理/共享出口
 //     （所有请求源 IP 坍缩为 127.0.0.1 等）不会互相误伤。
-//   - 公开接口按安全客户端 IP 计数：仅统计全局单播地址，回环/内网/链路本地
-//     地址（反代内部转发地址）直接跳过，避免误拦整条反代链路的流量。
+//   - 公开接口按可信客户端 IP 计数，反代部署应配置 server.trusted_proxies。
 //   - 配置走进程内缓存（60s TTL），热路径零 DB 访问。
 //   - Redis 异常一律 fail-open：限流是保护措施，不能反过来把面板打挂。
 type PanelRateLimiter struct {
@@ -102,9 +100,7 @@ func (p *PanelRateLimiter) userScoped(scope string, limitOf func(service.PanelRa
 }
 
 // PublicIP 无需认证的公开接口按客户端 IP 限流。
-// 使用与审计日志/会话绑定一致的安全客户端 IP 解析；解析结果为回环/内网/
-// 链路本地地址时跳过计数（这类地址通常是反代内部转发地址，按它计数会把
-// 整条反代链路的所有真实用户合并进同一个桶造成大面积误拦截）。
+// 与会话绑定共用可信代理解析，私网来源同样计数。
 func (p *PanelRateLimiter) PublicIP() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if p == nil || p.limiter == nil || p.settingService == nil {
@@ -117,11 +113,6 @@ func (p *PanelRateLimiter) PublicIP() gin.HandlerFunc {
 			return
 		}
 		clientIP := SecurityClientIP(c)
-		if !isPubliclyRoutableClientIP(clientIP) {
-			c.Next()
-			return
-		}
-
 		result, err := p.limiter.Allow(c.Request.Context(), "panel:public:ip:"+clientIP, settings.PublicIPRPM, panelRateLimitWindow)
 		if err != nil {
 			slog.Warn("panel public rate limit check failed, allowing request", "error", err)
@@ -134,20 +125,6 @@ func (p *PanelRateLimiter) PublicIP() gin.HandlerFunc {
 		}
 		c.Next()
 	}
-}
-
-// isPubliclyRoutableClientIP 判断地址是否为可作为限流依据的全局单播地址。
-// 回环、RFC1918/ULA 内网、链路本地与未指定地址返回 false。
-func isPubliclyRoutableClientIP(clientIP string) bool {
-	ip := net.ParseIP(clientIP)
-	if ip == nil {
-		return false
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
-		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return false
-	}
-	return ip.IsGlobalUnicast()
 }
 
 func abortPanelRateLimited(c *gin.Context, retryAfter time.Duration) {

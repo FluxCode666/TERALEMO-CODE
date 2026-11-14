@@ -52,7 +52,7 @@ describe('UseKeyModal', () => {
     expect(text).toContain('/v1/images/generations/async')
     expect(text).toContain('/v1/images/tasks/{task_id}')
     expect(text).toContain('-F image=@input.png')
-    expect(text).toContain('Bearer sk-image-test')
+    expect(text).toContain('Bearer YOUR_API_KEY')
     expect(wrapper.text()).not.toContain('keys.useKeyModal.noGroupTitle')
   })
 
@@ -190,7 +190,7 @@ describe('UseKeyModal', () => {
     expect(allCode).toMatch(/\[model\."grok-4\.5"\][\s\S]*?context_window = 500000/)
     expect(allCode).toMatch(/\[model\."grok-build-0\.1"\][\s\S]*?context_window = 256000/)
     // Prefer env_key; hardcode api_key only as commented alternative
-    expect(allCode).not.toMatch(/^api_key = "sk-grok-test"$/m)
+    expect(allCode).not.toMatch(/^api_key = "YOUR_API_KEY"$/m)
 
     const modelBlocks = allCode
       .split(/(?=^\[model\.)/m)
@@ -221,7 +221,7 @@ describe('UseKeyModal', () => {
     expect(parsed.provider.grok.name).toBe('Grok via Sub2API')
     expect(parsed.provider.grok.options).toEqual({
       baseURL: 'https://example.com/v1',
-      apiKey: 'sk-grok-test'
+      apiKey: 'YOUR_API_KEY'
     })
     expect(parsed.provider.grok.models['grok-4.5']).toBeDefined()
     expect(parsed.provider.grok.models['grok-4.5'].limit.context).toBe(500000)
@@ -261,7 +261,7 @@ describe('UseKeyModal', () => {
 
     let codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     expect(codeBlocks.join('\n')).toContain('ANTHROPIC_BASE_URL="https://example.com"')
-    expect(codeBlocks.join('\n')).toContain('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"')
+    expect(codeBlocks.join('\n')).toContain('ANTHROPIC_AUTH_TOKEN="YOUR_API_KEY"')
     const unixConfig = codeBlocks.find((content) => content.startsWith('export ANTHROPIC_BASE_URL'))
     expect(unixConfig).toBeDefined()
     for (const name of [
@@ -330,7 +330,7 @@ describe('UseKeyModal', () => {
     expect(copyButton).toBeDefined()
     await copyButton!.trigger('click')
     expect(copyToClipboardMock).toHaveBeenCalledWith(
-      expect.stringContaining('ANTHROPIC_AUTH_TOKEN="sk-grok-claude-test"'),
+      expect.stringContaining('ANTHROPIC_AUTH_TOKEN="YOUR_API_KEY"'),
       'keys.copied'
     )
   })
@@ -377,7 +377,7 @@ describe('UseKeyModal', () => {
     expect(configToml).toContain('grok-imagine-image')
     expect(configToml).toContain('grok-imagine-video')
     // Hardcoded bearer is only a commented fallback when env cannot be set.
-    expect(configToml).toMatch(/# experimental_bearer_token = "sk-grok-codex-test"/)
+    expect(configToml).toMatch(/# experimental_bearer_token = "YOUR_API_KEY"/)
     expect(configToml).not.toContain('supports_websockets = true')
     expect(configToml).not.toContain('responses_websockets_v2')
     expect(wrapper.text()).not.toContain('auth.json')
@@ -392,7 +392,7 @@ describe('UseKeyModal', () => {
 
     codeBlocks = wrapper.findAll('pre code').map((code) => code.text())
     expect(wrapper.text().toLowerCase()).toContain('%userprofile%\\.codex\\config.toml'.toLowerCase())
-    expect(codeBlocks.join('\n')).toContain('experimental_bearer_token = "sk-grok-codex-test"')
+    expect(codeBlocks.join('\n')).toContain('experimental_bearer_token = "YOUR_API_KEY"')
   })
 
   it('keeps legacy OpenAI Codex config as the default', () => {
@@ -434,7 +434,7 @@ describe('UseKeyModal', () => {
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('goals = true')
     expect(configToml).not.toContain('model_reasoning_effort = "xhigh"')
-    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
+    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "YOUR_API_KEY"\n}')
     expect(wrapper.text()).toContain('auth.json')
     expect(wrapper.find('[data-testid="codex-api-key-restart-notice"]').exists()).toBe(false)
   })
@@ -508,13 +508,13 @@ describe('UseKeyModal', () => {
     expect(apiKeyMode.attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
+    expect(configToml).toContain('experimental_bearer_token = "YOUR_API_KEY"')
     expect(configToml).toContain('http_headers = { "x-openai-actor-authorization" = "local-image-extension" }')
     expect(configToml).toContain('model_catalog_url = "https://example.com/v1/models"')
     expect(configToml).not.toContain('model_catalog_json')
     expect(configToml).not.toContain('env_key')
     expect(configToml).not.toContain('image_generation')
-    expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
+    expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "YOUR_API_KEY"\n}')
     expect(wrapper.text()).not.toContain('auth.json')
 
     const restartNotice = wrapper.get('[data-testid="codex-api-key-restart-notice"]')
@@ -577,7 +577,7 @@ describe('UseKeyModal', () => {
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('responses_websockets_v2 = true')
     expect(features).toContain('goals = true')
-    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
+    expect(codeBlocks).toContain('{\n  "OPENAI_API_KEY": "YOUR_API_KEY"\n}')
     expect(wrapper.text()).toContain('auth.json')
   })
 
@@ -619,7 +619,7 @@ describe('UseKeyModal', () => {
     expect(wrapper.get('[data-testid="codex-auth-mode-api-key"]').attributes('aria-checked')).toBe('true')
     expect(configToml).toBeDefined()
     expect(configToml).toContain('requires_openai_auth = false')
-    expect(configToml).toContain('experimental_bearer_token = "sk-test"')
+    expect(configToml).toContain('experimental_bearer_token = "YOUR_API_KEY"')
     expect(configToml).toContain('http_headers = { "x-openai-actor-authorization" = "local-image-extension" }')
     expect(configToml).not.toContain('env_key')
     expect(configToml).not.toContain('image_generation')
@@ -627,7 +627,7 @@ describe('UseKeyModal', () => {
     const features = configToml?.split('[features]\n')[1]?.split('\n[')[0]
     expect(features).toContain('responses_websockets_v2 = true')
     expect(features).toContain('goals = true')
-    expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "sk-test"\n}')
+    expect(codeBlocks).not.toContain('{\n  "OPENAI_API_KEY": "YOUR_API_KEY"\n}')
     expect(wrapper.text()).not.toContain('auth.json')
   })
 
@@ -884,13 +884,14 @@ describe('UseKeyModal', () => {
 
     await wrapper.get('[data-testid="codex-model-catalog-mode"]').setValue('file')
 
+    await wrapper.get('[data-testid="catalog-credential"]').setValue('sk-manual-catalog')
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://example.com/v1/models?client_version=0.158.0',
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer sk-composite-test' })
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-manual-catalog' })
       })
     )
     expect(wrapper.get('[data-testid="codex-model-catalog"]').text())
@@ -1006,6 +1007,7 @@ describe('UseKeyModal', () => {
     )
     expect(codexTab).toBeDefined()
     await codexTab!.trigger('click')
+    await wrapper.get('[data-testid="catalog-credential"]').setValue('sk-manual-catalog')
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
 
@@ -1091,7 +1093,8 @@ describe('UseKeyModal', () => {
         }
       })
 
-      await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
+      await wrapper.get('[data-testid="catalog-credential"]').setValue('sk-manual-catalog')
+    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
       await flushPromises()
 
       const oversized = responseBytes > 1024 * 1024

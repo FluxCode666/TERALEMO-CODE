@@ -170,6 +170,23 @@ describe('MonitorFormDialog linked account selector', () => {
     monitorUpdate.mockReset().mockResolvedValue({})
   })
 
+  it('requires manual credentials and preserves the saved key when editing with an empty input', async () => {
+    const wrapper = mountDialog(makeMonitor())
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.channelMonitor.form.manualKeyHint')
+    expect(wrapper.text()).not.toContain('admin.channelMonitor.form.useMyKey')
+    expect(wrapper.findComponent({ name: 'MonitorKeyPickerDialog' }).exists()).toBe(false)
+    expect(wrapper.get<HTMLInputElement>('input[type="password"]').element.value).toBe('')
+    await wrapper.get('#channel-monitor-form').trigger('submit')
+    await flushPromises()
+    expect(monitorUpdate).toHaveBeenCalledOnce()
+    expect(monitorUpdate.mock.calls[0][1]).not.toHaveProperty('api_key')
+    await wrapper.get('input[type="password"]').setValue('sk-manually-saved-monitor-key')
+    await wrapper.get('#channel-monitor-form').trigger('submit')
+    await flushPromises()
+    expect(monitorUpdate.mock.calls[1][1]).toHaveProperty('api_key', 'sk-manually-saved-monitor-key')
+  })
+
   it('loads the first page of provider accounts when quota mode is enabled', async () => {
     accountsList.mockResolvedValue({ items: [{ id: 1, name: 'a', platform: 'anthropic' }] })
     const wrapper = mountDialog()

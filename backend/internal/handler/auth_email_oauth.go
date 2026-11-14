@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outboundreq"
+
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -16,7 +18,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/imroc/req/v3"
 	"github.com/tidwall/gjson"
 )
 
@@ -214,6 +215,7 @@ func (h *AuthHandler) emailOAuthCallbackWithProfile(
 	fragment.Set("access_token", tokenPair.AccessToken)
 	fragment.Set("refresh_token", tokenPair.RefreshToken)
 	fragment.Set("expires_in", fmt.Sprintf("%d", tokenPair.ExpiresIn))
+	fragment.Set("requires_totp_setup", fmt.Sprintf("%t", tokenPair.RequiresTotpSetup))
 	fragment.Set("token_type", "Bearer")
 	fragment.Set("redirect", redirectTo)
 	redirectWithFragment(c, frontendCallback, fragment)
@@ -469,7 +471,7 @@ func buildEmailOAuthAuthorizeURL(cfg config.EmailOAuthProviderConfig, state stri
 }
 
 func exchangeEmailOAuthCode(ctx context.Context, cfg config.EmailOAuthProviderConfig, code string) (*emailOAuthTokenResponse, error) {
-	resp, err := req.C().
+	resp, err := outboundreq.New().
 		R().
 		SetContext(ctx).
 		SetHeader("Accept", "application/json").
@@ -498,7 +500,7 @@ func exchangeEmailOAuthCode(ctx context.Context, cfg config.EmailOAuthProviderCo
 }
 
 func fetchEmailOAuthProfile(ctx context.Context, provider string, cfg config.EmailOAuthProviderConfig, token *emailOAuthTokenResponse) (*emailOAuthProfile, error) {
-	resp, err := req.C().
+	resp, err := outboundreq.New().
 		R().
 		SetContext(ctx).
 		SetBearerAuthToken(token.AccessToken).
@@ -554,7 +556,7 @@ func parseGitHubOAuthProfile(ctx context.Context, cfg config.EmailOAuthProviderC
 }
 
 func fetchGitHubPrimaryVerifiedEmail(ctx context.Context, emailsURL string, accessToken string) (string, error) {
-	resp, err := req.C().
+	resp, err := outboundreq.New().
 		R().
 		SetContext(ctx).
 		SetBearerAuthToken(accessToken).

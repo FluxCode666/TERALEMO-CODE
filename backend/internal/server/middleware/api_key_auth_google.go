@@ -41,7 +41,8 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 		apiKeyString := extractAPIKeyForGoogle(c)
-		if apiKeyString == "" {
+		_, _, creationReplay := service.CreationStudioAPIKey(c.Request.Context())
+		if apiKeyString == "" && !creationReplay {
 			recordInvalidAuthFailure(c, apiKeyService)
 			if hasAPIKeyCredentialInput(c) {
 				MarkIngressRejected(c, IngressRejectInvalidAPIKey)
@@ -58,7 +59,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 
-		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
+		apiKey, err := lookupGatewayAPIKey(c.Request.Context(), apiKeyService, apiKeyString)
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
 				recordInvalidAuthFailure(c, apiKeyService)
@@ -78,6 +79,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		// 同 api_key_auth.go：早退中断前也写入 Ops 回退 key，便于错误日志展示
 		// user/group/platform。
 		SetOpsFallbackAPIKey(c, apiKey)
+		if !enforceModelAllowlist(c, apiKeyService, apiKey, true) {
+			return
+		}
 
 		// disabled / 未知状态 → 无条件拦截（expired 和 quota_exhausted 留给计费阶段，
 		// 与主中间件 api_key_auth.go 保持一致）。

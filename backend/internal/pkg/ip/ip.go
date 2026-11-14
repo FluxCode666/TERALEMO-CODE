@@ -45,6 +45,12 @@ func requestForwardedIPSettings(c *gin.Context) (forwardedIPSettings, bool) {
 	return settings, ok
 }
 
+// ForwardedClientIPHeaders returns a copy of this request's custom IP headers.
+func ForwardedClientIPHeaders(c *gin.Context) []string {
+	settings, _ := requestForwardedIPSettings(c)
+	return append([]string(nil), settings.headers...)
+}
+
 func requestUsesLegacyForwardedIPTrust(c *gin.Context) bool {
 	settings, ok := requestForwardedIPSettings(c)
 	return !ok || settings.trustForwarded
@@ -58,8 +64,21 @@ func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
+	value, configured := c.Get(proxyPolicyKey)
+	policy, valid := value.(ProxyPolicy)
+	legacyMetadata := configured && valid && policy.LegacyMetadata
+	if configured && !legacyMetadata {
+		return resolveTrustedClientIP(c)
+	}
 	if !requestUsesLegacyForwardedIPTrust(c) {
+		if legacyMetadata {
+			return normalizeIP(c.ClientIP())
+		}
 		return GetTrustedClientIP(c)
+	}
+	peer := peerAddress(c)
+	if !legacyMetadata && peer.IsValid() && normalizeIP(c.ClientIP()) == peer.String() {
+		return peer.String()
 	}
 
 	settings, _ := requestForwardedIPSettings(c)
@@ -154,20 +173,12 @@ func GetTrustedClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	return normalizeIP(c.ClientIP())
+	return resolveTrustedClientIP(c)
 }
 
-// GetSecurityClientIP returns the address used by security-sensitive paths.
-// When legacy forwarded-IP trust is enabled, raw forwarding headers take over
-// client-IP resolution. When disabled, Gin's server.trusted_proxies chain is
-// authoritative.
-func GetSecurityClientIP(c *gin.Context, trustForwarded bool) string {
-	if requestSettings, ok := requestForwardedIPSettings(c); ok {
-		trustForwarded = requestSettings.trustForwarded
-	}
-	if trustForwarded {
-		return GetClientIP(c)
-	}
+// GetSecurityClientIP always uses the trusted proxy chain. The forwarding flag
+// remains in the signature for callers that also configure metadata handling.
+func GetSecurityClientIP(c *gin.Context, _ bool) string {
 	return GetTrustedClientIP(c)
 }
 

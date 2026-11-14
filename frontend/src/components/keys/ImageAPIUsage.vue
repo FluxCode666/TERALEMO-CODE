@@ -22,7 +22,7 @@ const { t } = useI18n()
 const notes = ['noteN', 'noteSize', 'noteResponseFormat', 'noteUnsupported']
 const examples = computed(() => {
   const base = (props.baseUrl || window.location.origin).replace(/\/$/, '').replace(/\/v1$/, '')
-  const key = props.apiKey
+  const key = 'YOUR_API_KEY'
   return [
     { key: 'generations', title: t('imageAccounts.usage.generations'), code: `curl ${base}/v1/images/generations \\
   -H "Authorization: Bearer ${key}" \\

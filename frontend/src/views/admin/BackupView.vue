@@ -129,160 +129,6 @@
         </div>
       </div>
 
-      <!-- Schedule Config -->
-      <div class="card p-6" data-testid="backup-schedule">
-        <div class="mb-4">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-            {{ t('admin.backup.schedule.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {{ t('admin.backup.schedule.description') }}
-          </p>
-        </div>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 md:col-span-2">
-            <input v-model="scheduleForm.enabled" type="checkbox" />
-            <span>{{ t('admin.backup.schedule.enabled') }}</span>
-          </label>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.schedule.cronExpr') }}</label>
-            <input v-model="scheduleForm.cron_expr" class="input w-full" placeholder="0 2 * * *" />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.schedule.cronHint') }}</p>
-          </div>
-          <h4 class="mt-2 text-sm font-medium text-gray-900 dark:text-white md:col-span-2">{{ t('admin.backup.schedule.ordinaryRetention') }}</h4>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.schedule.retainDays') }}</label>
-            <input v-model.number="scheduleForm.retain_days" data-testid="backup-retain-days" type="number" min="0" step="1" class="input w-full" />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.schedule.retainDaysHint') }}</p>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.schedule.retainCount') }}</label>
-            <input v-model.number="scheduleForm.retain_count" data-testid="backup-retain-count" type="number" min="0" step="1" class="input w-full" />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.schedule.retainCountHint') }}</p>
-          </div>
-        </div>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.schedule.ordinaryHint') }}</p>
-        <BackupArchiveSettings v-model="archiveForm" />
-        <p v-if="scheduleValidationError" class="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{{ scheduleValidationError }}</p>
-        <div class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-dark-800 dark:text-gray-300" aria-live="polite">
-          <p class="font-medium">{{ t('admin.backup.schedule.preview') }}</p>
-          <p>{{ retentionPreview }}</p>
-        </div>
-        <div class="mt-4">
-          <button type="button" class="btn btn-primary btn-sm" :disabled="savingSchedule || !!scheduleValidationError" @click="saveSchedule">
-            {{ savingSchedule ? t('common.loading') : t('common.save') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Backup Operations -->
-      <div class="card p-6">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.backup.operations.title') }}
-            </h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.backup.operations.description') }}
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="flex items-center gap-1">
-              <label class="text-xs text-gray-600 dark:text-gray-400">{{ t('admin.backup.operations.expireDays') }}</label>
-              <input v-model.number="manualExpireDays" type="number" min="0" class="input w-20 text-xs" />
-            </div>
-            <button type="button" class="btn btn-primary btn-sm" :disabled="creatingBackup" @click="createBackup">
-              {{ creatingBackup ? t('admin.backup.operations.backing') : t('admin.backup.operations.createBackup') }}
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingBackups" @click="loadBackups">
-              {{ loadingBackups ? t('common.loading') : t('common.refresh') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-[800px] text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:text-gray-400">
-                <th class="py-2 pr-4">ID</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.status') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.fileName') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.size') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.parts') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.expiresAt') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.triggeredBy') }}</th>
-                <th class="py-2 pr-4">{{ t('admin.backup.columns.startedAt') }}</th>
-                <th class="py-2">{{ t('admin.backup.columns.actions') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in backups" :key="record.id" class="border-b border-gray-100 align-top dark:border-dark-800">
-                <td class="py-3 pr-4 font-mono text-xs">{{ record.id }}</td>
-                <td class="py-3 pr-4">
-                  <span
-                    class="rounded px-2 py-0.5 text-xs"
-                    :class="statusClass(record.status)"
-                  >
-                    {{ record.status === 'running' && record.progress
-                      ? t(`admin.backup.progress.${record.progress}`)
-                      : t(`admin.backup.status.${record.status}`) }}
-                  </span>
-                </td>
-                <td class="py-3 pr-4 text-xs">
-                  {{ record.file_name }}
-                  <span v-if="record.monthly_archive" class="ml-1 inline-block rounded bg-primary-50 px-1.5 py-0.5 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">{{ t('admin.backup.archive.badge') }}</span>
-                  <div v-if="record.monthly_archive" class="mt-1 text-gray-500 dark:text-gray-400">{{ record.monthly_archive.dates.join(' / ') }}</div>
-                </td>
-                <td class="py-3 pr-4 text-xs">{{ formatSize(record.size_bytes) }}</td>
-                <td class="py-3 pr-4 text-xs">{{ record.parts?.length || (record.status === 'running' ? '-' : 1) }}</td>
-                <td class="py-3 pr-4 text-xs">
-                  {{ record.monthly_archive
-                    ? record.monthly_archive.retain_count === 0 ? t('admin.backup.archive.forever') : t('admin.backup.archive.retainLatest', { count: record.monthly_archive.retain_count })
-                    : record.expires_at ? formatDate(record.expires_at) : t('admin.backup.neverExpire') }}
-                </td>
-                <td class="py-3 pr-4 text-xs">
-                  {{ record.triggered_by === 'scheduled' ? t('admin.backup.trigger.scheduled') : t('admin.backup.trigger.manual') }}
-                </td>
-                <td class="py-3 pr-4 text-xs">{{ formatDate(record.started_at) }}</td>
-                <td class="py-3 text-xs">
-                  <div class="flex flex-wrap gap-1">
-                    <button
-                      v-if="record.status === 'completed'"
-                      type="button"
-                      class="btn btn-secondary btn-xs"
-                      @click="downloadBackup(record.id)"
-                    >
-                      {{ t('admin.backup.actions.download') }}
-                    </button>
-                    <button
-                      v-if="record.status === 'completed'"
-                      type="button"
-                      class="btn btn-secondary btn-xs"
-                      :disabled="restoringId === record.id"
-                      @click="restoreBackup(record.id)"
-                    >
-                      {{ restoringId === record.id ? t('common.loading') : t('admin.backup.actions.restore') }}
-                    </button>
-                    <button
-                      v-if="record.status !== 'running'"
-                      type="button"
-                      class="btn btn-danger btn-xs"
-                      @click="removeBackup(record.id)"
-                    >
-                      {{ t('common.delete') }}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="backups.length === 0">
-                <td colspan="9" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  {{ t('admin.backup.empty') }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
 
     <!-- Cloudflare R2 Setup Guide Modal -->
@@ -368,67 +214,20 @@
         </div>
       </transition>
     </teleport>
-    <!-- 分卷下载链接 -->
-    <teleport to="body">
-      <transition name="modal">
-        <div
-          v-if="downloadPartsModalOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
-          @mousedown.self="closeDownloadParts"
-        >
-          <div class="fixed inset-0 bg-black/50" @click="closeDownloadParts"></div>
-          <div class="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-dark-800">
-            <button
-              type="button"
-              class="absolute right-4 top-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              :aria-label="t('common.close')"
-              @click="closeDownloadParts"
-            >
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <h2 class="mb-1 text-lg font-bold text-gray-900 dark:text-white">{{ t('admin.backup.actions.downloadParts') }}</h2>
-            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.backup.actions.downloadPartsHint') }}</p>
-            <div class="space-y-2">
-              <div
-                v-for="part in downloadParts"
-                :key="part.index"
-                class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-dark-600"
-              >
-                <span class="text-sm text-gray-700 dark:text-gray-300">
-                  {{ t('admin.backup.actions.partLabel', { index: part.index }) }}
-                  <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ formatSize(part.size_bytes) }}</span>
-                </span>
-                <a :href="part.url" class="btn btn-secondary btn-xs" rel="noopener">
-                  {{ t('admin.backup.actions.download') }}
-                </a>
-              </div>
-            </div>
-            <div class="mt-4 text-right">
-              <button type="button" class="btn btn-primary btn-sm" @click="closeDownloadParts">{{ t('common.close') }}</button>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </teleport>
     <TotpStepUpDialog :controller="backupStepUp" />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import { useAppStore } from '@/stores'
 import type {
   BackupS3Config,
-  BackupScheduleConfig,
-  BackupMonthlyArchiveConfig,
-  BackupRecord,
-  BackupDownloadPart,
   ImageStorageConfig,
 } from '@/api/admin/backup'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
-import BackupArchiveSettings from '@/components/admin/BackupArchiveSettings.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -459,8 +258,6 @@ const s3SecretConfigured = ref(false)
 const savingS3 = ref(false)
 const testingS3 = ref(false)
 
-// Async image object storage. Shares the S3 client with backups, so the default is
-// to reuse the credentials configured above and only differ by prefix.
 const imageStorageForm = ref<ImageStorageConfig>({
   enabled: false,
   reuse_backup_s3: true,
@@ -479,169 +276,6 @@ const imageStorageSecretConfigured = ref(false)
 const savingImageStorage = ref(false)
 const testingImageStorage = ref(false)
 
-// Schedule config
-const scheduleForm = ref<BackupScheduleConfig>({
-  enabled: false,
-  cron_expr: '0 2 * * *',
-  retain_days: 14,
-  retain_count: 10,
-})
-const savingSchedule = ref(false)
-const archiveForm = ref<BackupMonthlyArchiveConfig>({ enabled: false, days: [1], include_month_end: false, retain_count: 0 })
-// Disabling hides the archive parameters, so a save while disabled keeps the
-// persisted parameters and only turns the rule off.
-const savedArchive = ref<BackupMonthlyArchiveConfig>(cloneArchive(archiveForm.value))
-const archivePayload = computed<BackupMonthlyArchiveConfig>(() =>
-  archiveForm.value.enabled ? cloneArchive(archiveForm.value) : { ...cloneArchive(savedArchive.value), enabled: false },
-)
-function cloneArchive(config: BackupMonthlyArchiveConfig): BackupMonthlyArchiveConfig {
-  return { ...config, days: [...config.days] }
-}
-const scheduleValidationError = computed(() => {
-  const counts = [scheduleForm.value.retain_days, scheduleForm.value.retain_count]
-  if (archiveForm.value.enabled) counts.push(archiveForm.value.retain_count)
-  if (!counts.every(value => Number.isSafeInteger(value) && value >= 0)) {
-    return t('admin.backup.archive.invalidRetention')
-  }
-  if (archiveForm.value.enabled && !archiveForm.value.days.length && !archiveForm.value.include_month_end) {
-    return t('admin.backup.archive.selectDates')
-  }
-  return ''
-})
-const retentionPreview = computed(() => {
-  if (scheduleValidationError.value) return scheduleValidationError.value
-  const { retain_days: days, retain_count: count } = scheduleForm.value
-  const ordinary = days > 0 && count > 0
-    ? t('admin.backup.schedule.previewBoth', { days, count })
-    : days > 0 ? t('admin.backup.schedule.previewDays', { days })
-      : count > 0 ? t('admin.backup.schedule.previewCount', { count }) : t('admin.backup.schedule.previewUnlimited')
-  if (!archiveForm.value.enabled) return ordinary
-  const dates = [
-    ...[...archiveForm.value.days].sort((a, b) => a - b).map(day => t('admin.backup.archive.day', { day })),
-    ...(archiveForm.value.include_month_end ? [t('admin.backup.archive.monthEnd')] : []),
-  ].join(', ')
-  const retention = archiveForm.value.retain_count === 0 ? t('admin.backup.archive.forever') : t('admin.backup.archive.retainLatest', { count: archiveForm.value.retain_count })
-  return `${ordinary} ${t('admin.backup.archive.preview', { dates, retention })}`
-})
-
-// Backups
-const backups = ref<BackupRecord[]>([])
-const loadingBackups = ref(false)
-const creatingBackup = ref(false)
-const restoringId = ref('')
-const manualExpireDays = ref(14)
-const downloadParts = ref<BackupDownloadPart[]>([])
-const downloadPartsModalOpen = ref(false)
-
-// Polling
-const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const restoringPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const MAX_POLL_COUNT = 900
-let disposed = false
-
-function updateRecordInList(updated: BackupRecord) {
-  const idx = backups.value.findIndex(r => r.id === updated.id)
-  if (idx >= 0) {
-    backups.value[idx] = updated
-  }
-}
-
-function startPolling(backupId: string) {
-  if (disposed) return
-  stopPolling()
-  let count = 0
-  pollingTimer.value = setInterval(async () => {
-    if (count++ >= MAX_POLL_COUNT) {
-      stopPolling()
-      creatingBackup.value = false
-      appStore.showWarning(t('admin.backup.operations.backupRunning'))
-      return
-    }
-    try {
-      const record = await adminAPI.backup.getBackup(backupId)
-      updateRecordInList(record)
-      if (record.status === 'completed' || record.status === 'failed') {
-        stopPolling()
-        creatingBackup.value = false
-        if (record.status === 'completed') {
-          appStore.showSuccess(t('admin.backup.operations.backupCreated'))
-        } else {
-          appStore.showError(record.error_message || t('admin.backup.operations.backupFailed'))
-        }
-        await loadBackups()
-      }
-    } catch {
-      // 轮询失败时不中断
-    }
-  }, 2000)
-}
-
-function stopPolling() {
-  if (pollingTimer.value) {
-    clearInterval(pollingTimer.value)
-    pollingTimer.value = null
-  }
-}
-
-function startRestorePolling(backupId: string) {
-  if (disposed) return
-  stopRestorePolling()
-  let count = 0
-  restoringPollingTimer.value = setInterval(async () => {
-    if (count++ >= MAX_POLL_COUNT) {
-      stopRestorePolling()
-      restoringId.value = ''
-      appStore.showWarning(t('admin.backup.operations.restoreRunning'))
-      return
-    }
-    try {
-      const record = await adminAPI.backup.getBackup(backupId)
-      updateRecordInList(record)
-      if (record.restore_status === 'completed' || record.restore_status === 'failed') {
-        stopRestorePolling()
-        restoringId.value = ''
-        if (record.restore_status === 'completed') {
-          appStore.showSuccess(t('admin.backup.actions.restoreSuccess'))
-        } else {
-          appStore.showError(record.restore_error || t('admin.backup.operations.restoreFailed'))
-        }
-        await loadBackups()
-      }
-    } catch {
-      // 轮询失败时不中断
-    }
-  }, 2000)
-}
-
-function stopRestorePolling() {
-  if (restoringPollingTimer.value) {
-    clearInterval(restoringPollingTimer.value)
-    restoringPollingTimer.value = null
-  }
-}
-
-function handleVisibilityChange() {
-  if (document.hidden) {
-    stopPolling()
-    stopRestorePolling()
-  } else {
-    // 标签页恢复时刷新列表，检查是否仍有活跃操作
-    loadBackups().then(() => {
-      const running = backups.value.find(r => r.status === 'running')
-      if (running) {
-        creatingBackup.value = true
-        startPolling(running.id)
-      }
-      const restoring = backups.value.find(r => r.restore_status === 'running')
-      if (restoring) {
-        restoringId.value = restoring.id
-        startRestorePolling(restoring.id)
-      }
-    })
-  }
-}
-
-// R2 guide
 const showR2Guide = ref(false)
 const r2ConfigRows = computed(() => [
   { field: t('admin.backup.s3.endpoint'), value: 'https://<account_id>.r2.cloudflarestorage.com' },
@@ -682,6 +316,7 @@ async function saveS3Config() {
       savingS3.value = false
       return
     }
+    if (reportStepUpBlocked(error)) return
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   } finally {
     savingS3.value = false
@@ -714,6 +349,7 @@ async function saveImageStorageConfig() {
       savingImageStorage.value = false
       return
     }
+    if (reportStepUpBlocked(error)) return
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   } finally {
     savingImageStorage.value = false
@@ -752,194 +388,10 @@ async function testS3() {
   }
 }
 
-async function loadSchedule() {
-  try {
-    const cfg = await adminAPI.backup.getSchedule()
-    scheduleForm.value = {
-      enabled: cfg.enabled,
-      cron_expr: cfg.cron_expr || '0 2 * * *',
-      retain_days: cfg.retain_days ?? 14,
-      retain_count: cfg.retain_count ?? 10,
-    }
-    archiveForm.value = {
-      enabled: cfg.monthly_archive?.enabled ?? false,
-      days: cfg.monthly_archive?.days ?? [1],
-      include_month_end: cfg.monthly_archive?.include_month_end ?? false,
-      retain_count: cfg.monthly_archive?.retain_count ?? 0,
-    }
-    savedArchive.value = cloneArchive(archiveForm.value)
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  }
-}
-
-async function saveSchedule() {
-  if (scheduleValidationError.value) return
-  savingSchedule.value = true
-  try {
-    const archive = archivePayload.value
-    await adminAPI.backup.updateSchedule({ ...scheduleForm.value, monthly_archive: archive })
-    savedArchive.value = cloneArchive(archive)
-    appStore.showSuccess(t('admin.backup.schedule.saved'))
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  } finally {
-    savingSchedule.value = false
-  }
-}
-
-async function loadBackups() {
-  loadingBackups.value = true
-  try {
-    const result = await adminAPI.backup.listBackups()
-    backups.value = result.items || []
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  } finally {
-    loadingBackups.value = false
-  }
-}
-
-async function createBackup() {
-  creatingBackup.value = true
-  try {
-    const record = await backupStepUp.run(() => adminAPI.backup.createBackup({ expire_days: manualExpireDays.value }))
-    // 插入到列表顶部
-    backups.value.unshift(record)
-    startPolling(record.id)
-  } catch (error: any) {
-    if (isStepUpCancelled(error)) {
-      creatingBackup.value = false
-      return
-    }
-    if (reportStepUpBlocked(error)) {
-      creatingBackup.value = false
-      return
-    }
-    if (error?.response?.status === 409) {
-      appStore.showWarning(t('admin.backup.operations.alreadyInProgress'))
-    } else {
-      appStore.showError(error?.message || t('errors.networkError'))
-    }
-    creatingBackup.value = false
-  }
-}
-
-async function downloadBackup(id: string) {
-  try {
-    const result = await backupStepUp.run(() => adminAPI.backup.getDownloadURL(id))
-    if (result.parts && result.parts.length > 0) {
-      downloadParts.value = result.parts
-      downloadPartsModalOpen.value = true
-      return
-    }
-    if (!result.url) {
-      throw new Error(t('admin.backup.actions.downloadFailed'))
-    }
-    // 预签名 URL 带 attachment disposition，同页 anchor 导航直接触发下载；
-    // 不用 window.open：step-up 弹窗 await 会耗尽瞬态用户激活，新标签页会被浏览器拦截。
-    const link = document.createElement('a')
-    link.href = result.url
-    link.rel = 'noopener'
-    link.click()
-  } catch (error) {
-    if (isStepUpCancelled(error)) return
-    if (reportStepUpBlocked(error)) return
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  }
-}
-
-function closeDownloadParts() {
-  downloadPartsModalOpen.value = false
-  downloadParts.value = []
-}
-
-async function restoreBackup(id: string) {
-  if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
-  const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
-  if (!password) return
-  restoringId.value = id
-  try {
-    const record = await backupStepUp.run(() => adminAPI.backup.restoreBackup(id, password))
-    updateRecordInList(record)
-    startRestorePolling(id)
-  } catch (error: any) {
-    restoringId.value = ''
-    if (isStepUpCancelled(error)) return
-    if (reportStepUpBlocked(error)) return
-    // apiClient 拦截器把 HTTP 错误归一化为顶层 { status } 平面对象（无 response 字段）
-    if (error?.status === 409 || error?.response?.status === 409) {
-      appStore.showWarning(t('admin.backup.operations.restoreRunning'))
-    } else {
-      appStore.showError(error?.message || t('errors.networkError'))
-    }
-  }
-}
-
-async function removeBackup(id: string) {
-  const archived = !!backups.value.find(record => record.id === id)?.monthly_archive
-  if (!window.confirm(t(archived ? 'admin.backup.archive.deleteConfirm' : 'admin.backup.actions.deleteConfirm'))) return
-  try {
-    await adminAPI.backup.deleteBackup(id, archived)
-    appStore.showSuccess(t('admin.backup.actions.deleted'))
-    await loadBackups()
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  }
-}
-
-function statusClass(status: string): string {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-    case 'running':
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-    case 'failed':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-    default:
-      return 'bg-gray-100 text-gray-700 dark:bg-dark-800 dark:text-gray-300'
-  }
-}
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDate(value?: string): string {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
-}
-
 onMounted(async () => {
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups()])
-
-  // 如果有正在 running 的备份，恢复轮询
-  const runningBackup = backups.value.find(r => r.status === 'running')
-  if (runningBackup) {
-    creatingBackup.value = true
-    startPolling(runningBackup.id)
-  }
-  const restoringBackup = backups.value.find(r => r.restore_status === 'running')
-  if (restoringBackup) {
-    restoringId.value = restoringBackup.id
-    startRestorePolling(restoringBackup.id)
-  }
-})
-
-onBeforeUnmount(() => {
-  disposed = true
-  stopPolling()
-  stopRestorePolling()
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  await Promise.all([loadS3Config(), loadImageStorageConfig()])
 })
 </script>
-
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {

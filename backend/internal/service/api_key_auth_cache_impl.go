@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -172,6 +170,10 @@ func (s *APIKeyService) invalidateLocalAuthCache(cacheKey string) {
 	if s == nil {
 		return
 	}
+	if cacheKey == modelAllowlistInvalidationKey && s.modelAllowlistSettings != nil {
+		s.modelAllowlistSettings.InvalidateModelAllowlist()
+		return
+	}
 	if s.authCacheL1 != nil {
 		s.authCacheL1.Del(cacheKey)
 	}
@@ -208,8 +210,7 @@ func (s *APIKeyService) StopAuthCacheInvalidationSubscriber() {
 }
 
 func (s *APIKeyService) authCacheKey(key string) string {
-	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
+	return HashAPIKey(key)
 }
 
 func (s *APIKeyService) getAuthCacheEntry(ctx context.Context, cacheKey string) (*APIKeyAuthCacheEntry, bool) {
@@ -297,7 +298,9 @@ func (s *APIKeyService) loadAuthCacheEntry(ctx context.Context, key, cacheKey st
 		}
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
-	apiKey.Key = key
+	apiKey.Key = ""
+	apiKey.KeyHash = HashAPIKey(key)
+	apiKey.KeyHint = MaskAPIKey(key)
 	snapshot := s.snapshotFromAPIKey(ctx, apiKey)
 	if snapshot == nil {
 		return nil, fmt.Errorf("get api key: %w", ErrAPIKeyNotFound)
@@ -311,8 +314,14 @@ func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*A
 	if s == nil || s.apiKeyRepo == nil {
 		return nil, ErrAPIKeyNotFound
 	}
-	if s.authLookupSlots == nil {
+	return s.withAuthLookupSlot(ctx, func() (*APIKey, error) {
 		return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+	})
+}
+
+func (s *APIKeyService) withAuthLookupSlot(ctx context.Context, lookup func() (*APIKey, error)) (*APIKey, error) {
+	if s.authLookupSlots == nil {
+		return lookup()
 	}
 	s.authLookupTotal.Add(1)
 	select {
@@ -328,7 +337,7 @@ func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*A
 		s.authLookupRejected.Add(1)
 		return nil, ErrAPIKeyAuthOverloaded
 	}
-	return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+	return lookup()
 }
 
 func (s *APIKeyService) applyAuthCacheEntry(key string, entry *APIKeyAuthCacheEntry) (*APIKey, bool, error) {
@@ -469,7 +478,8 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		ID:          snapshot.APIKeyID,
 		UserID:      snapshot.UserID,
 		GroupID:     snapshot.GroupID,
-		Key:         key,
+		KeyHash:     HashAPIKey(key),
+		KeyHint:     MaskAPIKey(key),
 		Name:        snapshot.Name,
 		Status:      snapshot.Status,
 		IPWhitelist: snapshot.IPWhitelist,

@@ -86,7 +86,7 @@ func adminRechargeSettingService(enabled bool) *SettingService {
 	return NewSettingService(&settingRepoStub{values: values}, nil)
 }
 
-func (s *authCacheInvalidatorStub) InvalidateAuthCacheByKey(ctx context.Context, key string) {
+func (s *authCacheInvalidatorStub) InvalidateAuthCacheByHash(ctx context.Context, key string) {
 	s.keys = append(s.keys, key)
 }
 

@@ -589,6 +589,7 @@ export default {
         apiKey: 'API Key',
         apiKeyPlaceholder: 'Enter API Key',
         apiKeyEditPlaceholder: 'Leave blank to keep current key',
+        manualKeyHint: 'Paste the full key you saved when creating it. Existing keys cannot be retrieved from a list; leave blank when editing to keep the stored credential.',
         useMyKey: 'Use my key',
         selectKeyTitle: 'Select my API Key',
         selectKeyHint: 'Only your active, non-expired keys are listed.',

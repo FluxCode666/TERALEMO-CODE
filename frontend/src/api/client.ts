@@ -117,6 +117,11 @@ apiClient.interceptors.response.use(
       // Validate `data` shape to avoid HTML error pages breaking our error handling.
       const apiData = (typeof data === 'object' && data !== null ? data : {}) as Record<string, any>
 
+      if (status === 403 && (apiData.code === 'TOTP_SETUP_REQUIRED' || apiData.reason === 'TOTP_SETUP_REQUIRED' || apiData.error?.code === 'TOTP_SETUP_REQUIRED')) {
+        if (window.location.pathname !== '/auth/totp-required') window.location.assign('/auth/totp-required')
+        return Promise.reject({ status, code: 'TOTP_SETUP_REQUIRED', message: apiData.message || apiData.error?.message || error.message })
+      }
+
       // Ops monitoring disabled: treat as feature-flagged 404, and proactively redirect away
       // from ops pages to avoid broken UI states.
       if (status === 404 && apiData.message === 'Ops monitoring is disabled') {

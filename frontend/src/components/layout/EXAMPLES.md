@@ -179,7 +179,7 @@ async function handleSubmit() {
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-for="key in apiKeys" :key="key.id">
               <td class="whitespace-nowrap px-6 py-4">{{ key.name }}</td>
-              <td class="px-6 py-4 font-mono text-sm">{{ key.key }}</td>
+              <td class="px-6 py-4 font-mono text-sm">{{ key.key_hint }}</td>
               <td class="px-6 py-4">
                 <span
                   class="rounded-full px-2 py-1 text-xs"

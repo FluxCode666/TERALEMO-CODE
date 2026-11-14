@@ -29,7 +29,11 @@ type APIKey struct {
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
 	// Key holds the value of the "key" field.
-	Key string `json:"key,omitempty"`
+	Key string `json:"-"`
+	// KeyHash holds the value of the "key_hash" field.
+	KeyHash string `json:"-"`
+	// KeyHint holds the value of the "key_hint" field.
+	KeyHint string `json:"key_hint,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// GroupID holds the value of the "group_id" field.
@@ -127,7 +131,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus:
+		case apikey.FieldKey, apikey.FieldKeyHash, apikey.FieldKeyHint, apikey.FieldName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
@@ -182,6 +186,18 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field key", values[i])
 			} else if value.Valid {
 				_m.Key = value.String
+			}
+		case apikey.FieldKeyHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_hash", values[i])
+			} else if value.Valid {
+				_m.KeyHash = value.String
+			}
+		case apikey.FieldKeyHint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_hint", values[i])
+			} else if value.Valid {
+				_m.KeyHint = value.String
 			}
 		case apikey.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -366,8 +382,12 @@ func (_m *APIKey) String() string {
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
 	builder.WriteString(", ")
-	builder.WriteString("key=")
-	builder.WriteString(_m.Key)
+	builder.WriteString("key=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("key_hash=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("key_hint=")
+	builder.WriteString(_m.KeyHint)
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

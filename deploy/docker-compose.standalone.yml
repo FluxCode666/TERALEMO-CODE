@@ -81,6 +81,8 @@ services:
       # JWT Configuration
       # =======================================================================
       - JWT_SECRET=${JWT_SECRET:-}
+      # Empty inherits the mounted YAML list; use [] to explicitly clear it.
+      - SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS=${SECURITY_OUTBOUND_ALLOW_PRIVATE_TARGETS:-}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
 
       # =======================================================================

@@ -295,7 +295,11 @@ func TestImagePlatformBulkValidatesMergedCredentials(t *testing.T) {
 		svc := &adminServiceImpl{accountRepo: repo}
 		_, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{AccountIDs: []int64{1}, Credentials: delta})
 		require.Equal(t, 400, infraerrors.Code(err))
-		require.Equal(t, "INVALID_IMAGE_ACCOUNT", infraerrors.Reason(err))
+		if _, provided := delta["base_url"]; provided {
+			require.Equal(t, "INVALID_UPSTREAM_URL", infraerrors.Reason(err))
+		} else {
+			require.Equal(t, "INVALID_IMAGE_ACCOUNT", infraerrors.Reason(err))
+		}
 		require.Zero(t, repo.bulkUpdateCalls)
 	}
 }

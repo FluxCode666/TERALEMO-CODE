@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
@@ -528,7 +530,7 @@ func batchImageDefaultHTTPClient() *http.Client {
 		ResponseHeaderTimeout: 60 * time.Second,
 	})
 	if err != nil {
-		return http.DefaultClient
+		return outbound.NewClient(0)
 	}
 	return client
 }

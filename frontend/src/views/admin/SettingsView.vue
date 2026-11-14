@@ -1619,6 +1619,9 @@
                 </p>
               </div>
 
+              <ModelAllowlistPanel />
+              <ForceTotpPanel />
+
               <!-- TOTP 2FA -->
               <div
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
@@ -8998,6 +9001,8 @@
 </template>
 
 <script setup lang="ts">
+import ModelAllowlistPanel from "@/components/admin/ModelAllowlistPanel.vue";
+import ForceTotpPanel from "@/components/admin/ForceTotpPanel.vue";
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { listPlatformIds } from "@/constants/platformCatalog";
 import { useI18n } from "vue-i18n";
@@ -9074,6 +9079,7 @@ import {
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
+import { maskApiKey } from "@/utils/maskApiKey";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
@@ -12071,8 +12077,7 @@ async function createAdminApiKey() {
     const result = await adminAPI.settings.regenerateAdminApiKey();
     newAdminApiKey.value = result.key;
     adminApiKeyExists.value = true;
-    adminApiKeyMasked.value =
-      result.key.substring(0, 10) + "..." + result.key.slice(-4);
+    adminApiKeyMasked.value = maskApiKey(result.key);
     appStore.showSuccess(t("admin.settings.adminApiKey.keyGenerated"));
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t("common.error")));

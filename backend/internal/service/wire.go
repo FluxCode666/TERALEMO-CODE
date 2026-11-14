@@ -776,20 +776,14 @@ func ProvideImageTaskService(store ImageTaskStore, settings *ImageStorageSetting
 	return NewImageTaskServiceWithResolver(store, settings.Resolver(), defaultImageTaskTTL, defaultImageTaskExecutionTimeout)
 }
 
-// ProvideBackupService creates and starts BackupService
+// ProvideBackupService creates the shared S3 configuration service
 func ProvideBackupService(
 	settingRepo SettingRepository,
 	cfg *config.Config,
 	encryptor SecretEncryptor,
 	storeFactory BackupObjectStoreFactory,
-	dumper DBDumper,
-	lockCache LeaderLockCache,
-	db *sql.DB,
 ) *BackupService {
-	svc := NewBackupService(settingRepo, cfg, encryptor, storeFactory, dumper)
-	svc.SetLeaderLock(lockCache, db)
-	svc.Start()
-	return svc
+	return NewBackupService(settingRepo, cfg, encryptor, storeFactory)
 }
 
 // ProvideOpsService constructs OpsService and wires the SettingService-backed quota
@@ -902,6 +896,7 @@ func ProvideBillingCacheService(
 
 // ProvideAPIKeyService wires APIKeyService and connects rate-limit cache invalidation.
 func ProvideAPIKeyService(
+	settingService *SettingService,
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
@@ -914,6 +909,7 @@ func ProvideAPIKeyService(
 	enterpriseRepo EnterpriseRepository,
 ) *APIKeyService {
 	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
+	svc.SetModelAllowlistSettings(settingService)
 	svc.SetEnterpriseRepository(enterpriseRepo)
 	svc.SetRateLimitCacheInvalidator(billingCacheService)
 	svc.SetConcurrencyService(concurrencyService)

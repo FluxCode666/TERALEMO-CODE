@@ -570,7 +570,7 @@ func (h *AuthHandler) SendPendingOAuthVerifyCode(c *gin.Context) {
 	}
 
 	proof := captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetClientIP(c)); err != nil {
+	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetTrustedClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -1617,8 +1617,15 @@ func (h *AuthHandler) writeOAuthTokenPairResponse(c *gin.Context, tokenPair *ser
 		response.ErrorFrom(c, err)
 		return
 	}
+	requiresSetup, err := h.authService.RequiresTotpSetup(c.Request.Context(), user)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	userResponse.RequiresTotpSetup = requiresSetup
 	c.JSON(http.StatusOK, AuthResponse{
-		AccessToken: tokenPair.AccessToken, RefreshToken: tokenPair.RefreshToken,
+		RequiresTotpSetup: requiresSetup,
+		AccessToken:       tokenPair.AccessToken, RefreshToken: tokenPair.RefreshToken,
 		ExpiresIn: tokenPair.ExpiresIn, TokenType: "Bearer", User: userResponse,
 	})
 }
@@ -1764,7 +1771,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 		return
 	}
 	proof := captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetClientIP(c)); err != nil {
+	if err := h.authService.VerifyCaptcha(c.Request.Context(), proof, ip.GetTrustedClientIP(c)); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -2067,6 +2074,7 @@ func (h *AuthHandler) ExchangePendingOAuthCompletion(c *gin.Context) {
 		payload["access_token"] = tokenPair.AccessToken
 		payload["refresh_token"] = tokenPair.RefreshToken
 		payload["expires_in"] = tokenPair.ExpiresIn
+		payload["requires_totp_setup"] = tokenPair.RequiresTotpSetup
 		payload["token_type"] = "Bearer"
 		payload["user"] = loginUserResponse
 	}

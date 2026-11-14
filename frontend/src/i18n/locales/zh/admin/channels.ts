@@ -589,6 +589,7 @@ export default {
         apiKey: 'API Key',
         apiKeyPlaceholder: '请输入 API Key',
         apiKeyEditPlaceholder: '留空表示不修改',
+        manualKeyHint: '请手动粘贴创建时已保存的完整 Key。已创建的 Key 无法从列表取回；编辑时留空保留当前凭据。',
         useMyKey: '使用我的 Key',
         selectKeyTitle: '选择我的 API Key',
         selectKeyHint: '仅显示当前账号下处于「启用」状态且未过期的 Key。',

@@ -82,8 +82,8 @@ export default {
     },
 
     backup: {
-      title: '数据库备份',
-      description: '全量数据库备份到 S3 兼容存储，支持定时备份与恢复',
+      title: '对象存储',
+      description: '管理 S3 凭证和异步生图对象存储；数据库备份与恢复已禁用',
       s3: {
         title: 'S3 存储配置',
         description: '配置 S3 兼容存储（支持 Cloudflare R2）',
@@ -105,128 +105,31 @@ export default {
       },
       imageStorage: {
         title: '异步生图对象存储',
-        description: '开启后，异步生图接口可用，生成结果转存到对象存储，只把短链接写入 Redis。与备份共用同一套 S3 客户端，保存后立即生效，无需重启。',
+        description: '开启后，异步生图接口可用，生成结果转存到对象存储，只把短链接写入 Redis。使用共用的 S3 客户端，保存后立即生效，无需重启。',
         enabled: '启用异步生图',
-        reuseBackupS3: '复用上方备份的 S3 配置（只用不同的存储桶/前缀）',
+        reuseBackupS3: '复用上方的共用 S3 配置（只用不同的存储桶/前缀）',
         bucket: '存储桶',
-        bucketInherited: '留空则沿用备份存储桶',
+        bucketInherited: '留空则沿用共用存储桶',
         prefix: 'Key 前缀',
         publicBaseUrl: '公开访问域名',
         publicBaseUrlPlaceholder: '留空则返回预签名临时链接',
         presignExpiryHours: '预签名链接有效期（小时）',
         saved: '异步生图对象存储配置已保存'
       },
-      schedule: {
-        title: '定时备份',
-        description: '配置自动定时备份',
-        enabled: '启用定时备份',
-        cronExpr: 'Cron 表达式',
-        cronHint: '例如 "0 2 * * *" 表示每天凌晨 2 点',
-        retainDays: '备份过期天数',
-        retainDaysHint: '普通备份超过此天数后自动删除，0 = 不按天数清理',
-        retainCount: '最大保留份数',
-        retainCountHint: '最多保留的普通备份数量，0 = 不按份数清理',
-        ordinaryRetention: '普通备份保留',
-        ordinaryHint: '达到任一清理条件时，清理最旧的普通备份；月度归档独立保留。',
-        preview: '保留效果',
-        previewBoth: '最近 {days} 天内最多保留 {count} 份普通备份。',
-        previewDays: '保留最近 {days} 天的普通备份，份数不限。',
-        previewCount: '保留最新 {count} 份普通备份，天数不限。',
-        previewUnlimited: '普通备份不自动清理。',
-        saved: '定时备份配置已保存'
-      },
-      archive: {
-        title: '月度归档',
-        enabled: '启用',
-        dates: '归档日期（可多选）',
-        selectDates: '请至少选择一个归档日期',
-        selectedDates: '已选择 {count} 个日期',
-        day: '{day} 日',
-        monthEnd: '月末',
-        done: '完成',
-        datesHint: '按备份计划的时区与备份开始日期匹配，每个日期归档首份成功的定时备份。',
-        retention: '归档保留方式',
-        count: '归档保留数量',
-        copies: '份',
-        forever: '永久保留',
-        foreverHint: '所有新归档均永久保留；已有永久归档不会因配置变更被自动删除。',
-        countHint: '所有选定日期的非永久归档合计计数，超出时清理最旧归档。',
-        fallbackHint: '当日无成功备份时，顺延至本月下次成功备份；当月没有所选日期时按月末处理，同一份备份只计一份。',
-        independentHint: '归档不额外执行备份，不占普通备份名额；本月无后续成功备份则不归档。',
-        disabledHint: '关闭后停止产生新归档，已有归档继续按原保留方式管理。',
-        invalidRetention: '保留天数和份数须为非负整数；非永久归档须填写至少 1 份。',
-        preview: '每月 {dates} 各归档一份，{retention}。',
-        retainLatest: '合计保留最近 {count} 份',
-        badge: '月度归档',
-        deleteConfirm: '这是月度归档备份。确定要解除归档保护并永久删除此备份吗？此操作无法撤销。',
-      },
-      operations: {
-        title: '备份记录',
-        description: '创建手动备份和管理已有备份记录',
-        createBackup: '创建备份',
-        backing: '备份中...',
-        backupCreated: '备份创建成功',
-        expireDays: '过期天数',
-        alreadyInProgress: '已有备份正在进行中',
-        backupRunning: '备份进行中...',
-        backupFailed: '备份失败',
-        restoreRunning: '恢复进行中...',
-        restoreFailed: '恢复失败',
-      },
-      columns: {
-        status: '状态',
-        fileName: '文件名',
-        size: '大小',
-        parts: '分卷数',
-        expiresAt: '过期时间',
-        triggeredBy: '触发方式',
-        startedAt: '开始时间',
-        actions: '操作'
-      },
-      status: {
-        pending: '等待中',
-        running: '执行中',
-        completed: '已完成',
-        failed: '失败'
-      },
-      progress: {
-        pending: '准备中',
-        dumping: '导出数据库',
-        uploading: '上传中',
-      },
-      trigger: {
-        manual: '手动',
-        scheduled: '定时'
-      },
-      neverExpire: '永不过期',
-      empty: '暂无备份记录',
-      actions: {
-        download: '下载',
-        downloadParts: '下载分卷',
-        downloadPartsHint: '请按顺序下载全部分卷后拼接 gzip 字节流：Linux/macOS 使用 cat payload.part-* > backup.sql.gz；Windows 使用 copy /b payload.part-000001+payload.part-000002 backup.sql.gz。',
-        partLabel: '第 {index} 卷',
-        downloadFailed: '下载地址为空',
-        restore: '恢复',
-        restoreConfirm: '确定要从此备份恢复吗？这将覆盖当前数据库！',
-        restorePasswordPrompt: '请输入管理员密码以确认恢复操作',
-        restoreSuccess: '数据库恢复成功',
-        deleteConfirm: '确定要删除此备份吗？',
-        deleted: '备份已删除'
-      },
       r2Guide: {
         title: 'Cloudflare R2 配置教程',
-        intro: 'Cloudflare R2 提供 S3 兼容的对象存储，免费额度为 10GB 存储 + 每月 100 万次 A 类请求，非常适合数据库备份。',
+        intro: 'Cloudflare R2 提供 S3 兼容的对象存储，免费额度为 10GB 存储 + 每月 100 万次 A 类请求，非常适合生成产物存储。',
         step1: {
           title: '创建 R2 存储桶',
           line1: '登录 Cloudflare Dashboard (dash.cloudflare.com)，左侧菜单选择「R2 对象存储」',
-          line2: '点击「创建存储桶」，输入名称（如 sub2api-backups），选择区域',
+          line2: '点击「创建存储桶」，输入名称（如 sub2api-assets），选择区域',
           line3: '点击创建完成'
         },
         step2: {
           title: '创建 API 令牌',
           line1: '在 R2 页面，点击右上角「管理 R2 API 令牌」',
           line2: '点击「创建 API 令牌」，权限选择「对象读和写」',
-          line3: '建议指定存储桶范围（仅允许访问备份桶，更安全）',
+          line3: '建议指定存储桶范围（仅允许访问共用存储桶，更安全）',
           line4: '创建后会显示 Access Key ID 和 Secret Access Key',
           warning: 'Secret Access Key 只会显示一次，请立即复制保存！'
         },
@@ -242,7 +145,7 @@ export default {
           fromStep2: '第 2 步获取的值',
           unchecked: '不勾选'
         },
-        freeTier: 'R2 免费额度：10GB 存储 + 每月 100 万次 A 类请求 + 1000 万次 B 类请求，对数据库备份完全够用。'
+        freeTier: 'R2 免费额度：10GB 存储 + 每月 100 万次 A 类请求 + 1000 万次 B 类请求，对生成产物存储完全够用。'
       }
     },
 

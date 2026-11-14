@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -288,7 +289,8 @@ const (
 
 func NewClient(proxyURL string) (*Client, error) {
 	client := &http.Client{
-		Timeout: clientTimeout,
+		Timeout:   clientTimeout,
+		Transport: outbound.WrapTransport(outbound.NewTransport()),
 	}
 
 	_, parsed, err := proxyurl.Parse(proxyURL)
@@ -297,15 +299,15 @@ func NewClient(proxyURL string) (*Client, error) {
 	}
 	if parsed != nil {
 		transport := &http.Transport{
-			DialContext: (&net.Dialer{
+			DialContext: outbound.DialContext(&net.Dialer{
 				Timeout: proxyDialTimeout,
-			}).DialContext,
+			}),
 			TLSHandshakeTimeout: proxyTLSHandshakeTimeout,
 		}
 		if err := proxyutil.ConfigureTransportProxy(transport, parsed); err != nil {
 			return nil, fmt.Errorf("configure proxy: %w", err)
 		}
-		client.Transport = transport
+		client.Transport = outbound.WrapTransportWithProxy(transport, http.ProxyURL(parsed))
 	}
 	return &Client{
 		httpClient: client,

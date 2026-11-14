@@ -118,11 +118,9 @@
             class="input flex-1"
             :placeholder="editing ? t('admin.channelMonitor.form.apiKeyEditPlaceholder') : t('admin.channelMonitor.form.apiKeyPlaceholder')"
           />
-          <button type="button" @click="openMyKeyPicker" class="btn btn-secondary whitespace-nowrap">
-            {{ t('admin.channelMonitor.form.useMyKey') }}
-          </button>
         </div>
-        <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.manualKeyHint') }}</p>
+        <p v-if="editing" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
       </div>
 
       <div v-if="usesProbePart">
@@ -221,15 +219,6 @@
     </template>
   </BaseDialog>
 
-  <MonitorKeyPickerDialog
-    :show="showKeyPicker"
-    :loading="myKeysLoading"
-    :keys="myActiveKeys"
-    :provider="form.provider"
-    :user-group-rates="userGroupRates"
-    @close="showKeyPicker = false"
-    @pick="pickMyKey"
-  />
 </template>
 
 <script setup lang="ts">
@@ -238,8 +227,6 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
-import { keysAPI } from '@/api/keys'
-import { userGroupsAPI } from '@/api/groups'
 import type {
   BodyOverrideMode,
   ChannelMonitor,
@@ -250,13 +237,11 @@ import type {
   UpdateParams,
 } from '@/api/admin/channelMonitor'
 import type { ChannelMonitorTemplate } from '@/api/admin/channelMonitorTemplate'
-import type { ApiKey } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Select from '@/components/common/Select.vue'
 import ModelTagInput from '@/components/admin/channel/ModelTagInput.vue'
 import { getPlatformTextClass } from '@/components/admin/channel/types'
-import MonitorKeyPickerDialog from '@/components/admin/monitor/MonitorKeyPickerDialog.vue'
 import MonitorAdvancedRequestConfig from '@/components/admin/monitor/MonitorAdvancedRequestConfig.vue'
 import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
 import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
@@ -313,10 +298,6 @@ const editing = computed<ChannelMonitor | null>(() => props.monitor)
 const submitting = ref(false)
 
 // API key picker
-const showKeyPicker = ref(false)
-const myKeysLoading = ref(false)
-const myActiveKeys = ref<ApiKey[]>([])
-const userGroupRates = ref<Record<number, number>>({})
 
 interface MonitorForm {
   name: string
@@ -786,34 +767,6 @@ function useCurrentDomain() {
   form.endpoint = window.location.origin
 }
 
-async function openMyKeyPicker() {
-  showKeyPicker.value = true
-  if (myActiveKeys.value.length > 0) return
-  myKeysLoading.value = true
-  try {
-    const [res, rates] = await Promise.all([
-      keysAPI.list(1, 100, { status: 'active' }),
-      userGroupsAPI.getUserGroupRates(),
-    ])
-    const items = res.items || []
-    const now = Date.now()
-    myActiveKeys.value = items.filter(k => {
-      if (k.status !== 'active') return false
-      if (!k.expires_at) return true
-      return new Date(k.expires_at).getTime() > now
-    })
-    userGroupRates.value = rates
-  } catch (err: unknown) {
-    appStore.showError(extractApiErrorMessage(err, t('admin.channelMonitor.form.noActiveKey')))
-  } finally {
-    myKeysLoading.value = false
-  }
-}
-
-function pickMyKey(k: ApiKey) {
-  form.api_key = k.key
-  showKeyPicker.value = false
-}
 
 function buildPayload(): CreateParams {
   return {

@@ -169,7 +169,9 @@ func TestEnterpriseUsageOptionsLimitBounds(t *testing.T) {
 	e := enterpriseFixture(t, ctx)
 	m := enterpriseMemberFixture(t, ctx, e.ID, nil)
 	account := mustCreateAccount(t, client, &service.Account{Name: "options-limit"})
-	_, err := tx.ExecContext(ctx, `INSERT INTO api_keys(user_id,key,name) SELECT $1::bigint,'sk-option-limit-' || ($1::bigint)::text || '-' || n::text,'option-' || n::text FROM generate_series(1,105) n`, m.UserID)
+	_, err := tx.ExecContext(ctx, `INSERT INTO api_keys(user_id,key_hash,key_hint,name)
+	SELECT $1::bigint,encode(sha256(convert_to('sk-option-limit-' || ($1::bigint)::text || '-' || n::text,'UTF8')),'hex'),
+		'...','option-' || n::text FROM generate_series(1,105) n`, m.UserID)
 	require.NoError(t, err)
 	var keyID int64
 	require.NoError(t, scanSingleRow(ctx, tx, `SELECT MIN(id) FROM api_keys WHERE user_id=$1`, []any{m.UserID}, &keyID))

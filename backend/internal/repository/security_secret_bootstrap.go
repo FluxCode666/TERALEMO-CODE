@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -39,9 +40,15 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 			return fmt.Errorf("persist jwt secret: %w", err)
 		}
 		if storedSecret != cfg.JWT.Secret {
-			log.Println("Warning: configured JWT secret mismatches persisted value; using persisted secret for cross-instance consistency.")
+			if err := client.SecuritySecret.Update().
+				Where(securitysecret.KeyEQ(securitySecretKeyJWT)).
+				SetValue(cfg.JWT.Secret).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("rotate persisted jwt secret: %w", err)
+			}
+			log.Println("Warning: persisted JWT secret rotated to match explicit configuration.")
+			revokeRefreshTokensAfterJWTSecretRotation(ctx, cfg)
 		}
-		cfg.JWT.Secret = storedSecret
 		return nil
 	}
 
@@ -55,6 +62,19 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 		log.Println("Warning: JWT secret auto-generated and persisted to database. Consider rotating to a managed secret for production.")
 	}
 	return nil
+}
+
+func revokeRefreshTokensAfterJWTSecretRotation(ctx context.Context, cfg *config.Config) {
+	rdb := InitRedis(cfg)
+	defer func() { _ = rdb.Close() }()
+	revokeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cache := &refreshTokenCache{rdb: rdb}
+	if err := cache.DeleteAllRefreshTokens(revokeCtx); err != nil {
+		slog.Warn("refresh token revocation failed after JWT key rotation", "error", err)
+		return
+	}
+	slog.Info("all refresh tokens revoked after JWT key rotation")
 }
 
 func getOrCreateGeneratedSecuritySecret(ctx context.Context, client *ent.Client, key string, byteLength int) (string, bool, error) {

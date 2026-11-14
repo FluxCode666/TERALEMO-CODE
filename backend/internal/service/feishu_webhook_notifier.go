@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 )
 
 const scheduledQuestionFeishuPayloadLimit = 20 * 1024
@@ -42,10 +44,8 @@ type feishuWebhookNotifier struct {
 func newFeishuWebhookNotifier() *feishuWebhookNotifier {
 	return &feishuWebhookNotifier{
 		client: &http.Client{
-			Timeout: 10 * time.Second,
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-			},
+			Timeout:       10 * time.Second,
+			Transport:     outbound.WrapTransport(outbound.NewTransport()),
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 		now: time.Now,

@@ -164,7 +164,6 @@ var ProviderSet = wire.NewSet(
 	NewAESEncryptor,
 
 	// Backup infrastructure
-	NewPgDumper,
 	NewS3BackupStoreFactory,
 
 	// Image storage (async image task result offload)

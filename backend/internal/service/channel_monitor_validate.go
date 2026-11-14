@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/url"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
 )
 
 // 渠道监控参数校验与归一化辅助函数。
@@ -146,14 +148,9 @@ func validateEndpoint(ep string) error {
 		return ErrChannelMonitorEndpointPath
 	}
 
-	hostname := u.Hostname()
 	ctx, cancel := context.WithTimeout(context.Background(), monitorEndpointResolveTimeout)
 	defer cancel()
-	blocked, err := isPrivateOrLoopbackHost(ctx, hostname)
-	if err != nil {
-		return ErrChannelMonitorEndpointUnreachable
-	}
-	if blocked {
+	if err := outbound.Default().ValidateURL(ctx, u); err != nil {
 		return ErrChannelMonitorEndpointPrivate
 	}
 	return nil

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/outbound"
+
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -647,7 +649,7 @@ func (h *AuthHandler) dingTalkClient(cfg config.DingTalkConnectConfig) *DingTalk
 		h.dingTalkClientInstance = &DingTalkClient{
 			cfg: newCfg,
 			// 与 wechat OAuth client 对齐，避免上游网络抖动时请求悬挂。
-			httpClient: &http.Client{Timeout: 10 * time.Second},
+			httpClient: outbound.NewClient(10 * time.Second),
 		}
 	}
 	return h.dingTalkClientInstance

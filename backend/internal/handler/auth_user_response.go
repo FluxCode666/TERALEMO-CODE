@@ -10,6 +10,8 @@ import (
 // authUserResponse keeps enterprise identity scoped to the signed-in user;
 // nested user DTOs in unrelated resource responses retain their existing shape.
 type authUserResponse struct {
+	RequiresTotpSetup bool `json:"requires_totp_setup"`
+	TotpEnabled       bool `json:"totp_enabled"`
 	*dto.User
 	Enterprise *dto.EnterpriseIdentity `json:"enterprise"`
 }
@@ -33,5 +35,5 @@ func buildAuthUserResponse(ctx context.Context, user *service.User, reader enter
 	if err != nil {
 		return nil, err
 	}
-	return &authUserResponse{User: dto.UserFromService(user), Enterprise: identity}, nil
+	return &authUserResponse{User: dto.UserFromService(user), Enterprise: identity, TotpEnabled: user.TotpEnabled}, nil
 }

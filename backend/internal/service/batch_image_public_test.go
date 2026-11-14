@@ -781,7 +781,7 @@ type fakeBatchImageAuthCacheInvalidator struct {
 	groupIDs []int64
 }
 
-func (f *fakeBatchImageAuthCacheInvalidator) InvalidateAuthCacheByKey(_ context.Context, key string) {
+func (f *fakeBatchImageAuthCacheInvalidator) InvalidateAuthCacheByHash(_ context.Context, key string) {
 	f.keys = append(f.keys, key)
 }
 

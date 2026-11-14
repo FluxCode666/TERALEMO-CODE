@@ -116,29 +116,7 @@
           </template>
 
           <template #cell-key="{ value, row }">
-            <div class="flex items-center gap-2">
-              <code class="code text-xs">
-                {{ maskApiKey(value) }}
-              </code>
-              <button
-                @click="copyToClipboard(value, row.id)"
-                class="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-dark-700"
-                :class="
-                  copiedKeyId === row.id
-                    ? 'text-green-500'
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                "
-                :title="copiedKeyId === row.id ? t('keys.copied') : t('keys.copyToClipboard')"
-              >
-                <Icon
-                  v-if="copiedKeyId === row.id"
-                  name="check"
-                  size="sm"
-                  :stroke-width="2"
-                />
-                <Icon v-else name="clipboard" size="sm" />
-              </button>
-            </div>
+            <code class="code text-xs" data-testid="api-key-hint">{{ maskApiKey(row.key_hint || value) }}</code>
           </template>
 
           <template #cell-name="{ value, row }">
@@ -1070,9 +1048,10 @@
     />
 
     <!-- Use Key Modal -->
+    <CreatedKeyDialog v-if="createdKey" :api-key="createdKey" @saved="createdKey = ''" />
     <UseKeyModal
       :show="showUseKeyModal"
-      :api-key="selectedKey?.key || ''"
+      api-key="YOUR_API_KEY"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
       :claude-code-only="selectedKey?.group?.claude_code_only || false"
@@ -1203,7 +1182,6 @@
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
-	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
@@ -1211,6 +1189,7 @@ import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
+import CreatedKeyDialog from '@/components/keys/CreatedKeyDialog.vue'
 	import DataTable from '@/components/common/DataTable.vue'
 	import Pagination from '@/components/common/Pagination.vue'
 	import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -1260,7 +1239,6 @@ interface GroupOption {
 
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
-const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const allColumns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
@@ -1406,7 +1384,7 @@ const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
-const copiedKeyId = ref<number | null>(null)
+const createdKey = ref('')
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -1457,8 +1435,11 @@ const customKeyError = computed(() => {
     return ''
   }
   const key = formData.value.custom_key
-  if (key.length < 16) {
+  if (key.length < 32) {
     return t('keys.customKeyTooShort')
+  }
+  if (key.length > 128) {
+    return t('keys.customKeyTooLong')
   }
   // 检查字符：只允许字母、数字、下划线、连字符
   if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
@@ -1566,16 +1547,6 @@ const filteredGroupOptions = computed(() => {
       (opt.description && opt.description.toLowerCase().includes(query))
   })
 })
-
-const copyToClipboard = async (text: string, keyId: number) => {
-  const success = await clipboardCopy(text, t('keys.copied'))
-  if (success) {
-    copiedKeyId.value = keyId
-    setTimeout(() => {
-      copiedKeyId.value = null
-    }, 800)
-  }
-}
 
 const isAbortError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false
@@ -1872,7 +1843,7 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
+      const created = await keysAPI.create(
         formData.value.name,
         formData.value.group_id,
         customKey,
@@ -1882,7 +1853,12 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData
       )
-      appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      if (created.key && created.key !== created.key_hint) {
+        createdKey.value = created.key
+        appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      } else {
+        appStore.showSuccess(t('keys.showOnce.replayed'))
+      }
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
         onboardingStore.nextStep(500)
@@ -2034,11 +2010,12 @@ const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
     platform,
     clientType,
     providerName,
-    apiKey: row.key,
+    apiKey: 'YOUR_API_KEY',
     usageScript
   })
 
   try {
+    appStore.showSuccess(t('keys.showOnce.ccSwitchHint'))
     window.open(deeplink, '_self')
 
     // Check if the protocol handler worked by detecting if we're still focused

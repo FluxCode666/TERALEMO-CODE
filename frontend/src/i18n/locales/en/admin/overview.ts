@@ -82,8 +82,8 @@ export default {
     },
 
     backup: {
-      title: 'Database Backup',
-      description: 'Full database backup to S3-compatible storage with scheduled backup and restore',
+      title: 'Object Storage',
+      description: 'Manage shared S3 credentials and async image storage; database backup and restore are disabled',
       s3: {
         title: 'S3 Storage Configuration',
         description: 'Configure S3-compatible storage (supports Cloudflare R2)',
@@ -105,121 +105,24 @@ export default {
       },
       imageStorage: {
         title: 'Async image object storage',
-        description: 'Enables the asynchronous image endpoints and offloads generated images to object storage, keeping only short links in Redis. Shares the S3 client with backups and takes effect on save — no restart needed.',
+        description: 'Enables the asynchronous image endpoints and offloads generated images to object storage, keeping only short links in Redis. Uses the shared S3 client and takes effect on save — no restart needed.',
         enabled: 'Enable async image tasks',
-        reuseBackupS3: 'Reuse the backup S3 configuration above (different bucket/prefix only)',
+        reuseBackupS3: 'Reuse the shared S3 configuration above (different bucket/prefix only)',
         bucket: 'Bucket',
-        bucketInherited: 'Leave empty to use the backup bucket',
+        bucketInherited: 'Leave empty to use the shared bucket',
         prefix: 'Key prefix',
         publicBaseUrl: 'Public base URL',
         publicBaseUrlPlaceholder: 'Leave empty to return presigned links',
         presignExpiryHours: 'Presigned link TTL (hours)',
         saved: 'Async image object storage saved'
       },
-      schedule: {
-        title: 'Scheduled Backup',
-        description: 'Configure automatic scheduled backups',
-        enabled: 'Enable Scheduled Backup',
-        cronExpr: 'Cron Expression',
-        cronHint: 'e.g. "0 2 * * *" means every day at 2:00 AM',
-        retainDays: 'Backup Expire Days',
-        retainDaysHint: 'Ordinary backups are deleted after this many days; 0 = no age limit',
-        retainCount: 'Max Retain Count',
-        retainCountHint: 'Maximum ordinary backups to keep; 0 = no count limit',
-        ordinaryRetention: 'Ordinary backup retention',
-        ordinaryHint: 'Clean up the oldest ordinary backups when either limit is reached. Monthly archives are retained separately.',
-        preview: 'Retention preview',
-        previewBoth: 'Keep up to {count} ordinary backups from the last {days} days.',
-        previewDays: 'Keep ordinary backups from the last {days} days, with no count limit.',
-        previewCount: 'Keep the latest {count} ordinary backups, with no age limit.',
-        previewUnlimited: 'Ordinary backups are not automatically deleted.',
-        saved: 'Schedule configuration saved'
-      },
-      archive: {
-        title: 'Monthly archives',
-        enabled: 'Enable',
-        dates: 'Archive dates (select multiple)',
-        selectDates: 'Select at least one archive date',
-        selectedDates: '{count} dates selected',
-        day: 'Day {day}',
-        monthEnd: 'Month end',
-        done: 'Done',
-        datesHint: 'Archive the first successful scheduled backup for each selected date, using its start date and the schedule time zone.',
-        retention: 'Archive retention',
-        count: 'Number of archives to keep',
-        copies: 'copies',
-        forever: 'Keep forever',
-        foreverHint: 'Keep all new archives permanently. Existing permanent archives remain protected after settings change.',
-        countHint: 'Count non-permanent archives across all selected dates together; delete the oldest when the limit is exceeded.',
-        fallbackHint: 'If no backup succeeds on a selected date, use the next successful backup in that month. Missing dates use month end. Count each backup only once.',
-        independentHint: 'Archives reuse scheduled backups and do not count toward ordinary retention. No archive is created if the month has no later successful backup.',
-        disabledHint: 'Disabling stops new archives. Existing archives keep their previous retention policy.',
-        invalidRetention: 'Retention days and counts must be non-negative integers. Non-permanent archives require at least 1 copy.',
-        preview: 'Archive one backup on {dates} each month: {retention}.',
-        retainLatest: 'keep the latest {count} archives in total',
-        badge: 'Monthly archive',
-        deleteConfirm: 'This is a monthly archive. Remove archive protection and permanently delete this backup? This cannot be undone.',
-      },
-      operations: {
-        title: 'Backup Records',
-        description: 'Create manual backups and manage existing backup records',
-        createBackup: 'Create Backup',
-        backing: 'Backing up...',
-        backupCreated: 'Backup created successfully',
-        expireDays: 'Expire Days',
-        alreadyInProgress: 'A backup is already in progress',
-        backupRunning: 'Backup in progress...',
-        backupFailed: 'Backup failed',
-        restoreRunning: 'Restore in progress...',
-        restoreFailed: 'Restore failed',
-      },
-      columns: {
-        status: 'Status',
-        fileName: 'File Name',
-        size: 'Size',
-        parts: 'Parts',
-        expiresAt: 'Expires At',
-        triggeredBy: 'Triggered By',
-        startedAt: 'Started At',
-        actions: 'Actions'
-      },
-      status: {
-        pending: 'Pending',
-        running: 'Running',
-        completed: 'Completed',
-        failed: 'Failed'
-      },
-      progress: {
-        pending: 'Preparing',
-        dumping: 'Dumping database',
-        uploading: 'Uploading',
-      },
-      trigger: {
-        manual: 'Manual',
-        scheduled: 'Scheduled'
-      },
-      neverExpire: 'Never',
-      empty: 'No backup records',
-      actions: {
-        download: 'Download',
-        downloadParts: 'Download Parts',
-        downloadPartsHint: 'Download every part in order and concatenate the gzip bytes: on Linux/macOS run cat payload.part-* > backup.sql.gz; on Windows run copy /b payload.part-000001+payload.part-000002 backup.sql.gz.',
-        partLabel: 'Part {index}',
-        downloadFailed: 'Download URL is empty',
-        restore: 'Restore',
-        restoreConfirm: 'Are you sure you want to restore from this backup? This will overwrite the current database!',
-        restorePasswordPrompt: 'Please enter your admin password to confirm the restore operation',
-        restoreSuccess: 'Database restored successfully',
-        deleteConfirm: 'Are you sure you want to delete this backup?',
-        deleted: 'Backup deleted'
-      },
       r2Guide: {
         title: 'Cloudflare R2 Setup Guide',
-        intro: 'Cloudflare R2 provides S3-compatible object storage with a free tier of 10GB storage + 1M Class A requests/month, ideal for database backups.',
+        intro: 'Cloudflare R2 provides S3-compatible object storage with a free tier of 10GB storage + 1M Class A requests/month, ideal for generated assets.',
         step1: {
           title: 'Create an R2 Bucket',
           line1: 'Log in to the Cloudflare Dashboard (dash.cloudflare.com), select "R2 Object Storage" from the sidebar',
-          line2: 'Click "Create bucket", enter a name (e.g. sub2api-backups), choose a region',
+          line2: 'Click "Create bucket", enter a name (e.g. sub2api-assets), choose a region',
           line3: 'Click create to finish'
         },
         step2: {
@@ -242,7 +145,7 @@ export default {
           fromStep2: 'Value from Step 2',
           unchecked: 'Unchecked'
         },
-        freeTier: 'R2 Free Tier: 10GB storage + 1M Class A requests + 10M Class B requests per month — more than enough for database backups.'
+        freeTier: 'R2 Free Tier: 10GB storage + 1M Class A requests + 10M Class B requests per month — more than enough for generated assets.'
       }
     },
 

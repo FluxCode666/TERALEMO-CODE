@@ -10,6 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestForwardedClientIPHeadersReturnsSnapshotCopy(t *testing.T) {
+	require.Empty(t, ForwardedClientIPHeaders(nil))
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	headers := []string{"X-Viewer-IP"}
+	SetForwardedIPSettings(c, true, headers)
+	headers[0] = "X-Changed-Input"
+	copyHeaders := ForwardedClientIPHeaders(c)
+	require.Equal(t, []string{"X-Viewer-IP"}, copyHeaders)
+	copyHeaders[0] = "X-Changed-Output"
+	require.Equal(t, []string{"X-Viewer-IP"}, ForwardedClientIPHeaders(c))
+}
+
 func TestGetTrustedClientIPUsesGinClientIP(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -32,7 +44,7 @@ func TestGetTrustedClientIPUsesGinClientIP(t *testing.T) {
 	require.Equal(t, "9.9.9.9", w.Body.String())
 }
 
-func TestGetClientIPPreservesLegacyDockerForwardedHeaders(t *testing.T) {
+func TestGetClientIPIgnoresUntrustedDockerForwardedHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
@@ -49,7 +61,7 @@ func TestGetClientIPPreservesLegacyDockerForwardedHeaders(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, 200, w.Code)
-	require.Equal(t, "203.0.113.42", w.Body.String())
+	require.Equal(t, "192.168.32.1", w.Body.String())
 }
 
 func TestCheckIPRestrictionWithCompiledRules(t *testing.T) {
@@ -73,7 +85,7 @@ func TestCheckIPRestrictionWithCompiledRules_InvalidWhitelistStillDenies(t *test
 	require.Equal(t, "access denied", reason)
 }
 
-func TestGetSecurityClientIPSwitchEnabledUsesLegacyHeaders(t *testing.T) {
+func TestGetSecurityClientIPSwitchEnabledIgnoresUntrustedHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
@@ -89,7 +101,7 @@ func TestGetSecurityClientIPSwitchEnabledUsesLegacyHeaders(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, 200, w.Code)
-	require.Equal(t, "1.2.3.4", w.Body.String())
+	require.Equal(t, "9.9.9.9", w.Body.String())
 }
 
 func TestGetSecurityClientIPCustomHeaderPrecedenceAndFallback(t *testing.T) {
@@ -202,7 +214,7 @@ func TestGetSecurityClientIPCustomHeaderPrecedenceAndFallback(t *testing.T) {
 			}
 			r.ServeHTTP(w, req)
 
-			require.Equal(t, test.want, w.Body.String())
+			require.Equal(t, "9.9.9.9", w.Body.String())
 		})
 	}
 }
@@ -259,7 +271,7 @@ func TestGetSecurityClientIPRequestSnapshotCopiesCustomHeaders(t *testing.T) {
 	req.Header.Set("X-Mutated-IP", "4.4.4.4")
 	r.ServeHTTP(w, req)
 
-	require.Equal(t, "1.2.3.4", w.Body.String())
+	require.Equal(t, "9.9.9.9", w.Body.String())
 }
 
 func TestGetSecurityClientIPRequestSnapshotOverridesLiveFallback(t *testing.T) {
@@ -272,7 +284,7 @@ func TestGetSecurityClientIPRequestSnapshotOverridesLiveFallback(t *testing.T) {
 		want          string
 	}{
 		{name: "captured secure mode wins", requestTrust: false, fallbackTrust: true, want: "9.9.9.9"},
-		{name: "captured compatibility mode wins", requestTrust: true, fallbackTrust: false, want: "1.2.3.4"},
+		{name: "captured compatibility mode still rejects untrusted headers", requestTrust: true, fallbackTrust: false, want: "9.9.9.9"},
 	}
 
 	for _, test := range tests {

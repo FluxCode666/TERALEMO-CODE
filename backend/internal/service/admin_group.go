@@ -1257,7 +1257,7 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 		if err != nil {
 			return err
 		}
-		keys, err := s.apiKeyRepo.ListKeysByGroupID(ctx, id)
+		keys, err := s.apiKeyRepo.ListKeyHashesByGroupID(ctx, id)
 		if err == nil {
 			groupKeys = keys
 		}
@@ -1290,7 +1290,7 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 	}
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
-			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
+			s.authCacheInvalidator.InvalidateAuthCacheByHash(ctx, key)
 		}
 		invalidateEnterpriseMembersAuthCache(ctx, enterpriseUserIDs, s.authCacheInvalidator)
 	}
@@ -1471,7 +1471,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 			// 失效认证缓存（在事务提交后执行）
 			if s.authCacheInvalidator != nil {
-				s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+				s.authCacheInvalidator.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 			}
 
 			result.APIKey = apiKey
@@ -1486,7 +1486,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 	// 失效认证缓存
 	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		s.authCacheInvalidator.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 	}
 
 	result.APIKey = apiKey
@@ -1509,7 +1509,7 @@ func (s *adminServiceImpl) AdminResetAPIKeyRateLimitUsage(ctx context.Context, k
 		return nil, fmt.Errorf("reset api key rate limit usage: %w", err)
 	}
 	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		s.authCacheInvalidator.InvalidateAuthCacheByHash(ctx, apiKey.KeyHash)
 	}
 	if s.billingCacheService != nil {
 		_ = s.billingCacheService.InvalidateAPIKeyRateLimit(ctx, apiKey.ID)
@@ -1571,10 +1571,10 @@ func (s *adminServiceImpl) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 
 	// 失效该用户所有 Key 的认证缓存
 	if s.authCacheInvalidator != nil {
-		keys, keyErr := s.apiKeyRepo.ListKeysByUserID(ctx, userID)
+		keys, keyErr := s.apiKeyRepo.ListKeyHashesByUserID(ctx, userID)
 		if keyErr == nil {
 			for _, k := range keys {
-				s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, k)
+				s.authCacheInvalidator.InvalidateAuthCacheByHash(ctx, k)
 			}
 		}
 	}

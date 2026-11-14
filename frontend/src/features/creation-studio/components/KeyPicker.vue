@@ -17,7 +17,7 @@
         <span class="cs-option">
           <span class="cs-option-main">
             <span class="cs-option-name">{{ option.label }}</span>
-            <span class="cs-option-sub">{{ maskKey(option.apiKey?.key) }}</span>
+            <span class="cs-option-sub">{{ maskApiKey(option.apiKey?.key_hint || option.apiKey?.key || '') }}</span>
           </span>
           <GroupBadge
             v-if="option.apiKey?.group"
@@ -50,6 +50,7 @@ import { useI18n } from 'vue-i18n'
 import { CircleX } from '@lucide/vue'
 import Select from '@/components/common/Select.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
+import { maskApiKey } from '@/utils/maskApiKey'
 import type { ApiKey } from '@/types'
 
 const props = withDefaults(
@@ -80,12 +81,6 @@ const options = computed(() =>
   })),
 )
 
-/** `sk-****1234`：只露出末 4 位，避免把 Key 明文铺在页面上。 */
-function maskKey(value?: string): string {
-  if (!value) return ''
-  const tail = value.slice(-4)
-  return value.startsWith('sk-') ? `sk-****${tail}` : `****${tail}`
-}
 
 function onSelect(value: string | number | boolean | null) {
   emit('update:modelValue', typeof value === 'number' ? value : null)
