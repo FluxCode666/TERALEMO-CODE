@@ -24,7 +24,7 @@ func (s *enterpriseUserListStub) ListUsers(_ context.Context, _, _ int, f servic
 type enterpriseUserSummaryRepo struct{ service.EnterpriseRepository }
 
 func (enterpriseUserSummaryRepo) GetMemberContextsByUserIDs(context.Context, []int64) (map[int64]*service.EnterpriseMemberContext, error) {
-	return map[int64]*service.EnterpriseMemberContext{7: {EnterpriseID: 3, EnterpriseName: "Acme", Role: "owner"}}, nil
+	return map[int64]*service.EnterpriseMemberContext{7: {EnterpriseID: 3, EnterpriseName: "Acme", Role: "owner", EnterpriseBalance: 12.5}}, nil
 }
 func TestAdminUserListEnterpriseFilterAndSummary(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -50,6 +50,15 @@ func TestAdminUserListEnterpriseFilterAndSummary(t *testing.T) {
 			} `json:"data"`
 		}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-		require.Equal(t, &userEnterpriseSummary{ID: 3, Name: "Acme", Role: "owner"}, body.Data.Items[0].Enterprise)
+		bal := 12.5
+		require.Equal(t, &userEnterpriseSummary{ID: 3, Name: "Acme", Role: "owner", Balance: &bal}, body.Data.Items[0].Enterprise)
 	}
+}
+
+func TestNewUserEnterpriseSummaryHidesBalanceForNonOwner(t *testing.T) {
+	require.Nil(t, newUserEnterpriseSummary(nil))
+	s := newUserEnterpriseSummary(&service.EnterpriseMemberContext{EnterpriseID: 1, Role: "manager", EnterpriseBalance: 9})
+	require.Nil(t, s.Balance)
+	s = newUserEnterpriseSummary(&service.EnterpriseMemberContext{EnterpriseID: 1, Role: "owner", EnterpriseBalance: 9})
+	require.NotNil(t, s.Balance)
 }

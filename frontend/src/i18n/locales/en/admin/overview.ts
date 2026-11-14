@@ -500,6 +500,7 @@ export default {
         groups: 'Groups',
         subscriptions: 'Subscriptions',
         balance: 'Balance',
+        enterpriseBalance: 'Enterprise Balance',
         balancePlatformQuota: 'Balance (Platform Quota)',
         usage: 'Usage',
         usageAnthropic: 'Usage (Claude)',
@@ -643,6 +644,13 @@ export default {
       failedToLoadBalanceHistory: 'Failed to load balance history',
       createdAt: 'Created',
       totalRecharged: 'Total Recharged',
+      enterpriseRoles: {
+        owner: 'Enterprise Owner',
+        manager: 'Enterprise Manager',
+        member: 'Enterprise Member'
+      },
+      enterpriseDeposit: 'Top up',
+      enterpriseDepositTitle: 'Enterprise top-up - {name}',
       roles: {
         admin: 'Admin',
         user: 'User'

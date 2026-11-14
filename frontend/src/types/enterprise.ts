@@ -30,6 +30,8 @@ export interface EnterpriseSummary {
   id: number
   name: string
   role: EnterpriseRole
+  /** 企业余额，仅企业负责人（owner）时由管理端用户列表下发 */
+  balance?: number | null
 }
 export interface EnterpriseIdentity extends EnterpriseSummary {
   department_id: number | null
