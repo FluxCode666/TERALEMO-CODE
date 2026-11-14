@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // This opt-in test must point to a fresh, disposable database. It exercises real
 // SQL rather than sqlmock, including the migration and the atomic edit path.
 func TestMassEmailReviewPostgresRepository(t *testing.T) {

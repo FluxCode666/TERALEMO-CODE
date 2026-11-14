@@ -355,8 +355,11 @@ func TestMassEmailReviewCreateWorkerPixelEndToEnd(t *testing.T) {
 		}
 	}()
 	t.Cleanup(func() { _ = listener.Close(); serverWG.Wait() })
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok, "loopback listener must expose a TCP address")
+	smtpPort := fmt.Sprint(tcpAddr.Port)
 	settings := &massEmailReviewSettings{values: map[string]string{
-		service.SettingKeySMTPHost: "127.0.0.1", service.SettingKeySMTPPort: fmt.Sprint(listener.Addr().(*net.TCPAddr).Port),
+		service.SettingKeySMTPHost: "127.0.0.1", service.SettingKeySMTPPort: smtpPort,
 		service.SettingKeySMTPUsername: "local", service.SettingKeySMTPPassword: "local", service.SettingKeySMTPFrom: "sender@example.com",
 		service.SettingKeySMTPUseTLS: "false", service.SettingKeyFrontendURL: "https://site.example", service.SettingKeySiteName: "Review & Site",
 	}}
