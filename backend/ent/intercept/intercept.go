@@ -37,6 +37,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/massemailcampaign"
+	"github.com/Wei-Shaw/sub2api/ent/massemailrecipient"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -899,6 +901,60 @@ func (f TraverseIdentityAdoptionDecision) Traverse(ctx context.Context, q ent.Qu
 	return fmt.Errorf("unexpected query type %T. expect *ent.IdentityAdoptionDecisionQuery", q)
 }
 
+// The MassEmailCampaignFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MassEmailCampaignFunc func(context.Context, *ent.MassEmailCampaignQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MassEmailCampaignFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MassEmailCampaignQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MassEmailCampaignQuery", q)
+}
+
+// The TraverseMassEmailCampaign type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMassEmailCampaign func(context.Context, *ent.MassEmailCampaignQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMassEmailCampaign) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMassEmailCampaign) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MassEmailCampaignQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MassEmailCampaignQuery", q)
+}
+
+// The MassEmailRecipientFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MassEmailRecipientFunc func(context.Context, *ent.MassEmailRecipientQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MassEmailRecipientFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MassEmailRecipientQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MassEmailRecipientQuery", q)
+}
+
+// The TraverseMassEmailRecipient type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMassEmailRecipient func(context.Context, *ent.MassEmailRecipientQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMassEmailRecipient) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMassEmailRecipient) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MassEmailRecipientQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MassEmailRecipientQuery", q)
+}
+
 // The PaymentAuditLogFunc type is an adapter to allow the use of ordinary function as a Querier.
 type PaymentAuditLogFunc func(context.Context, *ent.PaymentAuditLogQuery) (ent.Value, error)
 
@@ -1500,6 +1556,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.IdempotencyRecordQuery, predicate.IdempotencyRecord, idempotencyrecord.OrderOption]{typ: ent.TypeIdempotencyRecord, tq: q}, nil
 	case *ent.IdentityAdoptionDecisionQuery:
 		return &query[*ent.IdentityAdoptionDecisionQuery, predicate.IdentityAdoptionDecision, identityadoptiondecision.OrderOption]{typ: ent.TypeIdentityAdoptionDecision, tq: q}, nil
+	case *ent.MassEmailCampaignQuery:
+		return &query[*ent.MassEmailCampaignQuery, predicate.MassEmailCampaign, massemailcampaign.OrderOption]{typ: ent.TypeMassEmailCampaign, tq: q}, nil
+	case *ent.MassEmailRecipientQuery:
+		return &query[*ent.MassEmailRecipientQuery, predicate.MassEmailRecipient, massemailrecipient.OrderOption]{typ: ent.TypeMassEmailRecipient, tq: q}, nil
 	case *ent.PaymentAuditLogQuery:
 		return &query[*ent.PaymentAuditLogQuery, predicate.PaymentAuditLog, paymentauditlog.OrderOption]{typ: ent.TypePaymentAuditLog, tq: q}, nil
 	case *ent.PaymentOrderQuery:

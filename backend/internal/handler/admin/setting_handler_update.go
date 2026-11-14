@@ -50,6 +50,9 @@ type UpdateSettingsRequest struct {
 	SMTPFromName string `json:"smtp_from_name"`
 	SMTPUseTLS   bool   `json:"smtp_use_tls"`
 
+	// 邮件群发发送速率（封/秒），0 表示未提交（保持现值）。
+	MassEmailRateLimitPerSecond int `json:"mass_email_rate_limit_per_second"`
+
 	// Cloudflare Turnstile 设置
 	TurnstileEnabled   bool   `json:"turnstile_enabled"`
 	TurnstileSiteKey   string `json:"turnstile_site_key"`
@@ -628,6 +631,16 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	req.TencentCaptchaCloudSecretKey = strings.TrimSpace(req.TencentCaptchaCloudSecretKey)
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
+	}
+	// 邮件群发速率：未提交或非法时保留现值。
+	if _, sent := sentFields["mass_email_rate_limit_per_second"]; !sent || req.MassEmailRateLimitPerSecond <= 0 {
+		req.MassEmailRateLimitPerSecond = previousSettings.MassEmailRateLimitPerSecond
+	}
+	if req.MassEmailRateLimitPerSecond <= 0 {
+		req.MassEmailRateLimitPerSecond = service.DefaultMassEmailRateLimitPerSecond
+	}
+	if req.MassEmailRateLimitPerSecond > service.MaxMassEmailRateLimitPerSecond {
+		req.MassEmailRateLimitPerSecond = service.MaxMassEmailRateLimitPerSecond
 	}
 	req.DefaultSubscriptions = normalizeDefaultSubscriptions(req.DefaultSubscriptions)
 	req.AuthSourceDefaultEmailSubscriptions = normalizeOptionalDefaultSubscriptions(req.AuthSourceDefaultEmailSubscriptions)
@@ -1550,6 +1563,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SMTPFrom:                            req.SMTPFrom,
 		SMTPFromName:                        req.SMTPFromName,
 		SMTPUseTLS:                          req.SMTPUseTLS,
+		MassEmailRateLimitPerSecond:         req.MassEmailRateLimitPerSecond,
 		TurnstileEnabled:                    req.TurnstileEnabled,
 		TurnstileSiteKey:                    req.TurnstileSiteKey,
 		TurnstileSecretKey:                  req.TurnstileSecretKey,
@@ -2219,6 +2233,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SMTPFrom:                                               updatedSettings.SMTPFrom,
 		SMTPFromName:                                           updatedSettings.SMTPFromName,
 		SMTPUseTLS:                                             updatedSettings.SMTPUseTLS,
+		MassEmailRateLimitPerSecond:                            updatedSettings.MassEmailRateLimitPerSecond,
 		TurnstileEnabled:                                       updatedSettings.TurnstileEnabled,
 		TurnstileSiteKey:                                       updatedSettings.TurnstileSiteKey,
 		TurnstileSecretKeyConfigured:                           updatedSettings.TurnstileSecretKeyConfigured,

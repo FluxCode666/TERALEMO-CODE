@@ -29,7 +29,7 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 	client := clientFromContext(ctx, r.client)
 	args := make([]any, 0, len(userIDs))
 	userPlaceholders := enterpriseContextPlaceholders(userIDs, &args)
-	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id, e.group_pool_configured, COALESCE(d.path,'')
+	rows, err := client.QueryContext(ctx, `SELECT m.user_id, e.id, e.name, e.status, m.id, m.status, m.role, m.department_id, e.group_pool_configured, COALESCE(d.path,''), e.balance
  FROM enterprise_members m JOIN enterprises e ON e.id = m.enterprise_id AND e.deleted_at IS NULL
  LEFT JOIN enterprise_departments d ON d.id=m.department_id AND d.enterprise_id=m.enterprise_id AND d.deleted_at IS NULL
  WHERE m.user_id IN (`+userPlaceholders+`) AND m.deleted_at IS NULL ORDER BY m.user_id`, args...)
@@ -42,7 +42,7 @@ func (r *enterpriseRepository) GetMemberContextsByUserIDs(ctx context.Context, u
 		c := &service.EnterpriseMemberContext{GroupPoolIDs: []int64{}, GroupWhitelistIDs: []int64{}}
 		var userID int64
 		var path string
-		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID, &c.GroupPoolConfigured, &path); err != nil {
+		if err := rows.Scan(&userID, &c.EnterpriseID, &c.EnterpriseName, &c.EnterpriseStatus, &c.MemberID, &c.MemberStatus, &c.Role, &c.DepartmentID, &c.GroupPoolConfigured, &path, &c.EnterpriseBalance); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}

@@ -113,6 +113,7 @@ var ProviderSet = wire.NewSet(
 	NewTLSFingerprintProfileRepository,
 	NewAccountTestQuestionRepository,
 	NewScheduledQuestionTestRepository,
+	NewMassEmailRepository, // 邮件群发（任务 + 收件人 + 打开追踪）
 	NewPluginRepository,
 	NewPluginKVStore,
 	NewChannelRepository,

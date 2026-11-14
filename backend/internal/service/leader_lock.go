@@ -16,6 +16,10 @@ type LeaderLockCache interface {
 	TryAcquireLeaderLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error)
 	// ReleaseLeaderLock deletes key iff it is still owned by owner.
 	ReleaseLeaderLock(ctx context.Context, key, owner string) error
+	// RenewLeaderLock extends the TTL iff the key is still owned by owner.
+	// Returns false when the lock was taken over or already expired, which
+	// callers must treat as "stop working immediately".
+	RenewLeaderLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error)
 }
 
 // tryAcquireSingletonLeaderLock provides best-effort single-flight execution of a

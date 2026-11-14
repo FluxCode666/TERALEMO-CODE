@@ -976,7 +976,9 @@ export default {
         fromName: 'From Name',
         fromNamePlaceholder: 'Sub2API',
         useTls: 'Use TLS',
-        useTlsHint: 'Enable TLS encryption for SMTP connection'
+        useTlsHint: 'Enable TLS encryption for SMTP connection',
+        massEmailRate: 'Mass email send rate (emails per second)',
+        massEmailRateHint: "Total sending rate of mass emails across all campaigns. Resend's default account limit is 2 per second; allowed range 1-50."
       },
       testEmail: {
         title: 'Send Test Email',

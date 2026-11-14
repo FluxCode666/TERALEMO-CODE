@@ -336,10 +336,34 @@
             </div>
           </template>
 
-          <template #cell-role="{ value }">
-            <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
-              {{ t('admin.users.roles.' + value) }}
-            </span>
+          <template #cell-role="{ value, row }">
+            <div class="flex flex-wrap items-center gap-1">
+              <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
+                {{ t('admin.users.roles.' + value) }}
+              </span>
+              <span
+                v-if="row.enterprise"
+                :class="['badge', row.enterprise.role === 'owner' ? 'badge-warning' : 'badge-primary']"
+                :title="row.enterprise.name"
+              >
+                {{ t('admin.users.enterpriseRoles.' + row.enterprise.role) }} · {{ row.enterprise.name }}
+              </span>
+            </div>
+          </template>
+
+          <template #cell-enterprise_balance="{ row }">
+            <div v-if="row.enterprise?.role === 'owner' && row.enterprise.balance != null" class="flex items-center gap-2">
+              <span class="font-medium text-gray-900 dark:text-white">${{ row.enterprise.balance.toFixed(2) }}</span>
+              <button
+                type="button"
+                class="rounded px-2 py-0.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                :title="t('admin.users.enterpriseDeposit')"
+                @click.stop="enterpriseDepositTarget = row.enterprise"
+              >
+                {{ t('admin.users.enterpriseDeposit') }}
+              </button>
+            </div>
+            <span v-else class="text-gray-400">-</span>
           </template>
 
           <template #cell-groups="{ row }">
@@ -768,6 +792,18 @@
       @confirm="confirmBulkDelete"
       @cancel="bulkDeleteIds = []"
     />
+    <EnterpriseDialog
+      :show="!!enterpriseDepositTarget"
+      :title="t('admin.users.enterpriseDepositTitle', { name: enterpriseDepositTarget?.name ?? '' })"
+      @close="enterpriseDepositTarget = null"
+    >
+      <EnterpriseBalanceForm
+        v-if="enterpriseDepositTarget"
+        :key="enterpriseDepositTarget.id"
+        :enterprise-id="enterpriseDepositTarget.id"
+        @updated="enterpriseDepositTarget = null; loadUsers()"
+      />
+    </EnterpriseDialog>
     <UserCreateModal :show="showCreateModal" @close="showCreateModal = false" @success="loadUsers" />
     <UserEditModal :show="showEditModal" :user="editingUser" @close="closeEditModal" @success="loadUsers" />
     <BulkEditUserModal
@@ -802,7 +838,9 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminGroup, UserAttributeDefinition } from '@/types'
+import type { AdminUser, AdminGroup, UserAttributeDefinition, EnterpriseSummary } from '@/types'
+import EnterpriseDialog from '@/features/enterprise/components/EnterpriseDialog.vue'
+import EnterpriseBalanceForm from '@/features/enterprise/components/EnterpriseBalanceForm.vue'
 import type { BatchUserUsageStats } from '@/api/admin/dashboard'
 import type { PlatformQuotaItem } from '@/api/admin/users'
 import type { Column } from '@/components/common/types'
@@ -891,6 +929,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
   { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
   { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
+  { key: 'enterprise_balance', label: t('admin.users.columns.enterpriseBalance'), sortable: false },
   { key: 'balance_platform_quota', label: t('admin.users.columns.balancePlatformQuota'), sortable: false },
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
   { key: 'usage_anthropic', label: t('admin.users.columns.usageAnthropic'), sortable: false },
@@ -1039,6 +1078,7 @@ const columns = computed<Column[]>(() =>
   )
 )
 
+const enterpriseDepositTarget = ref<EnterpriseSummary | null>(null)
 const users = ref<AdminUser[]>([])
 const loading = ref(false)
 const searchQuery = ref('')

@@ -8660,6 +8660,29 @@
                 </div>
                 <Toggle v-model="form.smtp_use_tls" />
               </div>
+
+              <!-- Mass email send rate -->
+              <div
+                class="border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {{ t("admin.settings.smtp.massEmailRate") }}
+                </label>
+                <input
+                  v-model.number="form.mass_email_rate_limit_per_second"
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="1"
+                  class="input w-40"
+                  data-test="mass-email-rate"
+                />
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.smtp.massEmailRateHint") }}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -9728,6 +9751,7 @@ type SettingsForm = Omit<
   channel_monitor_show_quota: boolean;
   channel_monitor_hide_user_ranking: boolean;
   smtp_password: string;
+  mass_email_rate_limit_per_second: number;
   turnstile_secret_key: string;
   tencent_captcha_app_secret_key: string;
   tencent_captcha_cloud_secret_id: string;
@@ -9877,6 +9901,7 @@ const form = reactive<SettingsForm>({
   smtp_from_email: "",
   smtp_from_name: "",
   smtp_use_tls: true,
+  mass_email_rate_limit_per_second: 2,
   // Cloudflare Turnstile
   turnstile_enabled: false,
   turnstile_site_key: "",
@@ -11048,6 +11073,12 @@ const claudeSyncedVersionLabel = computed(() => {
   });
 });
 
+function normalizeMassEmailRate(value: unknown): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 1) return 2;
+  return Math.min(50, n);
+}
+
 async function loadSettings() {
   loading.value = true;
   loadFailed.value = false;
@@ -11084,6 +11115,9 @@ async function loadSettings() {
     codexFingerprintRows.value = form.codex_cli_only_engine_fingerprint_signals
       ? parseFingerprintSignalsToRows(form.codex_cli_only_engine_fingerprint_signals)
       : defaultFingerprintSignalRows();
+    form.mass_email_rate_limit_per_second = normalizeMassEmailRate(
+      settings.mass_email_rate_limit_per_second,
+    );
     form.login_agreement_mode =
       settings.login_agreement_mode === "checkbox" ? "checkbox" : "modal";
     form.channel_monitor_mode =
@@ -11541,6 +11575,9 @@ async function saveSettings() {
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
       smtp_use_tls: form.smtp_use_tls,
+      mass_email_rate_limit_per_second: normalizeMassEmailRate(
+        form.mass_email_rate_limit_per_second,
+      ),
       turnstile_enabled: form.turnstile_enabled,
       turnstile_site_key: form.turnstile_site_key,
       turnstile_secret_key: form.turnstile_secret_key || undefined,

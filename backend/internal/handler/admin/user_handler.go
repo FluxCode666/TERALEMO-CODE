@@ -199,7 +199,7 @@ func (h *UserHandler) List(c *gin.Context) {
 			AdminUser: *dto.UserFromServiceAdmin(&users[i]),
 		}
 		if member := enterpriseContexts[users[i].ID]; member != nil {
-			out[i].Enterprise = &userEnterpriseSummary{ID: member.EnterpriseID, Name: member.EnterpriseName, Role: member.Role}
+			out[i].Enterprise = newUserEnterpriseSummary(member)
 		}
 		if info := loadInfo[users[i].ID]; info != nil {
 			out[i].CurrentConcurrency = info.CurrentConcurrency

@@ -44,6 +44,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/massemailcampaign"
+	"github.com/Wei-Shaw/sub2api/ent/massemailrecipient"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -131,6 +133,10 @@ type Client struct {
 	IdempotencyRecord *IdempotencyRecordClient
 	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
 	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
+	// MassEmailCampaign is the client for interacting with the MassEmailCampaign builders.
+	MassEmailCampaign *MassEmailCampaignClient
+	// MassEmailRecipient is the client for interacting with the MassEmailRecipient builders.
+	MassEmailRecipient *MassEmailRecipientClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -211,6 +217,8 @@ func (c *Client) init() {
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(c.config)
+	c.MassEmailCampaign = NewMassEmailCampaignClient(c.config)
+	c.MassEmailRecipient = NewMassEmailRecipientClient(c.config)
 	c.PaymentAuditLog = NewPaymentAuditLogClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
@@ -352,6 +360,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		MassEmailCampaign:             NewMassEmailCampaignClient(cfg),
+		MassEmailRecipient:            NewMassEmailRecipientClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -420,6 +430,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		MassEmailCampaign:             NewMassEmailCampaignClient(cfg),
+		MassEmailRecipient:            NewMassEmailRecipientClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -478,12 +490,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.EnterpriseDepartment, c.EnterpriseGroupWhitelist,
 		c.EnterpriseGroupWhitelistScope, c.EnterpriseMember, c.EnterpriseQuota,
 		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.IdentityAdoptionDecision, c.MassEmailCampaign, c.MassEmailRecipient,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -502,12 +515,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.EnterpriseDepartment, c.EnterpriseGroupWhitelist,
 		c.EnterpriseGroupWhitelistScope, c.EnterpriseMember, c.EnterpriseQuota,
 		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.IdentityAdoptionDecision, c.MassEmailCampaign, c.MassEmailRecipient,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -574,6 +588,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *IdentityAdoptionDecisionMutation:
 		return c.IdentityAdoptionDecision.mutate(ctx, m)
+	case *MassEmailCampaignMutation:
+		return c.MassEmailCampaign.mutate(ctx, m)
+	case *MassEmailRecipientMutation:
+		return c.MassEmailRecipient.mutate(ctx, m)
 	case *PaymentAuditLogMutation:
 		return c.PaymentAuditLog.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -5162,6 +5180,304 @@ func (c *IdentityAdoptionDecisionClient) mutate(ctx context.Context, m *Identity
 	}
 }
 
+// MassEmailCampaignClient is a client for the MassEmailCampaign schema.
+type MassEmailCampaignClient struct {
+	config
+}
+
+// NewMassEmailCampaignClient returns a client for the MassEmailCampaign from the given config.
+func NewMassEmailCampaignClient(c config) *MassEmailCampaignClient {
+	return &MassEmailCampaignClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `massemailcampaign.Hooks(f(g(h())))`.
+func (c *MassEmailCampaignClient) Use(hooks ...Hook) {
+	c.hooks.MassEmailCampaign = append(c.hooks.MassEmailCampaign, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `massemailcampaign.Intercept(f(g(h())))`.
+func (c *MassEmailCampaignClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MassEmailCampaign = append(c.inters.MassEmailCampaign, interceptors...)
+}
+
+// Create returns a builder for creating a MassEmailCampaign entity.
+func (c *MassEmailCampaignClient) Create() *MassEmailCampaignCreate {
+	mutation := newMassEmailCampaignMutation(c.config, OpCreate)
+	return &MassEmailCampaignCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MassEmailCampaign entities.
+func (c *MassEmailCampaignClient) CreateBulk(builders ...*MassEmailCampaignCreate) *MassEmailCampaignCreateBulk {
+	return &MassEmailCampaignCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MassEmailCampaignClient) MapCreateBulk(slice any, setFunc func(*MassEmailCampaignCreate, int)) *MassEmailCampaignCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MassEmailCampaignCreateBulk{err: fmt.Errorf("calling to MassEmailCampaignClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MassEmailCampaignCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MassEmailCampaignCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MassEmailCampaign.
+func (c *MassEmailCampaignClient) Update() *MassEmailCampaignUpdate {
+	mutation := newMassEmailCampaignMutation(c.config, OpUpdate)
+	return &MassEmailCampaignUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MassEmailCampaignClient) UpdateOne(_m *MassEmailCampaign) *MassEmailCampaignUpdateOne {
+	mutation := newMassEmailCampaignMutation(c.config, OpUpdateOne, withMassEmailCampaign(_m))
+	return &MassEmailCampaignUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MassEmailCampaignClient) UpdateOneID(id int64) *MassEmailCampaignUpdateOne {
+	mutation := newMassEmailCampaignMutation(c.config, OpUpdateOne, withMassEmailCampaignID(id))
+	return &MassEmailCampaignUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MassEmailCampaign.
+func (c *MassEmailCampaignClient) Delete() *MassEmailCampaignDelete {
+	mutation := newMassEmailCampaignMutation(c.config, OpDelete)
+	return &MassEmailCampaignDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MassEmailCampaignClient) DeleteOne(_m *MassEmailCampaign) *MassEmailCampaignDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MassEmailCampaignClient) DeleteOneID(id int64) *MassEmailCampaignDeleteOne {
+	builder := c.Delete().Where(massemailcampaign.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MassEmailCampaignDeleteOne{builder}
+}
+
+// Query returns a query builder for MassEmailCampaign.
+func (c *MassEmailCampaignClient) Query() *MassEmailCampaignQuery {
+	return &MassEmailCampaignQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMassEmailCampaign},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MassEmailCampaign entity by its id.
+func (c *MassEmailCampaignClient) Get(ctx context.Context, id int64) (*MassEmailCampaign, error) {
+	return c.Query().Where(massemailcampaign.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MassEmailCampaignClient) GetX(ctx context.Context, id int64) *MassEmailCampaign {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRecipients queries the recipients edge of a MassEmailCampaign.
+func (c *MassEmailCampaignClient) QueryRecipients(_m *MassEmailCampaign) *MassEmailRecipientQuery {
+	query := (&MassEmailRecipientClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(massemailcampaign.Table, massemailcampaign.FieldID, id),
+			sqlgraph.To(massemailrecipient.Table, massemailrecipient.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, massemailcampaign.RecipientsTable, massemailcampaign.RecipientsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MassEmailCampaignClient) Hooks() []Hook {
+	return c.hooks.MassEmailCampaign
+}
+
+// Interceptors returns the client interceptors.
+func (c *MassEmailCampaignClient) Interceptors() []Interceptor {
+	return c.inters.MassEmailCampaign
+}
+
+func (c *MassEmailCampaignClient) mutate(ctx context.Context, m *MassEmailCampaignMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MassEmailCampaignCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MassEmailCampaignUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MassEmailCampaignUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MassEmailCampaignDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MassEmailCampaign mutation op: %q", m.Op())
+	}
+}
+
+// MassEmailRecipientClient is a client for the MassEmailRecipient schema.
+type MassEmailRecipientClient struct {
+	config
+}
+
+// NewMassEmailRecipientClient returns a client for the MassEmailRecipient from the given config.
+func NewMassEmailRecipientClient(c config) *MassEmailRecipientClient {
+	return &MassEmailRecipientClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `massemailrecipient.Hooks(f(g(h())))`.
+func (c *MassEmailRecipientClient) Use(hooks ...Hook) {
+	c.hooks.MassEmailRecipient = append(c.hooks.MassEmailRecipient, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `massemailrecipient.Intercept(f(g(h())))`.
+func (c *MassEmailRecipientClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MassEmailRecipient = append(c.inters.MassEmailRecipient, interceptors...)
+}
+
+// Create returns a builder for creating a MassEmailRecipient entity.
+func (c *MassEmailRecipientClient) Create() *MassEmailRecipientCreate {
+	mutation := newMassEmailRecipientMutation(c.config, OpCreate)
+	return &MassEmailRecipientCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MassEmailRecipient entities.
+func (c *MassEmailRecipientClient) CreateBulk(builders ...*MassEmailRecipientCreate) *MassEmailRecipientCreateBulk {
+	return &MassEmailRecipientCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MassEmailRecipientClient) MapCreateBulk(slice any, setFunc func(*MassEmailRecipientCreate, int)) *MassEmailRecipientCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MassEmailRecipientCreateBulk{err: fmt.Errorf("calling to MassEmailRecipientClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MassEmailRecipientCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MassEmailRecipientCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MassEmailRecipient.
+func (c *MassEmailRecipientClient) Update() *MassEmailRecipientUpdate {
+	mutation := newMassEmailRecipientMutation(c.config, OpUpdate)
+	return &MassEmailRecipientUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MassEmailRecipientClient) UpdateOne(_m *MassEmailRecipient) *MassEmailRecipientUpdateOne {
+	mutation := newMassEmailRecipientMutation(c.config, OpUpdateOne, withMassEmailRecipient(_m))
+	return &MassEmailRecipientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MassEmailRecipientClient) UpdateOneID(id int64) *MassEmailRecipientUpdateOne {
+	mutation := newMassEmailRecipientMutation(c.config, OpUpdateOne, withMassEmailRecipientID(id))
+	return &MassEmailRecipientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MassEmailRecipient.
+func (c *MassEmailRecipientClient) Delete() *MassEmailRecipientDelete {
+	mutation := newMassEmailRecipientMutation(c.config, OpDelete)
+	return &MassEmailRecipientDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MassEmailRecipientClient) DeleteOne(_m *MassEmailRecipient) *MassEmailRecipientDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MassEmailRecipientClient) DeleteOneID(id int64) *MassEmailRecipientDeleteOne {
+	builder := c.Delete().Where(massemailrecipient.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MassEmailRecipientDeleteOne{builder}
+}
+
+// Query returns a query builder for MassEmailRecipient.
+func (c *MassEmailRecipientClient) Query() *MassEmailRecipientQuery {
+	return &MassEmailRecipientQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMassEmailRecipient},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MassEmailRecipient entity by its id.
+func (c *MassEmailRecipientClient) Get(ctx context.Context, id int64) (*MassEmailRecipient, error) {
+	return c.Query().Where(massemailrecipient.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MassEmailRecipientClient) GetX(ctx context.Context, id int64) *MassEmailRecipient {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryCampaign queries the campaign edge of a MassEmailRecipient.
+func (c *MassEmailRecipientClient) QueryCampaign(_m *MassEmailRecipient) *MassEmailCampaignQuery {
+	query := (&MassEmailCampaignClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(massemailrecipient.Table, massemailrecipient.FieldID, id),
+			sqlgraph.To(massemailcampaign.Table, massemailcampaign.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, massemailrecipient.CampaignTable, massemailrecipient.CampaignColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MassEmailRecipientClient) Hooks() []Hook {
+	return c.hooks.MassEmailRecipient
+}
+
+// Interceptors returns the client interceptors.
+func (c *MassEmailRecipientClient) Interceptors() []Interceptor {
+	return c.inters.MassEmailRecipient
+}
+
+func (c *MassEmailRecipientClient) mutate(ctx context.Context, m *MassEmailRecipientMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MassEmailRecipientCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MassEmailRecipientUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MassEmailRecipientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MassEmailRecipientDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MassEmailRecipient mutation op: %q", m.Op())
+	}
+}
+
 // PaymentAuditLogClient is a client for the PaymentAuditLog schema.
 type PaymentAuditLogClient struct {
 	config
@@ -8433,9 +8749,10 @@ type (
 		Enterprise, EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
 		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
 		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
-		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		IdempotencyRecord, IdentityAdoptionDecision, MassEmailCampaign,
+		MassEmailRecipient, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
 		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
 	}
@@ -8447,9 +8764,10 @@ type (
 		Enterprise, EnterpriseAllowedGroup, EnterpriseAuditLog, EnterpriseBalanceLog,
 		EnterpriseDepartment, EnterpriseGroupWhitelist, EnterpriseGroupWhitelistScope,
 		EnterpriseMember, EnterpriseQuota, ErrorPassthroughRule, Group,
-		IdempotencyRecord, IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		IdempotencyRecord, IdentityAdoptionDecision, MassEmailCampaign,
+		MassEmailRecipient, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
 		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
 		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
 	}

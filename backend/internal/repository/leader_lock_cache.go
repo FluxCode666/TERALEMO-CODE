@@ -22,6 +22,14 @@ end
 return 0
 `)
 
+// leaderLockRenewScript extends the TTL only when the caller still owns the lock.
+var leaderLockRenewScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("PEXPIRE", KEYS[1], ARGV[2])
+end
+return 0
+`)
+
 type leaderLockCache struct {
 	rdb *redis.Client
 }
@@ -39,4 +47,18 @@ func (c *leaderLockCache) TryAcquireLeaderLock(ctx context.Context, key, owner s
 
 func (c *leaderLockCache) ReleaseLeaderLock(ctx context.Context, key, owner string) error {
 	return leaderLockReleaseScript.Run(ctx, c.rdb, []string{leaderLockKeyPrefix + key}, owner).Err()
+}
+
+func (c *leaderLockCache) RenewLeaderLock(ctx context.Context, key, owner string, ttl time.Duration) (bool, error) {
+	milliseconds := ttl.Milliseconds()
+	if milliseconds <= 0 {
+		milliseconds = 1
+	}
+	result, err := leaderLockRenewScript.Run(
+		ctx, c.rdb, []string{leaderLockKeyPrefix + key}, owner, milliseconds,
+	).Int64()
+	if err != nil {
+		return false, err
+	}
+	return result == 1, nil
 }

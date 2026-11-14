@@ -56,6 +56,7 @@ func RegisterAdminRoutes(
 
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
+		registerMassEmailRoutes(admin, h)
 
 		// OpenAI OAuth
 		registerOpenAIOAuthRoutes(admin, h)
@@ -479,6 +480,30 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.POST("/exchange-setup-token-code", h.Admin.OAuth.ExchangeSetupTokenCode)
 		accounts.POST("/cookie-auth", h.Admin.OAuth.CookieAuth)
 		accounts.POST("/setup-token-cookie-auth", h.Admin.OAuth.SetupTokenCookieAuth)
+	}
+}
+
+// registerMassEmailRoutes 管理后台「邮件群发」。
+//
+// admin group 已挂 auditLog 中间件，这里的写操作会自动进审计日志。
+func registerMassEmailRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h.Admin == nil || h.Admin.MassEmail == nil {
+		return
+	}
+	group := admin.Group("/mass-emails")
+	{
+		group.GET("", h.Admin.MassEmail.List)
+		group.POST("", h.Admin.MassEmail.Create)
+		group.POST("/preview-recipients", h.Admin.MassEmail.Preview)
+		group.POST("/test", h.Admin.MassEmail.Test)
+		group.GET("/:id", h.Admin.MassEmail.Get)
+		group.PUT("/:id", h.Admin.MassEmail.Update)
+		group.DELETE("/:id", h.Admin.MassEmail.Delete)
+		group.POST("/:id/send", h.Admin.MassEmail.Send)
+		group.POST("/:id/cancel", h.Admin.MassEmail.Cancel)
+		group.POST("/:id/retry-failed", h.Admin.MassEmail.RetryFailed)
+		group.POST("/:id/recipients/:rid/retry", h.Admin.MassEmail.RetryRecipient)
+		group.GET("/:id/recipients", h.Admin.MassEmail.ListRecipients)
 	}
 }
 

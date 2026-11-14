@@ -180,6 +180,7 @@ export default {
     enterprises: '企业管理',
     dashboard: '仪表盘',
     announcements: '公告',
+    massEmails: '邮件群发',
     apiKeys: 'API 密钥',
     batchImage: '批量生图',
     usage: '使用记录',

@@ -162,6 +162,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SMTPFrom:                                               settings.SMTPFrom,
 		SMTPFromName:                                           settings.SMTPFromName,
 		SMTPUseTLS:                                             settings.SMTPUseTLS,
+		MassEmailRateLimitPerSecond:                            settings.MassEmailRateLimitPerSecond,
 		TurnstileEnabled:                                       settings.TurnstileEnabled,
 		TurnstileSiteKey:                                       settings.TurnstileSiteKey,
 		TurnstileSecretKeyConfigured:                           settings.TurnstileSecretKeyConfigured,

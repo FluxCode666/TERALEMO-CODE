@@ -478,6 +478,7 @@ export default {
         groups: '分组',
         subscriptions: '订阅分组',
         balance: '余额',
+        enterpriseBalance: '企业余额',
         balancePlatformQuota: '余额(平台配额)',
         usage: '用量',
         usageAnthropic: '用量 (Claude)',
@@ -529,6 +530,13 @@ export default {
       failedToToggle: '更新用户状态失败',
       failedToLoadApiKeys: '加载用户 API 密钥失败',
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
+      enterpriseRoles: {
+        owner: '企业负责人',
+        manager: '企业管理员',
+        member: '企业成员'
+      },
+      enterpriseDeposit: '企业充值',
+      enterpriseDepositTitle: '企业充值 - {name}',
       roles: {
         admin: '管理员',
         user: '用户'

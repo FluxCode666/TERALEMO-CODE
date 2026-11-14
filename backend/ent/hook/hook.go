@@ -357,6 +357,30 @@ func (f IdentityAdoptionDecisionFunc) Mutate(ctx context.Context, m ent.Mutation
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdentityAdoptionDecisionMutation", m)
 }
 
+// The MassEmailCampaignFunc type is an adapter to allow the use of ordinary
+// function as MassEmailCampaign mutator.
+type MassEmailCampaignFunc func(context.Context, *ent.MassEmailCampaignMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MassEmailCampaignFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MassEmailCampaignMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MassEmailCampaignMutation", m)
+}
+
+// The MassEmailRecipientFunc type is an adapter to allow the use of ordinary
+// function as MassEmailRecipient mutator.
+type MassEmailRecipientFunc func(context.Context, *ent.MassEmailRecipientMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MassEmailRecipientFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MassEmailRecipientMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MassEmailRecipientMutation", m)
+}
+
 // The PaymentAuditLogFunc type is an adapter to allow the use of ordinary
 // function as PaymentAuditLog mutator.
 type PaymentAuditLogFunc func(context.Context, *ent.PaymentAuditLogMutation) (ent.Value, error)

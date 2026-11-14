@@ -971,7 +971,9 @@ export default {
         fromName: '发件人名称',
         fromNamePlaceholder: 'Sub2API',
         useTls: '使用 TLS',
-        useTlsHint: '为 SMTP 连接启用 TLS 加密'
+        useTlsHint: '为 SMTP 连接启用 TLS 加密',
+        massEmailRate: '群发邮件发送速率（封/秒）',
+        massEmailRateHint: "所有群发任务的总发送速率。Resend 默认账号限制为每秒 2 封；可设置范围 1-50。"
       },
       testEmail: {
         title: '发送测试邮件',

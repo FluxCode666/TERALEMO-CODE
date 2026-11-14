@@ -41,6 +41,9 @@ func (f *fakeLeaderLockCache) ReleaseLeaderLock(_ context.Context, key, owner st
 	}
 	return nil
 }
+func (f *fakeLeaderLockCache) RenewLeaderLock(_ context.Context, _ string, _ string, _ time.Duration) (bool, error) {
+	return true, nil
+}
 
 func (f *fakeLeaderLockCache) heldBy(key string) string {
 	f.mu.Lock()

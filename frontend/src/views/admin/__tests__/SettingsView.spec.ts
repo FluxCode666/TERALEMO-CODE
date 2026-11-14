@@ -578,6 +578,16 @@ async function openPaymentTab(wrapper: ReturnType<typeof mountView>) {
   await flushPromises();
 }
 
+async function openEmailTab(wrapper: ReturnType<typeof mountView>) {
+  const emailTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.email"));
+
+  expect(emailTabButton).toBeDefined();
+  await emailTabButton?.trigger("click");
+  await flushPromises();
+}
+
 async function openSecurityTab(wrapper: ReturnType<typeof mountView>) {
   const securityTabButton = wrapper
     .findAll("button")
@@ -1216,6 +1226,47 @@ describe("admin SettingsView payment visible method controls", () => {
       expect.objectContaining({
         affiliate_admin_recharge_enabled: true,
       }),
+    );
+  });
+
+  it("loads, clamps and saves the mass email send rate", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      email_verify_enabled: true,
+      mass_email_rate_limit_per_second: 5,
+    });
+
+    const wrapper = mountView();
+    await flushPromises();
+    await openEmailTab(wrapper);
+
+    const input = wrapper.find('[data-test="mass-email-rate"]');
+    expect((input.element as HTMLInputElement).value).toBe("5");
+
+    await input.setValue("500");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ mass_email_rate_limit_per_second: 50 }),
+    );
+  });
+
+  it("defaults the mass email send rate to 2 when the backend omits it", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      email_verify_enabled: true,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openEmailTab(wrapper);
+
+    const input = wrapper.find('[data-test="mass-email-rate"]');
+    expect((input.element as HTMLInputElement).value).toBe("2");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ mass_email_rate_limit_per_second: 2 }),
     );
   });
 

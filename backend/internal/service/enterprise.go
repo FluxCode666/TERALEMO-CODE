@@ -173,6 +173,7 @@ type EnterpriseGroupWhitelist struct {
 type EnterpriseMemberContext struct {
 	EnterpriseID                     int64
 	EnterpriseName, EnterpriseStatus string
+	EnterpriseBalance                float64
 	MemberID                         int64
 	MemberStatus, Role               string
 	DepartmentID                     *int64

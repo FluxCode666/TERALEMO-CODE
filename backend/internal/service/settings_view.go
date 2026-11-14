@@ -39,6 +39,9 @@ type SystemSettings struct {
 	SMTPFromName           string
 	SMTPUseTLS             bool
 
+	// 邮件群发发送速率（封/秒），全局生效，默认 2。
+	MassEmailRateLimitPerSecond int
+
 	TurnstileEnabled                       bool
 	TurnstileSiteKey                       string
 	TurnstileSecretKey                     string
