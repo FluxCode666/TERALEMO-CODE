@@ -77,6 +77,8 @@ func RegisterUserRoutes(
 				totp.POST("/send-code", h.Totp.SendVerifyCode)
 				totp.POST("/setup", h.Totp.InitiateSetup)
 				totp.POST("/enable", h.Totp.Enable)
+				// 已开启 2FA 的用户更换验证器（强制 2FA 下不能先停用再启用）
+				totp.POST("/rebind", h.Totp.InitiateRebind)
 				totp.POST("/disable", h.Totp.Disable)
 				// 敏感操作二次验证：授予当前会话一段时间的 step-up 权限
 				totp.POST("/step-up", h.Totp.StepUp)

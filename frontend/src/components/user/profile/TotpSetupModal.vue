@@ -7,10 +7,13 @@
         <!-- Header -->
         <div class="mb-6 text-center">
           <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-            {{ t('profile.totp.setupTitle') }}
+            {{ isRebind ? t('profile.totp.rebindTitle') : t('profile.totp.setupTitle') }}
           </h3>
           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {{ stepDescription }}
+          </p>
+          <p v-if="isRebind && step === 0" class="mt-2 text-sm text-amber-600 dark:text-amber-400">
+            {{ t('profile.totp.rebindHint') }}
           </p>
         </div>
 
@@ -176,12 +179,20 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import type { TotpSetupResponse } from '@/types'
 import QRCode from 'qrcode'
 
+const props = withDefaults(defineProps<{
+  // rebind：已开启 2FA 的用户更换认证器，完成前旧认证器仍有效
+  mode?: 'setup' | 'rebind'
+}>(), {
+  mode: 'setup'
+})
+
 const emit = defineEmits<{
   close: []
   success: []
 }>()
 
 const { t } = useI18n()
+const isRebind = computed(() => props.mode === 'rebind')
 const appStore = useAppStore()
 
 // Step: 0 = verify identity, 1 = QR code, 2 = verify TOTP code
@@ -361,7 +372,9 @@ const handleVerifyAndSetup = async () => {
       ? { email_code: verifyForm.value.emailCode }
       : { password: verifyForm.value.password }
 
-    setupData.value = await totpAPI.initiateSetup(request)
+    setupData.value = isRebind.value
+      ? await totpAPI.initiateRebind(request)
+      : await totpAPI.initiateSetup(request)
     step.value = 1
   } catch (err: any) {
     appStore.showError(extractApiErrorMessage(err, t('profile.totp.setupFailed')))
@@ -381,7 +394,7 @@ const handleVerify = async () => {
       totp_code: totpCode,
       setup_token: setupData.value.setup_token
     })
-    appStore.showSuccess(t('profile.totp.enableSuccess'))
+    appStore.showSuccess(isRebind.value ? t('profile.totp.rebindSuccess') : t('profile.totp.enableSuccess'))
     emit('success')
   } catch (err: any) {
     appStore.showError(extractApiErrorMessage(err, t('profile.totp.verifyFailed')))

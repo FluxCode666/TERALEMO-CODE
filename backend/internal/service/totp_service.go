@@ -58,6 +58,9 @@ type TotpSetupSession struct {
 	Secret     string // Plain text TOTP secret (not encrypted yet)
 	SetupToken string // Random token to verify setup request
 	CreatedAt  time.Time
+	// Rebind 为 true 表示已开启 2FA 的用户更换验证器：完成时只替换密钥，
+	// 不经过“先停用再启用”，2FA 全程保持开启。
+	Rebind bool `json:"rebind,omitempty"`
 }
 
 // TotpLoginSession represents a pending 2FA login session
@@ -78,6 +81,8 @@ type TotpStatus struct {
 	Enabled        bool       `json:"enabled"`
 	EnabledAt      *time.Time `json:"enabled_at,omitempty"`
 	FeatureEnabled bool       `json:"feature_enabled"`
+	// Required 表示管理员开启了强制 2FA：此时不能停用，只能重新绑定。
+	Required bool `json:"required"`
 }
 
 // TotpSetupResponse represents the response for initiating TOTP setup
@@ -128,6 +133,10 @@ func NewTotpService(
 // GetStatus returns the TOTP status for a user
 func (s *TotpService) GetStatus(ctx context.Context, userID int64) (*TotpStatus, error) {
 	featureEnabled := s.settingService.IsTotpEnabled(ctx)
+	required, err := s.settingService.ForceTotpEnabled(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -138,6 +147,7 @@ func (s *TotpService) GetStatus(ctx context.Context, userID int64) (*TotpStatus,
 		Enabled:        user.TotpEnabled,
 		EnabledAt:      user.TotpEnabledAt,
 		FeatureEnabled: featureEnabled,
+		Required:       required,
 	}, nil
 }
 
@@ -188,6 +198,37 @@ func (s *TotpService) InitiateSetup(ctx context.Context, userID int64, emailCode
 		return nil, err
 	}
 
+	return s.startSetupSession(ctx, user, false)
+}
+
+// InitiateRebind 为已开启 2FA 的用户生成新的验证器密钥（更换手机/验证器）。
+// 身份校验与 InitiateSetup/Disable 相同（邮箱验证码或密码）；完成前旧密钥继续有效，
+// 完成后旧密钥立即失效。强制 2FA 下不能停用，这是唯一的更换途径。
+func (s *TotpService) InitiateRebind(ctx context.Context, userID int64, emailCode, password string) (*TotpSetupResponse, error) {
+	if !s.settingService.IsTotpEnabled(ctx) {
+		return nil, ErrTotpNotEnabled
+	}
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user: %w", err)
+	}
+
+	if !user.TotpEnabled {
+		return nil, ErrTotpNotSetup
+	}
+
+	if err := s.verifyIdentity(ctx, user, emailCode, password); err != nil {
+		return nil, err
+	}
+
+	return s.startSetupSession(ctx, user, true)
+}
+
+// startSetupSession 生成新的 TOTP 密钥并写入待确认的设置会话。
+func (s *TotpService) startSetupSession(ctx context.Context, user *User, rebind bool) (*TotpSetupResponse, error) {
+	userID := user.ID
+
 	// Generate a new TOTP key
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      totpIssuer,
@@ -208,6 +249,7 @@ func (s *TotpService) InitiateSetup(ctx context.Context, userID int64, emailCode
 		Secret:     key.Secret(),
 		SetupToken: setupToken,
 		CreatedAt:  time.Now(),
+		Rebind:     rebind,
 	}
 
 	if err := s.cache.SetSetupSession(ctx, userID, session, totpSetupTTL); err != nil {
@@ -249,6 +291,18 @@ func (s *TotpService) CompleteSetup(ctx context.Context, userID int64, totpCode,
 		return ErrTotpInvalidCode
 	}
 
+	// 重新绑定期间若 2FA 已被停用，不能只写入密钥而让账户处于“有密钥未启用”的状态。
+	if session.Rebind {
+		user, err := s.userRepo.GetByID(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("get user: %w", err)
+		}
+		if !user.TotpEnabled {
+			_ = s.cache.DeleteSetupSession(ctx, userID)
+			return ErrTotpNotSetup
+		}
+	}
+
 	slog.Debug("totp_complete_setup_before_encrypt",
 		"user_id", userID,
 		"secret_len", len(session.Secret))
@@ -282,9 +336,12 @@ func (s *TotpService) CompleteSetup(ctx context.Context, userID int64, totpCode,
 		return fmt.Errorf("update totp secret: %w", err)
 	}
 
-	// Enable TOTP for the user
-	if err := s.userRepo.EnableTotp(ctx, userID); err != nil {
-		return fmt.Errorf("enable totp: %w", err)
+	// 重新绑定只替换密钥：保留 totp_enabled_at，避免强制 2FA 生效前登录的会话
+	// 因 enabled_at 晚于策略生效时间而被判定失效。
+	if !session.Rebind {
+		if err := s.userRepo.EnableTotp(ctx, userID); err != nil {
+			return fmt.Errorf("enable totp: %w", err)
+		}
 	}
 
 	// Clean up the setup session
