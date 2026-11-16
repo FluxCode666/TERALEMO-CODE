@@ -52,6 +52,18 @@ export async function initiateSetup(request?: TotpSetupRequest): Promise<TotpSet
 }
 
 /**
+ * Start replacing the authenticator for an account that already has TOTP enabled.
+ * The new secret only takes effect after `enable` verifies a code from the new app;
+ * until then the old authenticator keeps working.
+ * @param request - Email code or password depending on verification method
+ * @returns Setup response with the new secret, QR code URL, and setup token
+ */
+export async function initiateRebind(request?: TotpSetupRequest): Promise<TotpSetupResponse> {
+  const { data } = await apiClient.post<TotpSetupResponse>('/user/totp/rebind', request || {})
+  return data
+}
+
+/**
  * Complete TOTP setup by verifying the code
  * @param request - TOTP code and setup token
  * @returns Enable response with success status and enabled timestamp
@@ -94,6 +106,7 @@ export const totpAPI = {
   getVerificationMethod,
   sendVerifyCode,
   initiateSetup,
+  initiateRebind,
   enable,
   disable,
   stepUp

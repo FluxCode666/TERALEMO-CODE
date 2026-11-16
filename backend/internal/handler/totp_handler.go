@@ -25,6 +25,7 @@ type TotpStatusResponse struct {
 	Enabled        bool   `json:"enabled"`
 	EnabledAt      *int64 `json:"enabled_at,omitempty"` // Unix timestamp
 	FeatureEnabled bool   `json:"feature_enabled"`
+	Required       bool   `json:"required"` // 管理员开启了强制 2FA：不能停用，只能重新绑定
 }
 
 // GetStatus returns the TOTP status for the current user
@@ -45,6 +46,7 @@ func (h *TotpHandler) GetStatus(c *gin.Context) {
 	resp := TotpStatusResponse{
 		Enabled:        status.Enabled,
 		FeatureEnabled: status.FeatureEnabled,
+		Required:       status.Required,
 	}
 
 	if status.EnabledAt != nil {
@@ -85,6 +87,35 @@ func (h *TotpHandler) InitiateSetup(c *gin.Context) {
 	}
 
 	result, err := h.totpService.InitiateSetup(c.Request.Context(), subject.UserID, req.EmailCode, req.Password)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, TotpSetupResponse{
+		Secret:     result.Secret,
+		QRCodeURL:  result.QRCodeURL,
+		SetupToken: result.SetupToken,
+		Countdown:  result.Countdown,
+	})
+}
+
+// InitiateRebind starts replacing the authenticator for a user who already has TOTP enabled.
+// The new secret only takes effect after POST /api/v1/user/totp/enable verifies a code.
+// POST /api/v1/user/totp/rebind
+func (h *TotpHandler) InitiateRebind(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	var req TotpSetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req = TotpSetupRequest{}
+	}
+
+	result, err := h.totpService.InitiateRebind(c.Request.Context(), subject.UserID, req.EmailCode, req.Password)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

@@ -2445,6 +2445,8 @@ export interface TotpStatus {
   enabled: boolean
   enabled_at: number | null  // Unix timestamp in seconds
   feature_enabled: boolean
+  /** 管理员开启了强制 2FA：不能停用，只能重新绑定 */
+  required?: boolean
 }
 
 export interface TotpSetupRequest {

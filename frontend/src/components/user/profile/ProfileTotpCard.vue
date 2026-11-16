@@ -32,29 +32,50 @@
       </div>
 
       <!-- 2FA Enabled -->
-      <div v-else-if="status?.enabled" class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <div class="flex-shrink-0 rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-            <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-            </svg>
+      <div v-else-if="status?.enabled">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 rounded-full bg-green-100 p-3 dark:bg-green-900/30">
+              <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+            </div>
+            <div>
+              <p class="font-medium text-gray-900 dark:text-white">
+                {{ t('profile.totp.enabled') }}
+              </p>
+              <p v-if="status.enabled_at" class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('profile.totp.enabledAt') }}: {{ formatDate(status.enabled_at) }}
+              </p>
+            </div>
           </div>
-          <div>
-            <p class="font-medium text-gray-900 dark:text-white">
-              {{ t('profile.totp.enabled') }}
-            </p>
-            <p v-if="status.enabled_at" class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('profile.totp.enabledAt') }}: {{ formatDate(status.enabled_at) }}
-            </p>
+          <div class="flex flex-shrink-0 items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-testid="totp-rebind"
+              @click="showRebindModal = true"
+            >
+              {{ t('profile.totp.rebind') }}
+            </button>
+            <button
+              v-if="!status.required"
+              type="button"
+              class="btn btn-outline-danger"
+              data-testid="totp-disable"
+              @click="showDisableDialog = true"
+            >
+              {{ t('profile.totp.disable') }}
+            </button>
           </div>
         </div>
-        <button
-          type="button"
-          class="btn btn-outline-danger"
-          @click="showDisableDialog = true"
+        <p
+          v-if="status.required"
+          class="mt-4 text-sm text-gray-500 dark:text-gray-400"
+          data-testid="totp-required-hint"
         >
-          {{ t('profile.totp.disable') }}
-        </button>
+          {{ t('profile.totp.requiredHint') }}
+        </p>
       </div>
 
       <!-- 2FA Not Enabled -->
@@ -91,6 +112,14 @@
       @success="handleSetupSuccess"
     />
 
+    <!-- Rebind Modal：替换认证器，2FA 全程保持开启 -->
+    <TotpSetupModal
+      v-if="showRebindModal"
+      mode="rebind"
+      @close="showRebindModal = false"
+      @success="handleRebindSuccess"
+    />
+
     <!-- Disable Dialog -->
     <TotpDisableDialog
       v-if="showDisableDialog"
@@ -114,6 +143,7 @@ const loading = ref(true)
 const status = ref<TotpStatus | null>(null)
 const showSetupModal = ref(false)
 const showDisableDialog = ref(false)
+const showRebindModal = ref(false)
 
 const loadStatus = async () => {
   loading.value = true
@@ -128,6 +158,11 @@ const loadStatus = async () => {
 
 const handleSetupSuccess = () => {
   showSetupModal.value = false
+  loadStatus()
+}
+
+const handleRebindSuccess = () => {
+  showRebindModal.value = false
   loadStatus()
 }
 
