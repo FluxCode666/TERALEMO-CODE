@@ -51,6 +51,7 @@ export async function list(
     group?: string
     search?: string
     privacy_mode?: string
+    model?: string
     lite?: string
     include_scheduler_score?: string
     sort_by?: string
@@ -93,6 +94,7 @@ export async function getUpstreamBillingRatesWithEtag(
     group?: string
     search?: string
     privacy_mode?: string
+    model?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },
@@ -126,6 +128,7 @@ export async function listWithEtag(
     group?: string
     search?: string
     privacy_mode?: string
+    model?: string
     lite?: string
     include_scheduler_score?: string
     sort_by?: string
@@ -742,6 +745,7 @@ export async function exportData(options?: {
     status?: string
     group?: string
     privacy_mode?: string
+    model?: string
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
@@ -752,12 +756,13 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { platform, type, status, group, privacy_mode, search, sort_by, sort_order } = options.filters
+    const { platform, type, status, group, privacy_mode, model, search, sort_by, sort_order } = options.filters
     if (platform) params.platform = platform
     if (type) params.type = type
     if (status) params.status = status
     if (group) params.group = group
     if (privacy_mode) params.privacy_mode = privacy_mode
+    if (model) params.model = model
     if (search) params.search = search
     if (sort_by) params.sort_by = sort_by
     if (sort_order) params.sort_order = sort_order

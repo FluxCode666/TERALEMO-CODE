@@ -33,6 +33,17 @@ func executeUserIdempotentJSONWithPresenter(
 	execute func(context.Context) (any, error),
 	present func(any) any,
 ) {
+	executeUserIdempotentJSONWithTimeout(c, scope, payload, ttl, 0, execute, present)
+}
+
+func executeUserIdempotentJSONWithTimeout(
+	c *gin.Context,
+	scope string,
+	payload any,
+	ttl, executionTimeout time.Duration,
+	execute func(context.Context) (any, error),
+	present func(any) any,
+) {
 	writeSuccess := func(data any) {
 		if present != nil {
 			data = present(data)
@@ -41,7 +52,13 @@ func executeUserIdempotentJSONWithPresenter(
 	}
 	coordinator := service.DefaultIdempotencyCoordinator()
 	if coordinator == nil {
-		data, err := execute(c.Request.Context())
+		ctx := c.Request.Context()
+		if executionTimeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), executionTimeout)
+			defer cancel()
+		}
+		data, err := execute(ctx)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
@@ -56,14 +73,15 @@ func executeUserIdempotentJSONWithPresenter(
 	}
 
 	result, err := coordinator.Execute(c.Request.Context(), service.IdempotencyExecuteOptions{
-		Scope:          scope,
-		ActorScope:     actorScope,
-		Method:         c.Request.Method,
-		Route:          c.FullPath(),
-		IdempotencyKey: c.GetHeader("Idempotency-Key"),
-		Payload:        payload,
-		RequireKey:     true,
-		TTL:            ttl,
+		Scope:            scope,
+		ActorScope:       actorScope,
+		Method:           c.Request.Method,
+		Route:            c.FullPath(),
+		IdempotencyKey:   c.GetHeader("Idempotency-Key"),
+		Payload:          payload,
+		RequireKey:       true,
+		TTL:              ttl,
+		ExecutionTimeout: executionTimeout,
 	}, execute)
 	if err != nil {
 		if infraerrors.Code(err) == infraerrors.Code(service.ErrIdempotencyStoreUnavail) {

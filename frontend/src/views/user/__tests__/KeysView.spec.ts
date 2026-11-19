@@ -63,6 +63,7 @@ vi.mock('@/api', () => ({
     list: listKeys,
     create: vi.fn(),
     update: updateKey,
+    rotate: vi.fn(),
     delete: vi.fn(),
     toggleStatus: vi.fn(),
   },
@@ -569,6 +570,51 @@ describe('user KeysView column settings', () => {
       },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+  })
+
+  describe('key rotation', () => {
+    it('waits for confirmation and shows the replacement once', async () => {
+      const rotate = vi.mocked(keysAPI.rotate)
+      rotate.mockReset()
+      rotate.mockResolvedValueOnce({ id: 1, key: 'sk-rotated-test-key', key_hint: 'sk-...-key' })
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'keys.rotateKey').trigger('click')
+      expect(rotate).not.toHaveBeenCalled()
+      await getButtonByText(wrapper, 'common.cancel').trigger('click')
+      expect(rotate).not.toHaveBeenCalled()
+
+      await getButtonByText(wrapper, 'keys.rotateKey').trigger('click')
+      await wrapper.get('[role="dialog"] .btn-danger').trigger('click')
+      await flushPromises()
+      expect(rotate).toHaveBeenCalledOnce()
+      expect(rotate).toHaveBeenCalledWith(1, expect.any(String))
+      expect(showSuccess).toHaveBeenCalledWith('keys.keyRotatedSuccess')
+      expect(wrapper.get('[data-testid="created-api-key"]').text()).toBe('sk-rotated-test-key')
+      expect(listKeys).toHaveBeenCalledTimes(2)
+      await wrapper.get('[data-testid="confirm-key-saved"]').setValue(true)
+      await wrapper.get('[data-testid="close-created-key"]').trigger('click')
+      expect(wrapper.find('[data-testid="created-api-key"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('reuses the operation ID on retry without displaying a replayed hint as a key', async () => {
+      const rotate = vi.mocked(keysAPI.rotate)
+      rotate.mockReset()
+      rotate.mockRejectedValueOnce(new Error('network error'))
+      rotate.mockResolvedValueOnce({ id: 1, key_hint: 'sk-...-key' })
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'keys.rotateKey').trigger('click')
+      await wrapper.get('[role="dialog"] .btn-danger').trigger('click')
+      await flushPromises()
+      expect(showError).toHaveBeenCalledWith('keys.failedToRotate')
+      await wrapper.get('[role="dialog"] .btn-danger').trigger('click')
+      await flushPromises()
+      expect(rotate).toHaveBeenCalledTimes(2)
+      expect(rotate.mock.calls[0]).toEqual(rotate.mock.calls[1])
+      expect(showSuccess).toHaveBeenCalledWith('keys.rotationReplayed')
+      expect(wrapper.find('[data-testid="created-api-key"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
   })
 
   describe('create provider selection', () => {

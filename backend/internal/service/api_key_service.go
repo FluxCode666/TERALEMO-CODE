@@ -28,6 +28,7 @@ var (
 	ErrGroupNotAllowed                = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrEnterpriseGatewayGroupRequired = infraerrors.BadRequest("ENTERPRISE_GROUP_NOT_ALLOWED", "企业成员必须绑定分组")
 	ErrAPIKeyExists                   = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
+	ErrAPIKeyRotationConflict         = infraerrors.Conflict("API_KEY_ROTATION_CONFLICT", "API key changed; refresh and try again")
 	ErrAPIKeyTooShort                 = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 32 characters")
 	ErrAPIKeyTooLong                  = infraerrors.BadRequest("API_KEY_TOO_LONG", "api key must be at most 128 characters")
 	ErrAPIKeyInvalidChars             = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
@@ -129,6 +130,15 @@ type APIKeyRepository interface {
 
 type apiKeyAllByUserIDLister interface {
 	ListAllByUserID(ctx context.Context, userID int64, filters APIKeyListFilters) ([]APIKey, error)
+}
+
+type apiKeyCredentialRotator interface {
+	RotateCredential(ctx context.Context, id, userID int64, previousHash, credential string) error
+}
+
+type APIKeyRotationResult struct {
+	Key     string
+	KeyHint string
 }
 
 // APIKeyTaskMetadata is the public identity projection used by task listings.
@@ -1069,6 +1079,33 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	}
 
 	return apiKey, nil
+}
+
+func (s *APIKeyService) Rotate(ctx context.Context, id, userID int64) (*APIKeyRotationResult, error) {
+	previousHash, ownerID, err := s.apiKeyRepo.GetKeyHashAndOwnerID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get api key: %w", err)
+	}
+	if ownerID != userID {
+		return nil, ErrAPIKeyNotFound
+	}
+	rotator, ok := s.apiKeyRepo.(apiKeyCredentialRotator)
+	if !ok {
+		return nil, infraerrors.ServiceUnavailable("API_KEY_ROTATION_UNAVAILABLE", "API key rotation is unavailable")
+	}
+	credential, err := s.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	if err := rotator.RotateCredential(ctx, id, userID, previousHash, credential); err != nil {
+		return nil, fmt.Errorf("rotate api key: %w", err)
+	}
+
+	invalidationCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	s.InvalidateAuthCacheByHash(invalidationCtx, previousHash)
+	s.InvalidateAuthCacheByHash(invalidationCtx, HashAPIKey(credential))
+	return &APIKeyRotationResult{Key: credential, KeyHint: MaskAPIKey(credential)}, nil
 }
 
 // Delete 删除API Key

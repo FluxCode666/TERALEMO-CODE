@@ -537,6 +537,7 @@ export default {
       },
       enterpriseDeposit: '企业充值',
       enterpriseDepositTitle: '企业充值 - {name}',
+      hideEnterpriseEmployees: '隐藏企业员工',
       roles: {
         admin: '管理员',
         user: '用户'

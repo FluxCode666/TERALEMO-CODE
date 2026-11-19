@@ -65,11 +65,15 @@ var (
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
-	EnterpriseID int64  // Current non-deleted enterprise membership; 0 means no filter.
-	Status       string // User status filter
-	Role         string // User role filter
-	Search       string // Search in email, username
-	GroupName    string // Filter by allowed group name (fuzzy match)
+	EnterpriseID int64 // Current non-deleted enterprise membership; 0 means no filter.
+	// HideEnterpriseEmployees 为 true 时仅保留"有效企业负责人"：存在未软删除、
+	// role=owner 且 status=active 的企业成员关系，且用户本身 status=active。
+	// 与 CountActiveOwners 的定义一致；非企业用户与非负责人均被排除。
+	HideEnterpriseEmployees bool
+	Status                  string // User status filter
+	Role                    string // User role filter
+	Search                  string // Search in email, username
+	GroupName               string // Filter by allowed group name (fuzzy match)
 	// APIKeyGroupID filters users who own at least one non-soft-deleted API key
 	// bound to this group (api_keys.group_id). 0 = no filter. Covers all three
 	// group types since it matches the key's group directly, not allowed_groups.

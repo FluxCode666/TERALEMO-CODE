@@ -111,6 +111,19 @@ export async function update(id: number, updates: UpdateApiKeyRequest): Promise<
   return data
 }
 
+export interface RotateApiKeyResult {
+  id: number
+  key_hint: string
+  key?: string
+}
+
+export async function rotate(id: number, operationId: string): Promise<RotateApiKeyResult> {
+  const { data } = await apiClient.post<RotateApiKeyResult>(`/keys/${id}/rotate`, undefined, {
+    headers: { 'Idempotency-Key': operationId }
+  })
+  return data
+}
+
 export interface BulkUpdateApiKeysResult {
   succeededIds: number[]
   failures: Array<{ id: number; error: unknown }>
@@ -162,6 +175,7 @@ export const keysAPI = {
   getById,
   create,
   update,
+  rotate,
   bulkUpdate,
   delete: deleteKey,
   toggleStatus

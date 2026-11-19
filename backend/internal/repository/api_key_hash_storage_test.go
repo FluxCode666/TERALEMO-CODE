@@ -6,8 +6,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -116,6 +118,68 @@ func TestAPIKeyServiceLegacyShortCredentialStillAuthenticates(t *testing.T) {
 	require.Equal(t, key.ID, loaded.ID)
 	require.Equal(t, "...", loaded.KeyHint)
 	require.ErrorIs(t, svc.ValidateCustomKey(credential), service.ErrAPIKeyTooShort)
+}
+
+func TestAPIKeyRotationPreservesRecordAndInvalidatesOldCredential(t *testing.T) {
+	ctx := context.Background()
+	repo, client := newAPIKeyRepoSQLite(t)
+	owner := mustCreateAPIKeyRepoUser(t, ctx, client, "rotation-owner@example.invalid")
+	other := mustCreateAPIKeyRepoUser(t, ctx, client, "rotation-other@example.invalid")
+	group, err := client.Group.Create().SetName("Rotation group").Save(ctx)
+	require.NoError(t, err)
+	expiry := time.Now().Add(time.Hour).Truncate(time.Second)
+	const oldCredential = "sk-rotate-test-legacy-0123456789abcdef"
+	key := &service.APIKey{
+		UserID: owner.ID, Name: "Rotation", Key: oldCredential, Status: service.StatusActive,
+		GroupID: &group.ID, Quota: 100, QuotaUsed: 9, ExpiresAt: &expiry, RateLimit5h: 20,
+		IPWhitelist: []string{"192.0.2.10"},
+	}
+	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, client.APIKey.UpdateOneID(key.ID).SetUsage5h(3).Exec(ctx))
+	before, err := repo.GetByID(ctx, key.ID)
+	require.NoError(t, err)
+
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	t.Cleanup(func() { _ = redisClient.Close() })
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, NewAPIKeyCache(redisClient), &config.Config{
+		APIKeyAuth: config.APIKeyAuthCacheConfig{L1Size: 32, L1TTLSeconds: 60, L2TTLSeconds: 60},
+	})
+	_, err = svc.GetByKey(ctx, oldCredential)
+	require.NoError(t, err)
+	cacheKey := apiKeyAuthCachePrefix + key.KeyHash
+	require.True(t, redisServer.Exists(cacheKey))
+	_, err = svc.Rotate(ctx, key.ID, other.ID)
+	require.ErrorIs(t, err, service.ErrAPIKeyNotFound)
+	require.True(t, redisServer.Exists(cacheKey))
+
+	rotated, err := svc.Rotate(ctx, key.ID, owner.ID)
+	require.NoError(t, err)
+	require.NotEqual(t, oldCredential, rotated.Key)
+	require.Equal(t, service.MaskAPIKey(rotated.Key), rotated.KeyHint)
+	require.False(t, redisServer.Exists(cacheKey))
+	_, err = svc.GetByKey(ctx, oldCredential)
+	require.ErrorIs(t, err, service.ErrAPIKeyNotFound)
+	active, err := svc.GetByKey(ctx, rotated.Key)
+	require.NoError(t, err)
+	require.Equal(t, key.ID, active.ID)
+
+	after, err := repo.GetByID(ctx, key.ID)
+	require.NoError(t, err)
+	require.Empty(t, after.Key)
+	require.Equal(t, service.HashAPIKey(rotated.Key), after.KeyHash)
+	require.Equal(t, rotated.KeyHint, after.KeyHint)
+	before.Key, before.KeyHash, before.KeyHint, before.UpdatedAt = after.Key, after.KeyHash, after.KeyHint, after.UpdatedAt
+	require.Equal(t, before, after)
+
+	err = repo.RotateCredential(ctx, key.ID, owner.ID, key.KeyHash, "unused-after-stale-write")
+	require.ErrorIs(t, err, service.ErrAPIKeyRotationConflict)
+	require.NoError(t, client.APIKey.UpdateOneID(key.ID).SetDeletedAt(time.Now()).Exec(ctx))
+	_, err = svc.Rotate(ctx, key.ID, owner.ID)
+	require.ErrorIs(t, err, service.ErrAPIKeyNotFound)
+	count, err := client.APIKey.Query().Where(apikey.IDEQ(key.ID)).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
 }
 
 func TestAPIKeyRepositoryPostgresHashAuthenticationSmoke(t *testing.T) {
