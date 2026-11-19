@@ -1000,7 +1000,7 @@ func (r *accountRepository) Delete(ctx context.Context, id int64) error {
 }
 
 func (r *accountRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.Account, *pagination.PaginationResult, error) {
-	return r.ListWithFilters(ctx, params, "", "", "", "", 0, "")
+	return r.ListWithFilters(ctx, params, "", "", "", "", 0, "", "")
 }
 
 func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode string) *dbent.AccountQuery {
@@ -1099,8 +1099,12 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 	return q
 }
 
-func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode, model string) ([]service.Account, *pagination.PaginationResult, error) {
 	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
+	model = strings.TrimSpace(model)
+	if model != "" {
+		return r.listWithFiltersByModel(ctx, q, params, model)
+	}
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's
 	// deleted_at IS NULL) don't accumulate on the shared builder and pollute the
 	// subsequent list query. Same pattern used in group_repo/promo_code_repo/user_repo
@@ -1127,6 +1131,40 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 		return nil, nil, err
 	}
 	return outAccounts, paginationResultFromTotal(int64(total), params), nil
+}
+
+// listWithFiltersByModel 在既有筛选与排序之上按账号的模型支持语义过滤后再分页。
+// 模型支持依赖 model_mapping 通配符、平台默认目录与 OpenAI 透传例外，无法在 SQL 中
+// 精确表达，因此先按同一 SQL 顺序取出候选账号做 Go 过滤（纯本地数据，不访问上游），
+// 再按排序结果切出当前页并为该页批量补齐分组/代理。
+func (r *accountRepository) listWithFiltersByModel(ctx context.Context, q *dbent.AccountQuery, params pagination.PaginationParams, model string) ([]service.Account, *pagination.PaginationResult, error) {
+	candidatesQuery := q
+	for _, order := range accountListOrder(params) {
+		candidatesQuery = candidatesQuery.Order(order)
+	}
+	candidates, err := candidatesQuery.All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	matched := make([]*dbent.Account, 0, len(candidates))
+	for _, candidate := range candidates {
+		account := accountEntityToService(candidate)
+		if account != nil && account.IsModelSupported(model) {
+			matched = append(matched, candidate)
+		}
+	}
+
+	result := paginationResultFromTotal(int64(len(matched)), params)
+	pageRows := paginateSlice(matched, params)
+	if len(pageRows) == 0 {
+		return []service.Account{}, result, nil
+	}
+	outAccounts, err := r.accountsToService(ctx, pageRows)
+	if err != nil {
+		return nil, nil, err
+	}
+	return outAccounts, result, nil
 }
 
 func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {

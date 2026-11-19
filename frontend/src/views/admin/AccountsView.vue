@@ -589,6 +589,7 @@ type AccountBulkEditTarget =
         group?: string
         search?: string
         privacy_mode?: string
+        model?: string
         sort_by?: string
         sort_order?: AccountSortOrder
       }
@@ -1234,6 +1235,7 @@ const buildUpstreamBillingRateFilters = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    model: typeof rawParams.model === 'string' ? rawParams.model : '',
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order
   }
@@ -1518,6 +1520,7 @@ const refreshAccountsIncrementally = async () => {
         privacy_mode?: string
         group?: string
         search?: string
+        model?: string
         sort_by?: string
         sort_order?: AccountSortOrder
 
@@ -2136,6 +2139,7 @@ const buildBulkEditFilterSnapshot = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    model: typeof rawParams.model === 'string' ? rawParams.model : '',
     sort_by: typeof rawParams.sort_by === 'string' ? rawParams.sort_by : '',
     sort_order: sortOrder
   }
@@ -2216,6 +2220,7 @@ const buildAccountQueryFilters = () => ({
   status: params.status || '',
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
+  model: params.model || '',
   search: params.search || '',
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
@@ -2261,6 +2266,8 @@ const accountMatchesCurrentFilters = (account: Account) => {
   }
   const search = String(filters.search || '').trim().toLowerCase()
   if (search && !account.name.toLowerCase().includes(search)) return false
+  // 模型支持依赖账号 model_mapping 的通配符与平台默认目录，服务端才是权威判定；
+  // 本地补丁无法安全推断，保留行等下一次列表刷新（避免误删仍有模型的账号）。
   return true
 }
 const mergeRuntimeFields = (oldAccount: Account, updatedAccount: Account): Account => ({

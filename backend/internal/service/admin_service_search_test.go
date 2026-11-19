@@ -13,23 +13,25 @@ import (
 type accountRepoStubForAdminList struct {
 	accountRepoStub
 
-	listWithFiltersCalls    int
-	listWithFiltersParams   pagination.PaginationParams
-	listWithFiltersPlatform string
-	listWithFiltersType     string
-	listWithFiltersStatus   string
-	listWithFiltersSearch   string
-	listWithFiltersPrivacy  string
-	listWithFiltersAccounts []Account
-	listWithFiltersResult   *pagination.PaginationResult
-	listWithFiltersErr      error
+	listWithFiltersCalls       int
+	listWithFiltersParams      pagination.PaginationParams
+	listWithFiltersPlatform    string
+	listWithFiltersType        string
+	listWithFiltersStatus      string
+	listWithFiltersSearch      string
+	listWithFiltersPrivacy     string
+	listWithFiltersModel       string
+	listWithFiltersAccounts    []Account
+	listWithFiltersResult      *pagination.PaginationResult
+	listWithFiltersErr         error
+	listAllWithFiltersAccounts []Account
 }
 
 func (s *accountRepoStubForAdminList) ListAllWithFilters(context.Context, string, string, string, string, int64, string) ([]Account, error) {
-	return nil, nil
+	return s.listAllWithFiltersAccounts, nil
 }
 
-func (s *accountRepoStubForAdminList) ListWithFilters(_ context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
+func (s *accountRepoStubForAdminList) ListWithFilters(_ context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode, model string) ([]Account, *pagination.PaginationResult, error) {
 	s.listWithFiltersCalls++
 	s.listWithFiltersParams = params
 	s.listWithFiltersPlatform = platform
@@ -37,6 +39,7 @@ func (s *accountRepoStubForAdminList) ListWithFilters(_ context.Context, params 
 	s.listWithFiltersStatus = status
 	s.listWithFiltersSearch = search
 	s.listWithFiltersPrivacy = privacyMode
+	s.listWithFiltersModel = model
 
 	if s.listWithFiltersErr != nil {
 		return nil, nil, s.listWithFiltersErr
@@ -174,7 +177,7 @@ func TestAdminService_ListAccounts_WithSearch(t *testing.T) {
 		}
 		svc := &adminServiceImpl{accountRepo: repo}
 
-		accounts, total, err := svc.ListAccounts(context.Background(), 1, 20, PlatformGemini, AccountTypeOAuth, StatusActive, "acc", 0, "", "name", "ASC")
+		accounts, total, err := svc.ListAccounts(context.Background(), 1, 20, PlatformGemini, AccountTypeOAuth, StatusActive, "acc", 0, "", "", "name", "ASC")
 		require.NoError(t, err)
 		require.Equal(t, int64(10), total)
 		require.Equal(t, []Account{{ID: 1, Name: "acc"}}, accounts)
@@ -196,7 +199,7 @@ func TestAdminService_ListAccounts_WithPrivacyMode(t *testing.T) {
 		}
 		svc := &adminServiceImpl{accountRepo: repo}
 
-		accounts, total, err := svc.ListAccounts(context.Background(), 1, 20, PlatformOpenAI, AccountTypeOAuth, StatusActive, "acc2", 0, PrivacyModeCFBlocked, "", "")
+		accounts, total, err := svc.ListAccounts(context.Background(), 1, 20, PlatformOpenAI, AccountTypeOAuth, StatusActive, "acc2", 0, PrivacyModeCFBlocked, "", "", "")
 		require.NoError(t, err)
 		require.Equal(t, int64(1), total)
 		require.Equal(t, []Account{{ID: 2, Name: "acc2"}}, accounts)
@@ -265,4 +268,96 @@ func TestAdminService_ListRedeemCodes_WithSearch(t *testing.T) {
 		require.Equal(t, StatusUnused, repo.listWithFiltersStatus)
 		require.Equal(t, "ABC", repo.listWithFiltersSearch)
 	})
+}
+
+func TestAdminService_ListAccounts_WithModelFilter(t *testing.T) {
+	t.Run("model 参数正常传递到 repository 层且不改变分页", func(t *testing.T) {
+		repo := &accountRepoStubForAdminList{
+			listWithFiltersAccounts: []Account{{ID: 3, Name: "model-acc"}},
+			listWithFiltersResult:   &pagination.PaginationResult{Total: 1},
+		}
+		svc := &adminServiceImpl{accountRepo: repo}
+
+		accounts, total, err := svc.ListAccounts(context.Background(), 2, 20, PlatformAnthropic, AccountTypeAPIKey, StatusActive, "", 0, "", "claude-opus-5", "name", "asc")
+		require.NoError(t, err)
+		require.Equal(t, int64(1), total)
+		require.Equal(t, []Account{{ID: 3, Name: "model-acc"}}, accounts)
+		require.Equal(t, "claude-opus-5", repo.listWithFiltersModel)
+		require.Equal(t, pagination.PaginationParams{Page: 2, PageSize: 20, SortBy: "name", SortOrder: "asc"}, repo.listWithFiltersParams)
+	})
+
+	t.Run("空 model 保持原有列表语义", func(t *testing.T) {
+		repo := &accountRepoStubForAdminList{
+			listWithFiltersAccounts: []Account{{ID: 4, Name: "all-acc"}},
+			listWithFiltersResult:   &pagination.PaginationResult{Total: 1},
+		}
+		svc := &adminServiceImpl{accountRepo: repo}
+
+		_, _, err := svc.ListAccounts(context.Background(), 1, 20, "", "", "", "", 0, "", "", "", "")
+		require.NoError(t, err)
+		require.Empty(t, repo.listWithFiltersModel)
+	})
+}
+
+func TestAdminService_ListAccountsForSchedulerScoreFilter_AppliesModelSupportSemantics(t *testing.T) {
+	mapped := Account{
+		ID:       1,
+		Platform: PlatformAnthropic,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{"claude-opus-5": "upstream-opus"},
+		},
+	}
+	wildcard := Account{
+		ID:       2,
+		Platform: PlatformAnthropic,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{"claude-*": "upstream-claude"},
+		},
+	}
+	unmapped := Account{
+		ID:       3,
+		Platform: PlatformGemini,
+		Type:     AccountTypeOAuth,
+	}
+	repo := &accountRepoStubForAdminList{listAllWithFiltersAccounts: []Account{mapped, wildcard, unmapped}}
+	svc := &adminServiceImpl{accountRepo: repo}
+
+	got, err := svc.ListAccountsForSchedulerScoreFilter(context.Background(), PlatformOpenAI, "", "", "", 0, "", "claude-opus-5")
+	require.NoError(t, err)
+	require.Equal(t, []int64{1, 2, 3}, filteredAccountIDs(got), "mapped、通配符与无映射账号都应命中")
+
+	got, err = svc.ListAccountsForSchedulerScoreFilter(context.Background(), PlatformOpenAI, "", "", "", 0, "", "gemini-2.5-pro")
+	require.NoError(t, err)
+	require.Equal(t, []int64{3}, filteredAccountIDs(got), "已有映射的账号不应因目录外模型被误选")
+
+	got, err = svc.ListAccountsForSchedulerScoreFilter(context.Background(), PlatformOpenAI, "", "", "", 0, "", "")
+	require.NoError(t, err)
+	require.Equal(t, []int64{1, 2, 3}, filteredAccountIDs(got), "空模型保持全部账号")
+}
+
+func filteredAccountIDs(accounts []Account) []int64 {
+	ids := make([]int64, 0, len(accounts))
+	for i := range accounts {
+		ids = append(ids, accounts[i].ID)
+	}
+	return ids
+}
+
+func TestAdminService_ResolveBulkUpdateTargetIDs_AppliesModelFilter(t *testing.T) {
+	repo := &accountRepoStubForAdminList{
+		listWithFiltersAccounts: []Account{{ID: 11}, {ID: 12}},
+		listWithFiltersResult:   &pagination.PaginationResult{Total: 2},
+	}
+	svc := &adminServiceImpl{accountRepo: repo}
+
+	ids, err := svc.resolveBulkUpdateTargetIDs(context.Background(), &BulkUpdateAccountFilters{
+		Platform: PlatformAnthropic,
+		Model:    "claude-opus-5",
+	})
+	require.NoError(t, err)
+	require.Equal(t, []int64{11, 12}, ids)
+	require.Equal(t, "claude-opus-5", repo.listWithFiltersModel)
+	require.Equal(t, PlatformAnthropic, repo.listWithFiltersPlatform)
 }

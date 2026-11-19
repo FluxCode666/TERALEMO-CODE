@@ -405,3 +405,56 @@ func TestAccountHandlerListSchedulerScoreIgnoresPagination(t *testing.T) {
 	require.Less(t, payload.Data.Items[0].SchedulerScore.BaseScore, 3.75)
 	require.Empty(t, payload.Data.Items[0].SchedulerScores)
 }
+
+func TestAccountHandlerListFiltersByModelAndScopesETag(t *testing.T) {
+	router, adminSvc := setupAccountListRouter()
+	adminSvc.accounts = []service.Account{{
+		ID:       901,
+		Name:     "model-filtered",
+		Platform: service.PlatformAnthropic,
+		Type:     service.AccountTypeAPIKey,
+		Status:   service.StatusActive,
+	}}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20&lite=1&model=%20claude-opus-5%20", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "claude-opus-5", adminSvc.lastListAccounts.model, "模型参数应去空格后传给服务层")
+	modelETag := rec.Header().Get("ETag")
+	require.NotEmpty(t, modelETag)
+
+	// 同一份账号数据在不同模型筛选下必须有不同的表示标识，避免缓存串用筛选结果。
+	recUnfiltered := httptest.NewRecorder()
+	router.ServeHTTP(recUnfiltered, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20&lite=1", nil))
+	require.Equal(t, http.StatusOK, recUnfiltered.Code)
+	require.Empty(t, adminSvc.lastListAccounts.model)
+	require.NotEqual(t, modelETag, recUnfiltered.Header().Get("ETag"))
+
+	rec304 := httptest.NewRecorder()
+	req304 := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20&lite=1&model=claude-opus-5", nil)
+	req304.Header.Set("If-None-Match", modelETag)
+	router.ServeHTTP(rec304, req304)
+	require.Equal(t, http.StatusNotModified, rec304.Code)
+}
+
+func TestAccountHandlerListModelFilterScopesSchedulerScorePool(t *testing.T) {
+	router, adminSvc := setupAccountListRouter()
+	adminSvc.accounts = []service.Account{{
+		ID:          902,
+		Name:        "openai-model-filtered",
+		Platform:    service.PlatformOpenAI,
+		Type:        service.AccountTypeAPIKey,
+		Status:      service.StatusActive,
+		Schedulable: true,
+		Concurrency: 10,
+	}}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20&include_scheduler_score=1&model=gpt-5.6", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "gpt-5.6", adminSvc.lastListAccounts.model)
+}

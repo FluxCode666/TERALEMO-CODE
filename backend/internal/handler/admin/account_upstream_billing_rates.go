@@ -44,6 +44,7 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 		search = search[:100]
 	}
 	privacyMode := strings.TrimSpace(c.Query("privacy_mode"))
+	modelFilter := strings.TrimSpace(c.Query("model"))
 	sortBy := c.DefaultQuery("sort_by", "name")
 	sortOrder := c.DefaultQuery("sort_order", "asc")
 
@@ -61,9 +62,13 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 		}
 	}
 
+	if len(modelFilter) > 100 {
+		modelFilter = modelFilter[:100]
+	}
+
 	accounts, total, err := h.adminService.ListAccounts(
 		c.Request.Context(), page, pageSize, platform, accountType, status,
-		search, groupID, privacyMode, sortBy, sortOrder,
+		search, groupID, privacyMode, modelFilter, sortBy, sortOrder,
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)
