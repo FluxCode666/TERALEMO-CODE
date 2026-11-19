@@ -124,6 +124,7 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
 //   - api_key_group_id: filter by the exact group bound to the user's API keys
+//   - hide_enterprise_employees: when true, only list active enterprise owners
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
@@ -154,6 +155,7 @@ func (h *UserHandler) List(c *gin.Context) {
 		}
 		filters.EnterpriseID = id
 	}
+	filters.HideEnterpriseEmployees = parseBoolQueryWithDefault(c.Query("hide_enterprise_employees"), false)
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if raw, ok := c.GetQuery("include_subscriptions"); ok {

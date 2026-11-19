@@ -72,6 +72,19 @@
               />
             </div>
 
+            <!-- Hide Enterprise Employees Toggle -->
+            <div class="flex items-center gap-2">
+              <Toggle
+                :model-value="hideEnterpriseEmployees"
+                data-test="hide-enterprise-employees"
+                :aria-label="t('admin.users.hideEnterpriseEmployees')"
+                @update:model-value="setHideEnterpriseEmployees"
+              />
+              <span class="whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                {{ t('admin.users.hideEnterpriseEmployees') }}
+              </span>
+            </div>
+
             <!-- Dynamic Attribute Filters -->
             <template v-for="(value, attrId) in activeAttributeFilters" :key="attrId">
               <div
@@ -853,6 +866,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import { buildApiKeyGroupFilterOptions } from './apiKeyGroupFilterOptions'
 import UserAttributesConfigModal from '@/components/user/UserAttributesConfigModal.vue'
 import UserConcurrencyCell from '@/components/user/UserConcurrencyCell.vue'
@@ -1172,6 +1186,14 @@ const filters = reactive({
   group: '',  // group name for fuzzy match, '' = all
   apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
 })
+
+// 「隐藏企业员工」开关：默认关闭且不持久化，开启后仅展示有效企业负责人(owner)
+const hideEnterpriseEmployees = ref(false)
+const setHideEnterpriseEmployees = (value: boolean) => {
+  hideEnterpriseEmployees.value = value
+  pagination.page = 1
+  loadUsers()
+}
 const activeAttributeFilters = reactive<Record<number, string>>({})
 
 // Visible filters tracking (which filters are shown in the UI)
@@ -1646,6 +1668,7 @@ const loadUsers = async () => {
         search: searchQuery.value || undefined,
         group_name: filters.group || undefined,
         api_key_group_id: filters.apiKeyGroup ?? undefined,
+        hide_enterprise_employees: hideEnterpriseEmployees.value || undefined,
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
         // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
         include_subscriptions: true,

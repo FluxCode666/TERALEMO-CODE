@@ -651,6 +651,7 @@ export default {
       },
       enterpriseDeposit: 'Top up',
       enterpriseDepositTitle: 'Enterprise top-up - {name}',
+      hideEnterpriseEmployees: 'Hide enterprise employees',
       roles: {
         admin: 'Admin',
         user: 'User'

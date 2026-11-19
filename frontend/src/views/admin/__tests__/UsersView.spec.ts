@@ -572,4 +572,40 @@ describe('admin UsersView', () => {
     expect(wrapper.find('[data-test="bulk-edit-limits"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="selected-keys"]').text()).toBe('')
   })
+
+  it('hide enterprise employees toggle defaults off, filters from page one, and restores on disable', async () => {
+    listUsers.mockImplementation(async (page: number) => ({
+      items: [createAdminUser()],
+      total: 2, page, page_size: 20, pages: 2
+    }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+
+    // 默认关闭：首次请求不携带开关
+    expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('false')
+    expect(listUsers.mock.lastCall?.[2].hide_enterprise_employees).toBeUndefined()
+
+    // 先到第 2 页，再开启开关：必须回到第 1 页并携带 true
+    await wrapper.get('[data-test="next-page"]').trigger('click')
+    await flushPromises()
+    expect(listUsers.mock.lastCall?.[0]).toBe(2)
+
+    await wrapper.get('[data-test="hide-enterprise-employees"]').trigger('click')
+    await flushPromises()
+    expect(listUsers.mock.lastCall?.[0]).toBe(1)
+    expect(listUsers.mock.lastCall?.[2].hide_enterprise_employees).toBe(true)
+    expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('true')
+
+    // 开关不写入 localStorage，保证下次进入页面仍默认关闭
+    const savedFilters = JSON.parse(localStorage.getItem('user-filter-values') ?? '{}')
+    expect(savedFilters).not.toHaveProperty('hideEnterpriseEmployees')
+
+    // 关闭开关恢复完整列表请求
+    await wrapper.get('[data-test="hide-enterprise-employees"]').trigger('click')
+    await flushPromises()
+    expect(listUsers.mock.lastCall?.[0]).toBe(1)
+    expect(listUsers.mock.lastCall?.[2].hide_enterprise_employees).toBeUndefined()
+    expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('false')
+    wrapper.unmount()
+  })
 })
