@@ -409,6 +409,14 @@
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
+              <button
+                type="button"
+                @click="confirmRotate(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-yellow-50 hover:text-yellow-600 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400"
+              >
+                <Icon name="refresh" size="sm" />
+                <span class="text-xs">{{ t('keys.rotateKey') }}</span>
+              </button>
               <!-- Delete Button -->
               <button
                 @click="confirmDelete(row)"
@@ -1011,6 +1019,20 @@
       @updated="handleBulkUpdated"
     />
 
+    <BaseDialog :show="!!rotationTarget" :title="t('keys.rotateTitle')" width="narrow" @close="cancelRotation">
+      <p class="break-words text-sm text-gray-600 dark:text-gray-400">
+        {{ t('keys.rotateConfirmMessage', { name: rotationTarget?.name }) }}
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button type="button" class="btn btn-secondary" :disabled="rotating" @click="cancelRotation">{{ t('common.cancel') }}</button>
+          <button type="button" class="btn btn-danger" :disabled="rotating" @click="handleRotate">
+            {{ rotating ? t('common.processing') : t('keys.rotateKey') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
       :show="showDeleteDialog"
@@ -1384,6 +1406,8 @@ const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
+const rotationTarget = ref<{ id: number; name: string; operationId: string } | null>(null)
+const rotating = ref(false)
 const createdKey = ref('')
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1766,6 +1790,42 @@ const closeGroupSelector = (event: MouseEvent) => {
 const confirmDelete = (key: ApiKey) => {
   selectedKey.value = key
   showDeleteDialog.value = true
+}
+
+const confirmRotate = (key: ApiKey) => {
+  const operationId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  rotationTarget.value = { id: key.id, name: key.name, operationId }
+}
+
+const cancelRotation = () => {
+  if (!rotating.value) rotationTarget.value = null
+}
+
+const handleRotate = async () => {
+  const target = rotationTarget.value
+  if (!target || rotating.value) return
+  rotating.value = true
+  try {
+    const result = await keysAPI.rotate(target.id, target.operationId)
+    rotationTarget.value = null
+    if (result.key && result.key !== result.key_hint) {
+      createdKey.value = result.key
+      appStore.showSuccess(t('keys.keyRotatedSuccess'))
+    } else {
+      appStore.showSuccess(t('keys.rotationReplayed'))
+    }
+    void loadApiKeys()
+  } catch (error: unknown) {
+    if ((error as { reason?: string } | null)?.reason === 'API_KEY_ROTATION_CONFLICT') {
+      rotationTarget.value = null
+      void loadApiKeys()
+      appStore.showError(t('keys.rotationConflict'))
+    } else {
+      appStore.showError(t('keys.failedToRotate'))
+    }
+  } finally {
+    rotating.value = false
+  }
 }
 
 const handleSubmit = async () => {

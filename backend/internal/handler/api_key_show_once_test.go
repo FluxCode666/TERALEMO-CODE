@@ -42,6 +42,27 @@ func (r *showOnceAPIKeyRepository) GetByID(_ context.Context, id int64) (*servic
 	return key, nil
 }
 
+func (r *showOnceAPIKeyRepository) GetKeyHashAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
+	key, err := r.GetByID(ctx, id)
+	if err != nil {
+		return "", 0, err
+	}
+	return key.KeyHash, key.UserID, nil
+}
+
+func (r *showOnceAPIKeyRepository) RotateCredential(ctx context.Context, id, userID int64, previousHash, credential string) error {
+	key, err := r.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if key.UserID != userID || key.KeyHash != previousHash {
+		return service.ErrAPIKeyRotationConflict
+	}
+	key.KeyHash = service.HashAPIKey(credential)
+	key.KeyHint = service.MaskAPIKey(credential)
+	return nil
+}
+
 func (r *showOnceAPIKeyRepository) ExistsByKey(_ context.Context, credential string) (bool, error) {
 	for _, key := range r.keys {
 		if key.KeyHash == service.HashAPIKey(credential) {
@@ -84,7 +105,42 @@ func newShowOnceAPIKeyRouter(t *testing.T, coordinator *service.IdempotencyCoord
 	router.POST("/api/v1/api-keys", handler.Create)
 	router.GET("/api/v1/api-keys", handler.List)
 	router.GET("/api/v1/api-keys/:id", handler.GetByID)
+	router.POST("/api/v1/keys/:id/rotate", handler.Rotate)
 	return router, repo
+}
+
+func TestAPIKeyRotationShowsCredentialOnce(t *testing.T) {
+	store := newUserMemoryIdempotencyRepoStub()
+	coordinator := service.NewIdempotencyCoordinator(store, service.DefaultIdempotencyConfig())
+	router, repo := newShowOnceAPIKeyRouter(t, coordinator)
+	created := showOnceAPIKeyRequest(router, http.MethodPost, "/api/v1/api-keys", `{"name":"rotate-once"}`, "create-key")
+	require.Equal(t, http.StatusOK, created.Code, created.Body.String())
+	oldKey := gjson.GetBytes(created.Body.Bytes(), "data.key").String()
+	path := "/api/v1/keys/1/rotate"
+	missingHeader := showOnceAPIKeyRequest(router, http.MethodPost, path, "", "")
+	require.Equal(t, http.StatusBadRequest, missingHeader.Code, missingHeader.Body.String())
+	require.Equal(t, service.HashAPIKey(oldKey), repo.keys[1].KeyHash)
+	rotated := showOnceAPIKeyRequest(router, http.MethodPost, path, "", "rotate-key")
+	require.Equal(t, http.StatusOK, rotated.Code, rotated.Body.String())
+	require.Equal(t, "no-store", rotated.Header().Get("Cache-Control"))
+	credential := gjson.GetBytes(rotated.Body.Bytes(), "data.key").String()
+	require.NotEmpty(t, credential)
+	require.NotEqual(t, oldKey, credential)
+	hint := service.MaskAPIKey(credential)
+	require.Equal(t, hint, gjson.GetBytes(rotated.Body.Bytes(), "data.key_hint").String())
+	for _, record := range store.data {
+		require.NotNil(t, record.ResponseBody)
+		require.NotContains(t, *record.ResponseBody, credential)
+		require.NotContains(t, *record.ResponseBody, service.HashAPIKey(credential))
+	}
+	replayed := showOnceAPIKeyRequest(router, http.MethodPost, path, "", "rotate-key")
+	require.Equal(t, http.StatusOK, replayed.Code, replayed.Body.String())
+	require.Equal(t, "true", replayed.Header().Get("X-Idempotency-Replayed"))
+	require.Equal(t, "no-store", replayed.Header().Get("Cache-Control"))
+	require.False(t, gjson.GetBytes(replayed.Body.Bytes(), "data.key").Exists())
+	require.Equal(t, hint, gjson.GetBytes(replayed.Body.Bytes(), "data.key_hint").String())
+	require.Equal(t, service.HashAPIKey(credential), repo.keys[1].KeyHash)
+	requireShowOnceReadResponses(t, router, credential, hint)
 }
 
 func showOnceAPIKeyRequest(router *gin.Engine, method, path, body, idempotencyKey string) *httptest.ResponseRecorder {

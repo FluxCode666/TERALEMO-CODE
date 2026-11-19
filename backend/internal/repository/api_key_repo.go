@@ -403,6 +403,23 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 	return nil
 }
 
+func (r *apiKeyRepository) RotateCredential(ctx context.Context, id, userID int64, previousHash, credential string) error {
+	affected, err := clientFromContext(ctx, r.client).APIKey.Update().
+		Where(apikey.IDEQ(id), apikey.UserIDEQ(userID), apikey.KeyHashEQ(previousHash), apikey.DeletedAtIsNil()).
+		ClearKey().
+		SetKeyHash(service.HashAPIKey(credential)).
+		SetKeyHint(service.MaskAPIKey(credential)).
+		SetUpdatedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
+	}
+	if affected == 0 {
+		return service.ErrAPIKeyRotationConflict
+	}
+	return nil
+}
+
 func (r *apiKeyRepository) Delete(ctx context.Context, id int64) error {
 	// 存在唯一键约束 生成tombstone key 用来释放原key，长度远小于 128，满足 schema 限制
 	tombstoneKey := fmt.Sprintf("__deleted__%d__%d", id, time.Now().UnixNano())

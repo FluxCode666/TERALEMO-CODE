@@ -313,6 +313,45 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	response.Success(c, dto.APIKeyFromService(key).Localized(c.GetHeader("Accept-Language")))
 }
 
+// Rotate handles POST /api/v1/keys/:id/rotate.
+func (h *APIKeyHandler) Rotate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	keyID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || keyID <= 0 {
+		response.BadRequest(c, "Invalid key ID")
+		return
+	}
+
+	c.Header("Cache-Control", "no-store")
+	operationID, err := service.NormalizeIdempotencyKey(c.GetHeader("Idempotency-Key"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if operationID == "" {
+		response.ErrorFrom(c, service.ErrIdempotencyKeyRequired)
+		return
+	}
+	var credential string
+	executeUserIdempotentJSONWithTimeout(c, "user.api_keys.rotate", gin.H{"id": keyID}, service.DefaultWriteIdempotencyTTL(), 10*time.Second, func(ctx context.Context) (any, error) {
+		result, err := h.apiKeyService.Rotate(ctx, keyID, subject.UserID)
+		if err != nil {
+			return nil, err
+		}
+		credential = result.Key
+		return gin.H{"id": keyID, "key_hint": result.KeyHint}, nil
+	}, func(data any) any {
+		if result, ok := data.(gin.H); ok && credential != "" {
+			return gin.H{"id": result["id"], "key_hint": result["key_hint"], "key": credential}
+		}
+		return data
+	})
+}
+
 // Delete handles deleting an API key
 // DELETE /api/v1/api-keys/:id
 func (h *APIKeyHandler) Delete(c *gin.Context) {
