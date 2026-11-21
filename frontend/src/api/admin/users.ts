@@ -73,7 +73,7 @@ export async function list(
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     enterprise_id?: number
-    hide_enterprise_employees?: boolean  // true = only active enterprise owners
+    hide_enterprise_employees?: boolean  // true = hide enterprise members except active owners; non-enterprise users stay
     api_key_group_id?: number   // filter users by the group their API keys are bound to
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean

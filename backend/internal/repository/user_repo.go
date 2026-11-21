@@ -544,17 +544,24 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	}
 
 	if filters.HideEnterpriseEmployees {
-		// 与 CountActiveOwners 的"有效负责人"定义一致：成员关系未软删除、
-		// role=owner、成员状态 active，且用户本身 active（未删除用户由软删除
-		// 拦截器保证）。在 Count/分页之前过滤，保证 total 与结果集一致。
-		q = q.Where(dbuser.StatusEQ(service.StatusActive))
+		// 只隐藏企业员工，非企业用户照常展示：保留"没有未软删除企业成员关系"的用户，
+		// 以及"有效负责人"（与 CountActiveOwners 一致：成员关系未软删除、role=owner、
+		// 成员状态 active，且用户本身 active）。用户 active 条件只约束企业负责人，
+		// 不影响非企业用户。在 Count/分页之前过滤，保证 total 与结果集一致。
 		q = q.Where(func(s *entsql.Selector) {
 			members := entsql.Table("enterprise_members")
-			s.Where(entsql.Exists(entsql.Select(members.C("user_id")).From(members).
-				Where(entsql.And(entsql.ColumnsEQ(members.C("user_id"), s.C("id")),
+			anyMembership := entsql.Select(members.C("user_id")).From(members).
+				Where(entsql.And(entsql.ColumnsEQ(members.C("user_id"), s.C(dbuser.FieldID)),
+					entsql.IsNull(members.C("deleted_at"))))
+			activeOwner := entsql.Select(members.C("user_id")).From(members).
+				Where(entsql.And(entsql.ColumnsEQ(members.C("user_id"), s.C(dbuser.FieldID)),
 					entsql.EQ(members.C("role"), service.EnterpriseRoleOwner),
 					entsql.EQ(members.C("status"), service.EnterpriseMemberStatusActive),
-					entsql.IsNull(members.C("deleted_at"))))))
+					entsql.IsNull(members.C("deleted_at"))))
+			s.Where(entsql.Or(
+				entsql.Not(entsql.Exists(anyMembership)),
+				entsql.And(entsql.EQ(s.C(dbuser.FieldStatus), service.StatusActive), entsql.Exists(activeOwner)),
+			))
 		})
 	}
 

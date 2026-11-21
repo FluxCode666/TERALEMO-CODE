@@ -14,8 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 开关语义与 CountActiveOwners 的"有效负责人"一致：成员关系未软删除、
-// role=owner、成员状态 active，且用户本身 active。非企业用户与非负责人均不显示。
+// 开关只隐藏企业员工：企业用户中仅保留与 CountActiveOwners 一致的"有效负责人"
+// （成员关系未软删除、role=owner、成员状态 active，且用户本身 active）；
+// 非企业用户（含已退出企业、被禁用的用户）不受影响，照常显示。
 func TestUserListHideEnterpriseEmployees(t *testing.T) {
 	tx := testEntTx(t)
 	ctx := dbent.NewTxContext(context.Background(), tx)
@@ -49,6 +50,11 @@ func TestUserListHideEnterpriseEmployees(t *testing.T) {
 		Email:    fmt.Sprintf("hide-emp-plain-%d@example.com", time.Now().UnixNano()),
 		Username: "hide-emp-plain",
 	})
+	disabledPlain := mustCreateUser(t, client, &service.User{
+		Email:    fmt.Sprintf("hide-emp-plain-disabled-%d@example.com", time.Now().UnixNano()),
+		Username: "hide-emp-plain-disabled",
+		Status:   service.StatusDisabled,
+	})
 
 	repo := newUserRepositoryWithSQL(client, client)
 	ids := func(users []service.User) []int64 {
@@ -78,18 +84,23 @@ func TestUserListHideEnterpriseEmployees(t *testing.T) {
 		}, ids(users))
 	})
 
-	t.Run("global filter excludes non owners and non enterprise users", func(t *testing.T) {
-		users, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 100},
-			service.UserListFilters{HideEnterpriseEmployees: true})
+	t.Run("global filter hides employees but keeps non enterprise users", func(t *testing.T) {
+		users, page, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 100},
+			service.UserListFilters{Search: "hide-emp", HideEnterpriseEmployees: true})
 		require.NoError(t, err)
-		got := ids(users)
-		require.Subset(t, got, []int64{owner.UserID, secondOwner.UserID, otherOwner.UserID})
-		for _, excluded := range []int64{
-			employee.UserID, manager.UserID, disabledMemberOwner.UserID,
-			deletedOwner.UserID, disabledUserOwner.UserID, plain.ID,
-		} {
-			require.NotContains(t, got, excluded)
-		}
+		// 已退出企业（成员关系软删除）的用户视为非企业用户，照常显示。
+		require.ElementsMatch(t, []int64{
+			owner.UserID, secondOwner.UserID, otherOwner.UserID,
+			plain.ID, disabledPlain.ID, deletedOwner.UserID,
+		}, ids(users))
+		require.EqualValues(t, 6, page.Total)
+	})
+
+	t.Run("combines with status filter for non enterprise users", func(t *testing.T) {
+		users, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 100},
+			service.UserListFilters{Search: "hide-emp", Status: service.StatusDisabled, HideEnterpriseEmployees: true})
+		require.NoError(t, err)
+		require.Equal(t, []int64{disabledPlain.ID}, ids(users))
 	})
 
 	t.Run("filters before pagination and count", func(t *testing.T) {
