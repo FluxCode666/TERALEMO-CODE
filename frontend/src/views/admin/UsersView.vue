@@ -1187,7 +1187,7 @@ const filters = reactive({
   apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
 })
 
-// 「隐藏企业员工」开关：默认关闭且不持久化，开启后仅展示有效企业负责人(owner)
+// 「隐藏企业员工」开关：默认关闭且不持久化，开启后隐藏企业员工（企业内仅保留有效负责人 owner），非企业用户照常展示
 const hideEnterpriseEmployees = ref(false)
 const setHideEnterpriseEmployees = (value: boolean) => {
   hideEnterpriseEmployees.value = value

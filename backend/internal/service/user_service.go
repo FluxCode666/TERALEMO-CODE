@@ -66,9 +66,9 @@ var (
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
 	EnterpriseID int64 // Current non-deleted enterprise membership; 0 means no filter.
-	// HideEnterpriseEmployees 为 true 时仅保留"有效企业负责人"：存在未软删除、
-	// role=owner 且 status=active 的企业成员关系，且用户本身 status=active。
-	// 与 CountActiveOwners 的定义一致；非企业用户与非负责人均被排除。
+	// HideEnterpriseEmployees 为 true 时隐藏企业员工：企业用户中仅保留"有效企业负责人"
+	// （存在未软删除、role=owner 且 status=active 的企业成员关系，且用户本身 status=active，
+	// 与 CountActiveOwners 一致）；没有未软删除企业成员关系的非企业用户不受影响。
 	HideEnterpriseEmployees bool
 	Status                  string // User status filter
 	Role                    string // User role filter

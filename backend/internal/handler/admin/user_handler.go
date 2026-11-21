@@ -124,7 +124,7 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
 //   - api_key_group_id: filter by the exact group bound to the user's API keys
-//   - hide_enterprise_employees: when true, only list active enterprise owners
+//   - hide_enterprise_employees: when true, hide enterprise members except active owners; non-enterprise users stay listed
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
