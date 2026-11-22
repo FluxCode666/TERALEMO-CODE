@@ -1187,10 +1187,13 @@ const filters = reactive({
   apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
 })
 
-// 「隐藏企业员工」开关：默认关闭且不持久化，开启后隐藏企业员工（企业内仅保留有效负责人 owner），非企业用户照常展示
+// 「隐藏企业员工」开关：开启后隐藏企业员工（企业内仅保留有效负责人 owner），非企业用户照常展示。
+// 状态持久化在 FILTER_VALUES_KEY ('user-filter-values') 的 hideEnterpriseEmployees 字段，
+// 刷新/重新进入页面后由 loadSavedFilters 恢复，仅当存储值严格等于 true 时视为开启。
 const hideEnterpriseEmployees = ref(false)
 const setHideEnterpriseEmployees = (value: boolean) => {
   hideEnterpriseEmployees.value = value
+  saveFiltersToStorage()
   pagination.page = 1
   loadUsers()
 }
@@ -1242,6 +1245,8 @@ const loadSavedFilters = () => {
       if (parsed.status) filters.status = parsed.status
       if (parsed.group) filters.group = parsed.group
       if (typeof parsed.apiKeyGroup === 'number') filters.apiKeyGroup = parsed.apiKeyGroup
+      // 旧数据可能没有该字段或值非布尔 true，一律按关闭处理
+      if (parsed.hideEnterpriseEmployees === true) hideEnterpriseEmployees.value = true
       if (parsed.attributes) {
         Object.assign(activeAttributeFilters, parsed.attributes)
       }
@@ -1262,6 +1267,7 @@ const saveFiltersToStorage = () => {
       status: filters.status,
       group: filters.group,
       apiKeyGroup: filters.apiKeyGroup,
+      hideEnterpriseEmployees: hideEnterpriseEmployees.value === true,
       attributes: activeAttributeFilters
     }
     localStorage.setItem(FILTER_VALUES_KEY, JSON.stringify(values))
