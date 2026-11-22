@@ -84,6 +84,7 @@ func RegisterAdminRoutes(
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
+		registerAlertNotifyRoutes(admin, h)
 
 		// 数据管理
 		registerDataManagementRoutes(admin, h, stepUpAuth)
@@ -631,6 +632,16 @@ func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		promoCodes.DELETE("/:id", h.Admin.Promo.Delete)
 		promoCodes.GET("/:id/usages", h.Admin.Promo.GetUsages)
 	}
+}
+
+func registerAlertNotifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h.Admin.AlertNotify == nil {
+		return
+	}
+	channels := admin.Group("/alert-notify/channels")
+	channels.GET("", h.Admin.AlertNotify.GetChannels)
+	channels.PUT("", h.Admin.AlertNotify.PutChannels)
+	channels.POST("/test", h.Admin.AlertNotify.TestChannel)
 }
 
 func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

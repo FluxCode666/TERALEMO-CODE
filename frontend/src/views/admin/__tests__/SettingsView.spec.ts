@@ -2178,3 +2178,38 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(quotas["anthropic"]?.["daily"]).toBe(null);
   });
 });
+
+describe("admin SettingsView save button visibility per tab", () => {
+  function findSaveSettingsButton(wrapper: ReturnType<typeof mountView>) {
+    return wrapper
+      .findAll("button")
+      .find((node) => node.text().includes("admin.settings.saveSettings"));
+  }
+
+  // v-show 容器即保存按钮的父 div，切换时改写其内联 display
+  function saveContainerDisplay(wrapper: ReturnType<typeof mountView>): string {
+    const btn = findSaveSettingsButton(wrapper);
+    expect(btn).toBeDefined();
+    return (btn!.element.parentElement as HTMLElement).style.display;
+  }
+
+  it("hides the global save button on the notify tab and shows it again on the email tab", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    // 切到「通知设置」标签页
+    const notifyTabButton = wrapper
+      .findAll("button")
+      .find((node) => node.text().includes("admin.settings.tabs.notify"));
+    expect(notifyTabButton).toBeDefined();
+    await notifyTabButton?.trigger("click");
+    await flushPromises();
+
+    // 告警渠道卡片即时保存，大表单保存按钮应隐藏
+    expect(saveContainerDisplay(wrapper)).toBe("none");
+
+    // 切回「邮件设置」标签页，保存按钮恢复可见
+    await openEmailTab(wrapper);
+    expect(saveContainerDisplay(wrapper)).not.toBe("none");
+  });
+});

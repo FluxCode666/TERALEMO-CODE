@@ -596,9 +596,9 @@ describe('admin UsersView', () => {
     expect(listUsers.mock.lastCall?.[2].hide_enterprise_employees).toBe(true)
     expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('true')
 
-    // 开关不写入 localStorage，保证下次进入页面仍默认关闭
+    // 开关状态持久化到 user-filter-values，刷新/重新进入页面后恢复
     const savedFilters = JSON.parse(localStorage.getItem('user-filter-values') ?? '{}')
-    expect(savedFilters).not.toHaveProperty('hideEnterpriseEmployees')
+    expect(savedFilters.hideEnterpriseEmployees).toBe(true)
 
     // 关闭开关恢复完整列表请求
     await wrapper.get('[data-test="hide-enterprise-employees"]').trigger('click')
@@ -606,6 +606,27 @@ describe('admin UsersView', () => {
     expect(listUsers.mock.lastCall?.[0]).toBe(1)
     expect(listUsers.mock.lastCall?.[2].hide_enterprise_employees).toBeUndefined()
     expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('false')
+    expect(JSON.parse(localStorage.getItem('user-filter-values') ?? '{}').hideEnterpriseEmployees).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('restores a persisted hide-enterprise-employees state on first request', async () => {
+    localStorage.setItem('user-filter-values', JSON.stringify({ hideEnterpriseEmployees: true }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('true')
+    expect(listUsers.mock.calls[0][2].hide_enterprise_employees).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('treats legacy filter data without the flag as hide-enterprise-employees off', async () => {
+    localStorage.setItem('user-filter-values', JSON.stringify({ role: '' }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="hide-enterprise-employees"]').attributes('aria-checked')).toBe('false')
+    expect(listUsers.mock.calls[0][2].hide_enterprise_employees).toBeUndefined()
     wrapper.unmount()
   })
 })

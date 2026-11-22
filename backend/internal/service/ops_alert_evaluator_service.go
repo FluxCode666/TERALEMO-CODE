@@ -32,10 +32,11 @@ return 0
 `)
 
 type OpsAlertEvaluatorService struct {
-	opsService   *OpsService
-	opsRepo      OpsRepository
-	emailService *EmailService
-	proxyRepo    ProxyRepository
+	opsService    *OpsService
+	opsRepo       OpsRepository
+	emailService  *EmailService
+	proxyRepo     ProxyRepository
+	alertNotifier AlertNotifier
 
 	redisClient *redis.Client
 	cfg         *config.Config
@@ -60,6 +61,10 @@ type OpsAlertEvaluatorService struct {
 type opsAlertRuleState struct {
 	LastEvaluatedAt     time.Time
 	ConsecutiveBreaches int
+}
+
+func (s *OpsAlertEvaluatorService) SetAlertNotifier(notifier AlertNotifier) {
+	s.alertNotifier = notifier
 }
 
 func NewOpsAlertEvaluatorService(
@@ -292,6 +297,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 
 			eventsCreated++
 			if created != nil && created.ID > 0 {
+				s.dispatchOpsAlert(runtimeCfg, rule, created, OpsAlertStatusFiring, now, metricValue, scopePlatform, scopeGroupID)
 				if s.maybeSendAlertEmail(ctx, runtimeCfg, rule, created) {
 					emailsSent++
 				}
@@ -306,6 +312,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] resolve event failed (event=%d): %v", activeEvent.ID, err)
 			} else {
 				eventsResolved++
+				s.dispatchOpsAlert(runtimeCfg, rule, activeEvent, OpsAlertStatusResolved, resolvedAt, metricValue, scopePlatform, scopeGroupID)
 			}
 		}
 	}

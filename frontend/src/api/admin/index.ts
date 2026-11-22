@@ -23,6 +23,7 @@ import grokAPI from './grok'
 import cnProvidersAPI from './cnProviders'
 import userAttributesAPI from './userAttributes'
 import opsAPI from './ops'
+import alertNotifyAPI from './alertNotify'
 import errorPassthroughAPI from './errorPassthrough'
 import dataManagementAPI from './dataManagement'
 import apiKeysAPI from './apiKeys'
@@ -69,6 +70,7 @@ export const adminAPI = {
   cnProviders: cnProvidersAPI,
   userAttributes: userAttributesAPI,
   ops: opsAPI,
+  alertNotify: alertNotifyAPI,
   errorPassthrough: errorPassthroughAPI,
   dataManagement: dataManagementAPI,
   apiKeys: apiKeysAPI,
@@ -110,6 +112,7 @@ export {
   cnProvidersAPI,
   userAttributesAPI,
   opsAPI,
+  alertNotifyAPI,
   errorPassthroughAPI,
   dataManagementAPI,
   apiKeysAPI,

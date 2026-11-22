@@ -148,6 +148,8 @@ var auditActionOverrides = map[string]string{
 	"POST /api/v1/admin/prompt-audit/events/batch-delete":     "admin.prompt_audit.events.batch_delete",
 	"POST /api/v1/admin/prompt-audit/events/delete-preview":   "admin.prompt_audit.events.delete_preview",
 	"POST /api/v1/admin/prompt-audit/events/delete-by-filter": "admin.prompt_audit.events.filter_delete",
+	"PUT /api/v1/admin/alert-notify/channels":                 "admin.alert_notify.channels.update",
+	"POST /api/v1/admin/alert-notify/channels/test":           "admin.alert_notify.channels.test",
 }
 
 // auditBodyOmittedRoutes 请求体几乎整体由凭证构成的路由（如整块粘贴 auth JSON 的导入接口）。
@@ -163,6 +165,8 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 	"POST /api/v1/admin/prompt-audit/events/batch-delete":       {},
 	"POST /api/v1/admin/prompt-audit/events/delete-preview":     {},
 	"POST /api/v1/admin/prompt-audit/events/delete-by-filter":   {},
+	"PUT /api/v1/admin/alert-notify/channels":                   {},
+	"POST /api/v1/admin/alert-notify/channels/test":             {},
 	// 创作页：正文是提示词、表单参数与 multipart 图片，键级脱敏无法覆盖。
 	"POST /api/v1/user/creation/estimate": {},
 	"POST /api/v1/user/creation/uploads":  {},
