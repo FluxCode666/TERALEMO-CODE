@@ -597,8 +597,10 @@ func ProvideOpsAlertEvaluatorService(
 	redisClient *redis.Client,
 	cfg *config.Config,
 	proxyRepo ProxyRepository,
+	alertNotify *AlertNotifyService,
 ) *OpsAlertEvaluatorService {
 	svc := NewOpsAlertEvaluatorService(opsService, opsRepo, emailService, redisClient, cfg, proxyRepo)
+	svc.SetAlertNotifier(alertNotify)
 	svc.Start()
 	return svc
 }
@@ -1057,6 +1059,7 @@ var ProviderSet = wire.NewSet(
 	ProvidePaymentService,
 	ProvidePaymentOrderExpiryService,
 	ProvideBalanceNotifyService,
+	ProvideAlertNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
 	NewChannelMonitorQuotaFetcher,
@@ -1080,10 +1083,17 @@ func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRep
 }
 
 // ProvideBalanceNotifyService creates BalanceNotifyService
-func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService, enterpriseRepo EnterpriseRepository, memberRepo EnterpriseMemberRepository) *BalanceNotifyService {
+func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService, enterpriseRepo EnterpriseRepository, memberRepo EnterpriseMemberRepository, alertNotify *AlertNotifyService) *BalanceNotifyService {
 	svc := NewBalanceNotifyService(emailService, settingRepo, accountRepo)
 	svc.SetNotificationEmailService(notificationEmailService)
+	svc.SetAlertNotifier(alertNotify)
 	svc.ConfigureEnterpriseBillingNotifications(enterpriseRepo, memberRepo)
+	return svc
+}
+
+func ProvideAlertNotifyService(settingRepo SettingRepository, encryptor SecretEncryptor, timingWheel *TimingWheelService) *AlertNotifyService {
+	svc := NewAlertNotifyService(settingRepo, encryptor, nil)
+	svc.refreshChannelsAndSchedule(timingWheel)
 	return svc
 }
 

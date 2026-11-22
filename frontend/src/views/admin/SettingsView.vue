@@ -8478,6 +8478,11 @@
           />
         </div>
 
+        <!-- Tab: Notifications -->
+        <div v-show="activeTab === 'notify'" class="space-y-6">
+          <AlertNotifyChannelsCard />
+        </div>
+
         <div v-show="activeTab === 'email'" class="space-y-6">
           <!-- Email disabled hint - show when email_verify_enabled is off -->
           <div v-if="!form.email_verify_enabled" class="card">
@@ -8928,7 +8933,7 @@
         </div>
 
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <div v-show="activeTab !== 'backup' && activeTab !== 'notify'" class="flex justify-end">
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -9002,6 +9007,7 @@
 
 <script setup lang="ts">
 import ModelAllowlistPanel from "@/components/admin/ModelAllowlistPanel.vue";
+import AlertNotifyChannelsCard from "@/components/admin/AlertNotifyChannelsCard.vue";
 import ForceTotpPanel from "@/components/admin/ForceTotpPanel.vue";
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { listPlatformIds } from "@/constants/platformCatalog";
@@ -9127,6 +9133,7 @@ type SettingsTab =
   | "users"
   | "gateway"
   | "payment"
+  | "notify"
   | "email"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
@@ -9138,6 +9145,7 @@ const settingsTabs = [
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
+  { key: "notify" as SettingsTab, icon: "bell" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];

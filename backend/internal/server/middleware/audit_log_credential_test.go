@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,60 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAlertNotifyAdminRoutesAuditWithoutCredentials(t *testing.T) {
+	repo := &auditCaptureRepository{}
+	auditService := service.NewAuditLogService(repo, nil)
+	auditService.Start()
+	t.Cleanup(auditService.Stop)
+	router := gin.New()
+	router.Use(func(ctx *gin.Context) {
+		ctx.Set(string(ContextKeyUser), AuthSubject{UserID: 77})
+		ctx.Set(string(ContextKeyUserRole), service.RoleAdmin)
+		ctx.Next()
+	})
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+	scenarios := []struct {
+		method, path, action, body string
+		status                     int
+	}{
+		{http.MethodPut, "/api/v1/admin/alert-notify/channels", "admin.alert_notify.channels.update", `{"channels":[{"url":"https://example.com/bot-private-path","secret":"fixture-signing-key"}]}`, http.StatusOK},
+		{http.MethodPost, "/api/v1/admin/alert-notify/channels/test", "admin.alert_notify.channels.test", `{"url":"https://example.com/test-private-path","secret":"fixture-signing-key"}`, http.StatusBadRequest},
+	}
+	for _, scenario := range scenarios {
+		router.Handle(scenario.method, scenario.path, func(ctx *gin.Context) {
+			body, err := io.ReadAll(ctx.Request.Body)
+			require.NoError(t, err)
+			require.Equal(t, scenario.body, string(body))
+			ctx.Status(scenario.status)
+		})
+		request := httptest.NewRequest(scenario.method, scenario.path, strings.NewReader(scenario.body))
+		request.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, request)
+		require.Equal(t, scenario.status, recorder.Code)
+	}
+	auditService.Stop()
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	require.Len(t, repo.logs, len(scenarios))
+	byPath := make(map[string]*service.AuditLog, len(repo.logs))
+	for _, entry := range repo.logs {
+		byPath[entry.Path] = entry
+	}
+	for _, scenario := range scenarios {
+		entry := byPath[scenario.path]
+		require.NotNil(t, entry)
+		require.Equal(t, scenario.action, entry.Action)
+		require.Equal(t, scenario.method, entry.Method)
+		require.Equal(t, scenario.status, entry.StatusCode)
+		require.NotNil(t, entry.ActorUserID)
+		require.EqualValues(t, 77, *entry.ActorUserID)
+		require.Equal(t, service.RoleAdmin, entry.ActorRole)
+		require.Equal(t, "<credential-bearing body omitted>", entry.RequestBody)
+	}
+}
 
 func TestAuditJWTRequestMasksAdditionalAPIKeyWithSharedHint(t *testing.T) {
 	for _, credential := range []string{"4b9e6a1f80c2d573", "sk-0123456789abcdef", "tenant_" + strings.Repeat("a", 32), "sk-" + strings.Repeat("b", 64), ""} {

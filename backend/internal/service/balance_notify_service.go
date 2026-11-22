@@ -38,12 +38,18 @@ type AccountQuotaReader interface {
 	GetByID(ctx context.Context, id int64) (*Account, error)
 }
 
+type quotaAlertNotifier interface {
+	AlertNotifier
+	HasEnabledChannel(event string) bool
+}
+
 // BalanceNotifyService handles balance and quota threshold notifications.
 type BalanceNotifyService struct {
 	emailService             *EmailService
 	settingRepo              SettingRepository
 	accountRepo              AccountQuotaReader
 	notificationEmailService *NotificationEmailService
+	alertNotifier            quotaAlertNotifier
 	enterpriseRepo           enterpriseBalanceNotifyReader
 	enterpriseMemberRepo     enterpriseOwnerNotifyReader
 	enterpriseEmailSender    enterpriseBalanceEmailSender
@@ -60,6 +66,10 @@ func NewBalanceNotifyService(emailService *EmailService, settingRepo SettingRepo
 
 func (s *BalanceNotifyService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+func (s *BalanceNotifyService) SetAlertNotifier(notifier quotaAlertNotifier) {
+	s.alertNotifier = notifier
 }
 
 // resolveBalanceThreshold returns the effective balance threshold.
@@ -185,18 +195,21 @@ func buildQuotaDimsFromState(account *Account, state *AccountQuotaState) []quota
 // When quotaState is non-nil (from DB transaction RETURNING), it is used directly for threshold
 // checking, avoiding a separate DB read. Otherwise it falls back to fetching fresh account data.
 func (s *BalanceNotifyService) CheckAccountQuotaAfterIncrement(ctx context.Context, account *Account, cost float64, quotaState *AccountQuotaState) {
-	if account == nil || s.emailService == nil || s.settingRepo == nil || cost <= 0 {
+	if s == nil || account == nil || cost <= 0 {
 		return
 	}
-	if !s.isAccountQuotaNotifyEnabled(ctx) {
+	notifyChannel := s.alertNotifier != nil && s.alertNotifier.HasEnabledChannel(AlertNotifyEventQuota)
+	var adminEmails []string
+	if s.emailService != nil && s.settingRepo != nil && s.isAccountQuotaNotifyEnabled(ctx) {
+		adminEmails = s.getAccountQuotaNotifyEmails(ctx)
+	}
+	if len(adminEmails) == 0 && !notifyChannel {
 		return
 	}
-	adminEmails := s.getAccountQuotaNotifyEmails(ctx)
-	if len(adminEmails) == 0 {
-		return
+	siteName := ""
+	if len(adminEmails) > 0 {
+		siteName = s.getSiteName(ctx)
 	}
-
-	siteName := s.getSiteName(ctx)
 	var dims []quotaDim
 	if quotaState != nil {
 		dims = buildQuotaDimsFromState(account, quotaState)
@@ -208,7 +221,16 @@ func (s *BalanceNotifyService) CheckAccountQuotaAfterIncrement(ctx context.Conte
 		dims = buildQuotaDims(freshAccount)
 		account = freshAccount // use fresh data for alert metadata
 	}
-	s.checkQuotaDimCrossings(account, dims, cost, adminEmails, siteName)
+	if notifyChannel {
+		for _, dim := range dims {
+			if dim.crossedThreshold(cost) {
+				s.alertNotifier.Dispatch(buildQuotaAlertNotification(account, dim, siteName, time.Now()))
+			}
+		}
+	}
+	if len(adminEmails) > 0 {
+		s.checkQuotaDimCrossings(account, dims, cost, adminEmails, siteName)
+	}
 }
 
 // fetchFreshAccount loads the latest account from DB. Missing accounts are skipped;
@@ -233,23 +255,22 @@ func (s *BalanceNotifyService) fetchFreshAccount(ctx context.Context, snapshot *
 // Pre-increment value is reconstructed as currentUsed - cost to detect the crossing moment.
 func (s *BalanceNotifyService) checkQuotaDimCrossings(account *Account, dims []quotaDim, cost float64, adminEmails []string, siteName string) {
 	for _, dim := range dims {
-		if !dim.enabled || dim.threshold <= 0 {
-			continue
-		}
-		effectiveThreshold := dim.resolvedThreshold()
-		if effectiveThreshold <= 0 {
-			continue
-		}
-		newUsed := dim.currentUsed
-		oldUsed := dim.currentUsed - cost
-		if oldUsed < effectiveThreshold && newUsed >= effectiveThreshold {
-			s.asyncSendQuotaAlert(adminEmails, account.ID, account.Name, account.Platform, dim, newUsed, effectiveThreshold, siteName)
+		if dim.crossedThreshold(cost) {
+			s.asyncSendQuotaAlert(adminEmails, account.ID, account.Name, account.Platform, dim, dim.currentUsed, siteName)
 		}
 	}
 }
 
+func (dim quotaDim) crossedThreshold(cost float64) bool {
+	if !dim.enabled || dim.threshold <= 0 {
+		return false
+	}
+	threshold := dim.resolvedThreshold()
+	return threshold > 0 && dim.currentUsed-cost < threshold && dim.currentUsed >= threshold
+}
+
 // asyncSendQuotaAlert sends quota alert email in a goroutine with panic recovery.
-func (s *BalanceNotifyService) asyncSendQuotaAlert(adminEmails []string, accountID int64, accountName, platform string, dim quotaDim, newUsed, effectiveThreshold float64, siteName string) {
+func (s *BalanceNotifyService) asyncSendQuotaAlert(adminEmails []string, accountID int64, accountName, platform string, dim quotaDim, newUsed float64, siteName string) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
